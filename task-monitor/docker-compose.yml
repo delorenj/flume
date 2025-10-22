@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # RabbitMQ message broker
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: task-monitor-rabbitmq
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - task-monitor-net
+
+  # Task monitor service
+  task-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-monitor-service
+    ports:
+      - "8000:8000"  # API port
+    environment:
+      # RabbitMQ settings
+      TASK_MONITOR_RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      TASK_MONITOR_RABBITMQ_EXCHANGE: "task_events"
+      TASK_MONITOR_RABBITMQ_QUEUE: "task_monitor_queue"
+      TASK_MONITOR_RABBITMQ_ROUTING_KEY: "task.lifecycle.*"
+
+      # State management
+      TASK_MONITOR_PERSISTENCE_ENABLED: "true"
+      TASK_MONITOR_PERSISTENCE_PATH: "/data/task_state.json"
+      TASK_MONITOR_PERSISTENCE_INTERVAL: "60"
+      TASK_MONITOR_STALE_THRESHOLD: "300"
+      TASK_MONITOR_RETENTION_HOURS: "24"
+
+      # API settings
+      TASK_MONITOR_API_HOST: "0.0.0.0"
+      TASK_MONITOR_API_PORT: "8000"
+
+      # Monitoring
+      TASK_MONITOR_STALE_CHECK_INTERVAL: "60"
+      TASK_MONITOR_METRICS_ENABLED: "true"
+
+      # Logging
+      TASK_MONITOR_LOG_LEVEL: "INFO"
+    volumes:
+      - task_data:/data
+      - ./logs:/app/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - task-monitor-net
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: task-monitor-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - task-monitor-net
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: task-monitor-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - task-monitor-net
+    profiles:
+      - monitoring
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  task_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  task-monitor-net:
+    driver: bridge
