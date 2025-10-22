@@ -23,7 +23,7 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   goimports:
-    local-prefixes: github.com/33GOD/cortex
+    local-prefixes: github.com/33GOD/flume
   golint:
     min-confidence: 0
   gomnd:

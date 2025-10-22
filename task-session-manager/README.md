@@ -53,8 +53,8 @@ A production-ready Go service that manages terminal sessions for task lifecycle 
 
 ```bash
 # Clone the repository
-git clone https://github.com/33GOD/cortex.git
-cd cortex/task-session-manager
+git clone https://github.com/33GOD/flume.git
+cd flume/task-session-manager
 
 # Download dependencies
 make deps
@@ -112,15 +112,15 @@ Configuration is done via environment variables. See `.env.example` for all avai
 
 ### Key Configuration Options
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RABBITMQ_URL` | `amqp://guest:guest@localhost:5672/` | RabbitMQ connection URL |
-| `RABBITMQ_EXCHANGE` | `task.lifecycle` | Exchange name |
-| `RABBITMQ_QUEUE` | `task.session.assigned` | Queue name |
-| `RABBITMQ_ROUTING_KEY` | `task.lifecycle.assigned` | Routing key for subscriptions |
-| `SESSION_MANAGER` | `zellij` | Preferred session manager (zellij or tmux) |
-| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-| `HEALTH_CHECK_PORT` | `8080` | Port for health check endpoints |
+| Variable               | Default                              | Description                                |
+| ---------------------- | ------------------------------------ | ------------------------------------------ |
+| `RABBITMQ_URL`         | `amqp://guest:guest@localhost:5672/` | RabbitMQ connection URL                    |
+| `RABBITMQ_EXCHANGE`    | `task.lifecycle`                     | Exchange name                              |
+| `RABBITMQ_QUEUE`       | `task.session.assigned`              | Queue name                                 |
+| `RABBITMQ_ROUTING_KEY` | `task.lifecycle.assigned`            | Routing key for subscriptions              |
+| `SESSION_MANAGER`      | `zellij`                             | Preferred session manager (zellij or tmux) |
+| `LOG_LEVEL`            | `info`                               | Log level (debug, info, warn, error)       |
+| `HEALTH_CHECK_PORT`    | `8080`                               | Port for health check endpoints            |
 
 ### Agent Command Mappings
 
@@ -304,6 +304,7 @@ make check
 ### Adding New Agent Types
 
 1. Add environment variable mapping:
+
    ```bash
    AGENT_CMD_NEWAGENT=newagent-cli
    ```
@@ -317,6 +318,7 @@ make check
 **Error**: `no session manager (tmux or zellij) available on system`
 
 **Solution**: Install tmux or zellij:
+
 ```bash
 # Ubuntu/Debian
 sudo apt-get install tmux
@@ -330,6 +332,7 @@ brew install zellij tmux
 **Error**: `failed to connect to RabbitMQ`
 
 **Solution**: Check RabbitMQ is running and URL is correct:
+
 ```bash
 # Check RabbitMQ status
 sudo systemctl status rabbitmq-server
@@ -343,6 +346,7 @@ telnet localhost 5672
 **Error**: `working directory does not exist`
 
 **Solution**: Ensure the working directory specified in the event exists:
+
 ```bash
 mkdir -p /path/to/work
 ```
@@ -352,6 +356,7 @@ mkdir -p /path/to/work
 **Error**: `exec: "claude": executable file not found in $PATH`
 
 **Solution**: Install the agent CLI or update the command mapping:
+
 ```bash
 export AGENT_CMD_CLAUDE=/full/path/to/claude
 ```
@@ -381,32 +386,3 @@ RABBITMQ_RECONNECT_DELAY=10s
 # Give up after 10 minutes
 RABBITMQ_MAX_RECONNECT_TIME=10m
 ```
-
-## Security Considerations
-
-- **Credential Management**: Use secure credential storage (e.g., Vault, AWS Secrets Manager)
-- **Network Security**: Use TLS for RabbitMQ connections in production
-- **Process Isolation**: Run service as non-root user with limited permissions
-- **Resource Limits**: Configure cgroups/resource limits to prevent runaway processes
-- **Input Validation**: Service validates all event inputs before processing
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Run `make check`
-6. Submit a pull request
-
-## License
-
-Copyright © 2025 33GOD. All rights reserved.
-
-## Support
-
-For issues, questions, or contributions:
-
-- **Issues**: https://github.com/33GOD/cortex/issues
-- **Documentation**: https://docs.33god.dev
-- **Email**: support@33god.dev

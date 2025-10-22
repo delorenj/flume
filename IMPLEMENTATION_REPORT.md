@@ -1,6 +1,6 @@
 # Task Lifecycle System - Final Implementation Report
 
-**Project:** 33GOD Cortex - Task Lifecycle Management System
+**Project:** 33GOD flume - Task Lifecycle Management System
 **Date:** October 22, 2025
 **Status:** Implementation Complete - QA Review Required
 **Swarm Configuration:** Hierarchical topology, 7 specialized agents
@@ -55,7 +55,7 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 
 ### 1. Event Schema System (Python/Pydantic)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/event_producers/events.py`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/event_producers/events.py`
 
 **Deliverables:**
 - 7 task lifecycle event payload models
@@ -82,7 +82,7 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 
 ### 2. Bloodbank CLI Enhancement (Python/Typer)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/event_producers/cli.py`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/event_producers/cli.py`
 
 **New Command:** `bb task-assign`
 
@@ -114,7 +114,7 @@ EVENT_ID=$(bb task-assign TASK-003 "Quick fix" claude-code --format event_id)
 
 ### 3. Obsidian QuickAdd Integration (JavaScript)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/obsidian-quickadd-*.js`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/obsidian-quickadd-*.js`
 
 **Scripts Delivered:**
 1. **Assign Task to Agent** - Full-featured task assignment
@@ -139,7 +139,7 @@ Note updated with event_id and timestamp
 
 ### 4. Task Session Manager (Go Service)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/task-session-manager/`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/task-session-manager/`
 
 **Architecture:**
 - **Size:** 1,549 lines of Go code
@@ -175,7 +175,7 @@ Note updated with event_id and timestamp
 
 ### 5. Task Monitor Service (Python/FastAPI)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/task-monitor/`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/task-monitor/`
 
 **Architecture:**
 - **Size:** ~4,300 lines (code + docs)
@@ -216,7 +216,7 @@ Note updated with event_id and timestamp
 
 ### 6. Task Dashboard (React/Next.js)
 
-**Location:** `/home/delorenj/code/projects/33GOD/cortex/task-dashboard/`
+**Location:** `/home/delorenj/code/projects/33GOD/flume/task-dashboard/`
 
 **Architecture:**
 - **Framework:** Next.js 16 with App Router
@@ -653,13 +653,13 @@ Successfully delivered a **comprehensive, event-driven task lifecycle management
 
 All components are located under:
 ```
-/home/delorenj/code/projects/33GOD/cortex/
+/home/delorenj/code/projects/33GOD/flume/
 ```
 
 ### Directory Structure
 
 ```
-cortex/
+flume/
 ├── event_producers/          # Existing RabbitMQ infrastructure
 │   ├── events.py            # UPDATED: Added task lifecycle events
 │   ├── cli.py               # UPDATED: Added task-assign command

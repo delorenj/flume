@@ -1,6 +1,6 @@
 [Unit]
 Description=Task Session Manager Service
-Documentation=https://github.com/33GOD/cortex
+Documentation=https://github.com/flume
 After=network.target rabbitmq-server.service
 Wants=rabbitmq-server.service
 

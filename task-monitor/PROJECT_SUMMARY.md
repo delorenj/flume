@@ -229,7 +229,7 @@ A **production-ready task monitoring service** built with Python 3.12+, FastAPI,
 ### Quick Start (5 minutes)
 
 ```bash
-cd /home/delorenj/code/projects/33GOD/cortex/task-monitor
+cd /home/delorenj/code/projects/33GOD/flume/task-monitor
 
 # Start services
 docker-compose up -d

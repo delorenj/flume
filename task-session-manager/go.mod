@@ -1,4 +1,4 @@
-module github.com/33GOD/cortex/task-session-manager
+module github.com/33GOD/flume/task-session-manager
 
 go 1.21
 

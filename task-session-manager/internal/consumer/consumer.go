@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/33GOD/cortex/task-session-manager/internal/config"
-	"github.com/33GOD/cortex/task-session-manager/internal/publisher"
-	"github.com/33GOD/cortex/task-session-manager/internal/session"
-	"github.com/33GOD/cortex/task-session-manager/pkg/events"
+	"github.com/33GOD/flume/task-session-manager/internal/config"
+	"github.com/33GOD/flume/task-session-manager/internal/publisher"
+	"github.com/33GOD/flume/task-session-manager/internal/session"
+	"github.com/33GOD/flume/task-session-manager/pkg/events"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
 )

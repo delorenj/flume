@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/33GOD/cortex/task-session-manager/internal/config"
-	"github.com/33GOD/cortex/task-session-manager/pkg/events"
+	"github.com/33GOD/flume/task-session-manager/internal/config"
+	"github.com/33GOD/flume/task-session-manager/pkg/events"
 	"github.com/rs/zerolog"
 )
 

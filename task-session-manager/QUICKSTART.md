@@ -34,7 +34,7 @@ sleep 10
 
 ```bash
 # Clone and enter directory
-cd /home/delorenj/code/projects/33GOD/cortex/task-session-manager
+cd /home/delorenj/code/projects/33GOD/flume/task-session-manager
 
 # Build
 make build
@@ -146,6 +146,7 @@ curl http://localhost:8080/ready
 **Problem**: Neither tmux nor zellij is installed
 
 **Solution**:
+
 ```bash
 # Ubuntu/Debian
 sudo apt-get install tmux
@@ -159,6 +160,7 @@ brew install tmux zellij
 **Problem**: RabbitMQ is not running or wrong URL
 
 **Solution**:
+
 ```bash
 # Check if RabbitMQ is running
 docker ps | grep rabbitmq
@@ -174,6 +176,7 @@ export RABBITMQ_URL="amqp://guest:guest@localhost:5672/"
 **Problem**: The working_dir in the event doesn't exist
 
 **Solution**:
+
 ```bash
 # Create the directory
 mkdir -p /tmp/work
@@ -185,12 +188,14 @@ mkdir -p /tmp/work
 ## Next Steps
 
 1. **Configure Agent Commands**: Edit environment variables to map agent types to CLI commands
+
    ```bash
    export AGENT_CMD_CLAUDE=/path/to/claude
    export AGENT_CMD_GEMINI=/path/to/gemini
    ```
 
 2. **Set Up Monitoring**: Use the health endpoints with your monitoring system
+
    ```bash
    # Prometheus, Datadog, etc.
    curl http://localhost:8080/health
@@ -278,11 +283,13 @@ rabbitmqadmin list connections
 ## Performance Tips
 
 1. **Prefetch Count**: Increase for higher throughput
+
    ```bash
    export RABBITMQ_PREFETCH_COUNT=5
    ```
 
 2. **Parallel Processing**: Run multiple service instances
+
    ```bash
    # Instance 1
    RABBITMQ_QUEUE=session.1 ./bin/task-session-manager &
@@ -297,26 +304,20 @@ rabbitmqadmin list connections
    LimitNPROC=4096
    ```
 
-## Getting Help
-
-- **Documentation**: See [README.md](README.md) for comprehensive docs
-- **Issues**: https://github.com/33GOD/cortex/issues
-- **Logs**: Always check logs first for error messages
-
 ## Quick Reference
 
-| Command | Purpose |
-|---------|---------|
-| `make build` | Build the binary |
-| `make run` | Build and run locally |
-| `make test` | Run tests |
-| `make docker-run` | Start with Docker |
-| `make docker-logs` | View Docker logs |
-| `sudo systemctl start task-session-manager` | Start service |
-| `sudo journalctl -u task-session-manager -f` | View service logs |
-| `./scripts/test-event.sh` | Publish test event |
-| `tmux list-sessions` | List sessions |
-| `curl localhost:8080/health` | Health check |
+| Command                                      | Purpose               |
+| -------------------------------------------- | --------------------- |
+| `make build`                                 | Build the binary      |
+| `make run`                                   | Build and run locally |
+| `make test`                                  | Run tests             |
+| `make docker-run`                            | Start with Docker     |
+| `make docker-logs`                           | View Docker logs      |
+| `sudo systemctl start task-session-manager`  | Start service         |
+| `sudo journalctl -u task-session-manager -f` | View service logs     |
+| `./scripts/test-event.sh`                    | Publish test event    |
+| `tmux list-sessions`                         | List sessions         |
+| `curl localhost:8080/health`                 | Health check          |
 
 ---
 

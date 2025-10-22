@@ -196,7 +196,7 @@ Here’s how your **vision can wrap perfectly around Obsidian and Git**:
 
 ### 🧭 Obsidian as the Cognitive Frontend
 
-Think of your vault as the **mental model and task conductor**. It's where you think, plan, structure. The eventing system becomes a kind of **exocortex stream**, capturing cognition as events and allowing for action via agents.
+Think of your vault as the **mental model and task conductor**. It's where you think, plan, structure. The eventing system becomes a kind of **exoflume stream**, capturing cognition as events and allowing for action via agents.
 
 Your imagined QuickAdd menu? That’s _pure gold._ Here's how you can chunk it out:
 
