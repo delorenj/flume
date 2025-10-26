@@ -51,7 +51,7 @@ The Task Monitor Service is a real-time task monitoring system built with modern
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────┐          │
-│  │          Topic Exchange (task_events)                 │          │
+│  │          Topic Exchange (amq.topic)                 │          │
 │  │                                                        │          │
 │  │  Routing Keys:                                         │          │
 │  │  - task.lifecycle.assigned                            │          │
@@ -257,7 +257,7 @@ Task Publisher
      │
      │ 1. Publish event
      ▼
-RabbitMQ Exchange (task_events)
+RabbitMQ Exchange (amq.topic)
      │
      │ 2. Route by key
      ▼
@@ -392,7 +392,7 @@ Full async implementation for I/O-bound operations.
 ## Monitoring & Observability
 
 ### Metrics (Prometheus)
-- `task_events_total` - Event counter by type
+- `amq.topic_total` - Event counter by type
 - `task_state_transitions_total` - Transition counter
 - `task_duration_seconds` - Duration histogram
 - `tasks_by_status` - Current count gauge

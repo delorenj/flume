@@ -553,7 +553,7 @@ Password: guest
 ```
 
 **Point Out:**
-- **Exchange**: `task_events` (topic exchange)
+- **Exchange**: `amq.topic` (topic exchange)
 - **Queues**:
   - `task_monitor_queue` (binds to `task.lifecycle.*`)
   - `task_session_queue` (binds to `task.lifecycle.assigned`)

@@ -1,6 +1,6 @@
 [Unit]
-Description=Task Session Manager Service
-Documentation=https://github.com/flume
+Description=33GOD Session Manager Service
+Documentation=https://github.com/delorenj/flume
 After=network.target rabbitmq-server.service
 Wants=rabbitmq-server.service
 
@@ -12,13 +12,13 @@ WorkingDirectory=/opt/task-session-manager
 
 # Environment variables
 Environment="RABBITMQ_URL=amqp://guest:guest@localhost:5672/"
-Environment="RABBITMQ_EXCHANGE=task.lifecycle"
-Environment="RABBITMQ_QUEUE=task.session.assigned"
-Environment="RABBITMQ_ROUTING_KEY=task.lifecycle.assigned"
+Environment="RABBITMQ_EXCHANGE=amq.topic"
+Environment="RABBITMQ_QUEUE=task.lifecycle"
+Environment="RABBITMQ_ROUTING_KEY=task.lifecycle.*"
 Environment="FLUME_SESSION_MANAGER=zellij"
 Environment="LOG_LEVEL=info"
 Environment="ENVIRONMENT=production"
-Environment="HEALTH_CHECK_PORT=8080"
+Environment="HEALTH_CHECK_PORT=9344"
 
 # Additional environment from file (optional)
 EnvironmentFile=-/etc/task-session-manager/env
@@ -27,7 +27,7 @@ EnvironmentFile=-/etc/task-session-manager/env
 ExecStart=/usr/local/bin/task-session-manager
 
 # Restart policy
-Restart=always
+Restart=unless-stopped
 RestartSec=5s
 
 # Resource limits

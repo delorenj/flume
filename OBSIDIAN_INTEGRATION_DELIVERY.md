@@ -329,7 +329,7 @@ All events conform to existing schema in `task-monitor/models.py`:
    - Real-time updates work as expected
 
 5. **RabbitMQ Bloodbank**
-   - Uses existing exchange: `task_events`
+   - Uses existing exchange: `amq.topic`
    - Publishes to routing key: `task.lifecycle.assigned`
    - Compatible with current topology
 

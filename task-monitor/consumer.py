@@ -20,7 +20,7 @@ class TaskEventConsumer:
     def __init__(
         self,
         rabbitmq_url: str,
-        exchange_name: str = "task_events",
+        exchange_name: str = "amq.topic",
         queue_name: str = "task_monitor_queue",
         routing_key_pattern: str = "task.lifecycle.*",
     ) -> None:
@@ -271,7 +271,7 @@ class TaskEventPublisher:
     def __init__(
         self,
         rabbitmq_url: str,
-        exchange_name: str = "task_events",
+        exchange_name: str = "amq.topic",
     ) -> None:
         """Initialize publisher.
 

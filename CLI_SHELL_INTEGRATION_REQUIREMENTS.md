@@ -341,7 +341,7 @@ wsl.exe -e zellij attach task-001
 
 rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
-  exchange: "task_events"
+  exchange: "amq.topic"
 
 agents:
   claude-code:
@@ -634,7 +634,7 @@ agents:
 # ~/.config/flume/config.yaml
 rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
-  exchange: "task_events"
+  exchange: "amq.topic"
   vhost: "/"
   heartbeat: 60
   connection_timeout: 30

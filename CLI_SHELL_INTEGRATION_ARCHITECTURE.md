@@ -244,7 +244,7 @@ class EventPublisher:
             'FLUME_RABBITMQ_URL',
             'amqp://guest:guest@localhost:5672/'
         )
-        self.exchange = os.getenv('FLUME_EXCHANGE', 'task_events')
+        self.exchange = os.getenv('FLUME_EXCHANGE', 'amq.topic')
 
     def publish(
         self,
@@ -748,7 +748,7 @@ version: "1.0.0"
 # RabbitMQ connection
 rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
-  exchange: "task_events"
+  exchange: "amq.topic"
   vhost: "/"
   heartbeat: 60
   connection_timeout: 30
@@ -840,7 +840,7 @@ class Config:
                     "FLUME_RABBITMQ_URL",
                     "amqp://guest:guest@localhost:5672/"
                 ),
-                "exchange": "task_events"
+                "exchange": "amq.topic"
             },
             "agents": {
                 "claude-code": {

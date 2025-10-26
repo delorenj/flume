@@ -210,7 +210,7 @@ async def publish_event():
     channel = await connection.channel()
 
     exchange = await channel.declare_exchange(
-        "task_events",
+        "amq.topic",
         aio_pika.ExchangeType.TOPIC,
         durable=True,
     )
@@ -242,7 +242,7 @@ asyncio.run(publish_event())
 ```bash
 # Note: This requires rabbitmq-management plugin and uses HTTP API
 curl -u guest:guest -H "content-type:application/json" \
-  -X POST http://localhost:15672/api/exchanges/%2F/task_events/publish \
+  -X POST http://localhost:15672/api/exchanges/%2F/amq.topic/publish \
   -d '{
     "properties": {},
     "routing_key": "task.lifecycle.started",
@@ -298,7 +298,7 @@ docker-compose logs rabbitmq
 ```bash
 # Verify queue is created and bound
 # Go to: http://localhost:15672/#/queues
-# Check: task_monitor_queue exists and is bound to task_events exchange
+# Check: task_monitor_queue exists and is bound to amq.topic exchange
 
 # Test publishing manually
 python example_publisher.py

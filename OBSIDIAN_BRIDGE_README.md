@@ -473,7 +473,7 @@ Create `~/.config/flume/config.yaml`:
 ```yaml
 rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
-  exchange: "task_events"
+  exchange: "amq.topic"
 
 monitor:
   api_url: "http://localhost:8001"

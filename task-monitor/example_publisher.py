@@ -22,7 +22,7 @@ class TaskEventPublisher:
         self.rabbitmq_url = rabbitmq_url
         self.connection: Optional[aio_pika.Connection] = None
         self.channel: Optional[aio_pika.Channel] = None
-        self.exchange_name = "task_events"
+        self.exchange_name = "amq.topic"
 
     async def connect(self) -> None:
         """Connect to RabbitMQ."""

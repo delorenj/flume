@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # RabbitMQ settings
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
-    rabbitmq_exchange: str = "task_events"
+    rabbitmq_exchange: str = "amq.topic"
     rabbitmq_queue: str = "task_monitor_queue"
     rabbitmq_routing_key: str = "task.lifecycle.*"
 

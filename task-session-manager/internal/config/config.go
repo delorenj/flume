@@ -62,7 +62,7 @@ func Load() (*Config, error) {
 		Service: ServiceConfig{
 			LogLevel:        getEnv("LOG_LEVEL", "info"),
 			ShutdownTimeout: getEnvDuration("SHUTDOWN_TIMEOUT", 30*time.Second),
-			HealthCheckPort: getEnvInt("HEALTH_CHECK_PORT", 8080),
+			HealthCheckPort: getEnvInt("HEALTH_CHECK_PORT", 9344),
 		},
 		AgentCommands: make(map[string]string),
 	}

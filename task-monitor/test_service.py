@@ -250,7 +250,7 @@ class TestAPI:
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_task_events(
+    async def test_get_amq.topic(
         self,
         client: AsyncClient,
         state_manager: TaskStateManager,

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Prometheus metrics
 TASK_EVENTS_TOTAL = Counter(
-    "task_events_total",
+    "amq.topic_total",
     "Total number of task events processed",
     ["event_type"],
 )

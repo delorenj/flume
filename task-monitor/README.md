@@ -42,7 +42,7 @@ A production-ready, real-time task monitoring service built with Python 3.12+, F
 ┌─────────────────┐
 │   RabbitMQ      │
 │  Topic Exchange │
-│ (task_events)   │
+│ (amq.topic)   │
 └────────┬────────┘
          │ task.lifecycle.*
          ▼
@@ -145,7 +145,7 @@ All configuration is done via environment variables (prefix: `TASK_MONITOR_`).
 ### RabbitMQ Settings
 ```bash
 TASK_MONITOR_RABBITMQ_URL=amqp://guest:guest@localhost:5672/
-TASK_MONITOR_RABBITMQ_EXCHANGE=task_events
+TASK_MONITOR_RABBITMQ_EXCHANGE=amq.topic
 TASK_MONITOR_RABBITMQ_QUEUE=task_monitor_queue
 TASK_MONITOR_RABBITMQ_ROUTING_KEY=task.lifecycle.*
 ```
@@ -203,7 +203,7 @@ event = {
 }
 
 channel.basic_publish(
-    exchange='task_events',
+    exchange='amq.topic',
     routing_key='task.lifecycle.started',
     body=json.dumps(event)
 )
@@ -360,7 +360,7 @@ task-monitor/
 
 Available at `/metrics/prometheus`:
 
-- `task_events_total` - Counter of processed events (by event_type)
+- `amq.topic_total` - Counter of processed events (by event_type)
 - `task_state_transitions_total` - Counter of state transitions (by from/to status)
 - `task_duration_seconds` - Histogram of task durations (by status)
 - `tasks_by_status` - Gauge of current tasks (by status)
