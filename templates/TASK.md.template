@@ -1,0 +1,144 @@
+---
+type: task
+task_id:
+title:
+agent_type: claude-code
+priority: medium
+status: pending
+working_dir:
+created_at:
+assigned_at:
+event_id:
+---
+
+# Task: [Brief Task Title]
+
+## Objective
+
+[Describe the main goal of this task in 1-2 sentences]
+
+## Requirements
+
+- [ ] Requirement 1
+- [ ] Requirement 2
+- [ ] Requirement 3
+
+## Context
+
+[Provide relevant context, constraints, or background information]
+
+### Project Information
+
+- **Project:** [Project Name]
+- **Repository:** [Git Repository Path]
+- **Branch:** [Target Branch]
+- **Related Issues:** [Issue Links]
+
+## Technical Details
+
+### Dependencies
+
+- [Dependency 1]
+- [Dependency 2]
+
+### Files/Modules to Modify
+
+- `path/to/file1.ext` - [Brief description of changes]
+- `path/to/file2.ext` - [Brief description of changes]
+
+### Architecture Considerations
+
+[Any architectural patterns, design decisions, or technical constraints to consider]
+
+## Acceptance Criteria
+
+- [ ] Criterion 1: [Specific, testable criterion]
+- [ ] Criterion 2: [Specific, testable criterion]
+- [ ] Criterion 3: [Specific, testable criterion]
+- [ ] Tests pass and code is documented
+- [ ] Changes reviewed and approved
+
+## Test Plan
+
+### Unit Tests
+
+- [ ] Test case 1
+- [ ] Test case 2
+
+### Integration Tests
+
+- [ ] Integration scenario 1
+- [ ] Integration scenario 2
+
+### Manual Testing
+
+- [ ] Manual test 1
+- [ ] Manual test 2
+
+## Success Metrics
+
+- [Metric 1: e.g., Performance improvement of X%]
+- [Metric 2: e.g., Bug reduction in area Y]
+- [Metric 3: e.g., User satisfaction increase]
+
+## Notes
+
+[Any additional notes, considerations, or special instructions]
+
+### Potential Challenges
+
+- [Challenge 1 and mitigation strategy]
+- [Challenge 2 and mitigation strategy]
+
+### Resources
+
+- [Link to relevant documentation]
+- [Link to design docs]
+- [Link to related tickets]
+
+---
+
+## Agent Instructions
+
+This task is part of the Flume Task Lifecycle System. When working on this task:
+
+1. **Report Progress:** Use the TodoWrite tool to track subtasks and progress
+2. **Document Decisions:** Update this TASK.md with important decisions and findings
+3. **Track Blockers:** Document any blockers or questions that arise
+4. **Emit Events:** Progress events are automatically tracked via the lifecycle system
+5. **Report Completion:** Mark the task complete when all acceptance criteria are met
+
+### Event System Information
+
+- **Session ID:** Will be assigned when task starts
+- **Event Tracking:** task.lifecycle.* events are monitored in real-time
+- **Dashboard:** View progress at http://localhost:3000
+
+---
+
+## Execution Log
+
+[This section will be updated during task execution]
+
+### Progress Updates
+
+<!-- Agent will add progress updates here -->
+
+### Decisions Made
+
+<!-- Document key technical decisions here -->
+
+### Issues Encountered
+
+<!-- Track blockers and how they were resolved -->
+
+---
+
+## Completion Summary
+
+<!-- Will be filled in when task is marked complete -->
+
+**Status:**
+**Completed At:**
+**Duration:**
+**Summary:**

@@ -1,7 +1,8 @@
-.PHONY: help build run test clean docker-build docker-run install deps lint
+.PHONY: help build build-all build-cli run test clean docker-build docker-run install install-all deps lint
 
 # Variables
 BINARY_NAME=task-session-manager
+CLI_BINARIES=flume-complete flume-session flume
 DOCKER_IMAGE=task-session-manager:latest
 GO_FILES=$(shell find . -name '*.go' -type f)
 
@@ -12,10 +13,21 @@ deps: ## Download dependencies
 	go mod download
 	go mod tidy
 
-build: deps ## Build the application
+build: deps ## Build the main application
 	CGO_ENABLED=0 go build -ldflags="-w -s" -o bin/$(BINARY_NAME) ./cmd
 
-run: build ## Build and run the application
+build-cli: deps ## Build all CLI tools
+	@echo "Building CLI tools..."
+	@mkdir -p bin
+	@for cli in $(CLI_BINARIES); do \
+		echo "  Building $$cli..."; \
+		CGO_ENABLED=0 go build -ldflags="-w -s" -o bin/$$cli ./cmd/$$cli; \
+	done
+	@echo "CLI tools built successfully"
+
+build-all: build build-cli ## Build everything (main app + CLI tools)
+
+run: build ## Build and run the main application
 	./bin/$(BINARY_NAME)
 
 test: ## Run tests
@@ -45,11 +57,18 @@ docker-stop: ## Stop Docker containers
 docker-logs: ## Show Docker logs
 	docker-compose logs -f task-session-manager
 
-install: build ## Install the binary to /usr/local/bin
+install: build ## Install the main binary to /usr/local/bin
 	sudo cp bin/$(BINARY_NAME) /usr/local/bin/
 
+install-all: build-all ## Install all binaries (main app + CLI tools) to /usr/local/bin
+	sudo cp bin/$(BINARY_NAME) /usr/local/bin/
+	@for cli in $(CLI_BINARIES); do \
+		sudo cp bin/$$cli /usr/local/bin/; \
+	done
+	@echo "All binaries installed to /usr/local/bin/"
+
 dev: ## Run with hot reload (requires air)
-	@which air > /dev/null || (echo "Installing air..." && go install github.com/cosmtrek/air@latest)
+	@which air > /dev/null || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	air
 
 fmt: ## Format code

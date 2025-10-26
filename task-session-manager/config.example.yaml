@@ -1,0 +1,76 @@
+# Flume CLI Tools Configuration Example
+# Copy this file to ~/.config/flume/config.yaml and adjust settings
+
+# RabbitMQ connection settings
+rabbitmq:
+  # RabbitMQ connection URL
+  # Format: amqp://username:password@host:port/vhost
+  url: "amqp://guest:guest@localhost:5672/"
+
+  # Exchange name for task lifecycle events
+  exchange: "task.lifecycle"
+
+# Task Monitor API settings
+monitoring:
+  # Task Monitor API base URL
+  api_url: "http://localhost:8000"
+
+  # Request timeout
+  timeout: 30s
+
+  # Number of retry attempts for failed requests
+  retry_attempts: 3
+
+  # Delay between retry attempts
+  retry_delay: 2s
+
+  # WebSocket URL for real-time updates
+  websocket_url: "ws://localhost:8000/ws"
+
+  # WebSocket connection timeout
+  connect_timeout: 10s
+
+# Session management settings
+session:
+  # Session manager to use: "zellij" or "tmux"
+  manager: "zellij"
+
+  # Prefix for session names
+  # Sessions will be named: <prefix><task-id>
+  session_prefix: "task-"
+
+  # Threshold for marking sessions as stale
+  # Sessions older than this are considered for cleanup
+  stale_threshold: 24h
+
+  # Interval for automatic cleanup checks
+  cleanup_interval: 1h
+
+# Environment-specific configurations
+
+# Development
+# rabbitmq:
+#   url: "amqp://dev:dev@localhost:5672/"
+#   exchange: "dev.task.lifecycle"
+# monitoring:
+#   api_url: "http://localhost:8001"
+
+# Production
+# rabbitmq:
+#   url: "amqp://prod:prod@rabbitmq.prod.example.com:5672/prod"
+#   exchange: "prod.task.lifecycle"
+# monitoring:
+#   api_url: "https://task-monitor.prod.example.com"
+#   timeout: 60s
+#   retry_attempts: 5
+
+# Custom session settings
+# session:
+#   manager: "tmux"
+#   session_prefix: "flume-"
+#   stale_threshold: 48h
+
+# Notes:
+# - Environment variables override these settings
+# - See CLI_TOOLS.md for complete documentation
+# - All duration values support: s (seconds), m (minutes), h (hours), d (days)

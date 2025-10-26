@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -197,10 +198,26 @@ func (c *Consumer) handleMessage(ctx context.Context, msg amqp.Delivery) {
 
 	log.Debug().Msg("Processing message")
 
+	// Sanitize message body - remove carriage returns
+	sanitizedBody := bytes.ReplaceAll(msg.Body, []byte("\r"), []byte(""))
+
+	// Try to parse as envelope first
+	var envelope events.EventEnvelope
+	if err := json.Unmarshal(sanitizedBody, &envelope); err == nil && envelope.EventType != "" {
+		// Re-marshal the payload and parse as TaskLifecycleAssigned
+		payloadBytes, err := json.Marshal(envelope.Payload)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to marshal envelope payload")
+			msg.Nack(false, false)
+			return
+		}
+		sanitizedBody = payloadBytes
+	}
+
 	// Parse the event
 	var event events.TaskLifecycleAssigned
-	if err := json.Unmarshal(msg.Body, &event); err != nil {
-		log.Error().Err(err).Msg("Failed to parse event")
+	if err := json.Unmarshal(sanitizedBody, &event); err != nil {
+		log.Error().Err(err).Str("body", string(sanitizedBody)).Msg("Failed to parse event")
 		msg.Nack(false, false) // Don't requeue malformed messages
 		return
 	}

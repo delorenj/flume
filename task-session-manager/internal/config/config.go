@@ -54,7 +54,7 @@ func Load() (*Config, error) {
 			MaxReconnectTime: getEnvDuration("RABBITMQ_MAX_RECONNECT_TIME", 5*time.Minute),
 		},
 		Session: SessionConfig{
-			PreferredManager: getEnv("SESSION_MANAGER", "zellij"),
+			PreferredManager: getEnv("FLUME_SESSION_MANAGER", "zellij"),
 			SessionNameTpl:   getEnv("SESSION_NAME_TEMPLATE", "task-{{.TaskID}}"),
 			DefaultWorkDir:   getEnv("DEFAULT_WORK_DIR", "/tmp"),
 			StartupTimeout:   getEnvDuration("SESSION_STARTUP_TIMEOUT", 30*time.Second),
@@ -96,7 +96,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("RABBITMQ_ROUTING_KEY is required")
 	}
 	if c.Session.PreferredManager != "zellij" && c.Session.PreferredManager != "tmux" {
-		return fmt.Errorf("SESSION_MANAGER must be 'zellij' or 'tmux'")
+		return fmt.Errorf("FLUME_SESSION_MANAGER must be 'zellij' or 'tmux'")
 	}
 	return nil
 }

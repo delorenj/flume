@@ -27,7 +27,7 @@ services:
       RABBITMQ_EXCHANGE: "task.lifecycle"
       RABBITMQ_QUEUE: "task.session.assigned"
       RABBITMQ_ROUTING_KEY: "task.lifecycle.assigned"
-      SESSION_MANAGER: "tmux"
+      FLUME_SESSION_MANAGER: "tmux"
       LOG_LEVEL: "info"
       ENVIRONMENT: "production"
     volumes:

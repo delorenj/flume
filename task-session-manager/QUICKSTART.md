@@ -171,6 +171,21 @@ sudo systemctl status rabbitmq-server
 export RABBITMQ_URL="amqp://guest:guest@localhost:5672/"
 ```
 
+### "Address already in use" (Port 8080 conflict)
+
+**Problem**: Health check server fails because port 8080 is already in use
+
+**Solution**:
+
+```bash
+# Change the health check port
+export HEALTH_CHECK_PORT=8081
+./bin/task-session-manager
+
+# Or add to .env file
+echo "HEALTH_CHECK_PORT=8081" >> .env
+```
+
 ### "Working directory does not exist"
 
 **Problem**: The working_dir in the event doesn't exist
@@ -217,7 +232,7 @@ RABBITMQ_QUEUE=task.session.assigned
 RABBITMQ_ROUTING_KEY=task.lifecycle.assigned
 
 # Session Manager
-SESSION_MANAGER=zellij  # or tmux
+FLUME_SESSION_MANAGER=zellij  # or tmux
 DEFAULT_WORK_DIR=/tmp
 
 # Agent Commands

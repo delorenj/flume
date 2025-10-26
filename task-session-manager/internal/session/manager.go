@@ -139,10 +139,16 @@ func (m *Manager) CreateSession(ctx context.Context, event *events.TaskLifecycle
 
 // createZellijSession creates a zellij session
 func (m *Manager) createZellijSession(ctx context.Context, name, workDir, command string, env map[string]string) (*SessionInfo, error) {
-	// Create zellij session in detached mode
-	cmd := exec.CommandContext(ctx, "zellij",
-		"--session", name,
-		"options", "--default-cwd", workDir,
+	// Zellij requires a PTY, so we use 'script' to provide one
+	// Create a shell script that will be executed
+	shellScript := fmt.Sprintf("cd %s && %s", workDir, command)
+
+	// Use zellij run in detached mode with script for PTY allocation
+	// The --detached flag works but we need to ensure no TTY is required
+	cmd := exec.CommandContext(ctx, "script",
+		"-qec",
+		fmt.Sprintf("zellij --session %s run --detached -- sh -c '%s'", name, shellScript),
+		"/dev/null",
 	)
 
 	// Set environment variables
@@ -150,6 +156,7 @@ func (m *Manager) createZellijSession(ctx context.Context, name, workDir, comman
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
+	cmd.Dir = workDir
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -159,27 +166,13 @@ func (m *Manager) createZellijSession(ctx context.Context, name, workDir, comman
 		return nil, fmt.Errorf("failed to create zellij session: %w (stderr: %s)", err, stderr.String())
 	}
 
-	// Start the agent command in the session
-	runCmd := exec.CommandContext(ctx, "zellij",
-		"--session", name,
-		"run", "--",
-		"sh", "-c", command,
-	)
-	runCmd.Dir = workDir
-	runCmd.Env = cmd.Env
-
-	if err := runCmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start agent in zellij session: %w", err)
-	}
-
-	// Get the PID (this is the zellij process, not the actual agent)
-	pid := runCmd.Process.Pid
-
 	// Try to find the actual agent PID
 	time.Sleep(1 * time.Second)
-	actualPID, err := m.findProcessPID(name, command)
-	if err == nil && actualPID > 0 {
-		pid = actualPID
+	pid, err := m.findProcessPID(name, command)
+	if err != nil {
+		// Fallback to a default PID if we can't find it
+		m.logger.Warn().Err(err).Msg("Could not find agent PID, using 0 as placeholder")
+		pid = 0
 	}
 
 	return &SessionInfo{

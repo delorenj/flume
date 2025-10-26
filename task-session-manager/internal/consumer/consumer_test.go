@@ -104,7 +104,7 @@ func TestHandleMessage(t *testing.T) {
 					MaxReconnectTime: 5 * time.Minute,
 				},
 			}
-			logger := zerolog.Nop()
+			_ = zerolog.Nop()
 
 			// Note: In a real test, you would use a mock RabbitMQ connection
 			// or integration tests with a test RabbitMQ instance

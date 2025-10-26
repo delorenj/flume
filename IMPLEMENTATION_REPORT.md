@@ -58,12 +58,14 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 **Location:** `/home/delorenj/code/projects/33GOD/flume/event_producers/events.py`
 
 **Deliverables:**
+
 - 7 task lifecycle event payload models
 - State machine with validated transitions
 - Helper functions for event creation
 - Full type safety with Pydantic
 
 **Event Types:**
+
 - `TaskLifecycleAssignedPayload` - Task assignment from Obsidian
 - `TaskLifecycleStartedPayload` - Session manager starts agent
 - `TaskLifecycleInProgressPayload` - Agent heartbeat/progress
@@ -73,6 +75,7 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 - `TaskLifecycleResumedPayload` - Resume after pause
 
 **Key Features:**
+
 - Rich metadata capture (git state, timing, resources)
 - Correlation ID chain for distributed tracing
 - Extensible metadata dictionaries
@@ -87,6 +90,7 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 **New Command:** `bb task-assign`
 
 **Features:**
+
 - Auto-detects git project and branch context
 - Reads TASK.md from current directory or specified path
 - Multiple output formats (json, event_id, silent)
@@ -94,6 +98,7 @@ Successfully implemented a comprehensive event-driven task lifecycle management 
 - Script-friendly with proper exit codes
 
 **Usage Examples:**
+
 ```bash
 # Basic - reads TASK.md automatically
 bb task-assign TASK-001 "Implement auth" claude-code
@@ -117,10 +122,12 @@ EVENT_ID=$(bb task-assign TASK-003 "Quick fix" claude-code --format event_id)
 **Location:** `/home/delorenj/code/projects/33GOD/flume/obsidian-quickadd-*.js`
 
 **Scripts Delivered:**
+
 1. **Assign Task to Agent** - Full-featured task assignment
 2. **Quick Task Fire** - Rapid task dispatch
 
 **Features:**
+
 - Frontmatter parsing and updating
 - Agent and priority selection menus
 - Shell command execution with proper escaping
@@ -129,6 +136,7 @@ EVENT_ID=$(bb task-assign TASK-003 "Quick fix" claude-code --format event_id)
 - Error handling with user notifications
 
 **Workflow:**
+
 ```
 User in Obsidian → Opens TASK.md → Runs macro →
 Selects agent → Confirms → Event published →
@@ -142,11 +150,13 @@ Note updated with event_id and timestamp
 **Location:** `/home/delorenj/code/projects/33GOD/flume/task-session-manager/`
 
 **Architecture:**
+
 - **Size:** 1,549 lines of Go code
 - **Components:** Consumer, Session Manager, Publisher, Config
 - **Tests:** Unit and integration test suites
 
 **Core Functionality:**
+
 - Consumes `task.lifecycle.assigned` events from RabbitMQ
 - Creates tmux/zellij sessions with task-specific names
 - Launches appropriate agent CLI in session
@@ -154,12 +164,14 @@ Note updated with event_id and timestamp
 - Handles failures with `task.lifecycle.failed` events
 
 **Deployment Options:**
+
 - Local binary execution
 - systemd service
 - Docker container
 - Docker Compose orchestration
 
 **Key Features:**
+
 - Automatic reconnection with exponential backoff
 - Graceful shutdown handling
 - Health check endpoints
@@ -167,6 +179,7 @@ Note updated with event_id and timestamp
 - Environment-based configuration
 
 **Performance:**
+
 - Throughput: 10-50 sessions/second
 - Latency: 1-2 seconds event-to-session
 - Memory: ~20MB base + ~5MB per operation
@@ -178,11 +191,13 @@ Note updated with event_id and timestamp
 **Location:** `/home/delorenj/code/projects/33GOD/flume/task-monitor/`
 
 **Architecture:**
+
 - **Size:** ~4,300 lines (code + docs)
 - **Framework:** FastAPI with async/await
 - **Storage:** In-memory with optional JSON persistence
 
 **Core Functionality:**
+
 - Consumes ALL `task.lifecycle.*` events
 - Maintains current state of all tasks
 - Validates state transitions
@@ -190,6 +205,7 @@ Note updated with event_id and timestamp
 - Provides REST API and WebSocket interface
 
 **API Endpoints:**
+
 - `GET /tasks` - List with filters and pagination
 - `GET /tasks/{id}` - Specific task details
 - `GET /tasks/{id}/events` - Full event history
@@ -200,6 +216,7 @@ Note updated with event_id and timestamp
 - `WS /ws` - Real-time WebSocket updates
 
 **Features:**
+
 - State machine validation
 - Automatic cleanup of old tasks
 - Prometheus metrics export
@@ -207,6 +224,7 @@ Note updated with event_id and timestamp
 - Comprehensive test suite
 
 **Performance:**
+
 - Throughput: 1,000+ events/second
 - Query latency: <10ms typical
 - Memory: ~100MB base + ~1KB per task
@@ -219,6 +237,7 @@ Note updated with event_id and timestamp
 **Location:** `/home/delorenj/code/projects/33GOD/flume/task-dashboard/`
 
 **Architecture:**
+
 - **Framework:** Next.js 16 with App Router
 - **UI:** TailwindCSS, Lucide icons
 - **State:** Zustand for global state
@@ -227,12 +246,14 @@ Note updated with event_id and timestamp
 **Core Features:**
 
 **Dashboard View:**
+
 - Grid of task cards with color-coded status
 - Real-time progress bars for active tasks
 - Advanced filtering (status, agent, project)
 - Debounced search functionality
 
 **Task Detail Modal:**
+
 - Full event timeline with timestamps
 - Agent metadata and context
 - Files modified and commands executed
@@ -240,6 +261,7 @@ Note updated with event_id and timestamp
 - Error details with stack traces
 
 **Metrics Sidebar:**
+
 - Total tasks and success rate
 - Status breakdown pie chart
 - Agent distribution
@@ -247,12 +269,14 @@ Note updated with event_id and timestamp
 - Tasks per hour
 
 **Real-time Updates:**
+
 - WebSocket connection with auto-reconnect
 - Live task status updates
 - Toast notifications for events
 - Connection status indicator
 
 **Tech Stack:**
+
 - Next.js 16.0.0, React 19.2.0
 - TypeScript 5.x for type safety
 - TailwindCSS 4.x for styling
@@ -266,16 +290,19 @@ Note updated with event_id and timestamp
 ### 1. Architecture Choices
 
 **Event-Driven Architecture:**
+
 - **Decision:** Use RabbitMQ topic exchange for event routing
 - **Rationale:** Decouples components, enables scalability, provides reliability
 - **Alternative Considered:** Direct HTTP calls (rejected due to tight coupling)
 
 **State Machine Design:**
+
 - **Decision:** Explicit state transitions with validation
 - **Rationale:** Prevents invalid states, enables debugging, clear lifecycle
 - **Alternative Considered:** Free-form status strings (rejected due to ambiguity)
 
 **Correlation IDs:**
+
 - **Decision:** Chain events using correlation_ids array
 - **Rationale:** Distributed tracing, causality tracking, debugging
 - **Alternative Considered:** Separate tracing system (deferred to later)
@@ -283,16 +310,19 @@ Note updated with event_id and timestamp
 ### 2. Technology Selections
 
 **Go for Session Manager:**
+
 - **Decision:** Implement session manager in Go
 - **Rationale:** Superior concurrency, low memory, fast startup, systemd integration
 - **Alternative Considered:** Python (rejected due to GIL limitations)
 
 **Python for Monitoring:**
+
 - **Decision:** FastAPI for monitoring service
 - **Rationale:** Rapid development, excellent async support, type hints, ecosystem
 - **Alternative Considered:** Go (rejected due to development velocity needs)
 
 **React/Next.js for Dashboard:**
+
 - **Decision:** Next.js 14+ with App Router
 - **Rationale:** Modern React patterns, excellent DX, SSR support, performance
 - **Alternative Considered:** Vue/Svelte (team expertise favored React)
@@ -300,11 +330,13 @@ Note updated with event_id and timestamp
 ### 3. Deployment Strategy
 
 **Containerization:**
+
 - **Decision:** Docker + Docker Compose for all services
 - **Rationale:** Consistency, portability, easy local development
 - **Production Path:** Kubernetes migration planned for phase 2
 
 **Configuration Management:**
+
 - **Decision:** Environment variables with validation
 - **Rationale:** 12-factor app compliance, flexibility, security
 - **Improvement Needed:** Secret management system (see QA report)
@@ -410,14 +442,14 @@ Note updated with event_id and timestamp
 
 ### Unit Tests
 
-| Component | Coverage | Status |
-|-----------|----------|--------|
-| Event Schemas | 0% | ❌ Not Implemented |
-| Bloodbank CLI | 0% | ❌ Not Implemented |
-| QuickAdd Scripts | 0% | ❌ Not Implemented |
-| Session Manager (Go) | ~30% | ⚠️ Partial |
-| Task Monitor | ~40% | ⚠️ Partial |
-| Dashboard | 0% | ❌ Not Implemented |
+| Component            | Coverage | Status             |
+| -------------------- | -------- | ------------------ |
+| Event Schemas        | 0%       | ❌ Not Implemented |
+| Bloodbank CLI        | 0%       | ❌ Not Implemented |
+| QuickAdd Scripts     | 0%       | ❌ Not Implemented |
+| Session Manager (Go) | ~30%     | ⚠️ Partial         |
+| Task Monitor         | ~40%     | ⚠️ Partial         |
+| Dashboard            | 0%       | ❌ Not Implemented |
 
 **Overall Unit Test Coverage: ~15%**
 
@@ -466,19 +498,22 @@ Note updated with event_id and timestamp
 
 ### Recommendations
 
-**Phase 1 (Week 1) - Critical Fixes:**
+**Phase 1 - Critical Fixes:**
+
 - Standardize event schemas across all components
 - Implement JWT authentication for API and WebSocket
 - Add dead letter queues and retry policies
 - Input validation on all entry points
 
-**Phase 2 (Week 2) - High Priority:**
+**Phase 2 - High Priority:**
+
 - Distributed locking for state updates
 - Circuit breakers and resilience patterns
 - Comprehensive monitoring and alerting
 - Secret management system
 
-**Phase 3 (Week 3) - Production Hardening:**
+**Phase 3 - Production Hardening:**
+
 - Achieve 80%+ test coverage
 - Performance optimization
 - Security hardening and penetration testing
@@ -490,14 +525,14 @@ Note updated with event_id and timestamp
 
 ### Agent Utilization
 
-| Agent Type | Tasks | Efficiency | Output Quality |
-|------------|-------|------------|----------------|
-| System Architect | 1 | 95% | Excellent |
-| Python Developer | 2 | 90% | Excellent |
-| Go Developer | 1 | 88% | Excellent |
-| JavaScript Developer | 1 | 92% | Excellent |
-| Frontend Developer | 1 | 87% | Very Good |
-| Code Reviewer | 1 | 93% | Excellent |
+| Agent Type           | Tasks | Efficiency | Output Quality |
+| -------------------- | ----- | ---------- | -------------- |
+| System Architect     | 1     | 95%        | Excellent      |
+| Python Developer     | 2     | 90%        | Excellent      |
+| Go Developer         | 1     | 88%        | Excellent      |
+| JavaScript Developer | 1     | 92%        | Excellent      |
+| Frontend Developer   | 1     | 87%        | Very Good      |
+| Code Reviewer        | 1     | 93%        | Excellent      |
 
 ### Coordination Effectiveness
 
@@ -522,26 +557,32 @@ Note updated with event_id and timestamp
 ### Total Files Created: 89 files
 
 **Event System:**
+
 - Event schemas and models (events.py additions)
 - CLI enhancements (cli.py modifications)
 
 **Obsidian Integration:**
+
 - 2 QuickAdd JavaScript macros
 - 1 Setup guide (QUICKADD_SETUP.md)
 
 **Session Manager (Go):**
-- 20 files (main.go, internal/*, pkg/*, configs, docs)
+
+- 20 files (main.go, internal/_, pkg/_, configs, docs)
 - Comprehensive Go service with tests
 
 **Task Monitor (Python):**
+
 - 22 files (main.py, api.py, models.py, consumer.py, etc.)
 - Full FastAPI service with tests and Docker
 
 **Dashboard (Next.js):**
-- 24 files (app/*, components/*, hooks/*, lib/*)
+
+- 24 files (app/_, components/_, hooks/_, lib/_)
 - Complete React application with TypeScript
 
 **Documentation:**
+
 - 15 comprehensive documentation files across all components
 - Total documentation: ~85KB
 
@@ -549,7 +590,7 @@ Note updated with event_id and timestamp
 
 ## Next Steps & Recommendations
 
-### Immediate Actions (This Week)
+### Immediate Actions
 
 1. **Fix Schema Consistency**
    - Create shared schema repository
@@ -566,21 +607,21 @@ Note updated with event_id and timestamp
    - Set up CI/CD pipeline
    - Create integration test harness
 
-### Short Term (2-3 Weeks)
+### Short Term
 
 1. **Address P0/P1 Issues** from QA report
 2. **Implement Monitoring** with Prometheus + Grafana
 3. **Add Error Recovery** with DLQ and retry policies
 4. **Security Hardening** with authentication and input validation
 
-### Medium Term (1-2 Months)
+### Medium Term
 
 1. **Horizontal Scaling** support for all components
 2. **Advanced Monitoring** with distributed tracing (Jaeger/Tempo)
 3. **Multi-User Support** with proper isolation
 4. **Mobile Dashboard** for monitoring on-the-go
 
-### Long Term (3-6 Months)
+### Long Term
 
 1. **AI-Powered Insights** from task execution patterns
 2. **Predictive Scheduling** based on historical data
@@ -652,14 +693,15 @@ Successfully delivered a **comprehensive, event-driven task lifecycle management
 ## Appendix: Component Locations
 
 All components are located under:
+
 ```
-/home/delorenj/code/projects/33GOD/flume/
+/home/delorenj/code/projects/33GOD/flume/trunk-main
 ```
 
 ### Directory Structure
 
 ```
-flume/
+trunk-main/
 ├── event_producers/          # Existing RabbitMQ infrastructure
 │   ├── events.py            # UPDATED: Added task lifecycle events
 │   ├── cli.py               # UPDATED: Added task-assign command

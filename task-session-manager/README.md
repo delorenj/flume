@@ -4,6 +4,7 @@ A production-ready Go service that manages terminal sessions for task lifecycle 
 
 ## Features
 
+### Core Service
 - **RabbitMQ Integration**: Robust consumer with automatic reconnection
 - **Session Management**: Supports both tmux and zellij session managers
 - **Agent Orchestration**: Launches appropriate agent CLIs (claude, gemini, etc.)
@@ -12,6 +13,13 @@ A production-ready Go service that manages terminal sessions for task lifecycle 
 - **Health Checks**: Built-in HTTP endpoints for health and readiness probes
 - **Graceful Shutdown**: Proper cleanup on SIGTERM/SIGINT
 - **Docker Support**: Containerized deployment with docker-compose
+
+### CLI Tools (NEW!)
+- **flume-complete**: Mark tasks as completed/failed/paused with event emission
+- **flume-session**: List, attach, kill, and cleanup sessions
+- **flume (status)**: Check task status with real-time monitoring
+
+See [CLI_README.md](CLI_README.md) for CLI tools documentation.
 
 ## Architecture
 
@@ -118,7 +126,7 @@ Configuration is done via environment variables. See `.env.example` for all avai
 | `RABBITMQ_EXCHANGE`    | `task.lifecycle`                     | Exchange name                              |
 | `RABBITMQ_QUEUE`       | `task.session.assigned`              | Queue name                                 |
 | `RABBITMQ_ROUTING_KEY` | `task.lifecycle.assigned`            | Routing key for subscriptions              |
-| `SESSION_MANAGER`      | `zellij`                             | Preferred session manager (zellij or tmux) |
+| `FLUME_SESSION_MANAGER`      | `zellij`                             | Preferred session manager (zellij or tmux) |
 | `LOG_LEVEL`            | `info`                               | Log level (debug, info, warn, error)       |
 | `HEALTH_CHECK_PORT`    | `8080`                               | Port for health check endpoints            |
 
