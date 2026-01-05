@@ -10,7 +10,8 @@
     "test": "echo 'No tests yet'",
     "typecheck": "tsc --noEmit",
     "demo": "tsx src/demo.ts",
-    "skeleton": "tsx src/walking-skeleton.ts"
+    "skeleton": "tsx src/walking-skeleton.ts",
+    "skeleton:postgres": "tsx src/walking-skeleton-postgres.ts"
   },
   "keywords": ["yi", "echo", "mock", "testing"],
   "license": "MIT",

@@ -18,3 +18,6 @@ export * from './types/state.js';
 
 // Plane integration
 export * from './plane/plane-client.js';
+
+// Database
+export * from './db/postgres-client.js';
