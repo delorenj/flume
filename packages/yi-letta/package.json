@@ -1,0 +1,24 @@
+{
+  "name": "@yi/letta",
+  "version": "0.1.0",
+  "description": "Yi Letta Adapter - Letta agent integration for Flume/Yi",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo 'No tests yet'",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["yi", "letta", "agent", "adapter"],
+  "license": "MIT",
+  "dependencies": {
+    "@flume/core": "file:../flume-core",
+    "@yi/adapter": "file:../yi-adapter",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/uuid": "^9.0.7"
+  }
+}
