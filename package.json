@@ -1,0 +1,36 @@
+{
+  "name": "flume-yi-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint packages/*/src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx packages/yi-echo/src/demo.ts",
+    "skeleton": "tsx packages/yi-echo/src/walking-skeleton.ts",
+    "skeleton:events": "tsx packages/yi-echo/src/walking-skeleton-events.ts",
+    "skeleton:rabbitmq": "tsx packages/yi-echo/src/walking-skeleton-rabbitmq.ts",
+    "skeleton:full": "tsx packages/yi-echo/src/walking-skeleton-full.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1",
+    "amqplib": "^0.10.3",
+    "@types/amqplib": "^0.10.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

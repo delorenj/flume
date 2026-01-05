@@ -1,0 +1,18 @@
+{
+  "name": "@flume/core",
+  "version": "0.1.0",
+  "description": "Flume Protocol - Pure interfaces for agent tree orchestration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo 'No tests yet'",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["flume", "agent", "orchestration", "protocol"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

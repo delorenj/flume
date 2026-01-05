@@ -1,0 +1,27 @@
+{
+  "name": "@yi/echo",
+  "version": "0.1.0",
+  "description": "Echo Implementation - Mock agents for testing Flume/Yi architecture",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo 'No tests yet'",
+    "typecheck": "tsc --noEmit",
+    "demo": "tsx src/demo.ts",
+    "skeleton": "tsx src/walking-skeleton.ts"
+  },
+  "keywords": ["yi", "echo", "mock", "testing"],
+  "license": "MIT",
+  "dependencies": {
+    "@flume/core": "file:../flume-core",
+    "@yi/adapter": "file:../yi-adapter",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/uuid": "^9.0.7",
+    "tsx": "^4.7.0"
+  }
+}

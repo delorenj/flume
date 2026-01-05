@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "outDir": "dist",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "paths": {
+      "@flume/core": ["./packages/flume-core/src"],
+      "@yi/adapter": ["./packages/yi-adapter/src"],
+      "@yi/echo": ["./packages/yi-echo/src"]
+    }
+  },
+  "references": [
+    { "path": "./packages/flume-core" },
+    { "path": "./packages/yi-adapter" },
+    { "path": "./packages/yi-echo" }
+  ],
+  "include": [],
+  "exclude": ["node_modules", "dist"]
+}
