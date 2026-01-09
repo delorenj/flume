@@ -26,6 +26,7 @@ export * from './agents/base-director.js';
 
 // Selection strategies
 export * from './selection/first-match.js';
+export * from './selection/skill-match.js';
 export * from './selection/llm-driven.js';
 
 // Event publishing
@@ -36,3 +37,5 @@ export * from './sync/plane-sync.js';
 
 // Boot sequence
 export * from './boot/boot-sequence.js';
+export * from './boot/health-checker.js';
+export * from './boot/shutdown.js';

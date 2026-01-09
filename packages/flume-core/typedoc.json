@@ -1,0 +1,38 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src/index.ts"],
+  "out": "./docs",
+  "name": "@flume/core - API Documentation",
+  "readme": "none",
+  "includeVersion": true,
+  "tsconfig": "./tsconfig.json",
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Task",
+    "Result",
+    "Employee",
+    "State",
+    "Event",
+    "Plane",
+    "Database",
+    "*"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "searchInComments": true,
+  "plugin": [],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts"],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "gitRevision": "main",
+  "sort": ["source-order", "alphabetical"],
+  "visibilityFilters": {
+    "protected": true,
+    "private": false,
+    "inherited": true,
+    "external": true
+  }
+}

@@ -134,6 +134,13 @@ export class BloodbankPublisher implements EventPublisher {
     console.log('[Bloodbank] Disconnected');
   }
 
+  /**
+   * Check if connected to RabbitMQ.
+   */
+  isConnected(): boolean {
+    return this.connected;
+  }
+
   // ============================================================================
   // Convenience methods for common events
   // ============================================================================

@@ -3,6 +3,8 @@
  *
  * Every significant action in Flume emits a Bloodbank event.
  * Events follow CloudEvents spec with 33GOD extensions.
+ *
+ * @category Event
  */
 
 /**

@@ -39,6 +39,7 @@ export interface AgentFactory {
 export class HRDepartment {
   private factories: Map<string, AgentFactory> = new Map();
   private teamContexts: Map<string, TeamContext> = new Map();
+  private recruitedAgentCount = 0;
 
   constructor(
     private onboarding: OnboardingSpecialist,
@@ -95,6 +96,7 @@ export class HRDepartment {
     // 4. Send to Onboarding
     const readyAgent = await this.onboarding.orient(rawRecruit, teamContext);
 
+    this.recruitedAgentCount++;
     console.log(
       `[HR] Agent ${readyAgent.name} is ready for manager ${request.reportingToManagerId}`
     );
@@ -119,7 +121,16 @@ export class HRDepartment {
     }
 
     const rawAgent = await factory.createAgent(skills);
-    return this.onboarding.orient(rawAgent, teamContext);
+    const readyAgent = await this.onboarding.orient(rawAgent, teamContext);
+    this.recruitedAgentCount++;
+    return readyAgent;
+  }
+
+  /**
+   * Get the total number of agents recruited.
+   */
+  getAgentCount(): number {
+    return this.recruitedAgentCount;
   }
 
   /**

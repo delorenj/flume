@@ -1,5 +1,6 @@
 /**
  * Result Types - Output from task execution
+ * @category Result
  */
 
 /**

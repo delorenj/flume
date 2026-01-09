@@ -3,6 +3,8 @@
  *
  * Syncs tasks between Flume and Plane for visibility and tracking.
  * Uses the public Plane API v1.
+ *
+ * @category Plane
  */
 
 /**
@@ -90,6 +92,41 @@ export interface UpdateWorkItemRequest {
   state?: string;
   assignees?: string[];
   labels?: string[];
+  parent?: string | null; // Parent issue ID for sub-issues
+}
+
+/**
+ * Plane comment representation.
+ */
+export interface PlaneComment {
+  id: string;
+  comment_html: string;
+  actor: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Create comment request.
+ */
+export interface CreateCommentRequest {
+  comment_html: string;
+}
+
+/**
+ * Issue link type.
+ */
+export type IssueLinkType = 'relates_to' | 'blocks' | 'blocked_by' | 'duplicate';
+
+/**
+ * Plane issue link representation.
+ */
+export interface PlaneIssueLink {
+  id: string;
+  issue: string;
+  related_issue: string;
+  relation_type: IssueLinkType;
+  created_at: string;
 }
 
 /**
@@ -295,6 +332,70 @@ export class PlaneClient {
       'DELETE',
       `/workspaces/${this.workspaceSlug}/projects/${projectId}/issues/${workItemId}/`
     );
+  }
+
+  // ============================================================================
+  // Comments
+  // ============================================================================
+
+  /**
+   * List comments on an issue.
+   */
+  async listComments(projectId: string, issueId: string): Promise<PlaneComment[]> {
+    const response = await this.request<PlaneListResponse<PlaneComment>>(
+      'GET',
+      `/workspaces/${this.workspaceSlug}/projects/${projectId}/issues/${issueId}/comments/`
+    );
+    return response.results;
+  }
+
+  /**
+   * Add a comment to an issue.
+   */
+  async addComment(
+    projectId: string,
+    issueId: string,
+    comment: string
+  ): Promise<PlaneComment> {
+    return this.request<PlaneComment>(
+      'POST',
+      `/workspaces/${this.workspaceSlug}/projects/${projectId}/issues/${issueId}/comments/`,
+      { comment_html: comment }
+    );
+  }
+
+  // ============================================================================
+  // Issue Links
+  // ============================================================================
+
+  /**
+   * Link two issues together.
+   */
+  async linkIssues(
+    projectId: string,
+    issueId: string,
+    relatedIssueId: string,
+    linkType: IssueLinkType = 'relates_to'
+  ): Promise<PlaneIssueLink> {
+    return this.request<PlaneIssueLink>(
+      'POST',
+      `/workspaces/${this.workspaceSlug}/projects/${projectId}/issues/${issueId}/issue-links/`,
+      {
+        related_issue: relatedIssueId,
+        relation_type: linkType,
+      }
+    );
+  }
+
+  /**
+   * Set parent issue (make issueId a sub-issue of parentId).
+   */
+  async setParentIssue(
+    projectId: string,
+    issueId: string,
+    parentId: string | null
+  ): Promise<PlaneWorkItem> {
+    return this.updateWorkItem(projectId, issueId, { parent: parentId });
   }
 
   // ============================================================================

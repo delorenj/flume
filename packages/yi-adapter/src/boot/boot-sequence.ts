@@ -19,6 +19,8 @@ import {
 import { PlaneSyncService, PlaneSyncConfig, DEFAULT_PLANE_SYNC_CONFIG } from '../sync/plane-sync.js';
 import { HRDepartment } from '../hr/hr-department.js';
 import { YiOnboarding } from '../hr/onboarding-specialist.js';
+import { HealthChecker, HealthCheckerConfig, DEFAULT_HEALTH_CONFIG } from './health-checker.js';
+import { ShutdownHandler, ShutdownConfig, DEFAULT_SHUTDOWN_CONFIG } from './shutdown.js';
 import type { YiMemoryStrategy } from '../memory/strategy.js';
 import type { TeamContext } from '../memory/team-context.js';
 
@@ -30,6 +32,8 @@ export interface BootConfig {
   bloodbank: BloodbankConfig;
   plane: PlaneConfig;
   planeSync: PlaneSyncConfig;
+  health: HealthCheckerConfig;
+  shutdown: ShutdownConfig;
 }
 
 /**
@@ -44,6 +48,8 @@ export const DEFAULT_BOOT_CONFIG: BootConfig = {
     workspaceSlug: process.env.PLANE_WORKSPACE ?? '33god',
   },
   planeSync: DEFAULT_PLANE_SYNC_CONFIG,
+  health: DEFAULT_HEALTH_CONFIG,
+  shutdown: DEFAULT_SHUTDOWN_CONFIG,
 };
 
 /**
@@ -55,6 +61,8 @@ export interface BootContext {
   planeSync: PlaneSyncService;
   hr: HRDepartment;
   onboarding: YiOnboarding;
+  health: HealthChecker;
+  shutdown: ShutdownHandler;
   correlationId: string;
 }
 
@@ -125,6 +133,34 @@ export class BootSequence {
       console.log('✓ HR department ready');
       console.log();
 
+      // Step 5: Initialize Health Checker
+      console.log('🏥 STEP 5: Initializing Health Checker');
+      console.log('─────────────────────────────────────────────────────────');
+      const health = new HealthChecker(this.config.health);
+      health.setBloodbank(bloodbank);
+      health.setHRDepartment(hr);
+      await health.start();
+      console.log('✓ Health checker ready');
+      console.log();
+
+      // Step 6: Initialize Shutdown Handler
+      console.log('🛑 STEP 6: Initializing Graceful Shutdown');
+      console.log('─────────────────────────────────────────────────────────');
+      const shutdown = new ShutdownHandler(
+        this.config.serviceName,
+        correlationId,
+        this.config.shutdown
+      );
+      shutdown.setBloodbank(bloodbank);
+      shutdown.setHealthChecker(health);
+      shutdown.registerSignalHandlers();
+      // Register health checker stop as a shutdown callback
+      shutdown.onShutdown(async () => {
+        await health.stop();
+      });
+      console.log(`✓ Graceful shutdown ready (timeout: ${this.config.shutdown.timeoutMs}ms)`);
+      console.log();
+
       // Emit boot event
       await bloodbank.publish({
         event: 'yi.system.booted',
@@ -147,6 +183,8 @@ export class BootSequence {
         planeSync,
         hr,
         onboarding,
+        health,
+        shutdown,
         correlationId,
       };
 
@@ -187,26 +225,17 @@ export class BootSequence {
     console.log('🛑 SHUTTING DOWN');
     console.log('─────────────────────────────────────────────────────────');
 
-    // Emit shutdown event
-    await this.context.bloodbank.publish({
-      event: 'yi.system.shutdown',
-      version: '1.0.0',
-      data: {
-        serviceName: this.config.serviceName,
-        shutdownTime: new Date().toISOString(),
-      },
-      exchange: 'amq.topic',
-      routingKey: 'yi.system.shutdown',
-      correlationId: this.context.correlationId,
-      timestamp: new Date().toISOString(),
-      source: this.config.serviceName,
-    });
+    // Use the shutdown handler for graceful shutdown
+    const result = await this.context.shutdown.shutdown();
 
-    await this.context.bloodbank.close();
     this.running = false;
     this.context = null;
 
-    console.log('✓ Shutdown complete');
+    if (result.success) {
+      console.log('✓ Shutdown complete');
+    } else {
+      console.warn(`⚠ Shutdown completed with issues (errors: ${result.errors.length})`);
+    }
   }
 
   /**

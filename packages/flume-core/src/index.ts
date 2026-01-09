@@ -7,6 +7,22 @@
  *
  * A developer can implement Manager and Contributor interfaces directly,
  * bypassing Yi entirely if they want raw control.
+ *
+ * ## Core Concepts
+ *
+ * - **Tasks**: The atomic unit of work flowing through the system
+ * - **Employees**: The corporate hierarchy (Contributor, Manager, Director)
+ * - **Results**: Structured responses from task execution
+ * - **Events**: Bloodbank integration for observability
+ * - **States**: Agent lifecycle management
+ *
+ * ## Integration Points
+ *
+ * - **Plane**: Project management sync for task visibility
+ * - **PostgreSQL**: Persistence layer for state and history
+ *
+ * @packageDocumentation
+ * @module @flume/core
  */
 
 // Re-export all types
@@ -21,3 +37,9 @@ export * from './plane/plane-client.js';
 
 // Database
 export * from './db/postgres-client.js';
+
+// Validation
+export * from './validation/validators.js';
+
+// State Machine
+export * from './state/state-machine.js';

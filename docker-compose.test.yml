@@ -1,0 +1,48 @@
+# Docker Compose for Flume/Yi Integration Tests
+#
+# This file sets up the infrastructure needed for integration tests:
+# - PostgreSQL: For persistence layer tests
+# - RabbitMQ (optional): For event correlation tests
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d
+#   npm run test:integration
+#   docker compose -f docker-compose.test.yml down
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flume-test-postgres
+    environment:
+      POSTGRES_USER: flume_test
+      POSTGRES_PASSWORD: flume_test_password
+      POSTGRES_DB: flume_test
+    ports:
+      - "5433:5432"  # Use non-standard port to avoid conflicts
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flume_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: flume-test-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: flume_test
+      RABBITMQ_DEFAULT_PASS: flume_test_password
+    ports:
+      - "5673:5672"   # AMQP port (non-standard)
+      - "15673:15672" # Management UI (non-standard)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

@@ -1,5 +1,6 @@
 /**
  * Task Types - The work units flowing through Flume
+ * @category Task
  */
 
 /**

@@ -1,0 +1,199 @@
+version: "6.0.0"
+project_name: "Flume"
+project_level: 2
+current_sprint: 3
+sprint_plan_path: "docs/sprint-plan-flume-2026-01-05.md"
+
+sprints:
+  - sprint_number: 1
+    start_date: "2026-01-06"
+    end_date: "2026-01-17"
+    capacity_points: 25
+    committed_points: 24
+    completed_points: 24
+    status: "completed"
+    goal: "Complete core protocol validation and establish robust Yi adapter foundation with health monitoring"
+    stories:
+      - story_id: "STORY-001"
+        title: "TypeDoc Documentation for Flume Core"
+        points: 3
+        priority: "must_have"
+        epic: "EPIC-001"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-002"
+        title: "Runtime Type Validation Helpers"
+        points: 3
+        priority: "should_have"
+        epic: "EPIC-001"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-003"
+        title: "Edge Case Handling for State Transitions"
+        points: 2
+        priority: "should_have"
+        epic: "EPIC-001"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-004"
+        title: "Round-Robin Selection Strategy"
+        points: 3
+        priority: "must_have"
+        epic: "EPIC-002"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-006"
+        title: "Health Check Endpoints"
+        points: 3
+        priority: "must_have"
+        epic: "EPIC-002"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-007"
+        title: "Graceful Shutdown Handling"
+        points: 3
+        priority: "must_have"
+        epic: "EPIC-002"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-008"
+        title: "Unit Test Coverage for Yi-Adapter"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-002"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-015"
+        title: "PostgreSQL Schema and Migrations"
+        points: 2
+        priority: "should_have"
+        epic: "EPIC-004"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+
+  - sprint_number: 2
+    start_date: "2026-01-20"
+    end_date: "2026-01-31"
+    capacity_points: 25
+    committed_points: 25
+    completed_points: 25
+    status: "completed"
+    goal: "Production-ready Claude and Letta adapters with persistence layer"
+    stories:
+      - story_id: "STORY-005"
+        title: "Skill-Match Selection Strategy"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-002"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-009"
+        title: "Claude Streaming Support"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-010"
+        title: "Claude Tool Use Integration"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-012"
+        title: "Letta Agent Persistence"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-016"
+        title: "Agent State Persistence Queries"
+        points: 3
+        priority: "should_have"
+        epic: "EPIC-004"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-017"
+        title: "Task History Persistence"
+        points: 2
+        priority: "should_have"
+        epic: "EPIC-004"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+
+  - sprint_number: 3
+    start_date: "2026-02-03"
+    end_date: "2026-02-14"
+    capacity_points: 25
+    committed_points: 19
+    completed_points: 19
+    status: "completed"
+    goal: "Integration completeness and optional enhancements"
+    stories:
+      - story_id: "STORY-011"
+        title: "Claude Context Window Management"
+        points: 3
+        priority: "could_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-013"
+        title: "Letta Memory Block Management"
+        points: 3
+        priority: "could_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-014"
+        title: "Integration Tests for Adapters"
+        points: 5
+        priority: "should_have"
+        epic: "EPIC-003"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-018"
+        title: "Plane Issue Sync Implementation"
+        points: 5
+        priority: "could_have"
+        epic: "EPIC-004"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+      - story_id: "STORY-019"
+        title: "Jelmore Bidirectional Communication"
+        points: 3
+        priority: "could_have"
+        epic: "EPIC-004"
+        status: "completed"
+        assigned_to: null
+        completion_date: "2026-01-05"
+
+velocity:
+  sprint_1: 24
+  sprint_2: 25
+  sprint_3: 19
+  rolling_average: 22.67
+
+team:
+  size: 1
+  sprint_length_weeks: 2
+  capacity_per_sprint: 25

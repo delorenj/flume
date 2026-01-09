@@ -27,6 +27,7 @@ export {
 export {
   LettaContributor,
   type LettaContributorConfig,
+  type LettaAgentState,
 } from './agents/letta-contributor.js';
 
 export {
@@ -47,3 +48,19 @@ export {
 
 // Memory
 export { LettaMemoryStrategy } from './memory/letta-memory.js';
+
+// Memory Block Management
+export {
+  MemoryBlockManager,
+  createMemoryManager,
+  type MemoryBlockManagerConfig,
+  type MemoryBlockType,
+  type TypedMemoryBlock,
+  type CoreMemoryContent,
+  type PersonaMemoryContent,
+  type KnowledgeMemoryContent,
+  type TaskContextMemoryContent,
+  type TeamContextMemoryContent,
+  type MemoryStats,
+  type MemoryBlockChange,
+} from './memory/index.js';

@@ -33,4 +33,5 @@ export {
 export {
   SessionContributor,
   type SessionContributorConfig,
+  type CompletionResult,
 } from './session/session-contributor.js';

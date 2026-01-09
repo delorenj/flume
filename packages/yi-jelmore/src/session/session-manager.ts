@@ -124,6 +124,18 @@ export class SessionManager {
   }
 
   /**
+   * Get fresh session info for a task (bypasses cache).
+   * Useful for checking current status during polling.
+   */
+  async getSessionForTask(taskId: string): Promise<SessionInfo | null> {
+    const session = await this.client.getSessionByTask(taskId);
+    if (session) {
+      this.activeSessions.set(taskId, session);
+    }
+    return session;
+  }
+
+  /**
    * Focus on a task's session (navigate to its pane).
    */
   async focusTask(taskId: string): Promise<boolean> {

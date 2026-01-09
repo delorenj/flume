@@ -7,6 +7,8 @@
  * - Delegator: Has subordinates (can assign work)
  * - Manager: Branch node (can delegate AND execute)
  * - Director: Pure orchestrator (can ONLY delegate)
+ *
+ * @category Employee
  */
 
 import type { TaskPayload } from './task.js';

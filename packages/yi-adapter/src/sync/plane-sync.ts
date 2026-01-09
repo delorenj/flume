@@ -213,17 +213,116 @@ export class PlaneSyncService {
       return;
     }
 
-    if (result.status === 'success' || result.status === 'delegated') {
-      await this.plane.completeTask(mapping.planeProjectId, mapping.planeIssueId);
-      console.log(`[PlaneSync] Completed task ${taskId} in Plane`);
-    } else if (result.status === 'failure') {
-      await this.plane.updateTaskState(
+    try {
+      if (result.status === 'success' || result.status === 'delegated') {
+        await this.plane.completeTask(mapping.planeProjectId, mapping.planeIssueId);
+        console.log(`[PlaneSync] Completed task ${taskId} in Plane`);
+      } else if (result.status === 'failure') {
+        await this.plane.updateTaskState(
+          mapping.planeProjectId,
+          mapping.planeIssueId,
+          'Cancelled'
+        );
+        console.log(`[PlaneSync] Marked task ${taskId} as cancelled in Plane`);
+      }
+
+      // Add completion comment with result summary
+      await this.addResultComment(taskId, result);
+    } catch (error) {
+      console.error(`[PlaneSync] Error syncing task completion: ${error}`);
+    }
+  }
+
+  /**
+   * Add a comment with WorkResult summary to the issue.
+   */
+  async addResultComment(taskId: string, result: WorkResult): Promise<void> {
+    const mapping = this.mappings.get(taskId);
+    if (!mapping) return;
+
+    try {
+      const statusEmoji = result.status === 'success' ? '✅' :
+                          result.status === 'delegated' ? '📤' : '❌';
+
+      let comment = `<h3>${statusEmoji} Task ${result.status}</h3>`;
+      comment += `<p><strong>Completed:</strong> ${result.completedAt}</p>`;
+
+      if (result.metrics?.durationMs) {
+        const duration = (result.metrics.durationMs / 1000).toFixed(1);
+        comment += `<p><strong>Duration:</strong> ${duration}s</p>`;
+      }
+
+      if (result.output) {
+        const outputStr = typeof result.output === 'string'
+          ? result.output
+          : JSON.stringify(result.output, null, 2);
+
+        if (outputStr.length > 0 && outputStr.length < 1000) {
+          comment += `<h4>Output</h4><pre><code>${this.escapeHtml(outputStr)}</code></pre>`;
+        } else if (outputStr.length >= 1000) {
+          comment += `<p><em>Output truncated (${outputStr.length} chars)</em></p>`;
+        }
+      }
+
+      if (result.error) {
+        const errorText = `${result.error.code}: ${result.error.message}`;
+        comment += `<h4>Error</h4><pre><code>${this.escapeHtml(errorText)}</code></pre>`;
+      }
+
+      await this.plane.addComment(
         mapping.planeProjectId,
         mapping.planeIssueId,
-        'Cancelled'
+        comment
       );
-      console.log(`[PlaneSync] Marked task ${taskId} as cancelled in Plane`);
+
+      console.log(`[PlaneSync] Added result comment to task ${taskId}`);
+    } catch (error) {
+      console.error(`[PlaneSync] Error adding comment: ${error}`);
     }
+  }
+
+  /**
+   * Link a task issue to a parent task issue.
+   */
+  async linkToParent(
+    taskId: string,
+    parentTaskId: string
+  ): Promise<void> {
+    const childMapping = this.mappings.get(taskId);
+    const parentMapping = this.mappings.get(parentTaskId);
+
+    if (!childMapping || !parentMapping) {
+      console.warn(`[PlaneSync] Cannot link - missing mapping for child or parent`);
+      return;
+    }
+
+    if (childMapping.planeProjectId !== parentMapping.planeProjectId) {
+      console.warn(`[PlaneSync] Cannot link issues across different projects`);
+      return;
+    }
+
+    try {
+      await this.plane.setParentIssue(
+        childMapping.planeProjectId,
+        childMapping.planeIssueId,
+        parentMapping.planeIssueId
+      );
+      console.log(`[PlaneSync] Linked task ${taskId} to parent ${parentTaskId}`);
+    } catch (error) {
+      console.error(`[PlaneSync] Error linking issues: ${error}`);
+    }
+  }
+
+  /**
+   * Escape HTML characters for safe embedding.
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   /**

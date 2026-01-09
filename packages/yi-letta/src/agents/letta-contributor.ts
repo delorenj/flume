@@ -22,6 +22,37 @@ export interface LettaContributorConfig {
 }
 
 /**
+ * Serializable state for Letta agent persistence.
+ * This can be saved to the database and used to restore an agent.
+ */
+export interface LettaAgentState {
+  /** Yi contributor ID */
+  yiId: string;
+  /** Letta server agent ID */
+  lettaAgentId: string;
+  /** Agent configuration */
+  config: {
+    name: string;
+    role: string;
+    teamId: string;
+    skills: string[];
+    salary: number;
+    systemPrompt: string;
+    tools: string[];
+  };
+  /** Memory block snapshots */
+  memoryBlocks: Array<{
+    label: string;
+    value: string;
+  }>;
+  /** Metadata */
+  metadata: {
+    exportedAt: string;
+    version: string;
+  };
+}
+
+/**
  * A Contributor backed by a Letta agent.
  */
 export class LettaContributor extends BaseContributor {
@@ -239,5 +270,164 @@ Always be thorough, precise, and communicate your findings.`;
       }
       this.lettaAgentId = null;
     }
+  }
+
+  // ============================================================================
+  // State Persistence
+  // ============================================================================
+
+  /**
+   * Export agent state for persistence.
+   * Returns a serializable snapshot that can be saved to the database.
+   */
+  async exportState(): Promise<LettaAgentState> {
+    if (!this.lettaAgentId) {
+      throw new Error('Cannot export state: Letta agent not initialized');
+    }
+
+    // Fetch current agent state from Letta server
+    const agent = await this.lettaClient.getAgent(this.lettaAgentId);
+    if (!agent) {
+      throw new Error(`Letta agent not found: ${this.lettaAgentId}`);
+    }
+
+    const state: LettaAgentState = {
+      yiId: this.id,
+      lettaAgentId: this.lettaAgentId,
+      config: {
+        name: this.name,
+        role: this.role,
+        teamId: this.teamId,
+        skills: [...this.skills],
+        salary: this.salary,
+        systemPrompt: this.systemPrompt,
+        tools: [...this.tools],
+      },
+      memoryBlocks: agent.memory.blocks.map((block) => ({
+        label: block.label,
+        value: block.value,
+      })),
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        version: '1.0.0',
+      },
+    };
+
+    console.log(`[${this.name}] Exported agent state`);
+    return state;
+  }
+
+  /**
+   * Import state to update this agent's configuration.
+   * Does not restore Letta server state - use restoreFromState for that.
+   */
+  importState(state: LettaAgentState): void {
+    // Update local config from saved state
+    // Note: We can't change the ID after construction in BaseContributor
+    this.systemPrompt = state.config.systemPrompt;
+    this.tools = [...state.config.tools];
+
+    console.log(`[${this.name}] Imported state configuration`);
+  }
+
+  /**
+   * Restore Letta agent from persisted state.
+   * Will attempt to reconnect to existing Letta agent or create a new one with saved memory.
+   */
+  async restoreFromState(state: LettaAgentState): Promise<void> {
+    console.log(`[${this.name}] Restoring from persisted state...`);
+
+    // First, update local config
+    this.importState(state);
+
+    // Try to reconnect to existing Letta agent
+    const existingAgent = await this.lettaClient.getAgent(state.lettaAgentId);
+
+    if (existingAgent) {
+      // Agent still exists on server - reconnect
+      this.lettaAgentId = state.lettaAgentId;
+      console.log(`[${this.name}] Reconnected to existing Letta agent: ${this.lettaAgentId}`);
+
+      // Update memory blocks to match saved state
+      for (const block of state.memoryBlocks) {
+        try {
+          await this.lettaClient.updateMemoryBlock(
+            this.lettaAgentId,
+            block.label,
+            block.value
+          );
+        } catch (error) {
+          console.warn(
+            `[${this.name}] Failed to restore memory block ${block.label}:`,
+            error
+          );
+        }
+      }
+    } else {
+      // Agent no longer exists - recreate with saved memory
+      console.log(`[${this.name}] Original Letta agent gone, recreating...`);
+
+      const newAgent = await this.lettaClient.createAgent({
+        name: `yi-${this.id}`,
+        description: `Yi Contributor: ${this.name} (${this.role}) [restored]`,
+        system: state.config.systemPrompt,
+        tools: state.config.tools,
+        memoryBlocks: state.memoryBlocks,
+      });
+
+      this.lettaAgentId = newAgent.id;
+      console.log(`[${this.name}] Created new Letta agent: ${this.lettaAgentId}`);
+    }
+
+    console.log(`[${this.name}] Restoration complete`);
+  }
+
+  /**
+   * Check if the Letta agent is still alive on the server.
+   */
+  async isAgentAlive(): Promise<boolean> {
+    if (!this.lettaAgentId) return false;
+
+    const agent = await this.lettaClient.getAgent(this.lettaAgentId);
+    return agent !== null;
+  }
+
+  /**
+   * Sync local memory blocks to Letta server.
+   * Useful for periodic persistence.
+   */
+  async syncMemory(blocks: Array<{ label: string; value: string }>): Promise<void> {
+    if (!this.lettaAgentId) {
+      throw new Error('Cannot sync: Letta agent not initialized');
+    }
+
+    for (const block of blocks) {
+      await this.lettaClient.updateMemoryBlock(
+        this.lettaAgentId,
+        block.label,
+        block.value
+      );
+    }
+
+    console.log(`[${this.name}] Synced ${blocks.length} memory blocks`);
+  }
+
+  /**
+   * Get current memory blocks from Letta server.
+   */
+  async getMemoryBlocks(): Promise<Array<{ label: string; value: string }>> {
+    if (!this.lettaAgentId) {
+      throw new Error('Cannot get memory: Letta agent not initialized');
+    }
+
+    const agent = await this.lettaClient.getAgent(this.lettaAgentId);
+    if (!agent) {
+      throw new Error(`Letta agent not found: ${this.lettaAgentId}`);
+    }
+
+    return agent.memory.blocks.map((block) => ({
+      label: block.label,
+      value: block.value,
+    }));
   }
 }

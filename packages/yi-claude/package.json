@@ -7,7 +7,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "echo 'No tests yet'",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "keywords": ["yi", "claude", "anthropic", "agent", "adapter"],
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3",
-    "@types/uuid": "^9.0.7"
+    "@types/uuid": "^9.0.7",
+    "vitest": "^3.0.0"
   }
 }

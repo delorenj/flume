@@ -3,6 +3,8 @@
  *
  * Provides typed access to the 33GOD database schema.
  * Uses pg library for connection pooling.
+ *
+ * @category Database
  */
 
 import type { Pool, PoolClient, QueryResult } from 'pg';
@@ -403,6 +405,198 @@ export class PostgresClient {
     return result.rows;
   }
 
+  /**
+   * Get tasks assigned to an employee.
+   */
+  async getTasksByEmployee(
+    employeeId: string,
+    options: { state?: string; limit?: number; offset?: number } = {}
+  ): Promise<TaskRecord[]> {
+    const conditions: string[] = ['assignee_id = $1'];
+    const params: unknown[] = [employeeId];
+    let paramIndex = 2;
+
+    if (options.state) {
+      conditions.push(`state = $${paramIndex}`);
+      params.push(options.state);
+      paramIndex++;
+    }
+
+    let query = `SELECT * FROM tasks WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`;
+
+    if (options.limit) {
+      query += ` LIMIT $${paramIndex}`;
+      params.push(options.limit);
+      paramIndex++;
+    }
+
+    if (options.offset) {
+      query += ` OFFSET $${paramIndex}`;
+      params.push(options.offset);
+    }
+
+    const result = await this.query<TaskRecord>(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Get tasks by state.
+   */
+  async getTasksByState(state: string): Promise<TaskRecord[]> {
+    const result = await this.query<TaskRecord>(
+      'SELECT * FROM tasks WHERE state = $1 ORDER BY priority, created_at',
+      [state]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get tasks completed within a date range.
+   */
+  async getCompletedTasksInRange(
+    startDate: Date,
+    endDate: Date,
+    employeeId?: string
+  ): Promise<TaskRecord[]> {
+    const conditions: string[] = [
+      'completed_at >= $1',
+      'completed_at <= $2',
+      "state IN ('done', 'failed')",
+    ];
+    const params: unknown[] = [startDate, endDate];
+
+    if (employeeId) {
+      conditions.push('assignee_id = $3');
+      params.push(employeeId);
+    }
+
+    const result = await this.query<TaskRecord>(
+      `SELECT * FROM tasks WHERE ${conditions.join(' AND ')} ORDER BY completed_at DESC`,
+      params
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get task metrics for an employee.
+   */
+  async getTaskMetrics(employeeId: string): Promise<TaskMetrics> {
+    const [totals, recentTasks, avgCompletionTime] = await Promise.all([
+      this.query<{ state: string; count: string }>(
+        `SELECT state, COUNT(*) as count FROM tasks
+         WHERE assignee_id = $1
+         GROUP BY state`,
+        [employeeId]
+      ),
+      this.query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM tasks
+         WHERE assignee_id = $1 AND completed_at > NOW() - INTERVAL '7 days'`,
+        [employeeId]
+      ),
+      this.query<{ avg_hours: string }>(
+        `SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) / 3600) as avg_hours
+         FROM tasks
+         WHERE assignee_id = $1 AND completed_at IS NOT NULL AND started_at IS NOT NULL`,
+        [employeeId]
+      ),
+    ]);
+
+    const stateCounts = totals.rows.reduce(
+      (acc, row) => {
+        acc[row.state] = parseInt(row.count, 10);
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    return {
+      employeeId,
+      totalTasks: Object.values(stateCounts).reduce((a, b) => a + b, 0),
+      tasksByState: stateCounts,
+      completedLast7Days: parseInt(recentTasks.rows[0]?.count ?? '0', 10),
+      avgCompletionTimeHours: parseFloat(avgCompletionTime.rows[0]?.avg_hours ?? '0'),
+    };
+  }
+
+  /**
+   * Get tasks grouped by priority.
+   */
+  async getTasksByPriority(): Promise<TaskPriorityBreakdown[]> {
+    const result = await this.query<TaskPriorityBreakdown>(
+      `SELECT
+         priority,
+         COUNT(*) as total,
+         COUNT(CASE WHEN state = 'done' THEN 1 END) as completed,
+         COUNT(CASE WHEN state = 'in_progress' THEN 1 END) as in_progress,
+         COUNT(CASE WHEN state IN ('draft', 'pending') THEN 1 END) as pending
+       FROM tasks
+       GROUP BY priority
+       ORDER BY
+         CASE priority
+           WHEN 'critical' THEN 1
+           WHEN 'high' THEN 2
+           WHEN 'medium' THEN 3
+           WHEN 'low' THEN 4
+         END`
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get recent task activity.
+   */
+  async getRecentTaskActivity(limit = 20): Promise<TaskActivityRecord[]> {
+    const result = await this.query<TaskActivityRecord>(
+      `SELECT
+         t.id,
+         t.title,
+         t.state,
+         t.assignee_id,
+         e.name as assignee_name,
+         t.priority,
+         t.updated_at
+       FROM tasks t
+       LEFT JOIN employees e ON t.assignee_id = e.id
+       ORDER BY t.updated_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get task completion trends.
+   */
+  async getTaskCompletionTrends(
+    days = 30,
+    employeeId?: string
+  ): Promise<TaskCompletionTrend[]> {
+    const conditions: string[] = [
+      "state IN ('done', 'failed')",
+      'completed_at >= NOW() - $1::interval',
+    ];
+    const params: unknown[] = [`${days} days`];
+
+    if (employeeId) {
+      conditions.push('assignee_id = $2');
+      params.push(employeeId);
+    }
+
+    const result = await this.query<TaskCompletionTrend>(
+      `SELECT
+         DATE(completed_at) as date,
+         COUNT(*) as total,
+         COUNT(CASE WHEN state = 'done' THEN 1 END) as completed,
+         COUNT(CASE WHEN state = 'failed' THEN 1 END) as failed
+       FROM tasks
+       WHERE ${conditions.join(' AND ')}
+       GROUP BY DATE(completed_at)
+       ORDER BY date DESC`,
+      params
+    );
+    return result.rows;
+  }
+
   // ============================================================================
   // Team Operations
   // ============================================================================
@@ -512,4 +706,276 @@ export class PostgresClient {
       [employeeId, fromState, toState, reason, taskId ?? null, correlationId ?? null]
     );
   }
+
+  /**
+   * Get state history for an employee.
+   */
+  async getStateHistory(
+    employeeId: string,
+    options: { limit?: number; since?: Date } = {}
+  ): Promise<StateHistoryRecord[]> {
+    const conditions = ['employee_id = $1'];
+    const params: unknown[] = [employeeId];
+    let paramIndex = 2;
+
+    if (options.since) {
+      conditions.push(`created_at >= $${paramIndex}`);
+      params.push(options.since);
+      paramIndex++;
+    }
+
+    const limit = options.limit ? `LIMIT ${options.limit}` : '';
+
+    const result = await this.query<StateHistoryRecord>(
+      `SELECT * FROM agent_state_history
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY created_at DESC
+       ${limit}`,
+      params
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get state history for a correlation ID.
+   */
+  async getStateHistoryByCorrelation(correlationId: string): Promise<StateHistoryRecord[]> {
+    const result = await this.query<StateHistoryRecord>(
+      'SELECT * FROM agent_state_history WHERE correlation_id = $1 ORDER BY created_at',
+      [correlationId]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get employees by current state.
+   */
+  async getEmployeesByState(state: string): Promise<EmployeeRecord[]> {
+    const result = await this.query<EmployeeRecord>(
+      'SELECT * FROM employees WHERE state = $1 ORDER BY name',
+      [state]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get employees currently working on tasks.
+   */
+  async getActiveEmployees(): Promise<EmployeeRecord[]> {
+    const result = await this.query<EmployeeRecord>(
+      `SELECT * FROM employees
+       WHERE state IN ('working', 'delegating', 'reviewing')
+       ORDER BY name`
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get employees needing attention (errored or blocked).
+   */
+  async getEmployeesNeedingAttention(): Promise<EmployeeRecord[]> {
+    const result = await this.query<EmployeeRecord>(
+      `SELECT * FROM employees
+       WHERE state IN ('errored', 'blocked')
+       ORDER BY updated_at DESC`
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get agent metrics (performance statistics).
+   */
+  async getAgentMetrics(employeeId: string): Promise<AgentMetrics> {
+    const [employee, stateChanges, recentTasks] = await Promise.all([
+      this.getEmployee(employeeId),
+      this.query<{ count: string }>(
+        'SELECT COUNT(*) as count FROM agent_state_history WHERE employee_id = $1',
+        [employeeId]
+      ),
+      this.query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM tasks
+         WHERE assignee_id = $1 AND completed_at > NOW() - INTERVAL '7 days'`,
+        [employeeId]
+      ),
+    ]);
+
+    return {
+      employeeId,
+      tasksCompleted: employee?.tasks_completed ?? 0,
+      tasksFailed: employee?.tasks_failed ?? 0,
+      totalStateTransitions: parseInt(stateChanges.rows[0]?.count ?? '0', 10),
+      tasksLast7Days: parseInt(recentTasks.rows[0]?.count ?? '0', 10),
+      currentState: employee?.state ?? 'unknown',
+      successRate: employee
+        ? employee.tasks_completed / Math.max(1, employee.tasks_completed + employee.tasks_failed)
+        : 0,
+    };
+  }
+
+  /**
+   * Get state transition patterns for analysis.
+   */
+  async getStateTransitionPatterns(options: {
+    since?: Date;
+    employeeId?: string;
+  } = {}): Promise<StateTransitionPattern[]> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    let paramIndex = 1;
+
+    if (options.since) {
+      conditions.push(`created_at >= $${paramIndex}`);
+      params.push(options.since);
+      paramIndex++;
+    }
+
+    if (options.employeeId) {
+      conditions.push(`employee_id = $${paramIndex}`);
+      params.push(options.employeeId);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await this.query<StateTransitionPattern>(
+      `SELECT
+         from_state,
+         to_state,
+         COUNT(*) as count,
+         COUNT(DISTINCT employee_id) as unique_employees
+       FROM agent_state_history
+       ${whereClause}
+       GROUP BY from_state, to_state
+       ORDER BY count DESC`,
+      params
+    );
+    return result.rows;
+  }
+
+  /**
+   * Get time spent in each state for an employee.
+   */
+  async getStateTimeBreakdown(
+    employeeId: string,
+    since?: Date
+  ): Promise<StateTimeBreakdown[]> {
+    const params: unknown[] = [employeeId];
+    const sinceCondition = since
+      ? 'AND created_at >= $2'
+      : '';
+    if (since) params.push(since);
+
+    const result = await this.query<StateTimeBreakdown>(
+      `WITH state_durations AS (
+         SELECT
+           from_state,
+           to_state,
+           created_at,
+           LEAD(created_at) OVER (PARTITION BY employee_id ORDER BY created_at) as next_transition
+         FROM agent_state_history
+         WHERE employee_id = $1 ${sinceCondition}
+       )
+       SELECT
+         to_state as state,
+         COUNT(*) as entry_count,
+         COALESCE(SUM(EXTRACT(EPOCH FROM (next_transition - created_at))), 0) as total_seconds
+       FROM state_durations
+       WHERE next_transition IS NOT NULL
+       GROUP BY to_state
+       ORDER BY total_seconds DESC`,
+      params
+    );
+    return result.rows;
+  }
+}
+
+/**
+ * State history record from database.
+ */
+export interface StateHistoryRecord extends Record<string, unknown> {
+  id: string;
+  employee_id: string;
+  from_state: string;
+  to_state: string;
+  reason: string;
+  task_id: string | null;
+  correlation_id: string | null;
+  error: string | null;
+  created_at: Date;
+}
+
+/**
+ * Agent performance metrics.
+ */
+export interface AgentMetrics {
+  employeeId: string;
+  tasksCompleted: number;
+  tasksFailed: number;
+  totalStateTransitions: number;
+  tasksLast7Days: number;
+  currentState: string;
+  successRate: number;
+}
+
+/**
+ * State transition pattern for analysis.
+ */
+export interface StateTransitionPattern {
+  from_state: string;
+  to_state: string;
+  count: string;
+  unique_employees: string;
+}
+
+/**
+ * Time breakdown by state.
+ */
+export interface StateTimeBreakdown {
+  state: string;
+  entry_count: string;
+  total_seconds: string;
+}
+
+/**
+ * Task metrics for an employee.
+ */
+export interface TaskMetrics {
+  employeeId: string;
+  totalTasks: number;
+  tasksByState: Record<string, number>;
+  completedLast7Days: number;
+  avgCompletionTimeHours: number;
+}
+
+/**
+ * Task priority breakdown.
+ */
+export interface TaskPriorityBreakdown {
+  priority: string;
+  total: string;
+  completed: string;
+  in_progress: string;
+  pending: string;
+}
+
+/**
+ * Task activity record with assignee info.
+ */
+export interface TaskActivityRecord {
+  id: string;
+  title: string;
+  state: string;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  priority: string;
+  updated_at: Date;
+}
+
+/**
+ * Task completion trend by date.
+ */
+export interface TaskCompletionTrend {
+  date: Date;
+  total: string;
+  completed: string;
+  failed: string;
 }

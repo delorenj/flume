@@ -1,5 +1,6 @@
 /**
  * State Types - Agent lifecycle states
+ * @category State
  */
 
 /**

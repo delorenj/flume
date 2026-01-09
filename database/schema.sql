@@ -1,10 +1,23 @@
 -- Flume/Yi Database Schema
 -- 33GOD Ecosystem - Agent Orchestration Layer
 --
+-- This file is the source of truth for the database schema.
+-- For incremental migrations, see database/migrations/
+--
 -- Connection: postgresql://delorenj:REDACTED_CREDENTIAL@192.168.1.12:5432/33god
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- SCHEMA MIGRATIONS TABLE
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version VARCHAR(50) PRIMARY KEY,
+  description VARCHAR(255),
+  applied_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- ============================================================================
 -- ENUMS
@@ -42,6 +55,23 @@ CREATE TYPE employee_role AS ENUM (
   'contributor',   -- Leaf node - does work
   'manager',       -- Branch node - can delegate AND execute
   'director'       -- Pure orchestrator - only delegates
+);
+
+-- Agent framework types
+CREATE TYPE agent_type AS ENUM (
+  'letta',         -- Letta agent framework
+  'agno',          -- Agno framework
+  'claude',        -- Claude/Anthropic
+  'smolagents',    -- HuggingFace smolagents
+  'custom'         -- Custom implementation
+);
+
+-- Task priority levels
+CREATE TYPE task_priority AS ENUM (
+  'critical',
+  'high',
+  'medium',
+  'low'
 );
 
 -- Memory shard types
@@ -100,31 +130,45 @@ CREATE TABLE teams (
 );
 
 -- Employees - Yi nodes (agents) with skills and memory
+-- Aligned with EmployeeRecord in postgres-client.ts
 CREATE TABLE employees (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
-  role VARCHAR(255) NOT NULL,
-  role_type employee_role NOT NULL DEFAULT 'contributor',
+  role employee_role NOT NULL DEFAULT 'contributor',
 
-  -- Team membership
-  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
-  manager_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  -- Agent framework details
+  agent_type agent_type NOT NULL DEFAULT 'custom',
+
+  -- Personality and background
+  personality TEXT,
+  background TEXT,
+  system_prompt TEXT,
 
   -- Current state
   state agent_state NOT NULL DEFAULT 'initializing',
   current_task_id UUID,  -- Forward reference to tasks
 
+  -- Team membership
+  team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
+  reports_to_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+
   -- Skills and capabilities
   skills TEXT[] DEFAULT ARRAY[]::TEXT[],
+  domains_of_expertise TEXT[] DEFAULT ARRAY[]::TEXT[],
+  domains_of_experience TEXT[] DEFAULT ARRAY[]::TEXT[],
   salary INTEGER DEFAULT 50000,  -- Importance metric
 
-  -- Agent framework details
-  framework VARCHAR(50),  -- letta, agno, claude, smolagents, echo
-  framework_agent_id VARCHAR(255),  -- ID in external system
+  -- Performance tracking
+  tasks_completed INTEGER DEFAULT 0,
+  tasks_failed INTEGER DEFAULT 0,
+
+  -- MCP server configuration
+  mcp_servers JSONB,
 
   -- Metadata
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  terminated_at TIMESTAMPTZ
 );
 
 -- Add director FK to projects
@@ -153,25 +197,38 @@ CREATE UNIQUE INDEX idx_memory_shard_active
   WHERE is_active = TRUE;
 
 -- Tasks - Flume-managed, synced with Plane
+-- Aligned with TaskRecord in postgres-client.ts
 CREATE TABLE tasks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
   -- Task details
-  objective TEXT NOT NULL,
-  context JSONB DEFAULT '{}',
-  priority INTEGER DEFAULT 0,
+  title VARCHAR(500) NOT NULL,
+  description TEXT,
+  requirements JSONB,
+  acceptance_criteria JSONB,
+  plan TEXT,
+
+  -- Priority and organization
+  priority task_priority NOT NULL DEFAULT 'medium',
   tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   timeout_ms INTEGER,
 
+  -- State
+  state task_state NOT NULL DEFAULT 'draft',
+
   -- Hierarchy
   parent_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  repo_id VARCHAR(255),
   correlation_id UUID NOT NULL,  -- Links related tasks
 
   -- Assignment
-  state task_state NOT NULL DEFAULT 'draft',
-  assigned_to UUID REFERENCES employees(id) ON DELETE SET NULL,
-  delegated_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-  delegation_depth INTEGER DEFAULT 0,
+  assignee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  active_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+
+  -- Creation tracking
+  created_by_employee_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+  created_by_human VARCHAR(255),
 
   -- Results
   result_status VARCHAR(50),
@@ -208,15 +265,17 @@ CREATE TABLE task_contributors (
 );
 
 -- Agent state history - Full observability
+-- Aligned with logStateTransition in postgres-client.ts
 CREATE TABLE agent_state_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
 
   from_state agent_state NOT NULL,
   to_state agent_state NOT NULL,
-  trigger VARCHAR(255) NOT NULL,
+  reason VARCHAR(255) NOT NULL,
 
   task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+  correlation_id UUID,
   error TEXT,
 
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -280,6 +339,7 @@ CREATE TABLE peer_reviews (
 );
 
 -- Bloodbank events - Event sourcing log
+-- Aligned with BloodbankEventRecord in postgres-client.ts
 CREATE TABLE bloodbank_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
@@ -309,18 +369,21 @@ CREATE TABLE bloodbank_events (
 -- Tasks
 CREATE INDEX idx_tasks_correlation ON tasks(correlation_id);
 CREATE INDEX idx_tasks_state ON tasks(state);
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX idx_tasks_active_employee ON tasks(active_employee_id);
 CREATE INDEX idx_tasks_parent ON tasks(parent_task_id);
+CREATE INDEX idx_tasks_project ON tasks(project_id);
 CREATE INDEX idx_tasks_plane_issue ON tasks(plane_issue_id);
 
 -- Employees
 CREATE INDEX idx_employees_team ON employees(team_id);
-CREATE INDEX idx_employees_manager ON employees(manager_id);
+CREATE INDEX idx_employees_reports_to ON employees(reports_to_id);
 CREATE INDEX idx_employees_state ON employees(state);
-CREATE INDEX idx_employees_framework ON employees(framework);
+CREATE INDEX idx_employees_agent_type ON employees(agent_type);
 
 -- Agent state history
 CREATE INDEX idx_state_history_employee ON agent_state_history(employee_id);
+CREATE INDEX idx_state_history_correlation ON agent_state_history(correlation_id);
 CREATE INDEX idx_state_history_created ON agent_state_history(created_at);
 
 -- Bloodbank events
@@ -344,26 +407,26 @@ CREATE INDEX idx_sessions_employee ON sessions(employee_id);
 CREATE VIEW v_agent_state_distribution AS
 SELECT
   state,
-  role_type,
+  role,
   COUNT(*) as count
 FROM employees
 WHERE state != 'terminated'
-GROUP BY state, role_type
-ORDER BY role_type, state;
+GROUP BY state, role
+ORDER BY role, state;
 
 -- Task throughput by agent (last 7 days)
 CREATE VIEW v_task_throughput AS
 SELECT
   e.id as employee_id,
   e.name,
-  e.role_type,
+  e.role,
   COUNT(t.id) as completed_tasks,
   AVG((t.result_metrics->>'durationMs')::INTEGER) as avg_duration_ms
 FROM employees e
-LEFT JOIN tasks t ON t.assigned_to = e.id
+LEFT JOIN tasks t ON t.assignee_id = e.id
   AND t.state = 'done'
   AND t.completed_at > NOW() - INTERVAL '7 days'
-GROUP BY e.id, e.name, e.role_type
+GROUP BY e.id, e.name, e.role
 ORDER BY completed_tasks DESC;
 
 -- Delegation chain depth analysis
@@ -392,9 +455,9 @@ SELECT
   t.name as team_name,
   p.name as project_name,
   COUNT(e.id) as member_count,
-  COUNT(CASE WHEN e.role_type = 'director' THEN 1 END) as directors,
-  COUNT(CASE WHEN e.role_type = 'manager' THEN 1 END) as managers,
-  COUNT(CASE WHEN e.role_type = 'contributor' THEN 1 END) as contributors
+  COUNT(CASE WHEN e.role = 'director' THEN 1 END) as directors,
+  COUNT(CASE WHEN e.role = 'manager' THEN 1 END) as managers,
+  COUNT(CASE WHEN e.role = 'contributor' THEN 1 END) as contributors
 FROM teams t
 LEFT JOIN projects p ON t.project_id = p.id
 LEFT JOIN employees e ON e.team_id = t.id
@@ -435,7 +498,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.state IS DISTINCT FROM NEW.state THEN
     INSERT INTO agent_state_history (
-      employee_id, from_state, to_state, trigger, task_id
+      employee_id, from_state, to_state, reason, task_id
     ) VALUES (
       NEW.id, OLD.state, NEW.state, 'db_update', NEW.current_task_id
     );
@@ -447,6 +510,27 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER tr_log_state_change
   AFTER UPDATE ON employees
   FOR EACH ROW EXECUTE FUNCTION log_agent_state_change();
+
+-- Increment task counters on completion
+CREATE OR REPLACE FUNCTION update_task_counters()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.state IS DISTINCT FROM NEW.state THEN
+    IF NEW.state = 'done' AND NEW.assignee_id IS NOT NULL THEN
+      UPDATE employees SET tasks_completed = tasks_completed + 1
+      WHERE id = NEW.assignee_id;
+    ELSIF NEW.state = 'failed' AND NEW.assignee_id IS NOT NULL THEN
+      UPDATE employees SET tasks_failed = tasks_failed + 1
+      WHERE id = NEW.assignee_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tr_update_task_counters
+  AFTER UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION update_task_counters();
 
 -- ============================================================================
 -- SEED DATA
