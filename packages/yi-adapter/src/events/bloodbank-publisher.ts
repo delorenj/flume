@@ -23,7 +23,7 @@ export interface BloodbankConfig {
  * Default Bloodbank configuration for 33GOD.
  */
 export const DEFAULT_BLOODBANK_CONFIG: BloodbankConfig = {
-  url: process.env.RABBITMQ_URL ?? 'amqp://delorenj:REDACTED_CREDENTIAL@192.168.1.12:5672',
+  url: process.env.RABBITMQ_URL ?? 'amqp://user:pass@localhost:5672',
   exchange: 'amq.topic',
 };
 

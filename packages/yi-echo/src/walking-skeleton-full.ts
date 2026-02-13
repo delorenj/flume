@@ -23,7 +23,7 @@ import {
   EchoMemory,
 } from './index.js';
 
-const PLANE_API_KEY = 'plane_api_72e0decd8f9e46e68e2885521b8d64ff';
+const PLANE_API_KEY = process.env.PLANE_API_KEY ?? 'your_plane_api_key_here';
 
 console.log('═══════════════════════════════════════════════════════════');
 console.log('  🏢 33GOD AGENTIC PIPELINE - FULL WALKING SKELETON');
@@ -39,7 +39,7 @@ async function runFullSkeleton(): Promise<void> {
     {
       serviceName: 'yi.echo.full-skeleton',
       bloodbank: {
-        url: 'amqp://delorenj:REDACTED_CREDENTIAL@192.168.1.12:5672',
+        url: 'amqp://user:pass@localhost:5672',
         exchange: 'amq.topic',
       },
       plane: {

@@ -909,7 +909,7 @@ The doc is ready for your review. Want to start spinning up the Postgres schema,
 4. Escalation travels up the chain, just like a real company. Manager i responsible for his teams results. Director is responsible for his managers (direct reports). An upstream manager can re-evaluate and try something new, or throw it up the chain. Ultimately, it will end up a “Needs Input” question to the human CEO.
 
 Plane Workspace: [33GOD](https://plane.delo.sh/33god/projects)
-Use existing postgres: delorenj:REDACTED_CREDENTIAL:192.168.1.12:5432/33god
+Use existing postgres: user:pass:192.168.1.12:5432/33god
 Use existing redis (when needed): 192.168.1.12 passwordless
 Use existing qdrant for all your vector needs: 192.168.1.12:6333 API_KEY=`touchmyflappyfoldyholds`
 
