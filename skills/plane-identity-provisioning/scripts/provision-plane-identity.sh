@@ -37,18 +37,55 @@ PLANE_KEY="$(op read 'op://DeLoSecrets/Plane/Main/apiKey')"
 
 # ── 1. email ────────────────────────────────────────────────────────────────────
 step 1 "Cloudflare email routing: ${EMAIL} -> ${FORWARD_TO}"
-CF_TOKEN="$(op read 'op://DeLoSecrets/Cloudflare-EmailRouting/token' 2>/dev/null || true)"
-[[ -n "$CF_TOKEN" ]] || die "no Cloudflare Email Routing token at op://DeLoSecrets/Cloudflare-EmailRouting/token"
-EXISTING_RULE="$(curl -sS "${CF_API}/zones/${CF_ZONE}/email/routing/rules?per_page=200" \
-  -H "Authorization: Bearer ${CF_TOKEN}" \
-  | python3 -c "
+# Two credential shapes live in the vault and they authenticate DIFFERENTLY.
+#   Cloudflare-EmailRouting/token  -> a scoped token, "Authorization: Bearer".
+#                                     Verified 2026-09-20: it authenticates for NEITHER read nor
+#                                     write on this zone (code 10000 on both list and create).
+#   Cloudflare/globalAPIToken      -> a 37-char GLOBAL API KEY. Not a bearer token; it needs
+#                                     X-Auth-Key + X-Auth-Email or Cloudflare 400s.
+# Pick whichever actually works by PROVING a read first, then reuse that mode for the write.
+CF_SCOPED="$(op read 'op://DeLoSecrets/Cloudflare-EmailRouting/token' 2>/dev/null || true)"
+CF_GLOBAL="$(op read 'op://DeLoSecrets/Cloudflare/globalAPIToken' 2>/dev/null || true)"
+CF_EMAIL="${CLOUDFLARE_ACCOUNT_EMAIL:-jaradd@gmail.com}"
+cf_curl() {
+  if [[ "${CF_MODE}" == "global" ]]; then
+    curl -sS -H "X-Auth-Key: ${CF_GLOBAL}" -H "X-Auth-Email: ${CF_EMAIL}" "$@"
+  else
+    curl -sS -H "Authorization: Bearer ${CF_SCOPED}" "$@"
+  fi
+}
+cf_list() { cf_curl "${CF_API}/zones/${CF_ZONE}/email/routing/rules?per_page=200"; }
+
+# Prove the credential before trusting anything it says. A failed LIST returns no rules, which
+# is indistinguishable from "no rule exists" — and that is precisely how an idempotent step
+# creates a duplicate. This exact bug produced a "Duplicated Zone rule" on 2026-09-20.
+CF_MODE=""; CF_RULES=""
+for mode in scoped global; do
+  case "$mode" in
+    scoped) [[ -n "$CF_SCOPED" ]] || continue ;;
+    global) [[ -n "$CF_GLOBAL" ]] || continue ;;
+  esac
+  CF_MODE="$mode"
+  CF_RULES="$(cf_list)"
+  if echo "$CF_RULES" | grep -q '"success": *true'; then
+    log "cloudflare auth: ${mode}"
+    break
+  fi
+  CF_MODE=""
+done
+[[ -n "$CF_MODE" ]] || die "no Cloudflare credential can read this zone (tried scoped token and global API key)"
+
+EXISTING_RULE="$(printf '%s' "$CF_RULES" | python3 -c "
 import sys,json
 addr=sys.argv[1]; d=json.load(sys.stdin)
+if not d.get('success'):
+    sys.stderr.write('cloudflare list failed: %s\\n' % d.get('errors')); sys.exit(2)
 for r in d.get('result') or []:
     for m in r.get('matchers') or []:
         if m.get('field')=='to' and m.get('value')==addr:
-            print(r.get('tag') or r.get('id')); break
-" "$EMAIL")"
+            print(r.get('tag') or r.get('id')); sys.exit(0)
+" "$EMAIL")" || die "could not read existing email rules — refusing to risk a duplicate"
+
 if [[ -n "$EXISTING_RULE" ]]; then
   log "rule exists (${EXISTING_RULE}) — reusing"
 else
@@ -58,16 +95,19 @@ print(json.dumps({'name':f'hermes:{sys.argv[1]}','enabled':True,'priority':100,
  'matchers':[{'field':'to','type':'literal','value':sys.argv[2]}],
  'actions':[{'type':'forward','value':[sys.argv[3]]}]}))" "$AGENT" "$EMAIL" "$FORWARD_TO")"
   if (( DRY )); then log "DRY-RUN: would POST email routing rule"; else
-    RESP="$(curl -sS -X POST "${CF_API}/zones/${CF_ZONE}/email/routing/rules" \
-      -H "Authorization: Bearer ${CF_TOKEN}" -H 'Content-Type: application/json' -d "$BODY")"
-    echo "$RESP" | grep -q '"success":true' || die "email rule create failed: $RESP"
+    RESP="$(cf_curl -X POST "${CF_API}/zones/${CF_ZONE}/email/routing/rules" \
+      -H 'Content-Type: application/json' -d "$BODY")"
+    echo "$RESP" | grep -q '"success": *true' || die "email rule create failed: $RESP"
     log "rule created"
   fi
 fi
 
 # ── 2. password ─────────────────────────────────────────────────────────────────
 step 2 "password into 1Password (never to disk)"
-if op item get "$OP_ITEM" --fields password >/dev/null 2>&1; then
+# --vault is MANDATORY for a service account: `op item get` without it fails with
+# "a vault query must be provided when this command is called by a service account",
+# which reads as "item not found" and makes this step create a duplicate every run.
+if op item get "$OP_ITEM" --vault DeLoSecrets --fields password --reveal >/dev/null 2>&1; then
   log "password already stored — reusing"
 else
   if (( DRY )); then log "DRY-RUN: would generate + store password"; else
@@ -103,10 +143,21 @@ for m in rows:
 if [[ -n "$IS_MEMBER" ]]; then
   log "already a member (${IS_MEMBER})"
 else
-  run curl -sS -X POST "${PLANE_BASE}/api/v1/workspaces/${WORKSPACE}/invitations/" \
-    -H "X-API-Key: ${PLANE_KEY}" -H 'Content-Type: application/json' \
-    -d "{\"emails\":[{\"email\":\"${EMAIL}\",\"role\":15}]}" >/dev/null
-  log "invitation sent"
+  # Payload is a FLAT dict with a singular `email`. {"emails":[{...}]} is silently
+  # rejected with {"email":["This field is required."]} and a 200-shaped body, so an
+  # unchecked POST reports success and invites nobody. Verify the response.
+  if (( DRY )); then log "DRY-RUN: would invite ${EMAIL}"; else
+    INV="$(curl -sS -X POST "${PLANE_BASE}/api/v1/workspaces/${WORKSPACE}/invitations/" \
+      -H "X-API-Key: ${PLANE_KEY}" -H 'Content-Type: application/json' \
+      -d "{\"email\":\"${EMAIL}\",\"role\":15}")"
+    if echo "$INV" | grep -q '"id"'; then
+      log "invitation created"
+    elif echo "$INV" | grep -qi 'already\|exists'; then
+      log "invitation already exists — reusing"
+    else
+      die "invitation failed: $INV"
+    fi
+  fi
 fi
 
 # ── 5+6. mint the token (ego-browser) and store it ──────────────────────────────

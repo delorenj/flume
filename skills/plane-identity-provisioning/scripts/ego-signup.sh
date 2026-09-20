@@ -4,7 +4,7 @@
 set -euo pipefail
 : "${EMAIL:?}" "${OP_ITEM:?}" "${TASK:?}" "${PLANE_BASE:?}"
 
-PW="$(op read "op://DeLoSecrets/${OP_ITEM}/password")"
+export PW="$(op read "op://DeLoSecrets/${OP_ITEM}/password")"
 [[ -n "$PW" ]] || { echo "no password stored for ${OP_ITEM}" >&2; exit 1; }
 
 # The password must ride inside the heredoc — ego lite has no env passthrough. The audit
