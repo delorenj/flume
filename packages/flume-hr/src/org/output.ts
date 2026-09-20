@@ -53,7 +53,7 @@ import {
   type FleetStatusVerdict,
 } from "./types";
 import { compareStatusFindings, hostSortKey, observationSortKey } from "./health";
-import { bold, cyan, dim, glyph, gray, green, joinDot, padVisible, red, statusStyle, yellow } from "../utils/style";
+import { bold, cyan, dim, glyph, gray, green, joinDot, padVisible, red, statusStyle, terminalWidth, truncateVisible, visibleWidth, yellow } from "../utils/style";
 
 /** Commands allowed to produce a fleet envelope. */
 export const FLEET_COMMANDS = ["fleet.contract.validate", "fleet.inventory", "fleet.provenance", "fleet.status"] as const;
@@ -595,103 +595,420 @@ function findingGlyph(severity: FleetInventoryFinding["severity"]): string {
   return dim(glyph.info);
 }
 
-function conflictLine(group: FleetConflictGroup): string {
-  const verdict = group.permitted
-    ? gray(`permitted${group.exception_id ? ` by ${bounded(group.exception_id)}` : ""}`)
-    : red("unpermitted");
-  return `    ${group.permitted ? gray(glyph.skip) : red(glyph.fail)}  ${bold(bounded(group.value))}  ${dim(glyph.dot)}  ${verdict}`;
+/**
+ * One reason an employee's row is not clean: a finding, or a conflict group
+ * they are a claimant in.
+ *
+ * Findings and conflicts used to be two sections of their own, so "what is
+ * wrong with THIS agent" meant scrolling three blocks and matching opaque
+ * conflict ids by eye. To the operator they are the same thing -- a reason this
+ * row is not clean -- so they share one shape and print UNDER the row they
+ * belong to. Nothing here changes the envelope: both lists are still emitted
+ * whole, in their own order, by the inventory the CLI hands `--json`.
+ */
+interface InventoryIssue {
+  /** 2 broken, 1 imperfect, 0 informational. Drives the row glyph and the tally. */
+  rank: 0 | 1 | 2;
+  glyph: string;
+  code: string;
+  field: string;
+  owner: string | null;
+  detail: string;
+  /** Set only in the unattributed block, where the row above no longer names the subject. */
+  subject?: string | null;
 }
 
-function rowLines(row: FleetInventoryRow, idWidth: number): string[] {
-  const id = row.agent_id.value ?? "<unnamed>";
-  const state = row.conflicts.length ? "conflicted" : row.malformed ? "unresolved" : row.project_id.state;
-  const style = stateColor(state);
-  const head = `    ${style(state === "resolved" ? glyph.pass : state === "conflicted" ? glyph.fail : glyph.warn)}  `
-    + `${padVisible(bounded(id), idWidth)}  ${cyan(fieldCell(row.role))}  ${dim(fieldCell(row.project_id))}`;
-  const detail = joinDot([
-    dim(`profile ${fieldCell(row.profile_name)} (${row.profile_path.state})`),
-    dim(`role_dir ${row.paths.role_dir?.classification ?? "undeclared"}`),
-    dim(`bloodbank ${fieldCell(row.bloodbank_scope)}/${row.activation.value === true ? "activated" : "deny"}`),
-  ]);
-  const lines = [head, `       ${dim(glyph.arrow)} ${detail}`];
-  if (row.conflicts.length) lines.push(`       ${dim(glyph.arrow)} ${red(`conflicts: ${row.conflicts.join(", ")}`)}`);
-  if (row.findings.length) lines.push(`       ${dim(glyph.arrow)} ${dim(`findings: ${bounded(row.findings.join(", "))}`)}`);
-  return lines;
+function findingIssue(finding: FleetInventoryFinding): InventoryIssue {
+  return {
+    rank: finding.severity === "error" ? 2 : finding.severity === "warn" ? 1 : 0,
+    glyph: findingGlyph(finding.severity),
+    code: finding.code,
+    field: finding.field,
+    owner: finding.source,
+    detail: finding.detail,
+    subject: finding.agent_id,
+  };
+}
+
+/**
+ * A conflict group, told from the point of view of ONE of its claimants.
+ *
+ * The group's own section named every participant, including the agent whose
+ * row it sat nowhere near. Under a row the useful half is who ELSE claims the
+ * value, so that is what it says -- and the group id stays on the line, because
+ * that is the handle the remediation takes.
+ */
+function conflictIssue(group: FleetConflictGroup, agentId: string): InventoryIssue {
+  const others = group.participants.filter((participant) => participant !== agentId);
+  const verdict = group.permitted
+    ? `permitted${group.exception_id ? ` by ${bounded(group.exception_id)}` : ""}`
+    : "unpermitted";
+  const claimants = others.length
+    ? `also claimed by ${others.join(", ")}`
+    : `claimed by ${group.participants.join(", ") || "nobody named"}`;
+  return {
+    rank: group.permitted ? 1 : 2,
+    glyph: group.permitted ? gray(glyph.skip) : red(glyph.fail),
+    code: "conflict",
+    field: group.field,
+    owner: group.owners.join(", ") || null,
+    detail: `${bounded(group.value)} ${glyph.dot} ${claimants} ${glyph.dot} ${verdict} ${glyph.dot} ${group.id}`,
+  };
+}
+
+/** A conflict a row names that the report cannot find. Silence here is a tally that does not add up. */
+function danglingConflictIssue(id: string): InventoryIssue {
+  return {
+    rank: 2,
+    glyph: red(glyph.fail),
+    code: "conflict",
+    field: "-",
+    owner: null,
+    detail: `${bounded(id)} ${glyph.dot} this row names a conflict group that is missing from the report`,
+  };
+}
+
+/** Worst rank in a set. An informational finding must never make a row look broken. */
+function worstRank(issues: readonly InventoryIssue[]): 0 | 1 | 2 {
+  let worst: 0 | 1 | 2 = 0;
+  for (const issue of issues) if (issue.rank > worst) worst = issue.rank;
+  return worst;
+}
+
+/**
+ * The cells the row model does not declare YET.
+ *
+ * `tickets` and `state` are being built by the provider work in flight. This
+ * reads them through an index signature rather than a widened row type, so the
+ * renderer does not have to guess the shape that lands: a scalar, or the
+ * `{ value, source, state }` field shape every other cell already uses, both
+ * render. Until one lands the column prints its placeholder rather than
+ * `undefined`, and this file never fetches anything itself.
+ */
+function optionalCell(row: FleetInventoryRow, key: string): string | null {
+  return scalarCell((row as unknown as Record<string, unknown>)[key]);
+}
+
+/**
+ * Keys a cell-shaped object might carry its one printable value under, in the
+ * order they win. `value` is the `FleetFieldValue` shape the rest of the row
+ * uses; `total` and `state` are the ones the live provider's `LiveTickets` and
+ * `LiveAgentState` carry. An object whose value is absent -- an unmeasured
+ * ticket count, an agent with no live record -- resolves to null and prints the
+ * placeholder, never a zero it did not measure.
+ */
+const CELL_VALUE_KEYS = ["value", "total", "state", "label", "count"] as const;
+
+function scalarCell(raw: unknown, depth = 0): string | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") return raw.trim() ? bounded(raw, 64) : null;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+  if (Array.isArray(raw)) {
+    const parts = raw.map((item) => scalarCell(item, depth + 1)).filter((item): item is string => Boolean(item));
+    return parts.length ? parts.join(", ") : null;
+  }
+  if (depth < 2 && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    for (const key of CELL_VALUE_KEYS) {
+      if (record[key] === undefined) continue;
+      const nested = scalarCell(record[key], depth + 1);
+      if (nested !== null) return nested;
+    }
+  }
+  return null;
+}
+
+/** The board an agent is bound to, in the short form an operator says out loud. */
+function boardCell(board: FleetInventoryRow["board"]): string | null {
+  const value = board.value;
+  if (!value) return null;
+  return bounded(value.identifier ?? value.workspace ?? value.project_id ?? "", 32) || null;
+}
+
+/** A cell nothing has reported yet. Deliberately not `-`, which this report already means "declared nothing". */
+const PENDING_CELL = "—";
+
+/** Column ceilings, so one pathological id cannot push the table off the terminal. */
+const ROSTER_WIDTHS = { id: 28, repo: 22, role: 16, board: 12, tickets: 7, state: 13 } as const;
+/** How far the three text columns may be squeezed before the table is allowed to overrun instead. */
+const ROSTER_FLOORS = { role: 6, repo: 8, id: 12 } as const;
+/** How many issue lines the block nobody's row owns may take, so a footnote can never become the report. */
+const REPORT_MAX_UNATTRIBUTED = 8;
+/** Columns held back for the row's own tally, so a narrow terminal never eats the verdict on the row. */
+const ROSTER_TALLY_RESERVE = 12;
+/** Indent, glyph, and the six two-space gaps between the seven columns. */
+const ROSTER_CHROME = 4 + 1 + 2 + 2 * 5;
+
+/** One printable employee row. Cells stay RAW here: the fit below still moves the columns. */
+interface RosterEntry {
+  glyph: string;
+  id: string;
+  repo: string;
+  repoPaint: (value: string | number) => string;
+  role: string;
+  board: string;
+  tickets: string;
+  state: string;
+  /** Every issue against this agent, worst first. `shown` is how many the cap left room for. */
+  issues: InventoryIssue[];
+  shown: number;
+}
+
+/** The row's own verdict: how many of each severity, in the glyph vocabulary the rest of the file uses. */
+function issueTally(issues: readonly InventoryIssue[]): string {
+  const counts = [2, 1, 0].map((rank) => issues.filter((issue) => issue.rank === rank).length);
+  const paints = [red, yellow, dim];
+  const glyphs = [glyph.fail, glyph.warn, glyph.info];
+  return counts
+    .map((count, index) => (count ? paints[index]!(`${count}${glyphs[index]}`) : ""))
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * One issue, indented under the row it belongs to.
+ *
+ * The contract path and the owning store go LAST on purpose. They are the least
+ * of what an operator needs and the first thing a narrow terminal should eat,
+ * and the tail is truncated BEFORE it is coloured -- `truncateVisible` on an
+ * already-coloured string drops every escape in it, which would leave exactly
+ * the long lines that matter most rendered in no colour at all.
+ */
+function issueLine(issue: InventoryIssue, codeWidth: number, subjectWidth: number, width: number): string {
+  const subject = subjectWidth
+    ? `${padVisible(issue.subject ? cyan(bounded(issue.subject, 64)) : dim("-"), subjectWidth)}  `
+    : "";
+  const head = `       ${issue.glyph} ${subject}${padVisible(issue.code, codeWidth)}  `;
+  const tail = `${issue.detail} ${glyph.dot} ${issue.field} ${glyph.dot} owner ${issue.owner ?? "undeclared"}`;
+  return `${head}${dim(truncateVisible(tail, Math.max(24, width - visibleWidth(head))))}`;
 }
 
 /**
  * Report in the `formatFleetContractReport` house style. The caller prints it.
  *
- * The health verdict leads deliberately. An unhealthy fleet exits 0 -- conflicts
- * are data, not a command failure -- so a report that opened with a row dump
- * would let "the command worked" read as "the fleet is fine".
+ * ONE ENTRY PER AGENT, and the whole shape of this function follows from that.
+ * This report used to be six blocks -- verdict, stores, totals, conflict
+ * groups, agents, findings -- and four of them listed agents again, so
+ * answering "what is wrong with `condaleeza`" meant reading the same 25 names
+ * four times and correlating an opaque conflict id by hand. Now the roster IS
+ * the report: one row per employee, that employee's findings and conflicts
+ * indented underneath, and everything that was a section reduced to the footer
+ * counts it was actually carrying.
+ *
+ * The health verdict still leads. An unhealthy fleet exits 0 -- conflicts are
+ * data, not a command failure -- so a report that opened with the table would
+ * let "the command worked" read as "the fleet is fine". It is ONE line now
+ * rather than a block of its own.
  */
 export function formatFleetInventoryReport(inventory: FleetInventory): string {
   const { health, totals } = inventory;
   const lines = [""];
+  const width = terminalWidth();
 
-  const headline = health.healthy
+  const verdict = health.healthy
     ? `${green(glyph.pass)} ${bold("Org chart in good standing")}`
     : `${red(glyph.fail)} ${bold("Org chart ON NOTICE")}`;
-  const tally = [
-    `${totals.observed} of ${totals.source_rows} rows`,
-    health.conflicts ? red(`${health.conflicts} unpermitted conflict${health.conflicts === 1 ? "" : "s"}`) : green("0 unpermitted conflicts"),
-    health.malformed_rows ? red(`${health.malformed_rows} malformed`) : dim("0 malformed"),
-  ];
-  lines.push(`  ${headline}  ${dim(glyph.dot)}  ${joinDot(tally)}`);
-  // The verdict's own reasons, on the line under it. They were computed, shipped
-  // in JSON, and never rendered -- so the operator who cannot run `--json` could
-  // see THAT the fleet was unhealthy and never why.
+  // The verdict's own reasons ride WITH it rather than under it. They were
+  // computed, shipped in JSON and once rendered nowhere -- so the operator who
+  // cannot run `--json` could see THAT the fleet was unhealthy, never why.
   const why = [
+    health.conflicts ? red(`${health.conflicts} unpermitted conflict${health.conflicts === 1 ? "" : "s"}`) : green("0 unpermitted conflicts"),
     health.unresolved_rows ? yellow(`${health.unresolved_rows} unresolved`) : dim("0 unresolved"),
     health.contract_violations ? red(`${health.contract_violations} contract violation${health.contract_violations === 1 ? "" : "s"}`) : dim("0 contract violations"),
-    health.permitted_conflicts ? dim(`${health.permitted_conflicts} permitted`) : dim("0 permitted"),
+    health.malformed_rows ? red(`${health.malformed_rows} malformed`) : dim("0 malformed"),
     health.collection_errors ? red(`${health.collection_errors} unreadable store${health.collection_errors === 1 ? "" : "s"}`) : dim("0 unreadable stores"),
   ];
-  lines.push(`  ${dim(glyph.arrow)} ${joinDot(why)}`);
-  lines.push(`  ${joinDot([dim(inventory.scope.label), dim(inventory.contract_path), dim(`contract ${inventory.contract_version ?? "?"}`)])}`);
+  lines.push(`  ${verdict}  ${dim(glyph.dot)}  ${joinDot(why)}`);
 
-  section(lines, "Stores");
-  const storeWidth = inventory.stores.reduce((max, store) => Math.max(max, store.id.length), 0);
-  for (const store of inventory.stores) {
-    const style = statusStyle(store.exists && store.parse === "ok" ? "pass" : store.exists ? "warn" : "fail");
-    lines.push(`    ${style.color(style.glyph)}  ${padVisible(store.id, storeWidth)}  ${cyan(store.owner ?? "unowned")}  ${dim(`${store.source_rows} record${store.source_rows === 1 ? "" : "s"} · ${store.parse}`)}`);
-    lines.push(`       ${dim(glyph.arrow)} ${dim(`configured ${store.configured_path}`)}`);
-    if (store.overridden) lines.push(`       ${dim(glyph.arrow)} ${yellow(`inspected ${store.inspected_path}`)}`);
+  // ---- regroup. Every finding already carries its `agent_id`, so this is sorting, not work.
+  const conflictsById = new Map(inventory.conflicts.map((group) => [group.id, group]));
+  const findingsByAgent = new Map<string, FleetInventoryFinding[]>();
+  const unattributed: InventoryIssue[] = [];
+  for (const finding of inventory.findings) {
+    if (!finding.agent_id) { unattributed.push(findingIssue(finding)); continue; }
+    const bucket = findingsByAgent.get(finding.agent_id);
+    if (bucket) bucket.push(finding);
+    else findingsByAgent.set(finding.agent_id, [finding]);
   }
 
-  section(lines, "Totals");
-  for (const [label, value] of Object.entries(totals)) {
-    lines.push(`    ${dim(glyph.bullet)} ${padVisible(label, 24)}  ${cyan(String(value))}`);
-  }
-  if (totals.source_rows !== totals.emitted_rows) {
-    lines.push(`    ${red(glyph.fail)} source_rows and emitted_rows disagree; a row was lost between counting and building`);
-  }
+  const shownRows = inventory.rows.slice(0, REPORT_MAX_ROWS);
+  const claimedConflicts = new Set<string>();
+  const claimedAgents = new Set<string>();
+  const plain = (value: string | number): string => String(value);
 
-  section(lines, "Conflict groups");
-  if (inventory.conflicts.length === 0) lines.push(`    ${dim("none")}`);
+  const entries: RosterEntry[] = shownRows.map((row) => {
+    const id = row.agent_id.value ?? "<unnamed>";
+    claimedAgents.add(id);
+    const conflicts = row.conflicts.map((conflictId) => {
+      const group = conflictsById.get(conflictId);
+      if (!group) return danglingConflictIssue(conflictId);
+      claimedConflicts.add(conflictId);
+      return conflictIssue(group, id);
+    });
+    const issues = [...conflicts, ...(findingsByAgent.get(id) ?? []).map(findingIssue)]
+      .sort((left, right) => right.rank - left.rank);
+    // The glyph is the worst thing about this row -- and an `info` finding is
+    // not one of them: a row carrying only `board-binding-missing` stays green.
+    const rank = Math.max(
+      worstRank(issues),
+      row.malformed ? 1 : 0,
+      row.project_id.state === "resolved" ? 0 : 1,
+    ) as 0 | 1 | 2;
+    const projectState = row.conflicts.length ? "conflicted" : row.project_id.state;
+    return {
+      glyph: rank === 2 ? red(glyph.fail) : rank === 1 ? yellow(glyph.warn) : green(glyph.pass),
+      id: bounded(id, 128),
+      repo: bounded(row.repo.value ?? row.project_id.value ?? "-"),
+      repoPaint: projectState === "resolved" ? plain : stateColor(projectState),
+      role: fieldCell(row.role),
+      board: boardCell(row.board) ?? "-",
+      tickets: optionalCell(row, "tickets") ?? PENDING_CELL,
+      state: optionalCell(row, "state") ?? PENDING_CELL,
+      issues,
+      shown: 0,
+    };
+  });
+
+  // Whatever the rows did not claim still has to be said out loud. A conflict
+  // between two PROJECT records has no agent row to sit under, and a finding can
+  // name an agent this scope or the row cap left out of the run.
   for (const group of inventory.conflicts) {
-    lines.push(conflictLine(group));
-    lines.push(`       ${dim(glyph.arrow)} ${dim(`${group.field} · owned by ${group.owners.join(", ") || "nobody declared"} · ${group.participants.join(", ")}`)}`);
-    lines.push(`       ${dim(glyph.arrow)} ${dim(group.id)}`);
+    if (claimedConflicts.has(group.id)) continue;
+    unattributed.push({ ...conflictIssue(group, ""), subject: null });
   }
+  for (const [agentId, findings] of findingsByAgent) {
+    if (claimedAgents.has(agentId)) continue;
+    for (const finding of findings) unattributed.push(findingIssue(finding));
+  }
+  unattributed.sort((left, right) => right.rank - left.rank);
+
+  // ---- bound the detail. Worst severity first, then round robin WITHIN a
+  // severity, rows before the block nobody's row owns.
+  //
+  // Every clause there is paid for. A straight walk down the list spends the
+  // whole budget on the first few agents and leaves every later one looking
+  // clean, which is the exact lie a cap must not tell. Severity first, so one
+  // agent's second warning never crowds out another agent's error -- and a
+  // fleet-level error still beats every agent's warning, because it is served
+  // in the same pass as theirs. Rows before the unattributed block, because
+  // `flume roster <employee>` still carries the whole fleet's findings: served
+  // the other way round, the one agent you asked about got three lines and
+  // twenty-two went to agents you did not.
+  const fleetBucket = { issues: unattributed, shown: 0 };
+  let budget = REPORT_MAX_FINDINGS;
+  let fleetRoom = REPORT_MAX_UNATTRIBUTED;
+  for (const rank of [2, 1, 0] as const) {
+    let served = 1;
+    while (budget > 0 && served > 0) {
+      served = 0;
+      for (const entry of entries) {
+        if (budget <= 0) break;
+        if (entry.issues[entry.shown]?.rank !== rank) continue;
+        entry.shown += 1;
+        budget -= 1;
+        served += 1;
+      }
+    }
+    while (budget > 0 && fleetRoom > 0 && fleetBucket.issues[fleetBucket.shown]?.rank === rank) {
+      fleetBucket.shown += 1;
+      budget -= 1;
+      fleetRoom -= 1;
+    }
+  }
+  const withheldIssues = [fleetBucket, ...entries]
+    .reduce((sum, bucket) => sum + (bucket.issues.length - bucket.shown), 0);
 
   section(lines, "Agents");
-  const idWidth = inventory.rows.reduce((max, row) => Math.max(max, (row.agent_id.value ?? "").length), 0);
-  for (const row of inventory.rows.slice(0, REPORT_MAX_ROWS)) for (const line of rowLines(row, idWidth)) lines.push(line);
+  // ---- fit the columns to the terminal, squeezing the text columns before the
+  // tally, so the row's verdict is never the part that falls off the edge.
+  const columnWidth = (label: string, values: string[], max: number): number =>
+    Math.min(max, values.reduce((wide, value) => Math.max(wide, value.length), label.length));
+  const columns = {
+    id: columnWidth("agent", entries.map((entry) => entry.id), ROSTER_WIDTHS.id),
+    repo: columnWidth("repo/project", entries.map((entry) => entry.repo), ROSTER_WIDTHS.repo),
+    role: columnWidth("role", entries.map((entry) => entry.role), ROSTER_WIDTHS.role),
+    board: columnWidth("board", entries.map((entry) => entry.board), ROSTER_WIDTHS.board),
+    tickets: columnWidth("tickets", entries.map((entry) => entry.tickets), ROSTER_WIDTHS.tickets),
+    state: columnWidth("state", entries.map((entry) => entry.state), ROSTER_WIDTHS.state),
+  };
+  let overflow = ROSTER_CHROME + ROSTER_TALLY_RESERVE
+    + Object.values(columns).reduce((sum, value) => sum + value, 0) - width;
+  for (const key of ["role", "repo", "id"] as const) {
+    if (overflow <= 0) break;
+    const give = Math.min(overflow, Math.max(0, columns[key] - ROSTER_FLOORS[key]));
+    columns[key] -= give;
+    overflow -= give;
+  }
+  const cell = (value: string, paint: (input: string | number) => string, wide: number): string =>
+    padVisible(paint(truncateVisible(value, wide)), wide);
+
+  lines.push(dim(`       ${cell("agent", plain, columns.id)}  ${cell("repo/project", plain, columns.repo)}  `
+    + `${cell("role", plain, columns.role)}  ${cell("board", plain, columns.board)}  `
+    + `${cell("tickets", plain, columns.tickets)}  ${cell("state", plain, columns.state)}  errors`));
+  if (entries.length === 0) lines.push(`    ${dim("no agent rows in this report -- the verdict above says why")}`);
+  const printed = [fleetBucket, ...entries].flatMap((bucket) => bucket.issues.slice(0, bucket.shown));
+  const codeWidth = printed.reduce((wide, issue) => Math.max(wide, issue.code.length), 0);
+  for (const entry of entries) {
+    // The tally is over EVERY issue this agent has, not the ones that fit: a
+    // row whose detail the cap withheld must still say how bad it is.
+    const row = `    ${entry.glyph}  ${cell(entry.id, plain, columns.id)}  ${cell(entry.repo, entry.repoPaint, columns.repo)}  `
+      + `${cell(entry.role, cyan, columns.role)}  ${cell(entry.board, dim, columns.board)}  `
+      + `${cell(entry.tickets, dim, columns.tickets)}  ${cell(entry.state, dim, columns.state)}  ${issueTally(entry.issues)}`;
+    lines.push(row.trimEnd());
+    for (const issue of entry.issues.slice(0, entry.shown)) lines.push(issueLine(issue, codeWidth, 0, width));
+    const held = entry.issues.length - entry.shown;
+    if (held) lines.push(`       ${dim(`... ${held} more on this agent, not shown -- use --json`)}`);
+  }
   if (inventory.rows.length > REPORT_MAX_ROWS) {
-    lines.push(`    ${dim(`... ${inventory.rows.length - REPORT_MAX_ROWS} more row(s); use --json for all of them`)}`);
+    lines.push(`    ${yellow(glyph.warn)} ${dim(`${inventory.rows.length - REPORT_MAX_ROWS} more agent(s) NOT SHOWN; the report prints ${REPORT_MAX_ROWS} rows -- use --json for all of them`)}`);
   }
 
-  section(lines, "Findings");
-  if (inventory.findings.length === 0) lines.push(`    ${dim("none")}`);
-  const codeWidth = inventory.findings.slice(0, REPORT_MAX_FINDINGS).reduce((max, item) => Math.max(max, item.code.length), 0);
-  for (const finding of inventory.findings.slice(0, REPORT_MAX_FINDINGS)) {
-    lines.push(`    ${findingGlyph(finding.severity)}  ${padVisible(finding.code, codeWidth)}  ${dim(finding.field)}${finding.agent_id ? `  ${cyan(finding.agent_id)}` : ""}`);
-    lines.push(`       ${dim(glyph.arrow)} ${dim(`${finding.detail} · owner ${finding.source ?? "undeclared"}`)}`);
+  if (fleetBucket.shown) {
+    lines.push("");
+    // Not always fleet-level: a scoped run still carries the whole fleet's
+    // findings, so this block holds anything with no row of its own ABOVE it.
+    lines.push(`  ${dim(glyph.arrow)} ${dim("no row above owns these")}`);
+    // Zero when nothing in the block names an agent, so the two registry-level
+    // duplicates do not each print a column containing one dash.
+    const subjectWidth = unattributed.slice(0, fleetBucket.shown)
+      .reduce((wide, issue) => Math.max(wide, issue.subject ? issue.subject.length : 0), 0);
+    for (const issue of unattributed.slice(0, fleetBucket.shown)) lines.push(issueLine(issue, codeWidth, subjectWidth, width));
   }
-  if (inventory.findings.length > REPORT_MAX_FINDINGS) {
-    lines.push(`    ${dim(`... ${inventory.findings.length - REPORT_MAX_FINDINGS} more finding(s); use --json for all of them`)}`);
+  if (withheldIssues) {
+    lines.push("");
+    lines.push(`  ${yellow(glyph.warn)} ${dim(`${withheldIssues} more finding(s)/conflict(s) NOT SHOWN -- this report caps issue lines at ${REPORT_MAX_FINDINGS}, and at ${REPORT_MAX_UNATTRIBUTED} for the ones no row owns; use --json for all of them`)}`);
+  }
+
+  // ---- the footer says in one line what the Stores, Totals and Conflict-group
+  // sections spent three blocks saying. `source_rows` and `emitted_rows` stay
+  // spelled out: they are counted in two independent passes and their agreement
+  // is the one check that says no agent was lost between counting and building.
+  const storesOk = inventory.stores.filter((store) => store.exists && store.parse === "ok").length;
+  lines.push("");
+  lines.push(`  ${joinDot([
+    `${totals.observed} agent${totals.observed === 1 ? "" : "s"}`,
+    health.conflicts ? red(`${health.conflicts} conflict${health.conflicts === 1 ? "" : "s"}`) : dim("0 conflicts"),
+    ...(health.permitted_conflicts ? [dim(`${health.permitted_conflicts} permitted`)] : []),
+    // "parsed", not "ok": a store can parse as YAML and still carry no fleet,
+    // which is a `collection_errors` in the verdict above. Two lines of the same
+    // report calling that store both "ok" and "unreadable" is how an operator
+    // stops believing either of them.
+    storesOk === inventory.stores.length
+      ? (health.collection_errors ? yellow(`${storesOk} store${storesOk === 1 ? "" : "s"} parsed`) : green(`${storesOk} store${storesOk === 1 ? "" : "s"} parsed`))
+      : red(`${storesOk} of ${inventory.stores.length} stores parsed`),
+    totals.findings ? `${totals.findings} findings` : dim("0 findings"),
+    totals.source_rows === totals.emitted_rows
+      ? dim(`source_rows ${totals.source_rows} = emitted_rows ${totals.emitted_rows}`)
+      : red(`source_rows ${totals.source_rows} != emitted_rows ${totals.emitted_rows}; a row was lost between counting and building`),
+    `contract ${inventory.contract_version ?? "?"}`,
+  ])}`);
+  lines.push(`  ${joinDot([dim(inventory.scope.label), dim(inventory.contract_path)])}`);
+  // A store the report could not read is the one store fact that cannot live in
+  // a count: the operator needs the path to go and fix it.
+  for (const store of inventory.stores) {
+    if (store.exists && store.parse === "ok") continue;
+    const style = statusStyle(store.exists ? "warn" : "fail");
+    lines.push(`  ${style.color(style.glyph)} ${dim(`${store.id} ${glyph.dot} ${store.parse} ${glyph.dot} ${store.overridden ? store.inspected_path : store.configured_path}`)}`);
   }
 
   if (inventory.truncated.length) {

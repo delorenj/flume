@@ -1328,7 +1328,7 @@ try {
       document.classifications.intentionally_unmanaged.entries = [{
         id: "alpha-pm-observed-only",
         kind: "managed-agent-exception",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.alpha-pm",
         lifecycle_state: "accepted",
         rationale: "This fixture declares alpha-pm as state the control plane observes and leaves alone.",
@@ -1374,7 +1374,7 @@ try {
       document.classifications.retired.entries = [{
         id: "beta-pm-retired-sighting",
         kind: "retired-mode-sighting",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.beta-pm",
         lifecycle_state: "retired",
         rationale: "This fixture records beta-pm as a sighting of a mode the contract has withdrawn.",
@@ -1392,7 +1392,7 @@ try {
       document.classifications.intentionally_unmanaged.entries = [{
         id: "every-row-would-be-wrong",
         kind: "managed-agent-exception",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.{agent_id}",
         lifecycle_state: "accepted",
         rationale: "A path shape is not an instance, and this entry must claim no row at all.",
@@ -1412,7 +1412,7 @@ try {
       document.classifications.intentionally_unmanaged.entries = [{
         id: "prefix-must-not-reach",
         kind: "managed-agent-exception",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.alpha",
         lifecycle_state: "accepted",
         rationale: "A prefix of a row path is not that row, and must claim nothing.",
@@ -1697,7 +1697,7 @@ try {
       document.classifications.intentionally_unmanaged.entries = [{
         id: "shared-profile-ruled-ok",
         kind: "identity-conflict-exception",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.{agent_id}.profile_name",
         lifecycle_state: "accepted",
         rationale: "Two agents intentionally share one generated profile in this fixture.",

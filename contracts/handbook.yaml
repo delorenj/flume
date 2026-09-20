@@ -93,8 +93,8 @@ authorities:
       - projects.{slug}.updated_at
 
   agent_operational_records:
-    owner: hermes-agent-registry
-    store: hermes-agent-registry
+    owner: agent-registry
+    store: agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
@@ -109,6 +109,7 @@ authorities:
     writable_fields:
       - agents.{agent_id}.repo
       - agents.{agent_id}.role
+      - agents.{agent_id}.type
       - agents.{agent_id}.display_name
       - agents.{agent_id}.project_path
       - agents.{agent_id}.role_dir
@@ -133,7 +134,7 @@ authorities:
 
   board_identity_projection:
     owner: project-registry
-    store: hermes-agent-registry
+    store: agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
@@ -248,8 +249,8 @@ authorities:
     writable_fields: []
 
   bloodbank_activation:
-    owner: hermes-agent-registry
-    store: hermes-agent-registry
+    owner: agent-registry
+    store: agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
@@ -263,37 +264,37 @@ projections:
   - field: project_repository_path
     source: projects.{slug}.repo_path
     target: agents.{agent_id}.project_path
-    direction: pjangler_project_registry_to_hermes_agent_registry
-    writable_by: hermes-agent-registry
+    direction: pjangler_project_registry_to_agent_registry
+    writable_by: agent-registry
 
   - field: project_slug
     source: projects.{slug}.slug
     target: agents.{agent_id}.repo
-    direction: pjangler_project_registry_to_hermes_agent_registry
-    writable_by: hermes-agent-registry
+    direction: pjangler_project_registry_to_agent_registry
+    writable_by: agent-registry
 
   - field: board_identifier
     source: projects.{slug}.ticket_provider.identifier
     target: agents.{agent_id}.plane.identifier
-    direction: pjangler_project_registry_to_hermes_agent_registry
+    direction: pjangler_project_registry_to_agent_registry
     writable_by: project-registry
 
   - field: board_id
     source: projects.{slug}.ticket_provider.board_id
     target: agents.{agent_id}.plane.project_id
-    direction: pjangler_project_registry_to_hermes_agent_registry
+    direction: pjangler_project_registry_to_agent_registry
     writable_by: project-registry
 
   - field: board_workspace
     source: projects.{slug}.ticket_provider.workspace
     target: agents.{agent_id}.plane.workspace
-    direction: pjangler_project_registry_to_hermes_agent_registry
+    direction: pjangler_project_registry_to_agent_registry
     writable_by: project-registry
 
   - field: agent_role_directory
     source: agents.{agent_id}.role_dir
     target: projects.{slug}.agents.{role}.role_dir
-    direction: hermes_agent_registry_to_pjangler_project_registry
+    direction: agent_registry_to_pjangler_project_registry
     writable_by: project-registry
 
 classifications:
@@ -768,7 +769,7 @@ activation:
     - activated
   execution_authority:
     field: agents.{agent_id}.bloodbank.enabled
-    owner: hermes-agent-registry
+    owner: agent-registry
     strict: true
     default: deny
   routing_prerequisites:

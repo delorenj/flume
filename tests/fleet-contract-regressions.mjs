@@ -261,7 +261,7 @@ try {
     // this one states.
     assert.match(out, /schema 5/, "report must name the effective schema version");
     assert.match(out, /contract 1\.\d+\.\d+/, "report must name the contract version");
-    for (const owner of ["project-registry", "hermes-agent-registry", "hermes-profile-renderer", "hermes-agent-template", "hermes-fleet-provisioner", "fleet-observer"]) {
+    for (const owner of ["project-registry", "agent-registry", "hermes-profile-renderer", "hermes-agent-template", "hermes-fleet-provisioner", "fleet-observer"]) {
       assert.ok(out.includes(owner), `report must name authority owner ${owner}`);
     }
     for (const klass of ["managed_agent", "managed_shared_service", "intentionally_unmanaged", "retired", "unclassified"]) {
@@ -350,9 +350,9 @@ try {
     assert.equal(byOwner.get("projects.{slug}.repo_path"), "project-registry");
     assert.equal(byOwner.get("projects.{slug}.ticket_provider.identifier"), "project-registry");
     assert.equal(byOwner.get("projects.{slug}.ticket_provider.board_id"), "project-registry");
-    assert.equal(byOwner.get("agents.{agent_id}.role_dir"), "hermes-agent-registry");
-    assert.equal(byOwner.get("agents.{agent_id}.profile_name"), "hermes-agent-registry");
-    assert.equal(byOwner.get("gateways.bloodbank.systemd_unit"), "hermes-agent-registry");
+    assert.equal(byOwner.get("agents.{agent_id}.role_dir"), "agent-registry");
+    assert.equal(byOwner.get("agents.{agent_id}.profile_name"), "agent-registry");
+    assert.equal(byOwner.get("gateways.bloodbank.systemd_unit"), "agent-registry");
   });
 
   check("every overlap projection declares one direction and one writer", () => {
@@ -377,9 +377,9 @@ try {
     // hermes side to start writing board identity back.
     const identifier = parsed.data.projections.find((item) => item.target === "agents.{agent_id}.plane.identifier");
     assert.equal(identifier.writable_by, "project-registry");
-    assert.equal(identifier.direction, "pjangler_project_registry_to_hermes_agent_registry");
+    assert.equal(identifier.direction, "pjangler_project_registry_to_agent_registry");
     const roleDir = parsed.data.projections.find((item) => item.source === "agents.{agent_id}.role_dir");
-    assert.equal(roleDir.direction, "hermes_agent_registry_to_pjangler_project_registry", "truth flows the other way for role_dir");
+    assert.equal(roleDir.direction, "agent_registry_to_pjangler_project_registry", "truth flows the other way for role_dir");
   });
 
   check("every projection endpoint is a field some authority really declares", () => {
@@ -408,8 +408,8 @@ try {
 
   check("direction is derived from the two stores, so it cannot be prose", () => {
     for (const [name, value] of [
-      ["backwards", "hermes_agent_registry_to_pjangler_project_registry"],
-      ["three-hop", "hermes_agent_registry_to_project_registry_to_n0thing"],
+      ["backwards", "agent_registry_to_pjangler_project_registry"],
+      ["three-hop", "agent_registry_to_project_registry_to_n0thing"],
     ]) {
       const path = mutated(`direction-${name}`, (document) => {
         document.setIn(["projections", 0, "direction"], value);
@@ -428,8 +428,8 @@ try {
         field: "duplicate_repo_path",
         source: "projects.{slug}.repo_path",
         target: "agents.{agent_id}.project_path",
-        direction: "pjangler_project_registry_to_hermes_agent_registry",
-        writable_by: "hermes-agent-registry",
+        direction: "pjangler_project_registry_to_agent_registry",
+        writable_by: "agent-registry",
       });
     });
     const result = cli(["handbook", "validate", "--contract", path, "--json"]);
@@ -460,7 +460,7 @@ try {
     assert.equal(result.status, 4, `expected exit 4, got ${result.status}`);
     const rendered = JSON.stringify(parsed.error);
     assert.ok(rendered.includes("projects.{slug}.ticket_provider.identifier"), "must name the conflicting field path");
-    assert.ok(rendered.includes("hermes-agent-registry"), "must name the first claimant");
+    assert.ok(rendered.includes("agent-registry"), "must name the first claimant");
     assert.ok(rendered.includes("project-registry"), "must name the second claimant");
     assert.ok(rendered.includes("project_identity"), "must name the first claiming authority block");
     assert.ok(rendered.includes("agent_operational_records"), "must name the second claiming authority block");
@@ -471,7 +471,7 @@ try {
 
   check("two authority blocks sharing an owner still conflict over one field", () => {
     // Keying claims on the OWNER name hid this: `bloodbank_activation` and
-    // `agent_operational_records` are both owned by `hermes-agent-registry`, so
+    // `agent_operational_records` are both owned by `agent-registry`, so
     // both could claim the activation flag and "agree" -- collapsing the
     // discovery/execution split those two blocks exist to keep apart.
     const path = mutated("same-owner-dual-claim", (document) => {
@@ -625,13 +625,13 @@ try {
     assert.deepEqual(parsed.data.activation.states, ["discovered", "installed", "healthy", "routing_ready", "activated"]);
     const authority = parsed.data.activation.execution_authority;
     assert.equal(authority.field, "agents.{agent_id}.bloodbank.enabled");
-    assert.equal(authority.owner, "hermes-agent-registry");
+    assert.equal(authority.owner, "agent-registry");
     assert.equal(authority.strict, true);
     assert.equal(authority.default, "deny");
     // The gate is only real if its owner is the declared writer of the field.
     const owning = parsed.data.authorities.filter((item) => item.writable_fields.includes(authority.field));
     assert.equal(owning.length, 1, "exactly one authority may write the activation flag");
-    assert.equal(owning[0].owner, "hermes-agent-registry");
+    assert.equal(owning[0].owner, "agent-registry");
   });
 
   check("routing metadata is discovery, held apart from execution authority", () => {

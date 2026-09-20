@@ -44,9 +44,12 @@ import {
   type FleetStatus,
 } from "./types";
 import { writeStdout } from "../utils/stdout";
+import { buildOrgChart, formatOrgChart } from "./tree";
+import { readLiveState, readTickets } from "./live";
 
 const VALIDATE_COMMAND = "fleet.contract.validate";
 const INVENTORY_COMMAND = "fleet.inventory";
+const ORG_COMMAND = "fleet.org";
 const PROVENANCE_COMMAND = "fleet.provenance";
 const STATUS_COMMAND = "fleet.status";
 
@@ -61,6 +64,8 @@ interface InventoryOptions {
   agentRegistry?: string;
   contract?: string;
   deadlineMs?: string;
+  /** Roster only: authorize the Redis + board reads the offline contract forbids by default. */
+  live?: boolean;
   json?: boolean;
 }
 
@@ -459,20 +464,87 @@ function withEmployee<T extends { agent?: string }>(employee: string | undefined
   return { ...options, agent: employee };
 }
 
+/**
+ * Fill the roster's `tickets` and `state` cells from the live providers.
+ *
+ * Both are best-effort by design: an agent with no ASM record inside the 900s
+ * TTL is the NORMAL case, not a fault, and an unreadable board is reported as
+ * unknown rather than zero. Neither can fail the command -- a roster that
+ * refuses to print because Redis is down is worse than one with two dim columns.
+ */
+async function attachLiveColumns(inventory: FleetInventory): Promise<void> {
+  const rows = inventory.rows as unknown as Record<string, unknown>[];
+  const refs = inventory.rows.map((row) => ({
+    agentId: row.agent_id.value ?? "",
+    profileName: row.profile_name.value ?? "",
+    type: row.type?.value ?? "hermes",
+    repoPath: row.repo_path.value ?? "",
+  })).filter((ref) => ref.agentId);
+
+  const [state, tickets] = await Promise.all([
+    readLiveState(refs).catch(() => new Map()),
+    readTickets(refs).catch(() => new Map()),
+  ]);
+
+  inventory.rows.forEach((row, index) => {
+    const id = row.agent_id.value ?? "";
+    const live = state.get(id);
+    const tix = tickets.get(id);
+    const target = rows[index];
+    if (!target) return;
+    if (live?.found) target.state = live;
+    if (tix?.known) target.tickets = tix;
+  });
+}
+
 export function registerOrgCli(program: Command): void {
   const handbook = program.command("handbook").description("Work with the employee handbook: authorities, classes, service model, retired modes");
+
+  // `org` is the HIERARCHY; `roster` is the flat list. They were the same command
+  // until 2026-09-20 (org was a bare alias), which is why no org chart existed.
+  program.command("org")
+    .description("The org chart: who reports to whom, from the top down (read-only)")
+    .option("--agent-registry <path>", "Read this agent registry instead of the configured one")
+    .option("--org <path>", "Read this hierarchy file instead of ~/.hermes/org.yaml")
+    .option("--json", "Emit the chart as JSON")
+    .action(async (rawOptions: { agentRegistry?: string; org?: string; json?: boolean }) => {
+      ignoreBrokenPipe();
+      const json = Boolean(rawOptions.json);
+      try {
+        const chart = buildOrgChart({
+          registryPath: rawOptions.agentRegistry,
+          orgPath: rawOptions.org,
+        });
+        // A drifted chart is still ok:true — same rule as the inventory. Only a
+        // COMMAND failure (unreadable registry, malformed hierarchy) is ok:false.
+        const nextActions = chart.unplaced.length || chart.phantom.length
+          ? [
+            "Place the unplaced agents in ~/.hermes/org.yaml; edges marked ~ were inferred, not recorded",
+            "Remove the phantom ids — they name agents with no registry row",
+          ]
+          : ["Every registered agent is placed; edit ~/.hermes/org.yaml to reshape the tree"];
+        await write(fleetSuccessEnvelope(ORG_COMMAND, chart, nextActions), json, () => formatOrgChart(chart));
+      } catch (error) {
+        const normalized = normalizeFleetError(error);
+        const envelope = fleetFailureEnvelope(ORG_COMMAND, normalized, [
+          "Check ~/.hermes/org.yaml parses, or pass --org <path>",
+        ]);
+        try { await write(envelope, json, () => formatFleetErrorReport("Org chart failed", normalized)); }
+        catch { await emitLastResort(ORG_COMMAND); }
+      }
+    });
 
   // Hangs off the root, not off `handbook`: the roster is a read of the two
   // canonical registries, not a read of the handbook.
   program.command("roster")
-    .alias("org")
-    .description("Every employee in the org chart, and everywhere the two registries disagree (read-only)")
+    .description("Every employee, one row each: repo, role, board, tickets, live state, errors (read-only)")
     .argument("[employee]", "Employee id; the same thing as --agent, in the order the sentence reads")
     .option("--agent <id>", "Report only this agent; totals still describe the whole fleet")
     .option("--project-registry <path>", "Inspect this project registry instead of the configured one")
     .option("--agent-registry <path>", "Inspect this agent registry instead of the configured one")
     .option("--contract <path>", "Validate and read this contract instead of the tracked one")
     .option("--deadline-ms <ms>", "Fail with TIMEOUT if the whole run has not finished within this budget")
+    .option("--live", "Also read live agent state from Redis and ticket counts from the boards")
     .option("--json", "Emit the fleet JSON v1 envelope")
     // Async because the two fleet observation commands share one option surface
     // and one run context. `src/index.ts` already awaits `program.parseAsync()`.
@@ -493,6 +565,11 @@ export function registerOrgCli(program: Command): void {
           contract: options.contract,
           runContext,
         }));
+        // Roster is offline by CONTRACT (inventory.ts:20-31 guarantees no network
+        // or service read), so the live columns are an explicit authorization --
+        // the same rule `review --live` already follows. Without the flag the two
+        // cells print their placeholder rather than a stale or invented number.
+        if (rawOptions.live) await attachLiveColumns(inventory);
         await write(inventoryEnvelope(inventory, json), json, () => formatFleetInventoryReport(inventory));
       } catch (error) {
         const normalized = normalizeFleetError(error);

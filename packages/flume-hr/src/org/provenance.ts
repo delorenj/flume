@@ -125,11 +125,11 @@ const SOURCE_TEMPLATE_CONFIG = "hermes-template-config";
 const SOURCE_FLEET_ENV = "hermes-fleet-env";
 const SOURCE_PJANGLER_REPO = "pjangler-repository";
 const SOURCE_TEMPLATE_SUBMODULE = "hermes-agent-template-submodule";
-const SOURCE_AGENT_REGISTRY = "hermes-agent-registry";
+const SOURCE_AGENT_REGISTRY = "agent-registry";
 /**
  * A LIVE read of the checkout an agent row declares -- not the row itself.
  *
- * Held apart from `hermes-agent-registry` deliberately. The registry says which
+ * Held apart from `agent-registry` deliberately. The registry says which
  * directory to look at; everything read out of that directory is an observation
  * of the filesystem, and labelling it with the registry's id would make a probed
  * remote URL look like a recorded one.

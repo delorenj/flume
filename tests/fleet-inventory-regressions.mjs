@@ -554,7 +554,7 @@ try {
     const group = data.conflicts.find((item) => item.value === "shared-repo-slug");
     assert.ok(group, "no group for the injected duplicate repo");
     assert.equal(group.field, "agents.{agent_id}.repo");
-    assert.deepEqual(group.owners, ["hermes-agent-registry"]);
+    assert.deepEqual(group.owners, ["agent-registry"]);
     assert.equal(group.participants.length, 2);
   });
 
@@ -693,7 +693,7 @@ try {
       document.addIn(["classifications", "intentionally_unmanaged", "entries"], document.createNode({
         id: "exception-profile-shared",
         kind: "identity-conflict-exception",
-        owner: "hermes-agent-registry",
+        owner: "agent-registry",
         source: "agents.{agent_id}.profile_name",
         lifecycle_state: "accepted",
         rationale: "Two agents intentionally share one generated profile in this fixture.",
@@ -827,7 +827,7 @@ try {
     const copy = rawCopy("verbatim-agent-copy", readFileSync(REAL_AGENT_REGISTRY, "utf8"));
     const before = { agents: fileFingerprint(REAL_AGENT_REGISTRY), projects: fileFingerprint(REAL_PROJECT_REGISTRY) };
     const data = inventory(cli(["roster", "--agent-registry", copy, "--json"]));
-    const store = data.stores.find((item) => item.id === "hermes-agent-registry");
+    const store = data.stores.find((item) => item.id === "agent-registry");
     assert.ok(store, "the agent store must be reported");
     assert.equal(store.overridden, true);
     assert.match(store.configured_path, /agents-registry\.yaml$/);
@@ -1126,7 +1126,7 @@ try {
     assert.ok(store.inspected_path.includes("projects-override"), `the inspected path must name the override: ${store.inspected_path}`);
     assert.ok(!store.configured_path.includes("projects-override"), "an override says which bytes to read, not which file is canonical");
     assert.match(store.configured_path, /projects\.yaml$/);
-    const agents = data.stores.find((item) => item.id === "hermes-agent-registry");
+    const agents = data.stores.find((item) => item.id === "agent-registry");
     assert.equal(agents.overridden, false, "the other store is untouched by this flag");
   });
 

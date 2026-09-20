@@ -669,6 +669,13 @@ export interface FleetInventoryRow {
   repo: FleetFieldValue<string>;
   repo_path: FleetFieldValue<string>;
   role: FleetFieldValue<string>;
+  /**
+   * The agent's RUNTIME, as data rather than assumption. The registry encoded
+   * hermes implicitly in ~6 places per row (profile_name, hermes.*,
+   * systemd.gateway_unit) but never named it, while Redis ASM has always keyed
+   * agents by runtime type — hermes | claude | codex. This is that key.
+   */
+  type: FleetFieldValue<string>;
   role_dir: FleetFieldValue<string>;
   profile_name: FleetFieldValue<string>;
   profile_path: FleetFieldValue<string>;

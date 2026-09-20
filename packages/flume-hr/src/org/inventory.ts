@@ -126,7 +126,7 @@ const ROW_SHAPE_CODES = new Set(["agent-id-unsafe"]);
 const SUPPORTED_REGISTRY_SCHEMA = 1;
 
 /** Store ids, used as stable keys in `data.stores` and in finding details. */
-const AGENT_STORE = "hermes-agent-registry";
+const AGENT_STORE = "agent-registry";
 const PROJECT_STORE = "pjangler-project-registry";
 
 export interface FleetInventoryOptions {
@@ -808,6 +808,11 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
 
   const repo = scalar("repo", "agents.{agent_id}.repo");
   const role = scalar("role", "agents.{agent_id}.role");
+  // The RUNTIME this row describes, read rather than assumed. Redis ASM already
+  // keys agents by runtime type (hermes|claude|codex); the registry was the last
+  // layer hard-coding hermes, so a row that does not state one is `unresolved`
+  // and never silently reported as a Hermes agent.
+  const type = scalar("type", "agents.{agent_id}.type");
   const projectPath = scalar("project_path", "agents.{agent_id}.project_path");
   const roleDir = scalar("role_dir", "agents.{agent_id}.role_dir");
   const profileName = scalar("profile_name", "agents.{agent_id}.profile_name");
@@ -1019,7 +1024,10 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     notes: manifestNotes.slice(0, MAX_MANIFEST_NOTES),
   };
 
-  return {
+  // `type` is declared by the contract (`agents.{agent_id}.type`) but is not yet
+  // a member of `FleetInventoryRow`. Widened locally so this module compiles and
+  // emits the field today; the row type is the owning module's to extend.
+  const row: FleetInventoryRow = {
     agent_id: entry.keyIsString && idSafe
       ? field(agentId, agentNamespaceOwner, "resolved")
       : field(agentId, agentNamespaceOwner, "unresolved"),
@@ -1039,6 +1047,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     repo,
     repo_path: repoPath,
     role,
+    type,
     role_dir: roleDir.value
       ? field(shownPath(roleDir.value), roleDir.source, paths.role_dir.classification === "ok" ? "resolved" : "unresolved")
       : roleDir,
@@ -1058,6 +1067,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     findings,
     malformed: entry.malformed || !entry.keyIsString,
   };
+  return row;
 }
 
 // ---------------------------------------------------------------------------
