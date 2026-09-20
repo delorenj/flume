@@ -2,13 +2,14 @@ import { validateExecutionBinding, executionReadiness } from "../kernel/executio
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, dirname, relative } from "node:path";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
 import YAML from "yaml";
 import { Command, type InvokeResult } from "../engine/Command";
 import { HERMES_AGENT_TEMPLATE, deriveAgentId, deriveProfileName, type HermesAgentContext } from "./types";
-import { normalizeAgentRole, resolveContainedPath } from "../kernel/paths";
+import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../kernel/paths";
+import { composeSoul, soulIsReplaceable, soulRolesDir } from "../parity/rules";
 import { verifyTrustedCopierIdentity } from "../kernel/preflight";
 import { existingRoleRefusal } from "./ValidateHermesOptions";
 
@@ -266,7 +267,7 @@ export class RunCopierTemplate extends Command {
         success: true,
         outcome: "planned",
         filePath: roleDir,
-        message: this.formatMessage(`Would run: ${ctx.trustedCopier?.executable ?? "copier"} ${args.join(" ")}`),
+        message: this.formatMessage(`Would run: ${ctx.trustedCopier?.executable ?? "copier"} ${args.join(" ")}\n  then compose SOUL.md from ${soulRolesDir(resolveFlumeRoot())}/${safeRole}.md`),
       };
     }
 
@@ -321,6 +322,81 @@ export class RunCopierTemplate extends Command {
         outcome: "failed",
         message: `Failed to record Hermes deployment mode in ${roleManifest}: ${error instanceof Error ? error.message : String(error)}`,
       };
+    }
+
+    // ONE composer, on every path.
+    //
+    // The copier template no longer renders a soul: `SOUL.md.jinja` renders an
+    // unmistakable placeholder, because a jinja `{% if role == "pm" %}` ladder
+    // inside a submodule and a hand-maintained TypeScript duplicate in
+    // `parity/rules.ts` had already stamped three different generations onto
+    // the live fleet. The role prose is `<flume>/roles/<role>.md` now.
+    //
+    // The template's own scripts copy the placeholder onward while copier is
+    // still running (`20-runtime-repo.sh` into `runtime/`, `10-hermes-profile.sh`
+    // into the profile), so overwrite every copy they made -- above all the
+    // runtime one, which is the file Hermes actually loads.
+    const flumeRoot = resolveFlumeRoot();
+    if (existsSync(soulRolesDir(flumeRoot))) {
+      const composed = (() => {
+        try {
+          const manifest = (YAML.parse(readFileSync(roleManifest, "utf8")) ?? {}) as Record<string, unknown>;
+          const telegram = (manifest.telegram ?? {}) as Record<string, unknown>;
+          return composeSoul(flumeRoot, {
+            agentId: String(manifest.agent_id ?? ""),
+            role: safeRole,
+            repo: String(manifest.repo ?? targetRepo),
+            displayName: String(manifest.display_name ?? ""),
+            profileName: String(manifest.profile ?? profileName ?? ""),
+            purpose: String(manifest.purpose ?? ""),
+            botHandle: String(telegram.bot_username ?? ""),
+            soulTone: String(manifest.soul_tone ?? soulTone ?? ""),
+          });
+        } catch (error) {
+          return error instanceof Error ? error : new Error(String(error));
+        }
+      })();
+      if (composed instanceof Error) {
+        return {
+          success: false,
+          outcome: "failed",
+          message: `Failed to compose SOUL.md from ${soulRolesDir(flumeRoot)}: ${composed.message}`,
+        };
+      }
+      const targets = [join(roleDir, "SOUL.md")];
+      if (existsSync(join(roleDir, "runtime"))) targets.push(join(roleDir, "runtime", "SOUL.md"));
+      // A profile SOUL.md that is already a symlink points into the runtime copy
+      // written just above; only the real-file copy `10-hermes-profile.sh` makes
+      // needs rewriting, and only for the role being provisioned right now.
+      if (profileName) {
+        const profileSoul = join(homedir(), ".hermes", "profiles", profileName, "SOUL.md");
+        try {
+          if (!lstatSync(profileSoul).isSymbolicLink()) targets.push(profileSoul);
+        } catch {
+          // no profile copy to repair
+        }
+      }
+      for (const target of targets) {
+        try {
+          const current = readFileSync(target, "utf8");
+          if (current === composed.text) continue;
+          // `hire --force` re-renders a provisioned role. A soul somebody wrote
+          // by hand is not the template's to replace -- `james-brennan-pm` is a
+          // real one -- so leave it and let the audit name it.
+          if (!soulIsReplaceable(current)) continue;
+        } catch {
+          // absent or unreadable -- write it
+        }
+        try {
+          writeFileSync(target, composed.text, "utf8");
+        } catch (error) {
+          return {
+            success: false,
+            outcome: "failed",
+            message: `Failed to write composed SOUL to ${target}: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      }
     }
 
     return {

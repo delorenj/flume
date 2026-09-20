@@ -81,6 +81,7 @@ import {
   resolveFleetHome,
   resolveInventoryStores,
   resolveProfileLayout,
+  ruleIdForFindingCode,
   type FleetAuthorityIndex,
   type FleetInventoryOptions,
 } from "./inventory";
@@ -149,6 +150,7 @@ import {
 import { resolveTemplateConfigPath } from "../kernel/host-config";
 import { resolveFlumeRoot, resolveFlumePackageRoot } from "../kernel/paths";
 import { recipeRegistry } from "../parity/catalog";
+import { ORG_REMEDIABLE_RULES } from "../parity/reconcile";
 
 /**
  * Rule id -> observation domain.
@@ -198,6 +200,17 @@ const RULE_DOMAIN: Readonly<Record<string, FleetStatusDomain>> = Object.freeze({
   "hermes.fleet-config": "bloodbank",
   // Registry parity between the two canonical stores.
   "hermes.registry-parity": "registry",
+  // The org-wide rules (`src/parity/reconcile.ts`), which answer for the
+  // findings the INVENTORY raises rather than for anything in a repository.
+  // Every one is host-scoped, so none of them spawns a per-agent audit child --
+  // the mapping exists so an observation the inventory already produced can name
+  // the rule that repairs it, and so the id is never filed under
+  // `UNMAPPED_RULE_DOMAIN`.
+  "org.board-projection": "project_binding",
+  "org.profile-path": "profile",
+  "org.runtime-path": "runtime",
+  "org.project-records": "registry",
+  "org.identity-conflict": "registry",
 });
 
 /**
@@ -1007,6 +1020,24 @@ interface ObservationInput {
   exceptionPolicy?: string | null;
   /** Typed per-asset items, for a scaffold group observation. Omitted from the record when empty. */
   items?: readonly FleetStatusObservationItem[];
+  /**
+   * The rule that can REPAIR this observation, where the observation did not
+   * come from a rule.
+   *
+   * Deliberately separate from `ruleId`, and the separation is load-bearing.
+   * `ruleId` is part of an observation's IDENTITY: it is hashed into
+   * `finding_id` and it is the second key of the declared sort order. An
+   * inventory observation that grew a rule id the moment it started failing
+   * would change its own finding id between two runs -- and `--baseline` joins
+   * transitions on exactly that id, so one state change would be reported as an
+   * unrelated finding appearing and another resolving. Measured: the transition
+   * case lost its `state_changed` entirely and reported `appeared, resolved`.
+   *
+   * So the repair rule rides beside the identity instead of inside it. It
+   * reaches `deriveRepair`, which is the only thing that needed it, and the
+   * record, the id and the order are byte-identical to what they were.
+   */
+  repairRule?: { id: string; scope: "project" | "host"; fixable: boolean } | null;
 }
 
 /**
@@ -1034,12 +1065,12 @@ function observation(ctx: FleetStatusContext, input: ObservationInput): FleetSta
     domain: input.domain,
     state: input.state,
     field,
-    ruleId: input.ruleId ?? null,
-    ruleScope: input.ruleScope ?? null,
+    ruleId: input.ruleId ?? input.repairRule?.id ?? null,
+    ruleScope: input.ruleScope ?? input.repairRule?.scope ?? null,
     source: input.source,
     capability: input.capability ?? null,
     evidence: input.evidence ?? null,
-    fixable: input.fixable ?? null,
+    fixable: input.fixable ?? input.repairRule?.fixable ?? null,
     exceptionId: input.exceptionId ?? null,
     exceptionReason: input.exceptionReason ?? null,
     exceptionPolicy: input.exceptionPolicy ?? null,
@@ -1084,6 +1115,45 @@ function observation(ctx: FleetStatusContext, input: ObservationInput): FleetSta
     justification: classification.justification,
     ...items,
   };
+}
+
+/**
+ * The org rule that answers for this row's findings in one domain, plus how it
+ * has to be reported so `deriveRepair` can offer a command.
+ *
+ * WITHOUT THIS, every inventory observation reached `deriveRepair` with
+ * `rule_id: null`, fell past every branch, and was classified `manual` with the
+ * read-only retrieval as its "next action" -- thirty-six findings telling an
+ * operator to go and look at them again. The codes were always there; the join
+ * to a rule was the missing half, and `FINDING_RULE_IDS` in `./inventory` is
+ * that join.
+ *
+ * `rule_scope: "host"` because that is what the checks in
+ * `src/parity/reconcile.ts` declare, verbatim: the two registries are machine
+ * state, so a host scope keeps these findings out of any repository's verdict.
+ * `fixable` is the recipe's own answer -- `ORG_REMEDIABLE_RULES` -- never a
+ * guess made here, so a rule that stops being able to repair itself stops
+ * advertising a repair in the same commit.
+ */
+function inventoryRule(row: FleetInventoryRow, domain: FleetStatusDomain, state: FleetStatusState): {
+  repairRule: { id: string; scope: "host"; fixable: boolean } | null;
+} {
+  // A pass names no repair. Anything else is looked up by the codes the row
+  // actually carries, so an observation can never advertise a repair for a
+  // finding this row did not raise.
+  if (state === "pass") return { repairRule: null };
+  // A CONFLICT FIRST. A contested row usually also fails to correlate to a
+  // project record, and the two rules land in the same domain -- offering to
+  // register a project for a row whose real problem is that two agents claim it
+  // would be the wrong repair, confidently.
+  const codes = row.conflicts.length > 0 ? ["identity-conflict", ...row.findings] : row.findings;
+  for (const code of codes) {
+    const candidate = ruleIdForFindingCode(code);
+    if (candidate && RULE_DOMAIN[candidate] === domain) {
+      return { repairRule: { id: candidate, scope: "host", fixable: ORG_REMEDIABLE_RULES.has(candidate) } };
+    }
+  }
+  return { repairRule: null };
 }
 
 /**
@@ -1163,6 +1233,7 @@ export function observeFromInventory(
     out.push(observation(ctx, {
       domain: "registry", agentId, state, field, summary, details, source: SOURCE_REGISTRY,
       observed, evidence, exceptionId, exceptionReason,
+      ...inventoryRule(row, "registry", state),
     }));
   }
 
@@ -1189,6 +1260,7 @@ export function observeFromInventory(
     out.push(observation(ctx, {
       domain: "project_binding", agentId, state, field, summary, details, source: SOURCE_REGISTRY,
       observed: binding,
+      ...inventoryRule(row, "project_binding", state),
       // The manifest comparison is DERIVED: it is a disagreement between two
       // readings rather than a reading of its own.
       evidence: row.manifest.agrees === false ? "derived" : null,
@@ -1216,6 +1288,7 @@ export function observeFromInventory(
     out.push(observation(ctx, {
       domain: "profile", agentId, state, field, summary, details, source: SOURCE_REGISTRY,
       observed: `${row.profile_name.value ?? "no profile named"} at ${view?.declared ?? "an undeclared path"} (${view?.classification ?? "undeclared"})`,
+      ...inventoryRule(row, "profile", state),
     }));
   }
 
@@ -1239,6 +1312,7 @@ export function observeFromInventory(
     out.push(observation(ctx, {
       domain: "runtime", agentId, state, field, summary, details, source: SOURCE_REGISTRY,
       observed: `${view?.declared ?? "no runtime directory derived"} (${view?.classification ?? "undeclared"})`,
+      ...inventoryRule(row, "runtime", state),
     }));
   }
 

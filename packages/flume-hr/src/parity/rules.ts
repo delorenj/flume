@@ -349,15 +349,323 @@ function declaredRoleIsUnprovisioned(repoRoot: string, roleDir: string | undefin
 }
 
 
-function renderSoul(role: RoleMeta): string {
-  const telegram = role.botHandle ? `@${role.botHandle}` : "(unwired)";
-  const tone = role.role === "pm"
-    ? "Direct and brief. Decision-forward. No throat-clearing, no apologies, no \"I'll help you with that\" preambles."
-    : "Direct and brief.";
-  const roleSpecific = role.role === "pm"
-    ? `You are the project manager. You triage incoming work, create or refine tickets, and delegate implementation. You do not ship product code. A systemd heartbeat checks runtime health. Board work reaches you as a command on the Bloodbank gateway, not on a timer.`
-    : `You operate as the ${role.role} agent for this repo.`;
-  return `# ${role.displayName || role.agentId}\n\nYou are **${role.displayName || role.agentId}** — a Hermes agent provisioned to work inside the\n\`${role.repo}\` repository.\n\n## Identity\n\n| | |\n| --- | --- |\n| Agent ID | \`${role.agentId}\` |\n| Profile | \`${role.profileName || role.agentId}\` |\n| Repo | \`${role.repo}\` |\n| Role | \`${role.role}\` |\n| Telegram | \`${telegram}\` |\n| Purpose | ${role.purpose || `${role.role} agent for ${role.repo}`} |\n\n## Scope\n\nYou operate only within the working directory of \`${role.repo}\`. HERMES_HOME is the real named profile at \`~/.hermes/profiles/${role.profileName || role.agentId}\`; shared config/auth/skills remain linked to fleet truth while owned state lives in ignored \`./runtime/\`. The launcher supplies the project root through process-local \`TERMINAL_CWD\` and never persists it into shared config.\n\n## Tone\n\n${tone}\n\n## Role-specific behavior\n\n${roleSpecific}\n\n## Memory hygiene\n\nYour memory is stored locally at \`./runtime/memories/\`. Use durable memory deliberately and keep \`memories/MEMORY.md\` current.\n`;
+// ---------------------------------------------------------------------------
+// The ONE soul composer
+// ---------------------------------------------------------------------------
+//
+// A SOUL used to be rendered by three different things, and all three had
+// stamped a different generation onto the live fleet:
+//
+//   1. `templates/hermes-agent/template/SOUL.md.jinja` -- an `{% if role ==
+//      "pm" %}` ladder, evaluated once at hire and never re-read.
+//   2. `renderSoul()` right here -- a hand-maintained TypeScript duplicate of
+//      the same prose, used by this rule's migration.
+//   3. `templates/hermes-agent/scripts/momo-unify-agent.py` -- a third renderer
+//      driven off momo's `momo-agent.spec.yaml`, with no caller anywhere.
+//
+// Measured on 2026-09-20: `bloodbank-pm` (Jul 23) and `pjangler-pm` (Aug 29)
+// differ only by identity substitution and generation drift -- there is no
+// agent-authored content in ANY deployed SOUL, and Hermes itself only ever
+// seeds its default into an EMPTY profile (`hermes_cli/config.py`
+// `_ensure_default_soul_md`), never over one that exists. So re-composing is
+// safe: nothing evolved is being clobbered.
+//
+// The role prose lives in `<flume>/roles/` now -- one file per role, branchable
+// by `cp` -- and this is the only thing that turns it into a SOUL. The copier
+// template renders a placeholder that flume overwrites; renderer (3) is gone.
+
+/** What a deployed agent supplies to the composer. Everything else comes from `roles/`. */
+export interface SoulIdentity {
+  agentId: string;
+  role: string;
+  repo: string;
+  displayName: string;
+  profileName: string;
+  purpose: string;
+  botHandle: string;
+  /**
+   * The `soul_tone` key from `role.yaml`.
+   *
+   * Empty for every role hired before `role.yaml` carried one, which is all 60
+   * deployed today: tone was a hire-time-only copier variable that was never
+   * persisted anywhere. `resolveSoulTone` recovers those by RECOGNISING the
+   * tone paragraph already in the deployed soul rather than normalising the
+   * whole fleet to `direct`.
+   */
+  soulTone: string;
+}
+
+export interface SoulComposition {
+  /** The composed soul, newline-normalised and newline-terminated. */
+  text: string;
+  /** The `roles/` file that supplied the charter -- `_default.md` when the role has none. */
+  source: string;
+  /** Which tone was used, and how it was chosen. */
+  tone: { key: string; origin: "role.yaml" | "recognised" | "default" };
+}
+
+/** The role-definition directory for a flume checkout. */
+export function soulRolesDir(flumeRoot: string): string {
+  return join(flumeRoot, "roles");
+}
+
+/** A role name safe to resolve to a file: no separators, no dots, no surprises. */
+const ROLE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
+
+interface RoleDefinition {
+  path: string;
+  front: Record<string, unknown>;
+  body: string;
+}
+
+function readRoleDefinition(dir: string, role: string): RoleDefinition {
+  const named = ROLE_FILE_NAME.test(role) ? join(dir, `${role}.md`) : "";
+  const path = named && existsSync(named) ? named : join(dir, "_default.md");
+  if (!existsSync(path)) throw new Error(`roles/${basename(path)} is missing`);
+  const raw = readText(path);
+  const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/u.exec(raw);
+  if (!match) throw new Error(`roles/${basename(path)} is missing its YAML frontmatter`);
+  const parsed = YAML.parse(match[1] ?? "") as unknown;
+  if (parsed !== null && (typeof parsed !== "object" || Array.isArray(parsed))) {
+    throw new Error(`roles/${basename(path)} frontmatter must be a YAML mapping`);
+  }
+  return { path, front: (parsed ?? {}) as Record<string, unknown>, body: match[2] ?? "" };
+}
+
+/** A frontmatter list as markdown bullets. `code` wraps each item in backticks. */
+function soulBullets(value: unknown, code: boolean): string {
+  if (!Array.isArray(value) || value.length === 0) return "";
+  return value.map((item) => (code ? `- \`${String(item)}\`` : `- ${String(item)}`)).join("\n");
+}
+
+
+function soulScalar(value: unknown): string {
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+
+/** `{repo}` / `{role}` interpolation, for `purpose_template` only. */
+function fillPurposeTemplate(template: string, identity: SoulIdentity): string {
+  return template.replace(/\{repo\}/gu, identity.repo).replace(/\{role\}/gu, identity.role);
+}
+
+
+function renderSoulPart(label: string, source: string, inputs: Record<string, string | null>): string {
+  const result = renderScaffoldTemplate(source, inputs);
+  if (!result.ok) throw new Error(`roles/${label}: ${result.detail}`);
+  return result.text;
+}
+
+
+/** The `## Tone` paragraph of a soul that is already on disk, or "". */
+function deployedToneParagraph(soul: string | null): string {
+  if (!soul) return "";
+  const lines = soul.split("\n");
+  const heading = lines.findIndex((line) => /^##\s+Tone\s*$/u.test(line));
+  if (heading < 0) return "";
+  const rest = lines.slice(heading + 1);
+  const next = rest.findIndex((line) => /^##\s/u.test(line));
+  return (next < 0 ? rest : rest.slice(0, next)).join("\n").trim();
+}
+
+
+interface ToneBook {
+  default: string;
+  tones: Record<string, { text: string; recognise: string[] }>;
+}
+
+
+function readToneBook(dir: string): ToneBook {
+  const path = join(dir, "_tones.yaml");
+  if (!existsSync(path)) throw new Error("roles/_tones.yaml is missing");
+  const parsed = YAML.parse(readText(path)) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("roles/_tones.yaml must be a YAML mapping");
+  }
+  const raw = parsed as Record<string, unknown>;
+  const tones: ToneBook["tones"] = {};
+  const declared = raw.tones;
+  if (!declared || typeof declared !== "object" || Array.isArray(declared)) {
+    throw new Error("roles/_tones.yaml must declare a `tones` mapping");
+  }
+  for (const [key, value] of Object.entries(declared as Record<string, unknown>)) {
+    const entry = (value ?? {}) as Record<string, unknown>;
+    const text = soulScalar(entry.text);
+    if (!text) throw new Error(`roles/_tones.yaml: tone ${key} has no text`);
+    const recognise = Array.isArray(entry.recognise) ? entry.recognise.map((item) => String(item)) : [];
+    tones[key] = { text, recognise };
+  }
+  const fallback = soulScalar(raw.default) || "direct";
+  if (!tones[fallback]) throw new Error(`roles/_tones.yaml: default tone ${fallback} is not declared`);
+  return { default: fallback, tones };
+}
+
+
+/**
+ * Which tone this agent gets, and why.
+ *
+ * `role.yaml` wins when it carries one. Otherwise the tone paragraph already
+ * deployed is matched against each tone's `recognise` prefixes -- that is the
+ * ONLY way to recover the operator's original choice for an agent hired before
+ * `soul_tone` was persisted, and without it a re-compose silently normalises
+ * every one of them to `direct`.
+ */
+function resolveSoulTone(book: ToneBook, identity: SoulIdentity, deployed: string | null): SoulComposition["tone"] & { text: string } {
+  const declared = identity.soulTone.trim();
+  if (declared && book.tones[declared]) {
+    return { key: declared, origin: "role.yaml", text: book.tones[declared]!.text };
+  }
+  const paragraph = deployedToneParagraph(deployed);
+  if (paragraph) {
+    for (const [key, tone] of Object.entries(book.tones)) {
+      if (tone.recognise.some((prefix) => prefix && paragraph.startsWith(prefix))) {
+        return { key, origin: "recognised", text: tone.text };
+      }
+    }
+  }
+  return { key: book.default, origin: "default", text: book.tones[book.default]!.text };
+}
+
+
+/**
+ * Compose one agent's SOUL from `<flumeRoot>/roles/`.
+ *
+ * `deployed` is the soul currently on disk, when there is one. It is read for
+ * exactly one purpose -- recovering an unpersisted tone -- and never copied
+ * forward: everything else in the output comes from `roles/` and `role.yaml`.
+ *
+ * Throws when `roles/` is malformed. Callers check `existsSync(soulRolesDir())`
+ * first: a packaged install without the directory composes nothing rather than
+ * inventing a soul.
+ */
+export function composeSoul(flumeRoot: string, identity: SoulIdentity, deployed: string | null = null): SoulComposition {
+  const dir = soulRolesDir(flumeRoot);
+  const base = join(dir, "_base.md");
+  if (!existsSync(base)) throw new Error("roles/_base.md is missing");
+  const definition = readRoleDefinition(dir, identity.role);
+  const tone = resolveSoulTone(readToneBook(dir), identity, deployed);
+
+  const purposeTemplate = soulScalar(definition.front.purpose_template) || "{role} agent for {repo}";
+  const purpose = identity.purpose.trim() || fillPurposeTemplate(purposeTemplate, identity);
+  const shared: Record<string, string | null> = {
+    repo: identity.repo,
+    role: identity.role,
+    agent_id: identity.agentId,
+    display_name: identity.displayName || identity.agentId,
+    profile: identity.profileName || identity.agentId,
+    telegram: identity.botHandle ? `@${identity.botHandle}` : "(unwired)",
+    purpose,
+  };
+
+  const behavior = renderSoulPart(basename(definition.path), definition.body.trim(), {
+    ...shared,
+    prime_directives: soulBullets(definition.front.prime_directives, false),
+    bloodbank_events: soulBullets(definition.front.bloodbank_events, true),
+    default_execution: soulScalar(definition.front.default_execution),
+  });
+
+  const composed = renderSoulPart("_base.md", readText(base), {
+    ...shared,
+    tone: tone.text,
+    role_behavior: behavior.trim(),
+  });
+
+  // An empty frontmatter block leaves a blank line where its bullets would have
+  // been. Collapse runs rather than making every role file carry the same
+  // conditional whitespace the jinja ladder used to.
+  const text = `${composed.replace(/\n{3,}/gu, "\n\n").trimEnd()}\n`;
+  return { text, source: definition.path, tone: { key: tone.key, origin: tone.origin } };
+}
+
+
+/**
+ * The provenance line every composed soul carries, and the thing that makes a
+ * later compose safe: a soul that has it was written by this composer.
+ */
+export const SOUL_COMPOSED_MARKER = "Composed by flume from roles/";
+
+/** The `## ` headings every generation of the three renderers emitted. */
+const SOUL_RENDERED_SPINE = ["## Identity", "## Tone", "## Role-specific behavior"];
+
+
+/**
+ * Whether a deployed soul may be overwritten.
+ *
+ * The brief for this work stated that no deployed SOUL carries agent- or
+ * operator-authored content, and that a re-compose is therefore always safe.
+ * MEASURED against all 58 role directories on this host, that is true of 57 of
+ * them and FALSE of `james-brennan-pm`, whose soul is a hand-written client
+ * persona ("# George Carlin — James Brennan PM", `## Voice`, `## PM contract`,
+ * a Slack channel id and a draft-for-human-approval rule) that no renderer ever
+ * produced. A convergent compose would have deleted it on the first apply.
+ *
+ * So the composer refuses, exactly as the scaffold migration refuses to
+ * overwrite a locally-modified script: a soul is replaceable only when it says
+ * this composer wrote it, or when it still carries the three headings every
+ * generation of the three renderers emitted. Anything else is somebody's work,
+ * and it is reported by name rather than repaired.
+ */
+export function soulIsReplaceable(deployed: string | null): boolean {
+  if (deployed === null || deployed.trim() === "") return true;
+  if (deployed.includes(SOUL_COMPOSED_MARKER)) return true;
+  const headings = new Set(deployed.split("\n").map((line) => line.trimEnd()));
+  return SOUL_RENDERED_SPINE.every((heading) => headings.has(heading));
+}
+
+
+/** A discovered role's identity, as the composer wants it. */
+function soulIdentityOf(role: RoleMeta): SoulIdentity {
+  return {
+    agentId: role.agentId,
+    role: role.role,
+    repo: role.repo,
+    displayName: role.displayName,
+    profileName: role.profileName,
+    purpose: role.purpose,
+    botHandle: role.botHandle,
+    soulTone: yamlGet(safeReadText(role.roleYamlPath) ?? "", "soul_tone"),
+  };
+}
+
+
+/** The two souls a deployed role carries: the tracked copy, and the one Hermes loads. */
+function soulPaths(role: RoleMeta): { tracked: string; runtime: string } {
+  return { tracked: join(role.roleDir, "SOUL.md"), runtime: join(role.roleDir, "runtime", "SOUL.md") };
+}
+
+
+/**
+ * Compose this role's soul and say how the two on-disk copies differ from it.
+ *
+ * The RUNTIME copy is the one that matters: `<repo>/agents/hermes/<role>/runtime/SOUL.md`
+ * is what Hermes loads, and 27 of 36 profiles link straight at it. An audit
+ * that only checked the tracked copy would pass a fleet whose agents were all
+ * running two-generation-stale prose -- which is exactly what it did.
+ */
+function soulParityDetails(ctx: Context, role: RoleMeta): string[] {
+  if (!existsSync(soulRolesDir(ctx.pjanglerRoot))) return [];
+  const { tracked, runtime } = soulPaths(role);
+  let composed: SoulComposition;
+  try {
+    composed = composeSoul(ctx.pjanglerRoot, soulIdentityOf(role), safeReadText(runtime) ?? safeReadText(tracked));
+  } catch (error) {
+    return [`soul composer failed: ${error instanceof Error ? error.message : String(error)}`];
+  }
+  const details: string[] = [];
+  const check = (path: string, note: string): void => {
+    const seen = safeReadText(path);
+    // Absence of the tracked copy is already the scaffold presence finding, and
+    // a role with no runtime directory has no runtime soul to be stale.
+    if (seen === null || seen === composed.text) return;
+    if (!soulIsReplaceable(seen)) {
+      details.push(`soul-authored ${relative(ctx.repoRoot, path)} (${note}; written by hand, not by any renderer — the composer will not overwrite it)`);
+      return;
+    }
+    details.push(`soul-drift ${relative(ctx.repoRoot, path)} (${note}; composed from roles/${basename(composed.source)})`);
+  };
+  check(tracked, "tracked copy");
+  check(runtime, "the file Hermes loads");
+  return details;
 }
 
 
@@ -1388,6 +1696,11 @@ return [
           const shown = relative(ctx.repoRoot, join(role.roleDir, ...finding.path.split("/")));
           details.push(`${prefix}: ${word} ${shown}${finding.detail ? ` (${finding.detail})` : ""}`);
         }
+        // SOUL CONTENT, not presence. The shared scaffold core treats SOUL.md
+        // as presence-only by contract (`contracts/handbook.yaml`), which is
+        // why a soul two template generations stale audited as PASS. The
+        // composer gives this rule a byte-exact expectation, so it can say so.
+        for (const line of soulParityDetails(ctx, role)) details.push(`${prefix}: ${line}`);
         if (hasRuntimeSubmoduleMapping(ctx.repoRoot, role)) details.push(`${prefix}: .gitmodules contains retired ${role.role} runtime submodule mapping`);
         if (!profileMetaInheritsDefault(join(role.roleDir, "runtime", "profile.yaml"))) details.push(`${prefix}: runtime/profile.yaml missing inherited default config metadata`);
         const registry = safeReadText(registryPath(ctx.homeDir));
@@ -1426,7 +1739,38 @@ return [
         if (!retirement.ok) {
           return { id: finding.id, title: finding.title, status: "blocked", summary: `Failed to retire ${role.role} runtime submodule metadata safely`, changedFiles, details: [retirement.error ?? "unknown runtime retirement failure"] };
         }
-        if (!existsSync(join(role.roleDir, "SOUL.md"))) writeIfDifferent(join(role.roleDir, "SOUL.md"), renderSoul(role), ctx.dryRun, changedFiles);
+        // THE RE-RENDER PATH. This is the thing that did not exist: `hire`
+        // refuses a provisioned role dir, `onboard` is `runHire(force:false)`
+        // and this line used to be `if (!existsSync(...))` -- so no path in the
+        // product could ever update a deployed soul. It is convergent now, and
+        // it writes `runtime/SOUL.md` as well as the tracked copy, because the
+        // runtime one is what Hermes loads and a write that skipped it would
+        // change no agent's behaviour at all.
+        //
+        // `flume remediate hermes.pm-scaffold <repo> --dry-run` shows the diff
+        // before anything is written; remediate applies only without it.
+        if (existsSync(soulRolesDir(ctx.pjanglerRoot))) {
+          const { tracked, runtime } = soulPaths(role);
+          try {
+            const before = changedFiles.length;
+            const deployed = safeReadText(runtime) ?? safeReadText(tracked);
+            const composed = composeSoul(ctx.pjanglerRoot, soulIdentityOf(role), deployed);
+            // A hand-written soul is preserved, named, and left alone -- the
+            // same contract the managed scripts keep. `writeIfDifferent` keeps
+            // no backup, so clobbering one destroys the only copy.
+            for (const [path, label] of [[tracked, "SOUL.md"], [runtime, "runtime/SOUL.md"]] as const) {
+              if (path === runtime && !existsSync(dirname(runtime))) continue;
+              const seen = safeReadText(path);
+              if (!soulIsReplaceable(seen)) { preserved.push(`${prefix}: preserved hand-written ${label}`); continue; }
+              writeIfDifferent(path, composed.text, ctx.dryRun, changedFiles);
+            }
+            if (changedFiles.length > before) {
+              details.push(`${prefix}: composed SOUL from roles/${basename(composed.source)} (tone ${composed.tone.key}, ${composed.tone.origin})`);
+            }
+          } catch (error) {
+            return { id: finding.id, title: finding.title, status: "blocked", summary: `Cannot compose ${prefix}'s SOUL`, changedFiles, details: [...details, error instanceof Error ? error.message : String(error)] };
+          }
+        }
         writeIfDifferent(join(role.roleDir, "hermes"), renderHermesWrapper(role, templateRoleDir), ctx.dryRun, changedFiles, 0o755);
         writeIfDifferent(join(role.roleDir, ".gitignore"), readText(join(templateRoleDir, ".gitignore.jinja")).replace(/\{\{\s*role\s*\}\}/g, role.role), ctx.dryRun, changedFiles);
         copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, ".runtime-scaffold"), changedFiles, ctx.dryRun);

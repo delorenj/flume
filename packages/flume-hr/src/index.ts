@@ -16,7 +16,8 @@ import { registerOrgCli, isOrgJsonInvocation, orgParserFailureEnvelope } from ".
 import { fleetEnvelopeExitCode, renderFleetJson } from "./org/output";
 import { recipeRegistry } from "./parity/catalog";
 import { lifecycleContext, runAudit, runMigrationForRules } from "./parity/index";
-import { formatAuditReport, formatMigrationReport } from "./parity/rules";
+import { formatAuditReport, formatMigrationReport, type MigrationReport } from "./parity/rules";
+import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
@@ -197,6 +198,23 @@ program
     await exitAfterFlush(report.ok ? 0 : 1);
   });
 
+/**
+ * Every failing rule this run is allowed to correct, and an account of the ones
+ * it is not.
+ *
+ * `RecipeRegistry.migrateAll` has been complete since PJAN-75 and had ZERO
+ * callers: it audits, migrates every fixable fail/warn, then RE-AUDITS the
+ * non-fixable ones so a rule nobody was allowed to touch is reported rather
+ * than silently dropped. Wiring it is what turns a report into a repair.
+ */
+async function runFullRemediation(repo: string | undefined, dryRun: boolean): Promise<MigrationReport> {
+  const report = await recipeRegistry.migrateAll(lifecycleContext(repo, dryRun));
+  // `recipeId` is internal routing -- which recipe owns a rule -- and
+  // `parity/index.ts` strips it from every other report that goes on the wire.
+  // This one must not be the exception.
+  return { ...report, results: report.results.map(({ recipeId: _recipeId, ...result }) => result) } as MigrationReport;
+}
+
 program
   .command("remediate")
   // `migrate` is a FROZEN compatibility alias, not a nicety.
@@ -207,15 +225,38 @@ program
   // all `fleet-sync.sh` iterates. Redirecting them is a one-line config change
   // (`fleet.flume_bin`), but only if this argv keeps working. Renaming the verb
   // without keeping the alias strands roughly fifty deployed copies.
+  //
+  // `<finding>` became `[finding]` for `--all`, which is additive: every
+  // deployed invocation still passes a rule id and a path, and still lands in
+  // exactly the same call. Adding flags is safe; reshaping the argv is not.
   .alias("migrate")
-  .argument("<finding>", "Rule id to correct, e.g. hermes.runtime-singleton")
+  .argument("[finding]", "Rule id to correct, e.g. hermes.runtime-singleton")
   .argument("[repo]", "Repository to correct (default: cwd)")
-  .description("Correct a finding")
+  .description("Correct a finding, or every finding this run can correct (--all)")
+  .option("--all", "Correct every fixable failing rule, and report each one it may not touch")
+  .option("--register-projects", "Authorize org.project-records to create the project records it reports; without it that rule only says what it would register")
   .option("--dry-run", "Report what would change without changing it")
   .option("--json", "Output machine-parseable JSON")
-  .action(async (finding: string, repo: string | undefined, options) => {
+  .action(async (finding: string | undefined, repo: string | undefined, options) => {
     guardBrokenPipe();
-    const report = await runMigrationForRules([finding], repo, Boolean(options.dryRun));
+    const usage = options.all && finding
+      ? "--all corrects every rule; drop the rule id, or drop --all"
+      : !options.all && !finding
+        ? "name a rule id to correct, or pass --all"
+        : null;
+    if (usage) {
+      await writeStdout(options.json ? `${JSON.stringify({ ok: false, error: usage }, null, 2)}\n` : "");
+      console.error(`\u2717 ${usage}`);
+      await exitAfterFlush(1);
+      return;
+    }
+    // Set BEFORE the migration reads it. The gate lives in an environment key
+    // rather than the lifecycle context because the context is the engine's
+    // shape, shared by every recipe, and this authorization belongs to one rule.
+    if (options.registerProjects) process.env[REGISTER_PROJECTS_ENV] = "1";
+    const report = options.all
+      ? await runFullRemediation(repo, Boolean(options.dryRun))
+      : await runMigrationForRules([finding!], repo, Boolean(options.dryRun));
     await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatMigrationReport(report)}\n`);
     await exitAfterFlush(report.ok ? 0 : 1);
   });

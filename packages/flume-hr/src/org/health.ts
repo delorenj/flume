@@ -434,10 +434,12 @@ interface RepairDecision {
  * The order is the derivation table, and each branch reads a field rather than
  * a phrase:
  *
- *   automatic       an audit rule, project-scoped, reporting `fixable: true`
+ *   automatic       an audit rule reporting `fixable: true` -- project-scoped
+ *                   (repaired in its repository) or host-scoped (repaired
+ *                   fleet-wide by `flume remediate`)
  *   approval-gated  the observation's field IS `activation.execution_authority`
  *   blocked         a contract-declared deferred capability
- *   other-owner     `rule_scope: "host"`
+ *   other-owner     `rule_scope: "host"` with no migration behind it
  *   manual          everything else that needs a decision
  *   none            a pass, or a declared-not-applicable skip
  */
@@ -487,6 +489,23 @@ function deriveRepair(
       + `re-read it with ${input.retrieval}`,
       "blocked",
     );
+  }
+
+  // A HOST rule WITH a migration is `automatic`, and the order of these two
+  // branches is the whole difference.
+  //
+  // `other-owner` says nobody reading this can act, which was true of every
+  // host rule right up until the org rules landed: the checks in
+  // `src/parity/reconcile.ts` repair the two shared registries from wherever
+  // they are run. Leaving those under the branch below would hand an operator
+  // "no work in any repository changes it" about a finding one command fixes --
+  // the exact dead end that made thirty-six roster findings look unactionable.
+  //
+  // No repository is named, unlike the project branch below: the repair is
+  // fleet-wide, and naming a repo would imply a scope the migration does not
+  // have. It is still a DRY RUN, for the same reason the project branch is one.
+  if (input.ruleScope === "host" && input.ruleId !== null && input.fixable === true) {
+    return readOnly(`flume remediate ${input.ruleId} --dry-run`, "automatic");
   }
 
   if (input.ruleScope === "host") {

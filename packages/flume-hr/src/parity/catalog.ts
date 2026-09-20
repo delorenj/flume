@@ -1,4 +1,5 @@
 import { HireRecipe } from "../hire/HireRecipe";
+import { OrgReconcileRecipe } from "./reconcile";
 import { RecipeRegistry } from "../engine/registry";
 
 /**
@@ -11,5 +12,14 @@ import { RecipeRegistry } from "../engine/registry";
  * on the documented invariant that the registry answers for every rule it is
  * asked about, so pointing it at pjangler's would make it return null for every
  * employee finding.
+ *
+ * TWO RECIPES, TWO ALTITUDES, and the split is the point.
+ *
+ * `hire` owns the rules about ONE repository -- every check it declares opens
+ * with `discoverRoles(ctx.repoRoot)`. `org-reconcile` owns the rules about the
+ * shared registries, which no repository can answer for: they are what
+ * `flume roster` reports and what `flume remediate --all` repairs. Bolting the
+ * org-wide rules onto `hire` would have made hiring an agent depend on the state of
+ * fifteen other repositories.
  */
-export const recipeRegistry = new RecipeRegistry([new HireRecipe()]);
+export const recipeRegistry = new RecipeRegistry([new HireRecipe(), new OrgReconcileRecipe()]);

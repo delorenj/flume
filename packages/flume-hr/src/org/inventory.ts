@@ -116,6 +116,43 @@ const ROW_INTEGRITY_CODES = new Set([
 const ROW_SHAPE_CODES = new Set(["agent-id-unsafe"]);
 
 /**
+ * Finding code -> the parity rule that can repair it.
+ *
+ * This module raises BARE CODES: a `note()` call carries a code, a field path,
+ * an owner and a sentence, and nothing that says what to do about it. That is
+ * why thirty-six roster findings arrived with `rule_id: null`, fell through
+ * every branch of `deriveRepair` in `org/health.ts`, and were reported as
+ * "manual" -- an operator was handed a list of problems and no command.
+ *
+ * The table is the seam. `src/parity/reconcile.ts` declares one check per rule
+ * id here and owns what the repair actually does; `org/status.ts` reads it to
+ * hand an inventory observation the rule that REPAIRS it (beside its identity,
+ * never inside it -- see `ObservationInput.repairRule`); and the hint below puts
+ * the read-only planning command in the finding an operator is looking at.
+ *
+ * NOTHING HERE WRITES. The module header's guarantee -- no registry, manifest,
+ * profile, repo, service or network write -- is why `roster` is safe to run
+ * anywhere, and a lookup table plus a string suffix does not touch it. The rule
+ * ids are declared here rather than imported so that the read-only inventory
+ * never depends on the module that performs the writes.
+ */
+export const FINDING_RULE_IDS: Readonly<Record<string, string>> = Object.freeze({
+  "manifest-disagrees": "org.board-projection",
+  "profile-path-symlinked": "org.profile-path",
+  "profile-path-unusable": "org.profile-path",
+  "runtime-path-unusable": "org.runtime-path",
+  "role-dir-unusable": "org.runtime-path",
+  "project-record-missing": "org.project-records",
+  "identity-conflict": "org.identity-conflict",
+  "project-registry-duplicate": "org.identity-conflict",
+});
+
+/** The rule that answers for a finding code, or null where none does yet. */
+export function ruleIdForFindingCode(code: string): string | null {
+  return FINDING_RULE_IDS[code] ?? null;
+}
+
+/**
  * The registry schema this reader models.
  *
  * Both live stores declare `schema_version: 1`. The field was already parsed and
@@ -664,7 +701,17 @@ function addFinding(ctx: InventoryContext, finding: FleetInventoryFinding): void
   // clip could never be recorded -- the exact "quietly short-changed" failure
   // `truncated` exists to prevent.
   if (ctx.findings.length >= MAX_FINDINGS) { ctx.droppedFindings += 1; return; }
-  ctx.findings.push({ ...finding, detail: bounded(finding.detail) });
+  // The repair hint is appended HERE, at the one funnel every finding passes
+  // through, rather than at each `note()` call -- the conflict findings below
+  // are added directly and would otherwise be the two that never carried one.
+  //
+  // `info` is excluded on purpose: an `info` finding is an observation, not a
+  // violation (a permitted conflict is one), and offering a repair for
+  // something nobody has to repair is how a report earns its way into being
+  // ignored.
+  const rule = finding.severity === "info" ? null : ruleIdForFindingCode(finding.code);
+  const detail = rule ? `${finding.detail}; repair: flume remediate ${rule} --dry-run` : finding.detail;
+  ctx.findings.push({ ...finding, detail: bounded(detail) });
 }
 
 /**
