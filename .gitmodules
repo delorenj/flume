@@ -1,0 +1,4 @@
+[submodule "templates/hermes-agent"]
+	path = templates/hermes-agent
+	url = git@github.com:delorenj/hermes-agent-template.git
+	branch = main
