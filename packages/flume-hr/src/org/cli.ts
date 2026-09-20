@@ -440,6 +440,25 @@ function requireValue(value: string | undefined, flag: string): void {
  * `process.exit()` -- that is what truncates buffered stdout under pipe capture,
  * and it is the exact defect this code was written to stop reproducing.
  */
+/**
+ * Fold a positional employee id into `--agent`.
+ *
+ * `flume review 33god-pm` is how the vocabulary reads, and it is what the README
+ * and the runbook document. `--agent <id>` stays because it is the spelling the
+ * MCP adapter uses and the one every existing script passes; the positional is a
+ * second way to say the same thing, not a second thing.
+ *
+ * Giving BOTH is refused rather than silently resolved. Two ids in one
+ * invocation means the caller believes something untrue about one of them.
+ */
+function withEmployee<T extends { agent?: string }>(employee: string | undefined, options: T): T {
+  if (employee === undefined) return options;
+  if (options.agent !== undefined && options.agent !== employee) {
+    throw new FleetError("INVALID_INPUT", `two different employees named in one invocation: "${employee}" and --agent "${options.agent}"`);
+  }
+  return { ...options, agent: employee };
+}
+
 export function registerOrgCli(program: Command): void {
   const handbook = program.command("handbook").description("Work with the employee handbook: authorities, classes, service model, retired modes");
 
@@ -448,6 +467,7 @@ export function registerOrgCli(program: Command): void {
   program.command("roster")
     .alias("org")
     .description("Every employee in the org chart, and everywhere the two registries disagree (read-only)")
+    .argument("[employee]", "Employee id; the same thing as --agent, in the order the sentence reads")
     .option("--agent <id>", "Report only this agent; totals still describe the whole fleet")
     .option("--project-registry <path>", "Inspect this project registry instead of the configured one")
     .option("--agent-registry <path>", "Inspect this agent registry instead of the configured one")
@@ -456,10 +476,15 @@ export function registerOrgCli(program: Command): void {
     .option("--json", "Emit the fleet JSON v1 envelope")
     // Async because the two fleet observation commands share one option surface
     // and one run context. `src/index.ts` already awaits `program.parseAsync()`.
-    .action(async (options: InventoryOptions) => {
+    .action(async (employee: string | undefined, rawOptions: InventoryOptions) => {
       ignoreBrokenPipe();
-      const json = Boolean(options.json);
+      const json = Boolean(rawOptions.json);
+      // Inside the try on purpose: a conflicting pair is a semantic refusal, and
+      // the command's own handler keeps its message. Thrown outside, it escapes
+      // to the top-level parser-failure envelope, which reports a generic
+      // "invalid arguments" and drops the reason.
       try {
+        const options = withEmployee(employee, rawOptions);
         const { deadlineMs } = fleetRunInputs(options);
         const inventory = await withSignals(deadlineMs, async (runContext) => collectFleetInventory({
           agentId: options.agent,
@@ -489,16 +514,22 @@ export function registerOrgCli(program: Command): void {
   // one and not the other is how the MCP tool and the CLI stop being equal.
   program.command("record")
     .description("Each employee's employment record: which build they actually run, against the configured pin (read-only)")
+    .argument("[employee]", "Employee id; the same thing as --agent, in the order the sentence reads")
     .option("--agent <id>", "Report only this agent; totals and the verdict still describe the whole fleet")
     .option("--project-registry <path>", "Inspect this project registry instead of the configured one")
     .option("--agent-registry <path>", "Inspect this agent registry instead of the configured one")
     .option("--contract <path>", "Validate and read this contract instead of the tracked one")
     .option("--deadline-ms <ms>", "Fail with TIMEOUT if the whole run has not finished within this budget")
     .option("--json", "Emit the fleet JSON v1 envelope")
-    .action(async (options: ProvenanceOptions) => {
+    .action(async (employee: string | undefined, rawOptions: ProvenanceOptions) => {
       ignoreBrokenPipe();
-      const json = Boolean(options.json);
+      const json = Boolean(rawOptions.json);
+      // Inside the try on purpose: a conflicting pair is a semantic refusal, and
+      // the command's own handler keeps its message. Thrown outside, it escapes
+      // to the top-level parser-failure envelope, which reports a generic
+      // "invalid arguments" and drops the reason.
       try {
+        const options = withEmployee(employee, rawOptions);
         const { deadlineMs } = fleetRunInputs(options);
         const provenance = await withSignals(deadlineMs, async (runContext) => collectFleetProvenance({
           agentId: options.agent,
@@ -531,6 +562,7 @@ export function registerOrgCli(program: Command): void {
   // process control, service changes, board changes, or Bloodbank activation.
   program.command("review")
     .description("Performance review: every employee across all nine observation domains, in one read-only invocation")
+    .argument("[employee]", "Employee id; the same thing as --agent, in the order the sentence reads")
     .option("--agent <id>", "Report only this agent; totals still describe the whole fleet, and no child runs for any other agent")
     .option("--domain <domain>", `Report only this domain (${FLEET_STATUS_DOMAINS.join(", ")})`)
     .option("--live", "Authorize bounded, read-only host and network observation: run the recipe-owned audit rules per repository")
@@ -541,10 +573,15 @@ export function registerOrgCli(program: Command): void {
     .option("--contract <path>", "Validate and read this contract instead of the tracked one")
     .option("--deadline-ms <ms>", "Fail with TIMEOUT if the whole run has not finished within this budget")
     .option("--json", "Emit the fleet JSON v1 envelope")
-    .action(async (options: StatusOptions) => {
+    .action(async (employee: string | undefined, rawOptions: StatusOptions) => {
       ignoreBrokenPipe();
-      const json = Boolean(options.json);
+      const json = Boolean(rawOptions.json);
+      // Inside the try on purpose: a conflicting pair is a semantic refusal, and
+      // the command's own handler keeps its message. Thrown outside, it escapes
+      // to the top-level parser-failure envelope, which reports a generic
+      // "invalid arguments" and drops the reason.
       try {
+        const options = withEmployee(employee, rawOptions);
         const { deadlineMs } = fleetRunInputs(options);
         // `--domain` gets the same guard as every other value flag. Commander
         // binds the NEXT argv token, so `--domain --json` would otherwise make

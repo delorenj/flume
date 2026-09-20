@@ -32,21 +32,23 @@ with complexity, and it is the pillar every name in this repo is held to.
 ## Commands
 
 ```
-flume hire <title>            # bring on a new employee for this repo
-flume onboard                 # run the onboarding checklist (idempotent)
-flume offboard <employee>     # retire an employee
+flume hire <title>            # bring on a new employee for this repo (title defaults to pm)
+flume onboard [title]         # re-run the onboarding checklist; convergent, no --force
+flume offboard <employee>     # remove the org-chart row; dry run unless --apply
 
-flume org                     # the org chart
-flume roster                  # who works here
-flume review [employee]       # performance review
-flume record <employee>       # employment record
+flume roster                  # the org chart, and where the two registries disagree
+flume review [--agent <id>]   # performance review across nine observation domains
+flume record [--agent <id>]   # employment records: the build each employee runs
 
 flume handbook validate       # check the handbook is well-formed
 flume handbook bootstrap      # seed host configuration
 
-flume audit                   # compliance audit
+flume audit [repo]            # compliance audit
 flume remediate <finding>     # correct a finding
 ```
+
+`flume org` is an alias for `flume roster`. `review` and `record` scope with `--agent <id>`,
+not a positional — the totals still describe the whole workforce either way.
 
 `flume review` returns one of three verdicts, and the third one matters most:
 
