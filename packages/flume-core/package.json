@@ -1,32 +1,13 @@
 {
-  "name": "@flume/core",
-  "version": "0.1.0",
-  "description": "Flume Protocol - Pure interfaces for agent tree orchestration",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "@delorenj/flume-core",
+  "version": "1.0.0",
   "type": "module",
+  "description": "The HR domain: Employee, Title, Desk, Record, OrgChart, standing",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
-  },
-  "keywords": [
-    "flume",
-    "agent",
-    "orchestration",
-    "protocol"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "pg": "^8.11.3"
-  },
-  "devDependencies": {
-    "@types/pg": "^8.10.9",
-    "typedoc": "^0.28.15",
-    "typescript": "^5.3.3",
-    "vitest": "^2.1.9"
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

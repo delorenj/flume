@@ -1,42 +1,23 @@
 {
-  "name": "flume-yi-monorepo",
-  "version": "0.1.0",
+  "name": "flume",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
+  "description": "The workforce: hire, onboard and review the agents that do the work",
   "workspaces": [
     "packages/*"
   ],
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces --if-present",
-    "test:integration": "vitest run --config tests/vitest.config.ts",
-    "test:integration:echo": "vitest run --config tests/vitest.config.ts tests/integration/yi-echo.integration.test.ts",
-    "test:integration:claude": "vitest run --config tests/vitest.config.ts tests/integration/yi-claude.integration.test.ts",
-    "test:integration:letta": "vitest run --config tests/vitest.config.ts tests/integration/yi-letta.integration.test.ts",
-    "test:all": "npm run test && npm run test:integration",
-    "lint": "eslint packages/*/src --ext .ts",
-    "typecheck": "tsc --noEmit",
-    "dev": "tsx packages/yi-echo/src/demo.ts",
-    "skeleton": "tsx packages/yi-echo/src/walking-skeleton.ts",
-    "skeleton:events": "tsx packages/yi-echo/src/walking-skeleton-events.ts",
-    "skeleton:rabbitmq": "tsx packages/yi-echo/src/walking-skeleton-rabbitmq.ts",
-    "skeleton:full": "tsx packages/yi-echo/src/walking-skeleton-full.ts"
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
-    "@types/uuid": "^9.0.7",
-    "typescript": "^5.3.3",
-    "tsx": "^4.7.0",
-    "vitest": "^3.0.0",
-    "eslint": "^8.56.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0"
-  },
-  "dependencies": {
-    "uuid": "^9.0.1",
-    "amqplib": "^0.10.3",
-    "@types/amqplib": "^0.10.4"
-  },
-  "engines": {
-    "node": ">=20.0.0"
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5"
   }
 }

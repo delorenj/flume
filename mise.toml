@@ -1,2 +1,19 @@
+# mise configuration for flume
+
+[env]
+_.file = [".env"]
+
 [tools]
-cargo = "latest"
+node = "24"
+
+[tasks.build]
+description = "Build every workspace package"
+run = "npm run build"
+
+[tasks.typecheck]
+description = "Typecheck every workspace package"
+run = "npm run typecheck"
+
+[tasks.test]
+description = "Run every workspace package's tests"
+run = "npm run test"

@@ -1,0 +1,18 @@
+{
+  "name": "@delorenj/flume-hr",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "The flume CLI: hire, onboard, review",
+  "bin": {
+    "flume": "dist/index.js",
+    "fl": "dist/index.js",
+    "flume-mcp": "dist/mcp-server.js"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@delorenj/flume-core": "1.0.0"
+  }
+}

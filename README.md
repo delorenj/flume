@@ -1,15 +1,76 @@
-Flume: The Agentic Corporate Protocol
-The "Corporate Charter" for the 33GOD Ecosystem.
-Flume is the implementation-agnostic protocol that defines the structural hierarchy, communication interfaces, and role definitions for the 33GOD Agentic Pipeline. It does not know how an agent "thinks"—it only defines how they work, report, and delegate within a corporate structure.
-🏛 Philosophy: Anthropomorphism as Protocol
-Flume is built on the philosophy that the most scalable pattern for complex work is the Corporate Hierarchy. It rejects standard AI terminology (chains, nodes, tools) in favor of strictly anthropomorphic roles:
-• Employees (Agents)
-• Managers (Orchestrators/Delegators)
-• Contributors (Individual Contributors/Leaf Nodes)
-⚡ Core Architecture
-Flume provides the pure TypeScript/Node.js interfaces that act as the standard for any agent to participate in the ecosystem:
+# Flume
 
-1. The Hierarchy: Defines Manager and Contributor interfaces.
-2. The Unit of Work: Defines TaskPayload (the assignment) and WorkResult (the deliverable).
-3. The State Machine: Defines the lifecycle states of an employee (initializing, onboarding, working, blocked).
-   Flume is the "USB Port." It defines the shape of the connection. It does not contain the logic for Letta, Agno, or LLM inference. To build a functioning agent, you must implement these interfaces or use the official adapter layer, Yi.
+**The workforce.** Flume is the corporate layer of the 33GOD pipeline: it hires,
+onboards, and reviews the agents that do the work, and it owns the org chart they
+appear in.
+
+The name evokes a water channel that directs flow — tasks flow *down* the hierarchy
+from Director to Manager to Contributor, results flow back *up*, and Bloodbank events
+flow *out* to observability.
+
+## Anthropomorphism as protocol
+
+Flume rejects standard AI terminology — chains, nodes, tools, *fleets* — in favour of
+strictly anthropomorphic roles. This is not cosmetic. It is a mental model that scales
+with complexity, and it is the pillar every name in this repo is held to.
+
+- **Employee** — the base unit. A deployed agent. Has a title, a desk, and a record.
+- **Contributor** — a leaf node. Executes work.
+- **Manager** — delegates *and* executes.
+- **Director** — a pure orchestrator. Only delegates.
+
+| corporate | mechanical |
+|---|---|
+| employee | a deployed Hermes agent (`33god-pm`) |
+| title | role (`pm`) |
+| desk | `~/.hermes/profiles/<name>` |
+| record | that agent's row in `~/.hermes/agents-registry.yaml` |
+| org chart | the whole registry |
+| job description | `role.yaml` |
+| handbook | `contracts/handbook.yaml` |
+
+## Commands
+
+```
+flume hire <title>            # bring on a new employee for this repo
+flume onboard                 # run the onboarding checklist (idempotent)
+flume offboard <employee>     # retire an employee
+
+flume org                     # the org chart
+flume roster                  # who works here
+flume review [employee]       # performance review
+flume record <employee>       # employment record
+
+flume handbook validate       # check the handbook is well-formed
+flume handbook bootstrap      # seed host configuration
+
+flume audit                   # compliance audit
+flume remediate <finding>     # correct a finding
+```
+
+`flume review` returns one of three verdicts, and the third one matters most:
+
+- **in good standing** — every observation passed
+- **on notice** — an observation failed
+- **unable to assess** — the observation itself could not be trusted
+
+A review that cannot see clearly says so rather than guessing. That honesty is the
+whole point of the handbook.
+
+## Packages
+
+| package | what |
+|---|---|
+| `@delorenj/flume-core` | the HR domain — Employee, Title, Desk, Record, OrgChart, standing |
+| `@delorenj/flume-hr` | the `flume` CLI and its MCP server |
+
+## Position
+
+Flume owns the workforce. It does not own projects — that is
+[pjangler](https://github.com/delorenj/pjangler), which bootstraps a repo and keeps the
+project registry. It does not own tickets — that is Krebs and Pilot. It does not own the
+runtime — that is Hermes, and the job descriptions it renders from come from
+[hermes-agent-template](https://github.com/delorenj/hermes-agent-template).
+
+The boundary is written down in `contracts/handbook.yaml`, which names an owner for
+every field either side may write.

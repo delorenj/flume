@@ -1,31 +1,26 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
-    "outDir": "dist",
-    "rootDir": ".",
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "allowJs": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
     "strict": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "composite": true,
-    "paths": {
-      "@flume/core": ["./packages/flume-core/src"],
-      "@yi/adapter": ["./packages/yi-adapter/src"],
-      "@yi/echo": ["./packages/yi-echo/src"]
-    }
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
   },
-  "references": [
-    { "path": "./packages/flume-core" },
-    { "path": "./packages/yi-adapter" },
-    { "path": "./packages/yi-echo" }
-  ],
-  "include": [],
-  "exclude": ["node_modules", "dist"]
+  "include": ["packages/*/src/**/*.ts"],
+  "exclude": ["**/dist/**", "**/node_modules/**", "templates/**"]
 }

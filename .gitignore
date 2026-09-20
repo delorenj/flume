@@ -1,5 +1,43 @@
+# Dependencies
 node_modules/
+.pnp.*
+
+# Build output
 dist/
 *.tsbuildinfo
+
+# Environment — never commit a rendered .env; commit .env.op with op:// refs
 .env
-.env.local
+.env.*
+!.env.op
+!.env.example
+
+# Runtime droppings — repos hold source, never runtime state
+*.pid
+*.sock
+*.db
+*.db-wal
+*.db-shm
+.codegraph/
+.code-review-graph/
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+__pycache__/
+*.py[cod]
+logs/
+*.log
+
+# Backups — git is the backup
+*.bak
+*.bak-*
+*.orig
+*~
+*-backup.*
+
+# Agent runtime state — never a git repo, never tracked
+agents/hermes/*/runtime/
+.agents/skills/
+
+# OS
+.DS_Store
