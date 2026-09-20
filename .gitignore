@@ -41,3 +41,6 @@ agents/hermes/*/runtime/
 
 # OS
 .DS_Store
+
+# Canonical agent config lives in .agents; generated skill projections stay local.
+/.agents/skills

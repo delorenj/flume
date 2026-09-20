@@ -559,7 +559,7 @@ export function registerOrgCli(program: Command): void {
     });
 
   handbook.command("validate")
-    .description("Validate the fleet contract and report authorities, classes, service model, and retired modes")
+    .description("Validate the employee handbook and report authorities, classes, service model, and retired modes")
     .option("--contract <path>", "Validate this contract instead of the tracked one")
     .option("--json", "Emit the fleet JSON v1 envelope")
     // Async because `write()` now AWAITS the stdout drain. A sync action would

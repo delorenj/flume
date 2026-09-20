@@ -226,15 +226,15 @@ function budgetAwareActions(what: string): (error: FleetError) => string[] {
  * nothing else in this server does, and introducing them on two tools would
  * split the surface.
  */
-export function registerFleetMcpTools(server: ToolHost, asText: AsText): void {
+export function registerOrgMcpTools(server: ToolHost, asText: AsText): void {
   server.registerTool(
-    "pjangler_fleet_inventory",
+    "flume_roster",
     {
-      title: "Inventory the Hermes fleet",
+      title: "The org chart",
       description:
-        "Reads the two canonical registries and reports every registered agent with per-field authoritative-source provenance, "
+        "Reads the two canonical registries and reports every employee with per-field authoritative-source provenance, "
         + "identity conflicts under stable group ids, and independently counted totals. Strictly read-only. "
-        + "Returns the fleet JSON v1 envelope; an unhealthy fleet is still ok:true with data.health.healthy false.",
+        + "Returns the workforce JSON v1 envelope; an unhealthy fleet is still ok:true with data.health.healthy false.",
       inputSchema: z.strictObject({ ...FLEET_TOOL_INPUT }),
     },
     async (args: unknown, extra: { signal: AbortSignal }) => {
@@ -249,14 +249,14 @@ export function registerFleetMcpTools(server: ToolHost, asText: AsText): void {
   );
 
   server.registerTool(
-    "pjangler_fleet_provenance",
+    "flume_record",
     {
-      title: "Report Hermes fleet provenance",
+      title: "Employment records",
       description:
         "Pairs every recorded or pinned fleet value with its live counterpart -- template gitlink, host pin, per-agent hermes "
         + "executable, checkout identity, HEAD and cleanliness -- each side naming its own source and categorized "
         + "match/mismatch/dirty/missing/unsupported/unobserved. Never executes the observed binary and never touches the network. "
-        + "Returns the fleet JSON v1 envelope; a drifted fleet is still ok:true with data.health.healthy false.",
+        + "Returns the workforce JSON v1 envelope; a drifted fleet is still ok:true with data.health.healthy false.",
       inputSchema: z.strictObject({ ...FLEET_TOOL_INPUT }),
     },
     async (args: unknown, extra: { signal: AbortSignal }) => {
@@ -271,11 +271,11 @@ export function registerFleetMcpTools(server: ToolHost, asText: AsText): void {
   );
 
   server.registerTool(
-    "pjangler_fleet_status",
+    "flume_review",
     {
-      title: "Report registry-wide Hermes fleet status",
+      title: "Performance review",
       description:
-        "Traverses the registry once and reports every registered agent across all nine observation domains -- registry, "
+        "Traverses the registry once and reports every employee across all nine observation domains -- registry, "
         + `project_binding, template_scaffold, profile, runtime, systemd, live_process, bloodbank, release_provenance -- each `
         + "either observed or carrying an explicit unobserved/unsupported reason. Host-scoped findings are reported once in "
         + "data.host and never folded into an agent. Strictly read-only; `live` authorizes bounded read-only host and network "

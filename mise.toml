@@ -2,9 +2,60 @@
 
 [env]
 _.file = [".env"]
-
+_.path = [".mise/scripts", "agents/hermes/pm"]
 [tools]
 node = "24"
+
+# This block will handle the linking of
+# agent files to the main AGENTS.md file.
+#
+# TODO: Ensure this works for all levels of nesting.
+# i.e. All linked agent files MUST be siblings at
+# any given level of nesting.
+[[hooks.enter]]
+script = "'{{config_root}}/.mise/scripts/link-agentfiles.sh' '{{config_root}}'"
+[[hooks.enter]]
+script = "'{{config_root}}/.mise/scripts/materialize-env.sh'"
+
+[[watch_files]]
+patterns = ["AGENTS.md"]
+task = "link:agentfiles"
+
+[tasks."link:agentfiles"]
+description = "Symlink all agent files to AGENTS.md"
+run = "'{{config_root}}/.mise/scripts/link-agentfiles.sh' '{{config_root}}'"
+
+[tasks."skills:sync"]
+description = "Reconcile this project's selected skills"
+tools = { "npm:@delorenj/skillex" = "0.1.1", node = "24" }
+run = "skillex sync --scope project --project '{{config_root}}'"
+
+# >>> mise-versioning >>>  (managed block — do not edit by hand; re-run init to update)
+[tasks."version"]
+description = "Print the current version (vX.Y.Z)"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' current"
+
+[tasks."version:bump"]
+description = "Bump patch version: vX.Y.Z -> vX.Y.(Z+1)"
+alias = "version:bump-patch"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' bump patch"
+
+[tasks."version:bump-minor"]
+description = "Bump minor version: vX.Y.Z -> vX.(Y+1).0"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' bump minor"
+
+[tasks."version:bump-major"]
+description = "Bump major version: vX.Y.Z -> v(X+1).0.0"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' bump major"
+
+[tasks."version:check"]
+description = "Verify every versioned file is in parity"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' check"
+
+[tasks."version:sync"]
+description = "Force every versioned file up to the highest version"
+run = "'{{config_root}}/.mise/scripts/versioning.sh' sync"
+# <<< mise-versioning <<<
 
 [tasks.build]
 description = "Build every workspace package"
@@ -17,3 +68,56 @@ run = "npm run typecheck"
 [tasks.test]
 description = "Run every workspace package's tests"
 run = "npm run test"
+
+# ---------------------------------------------------------------------------
+# The org chart
+#
+# All four are strictly READ-ONLY. They open no service, no network, and no
+# mutation verb; `fleet-sync` below is the one that changes anything. An
+# unhealthy workforce still exits 0 -- only a command failure, a blown deadline
+# or a cancellation is nonzero.
+# ---------------------------------------------------------------------------
+
+[tasks."org:handbook"]
+description = "Validate the employee handbook: authorities, classes, service model, retired modes (read-only)"
+# `depends` matters: without a build, a fresh clone fails with
+# ERR_MODULE_NOT_FOUND rather than the categorized handbook diagnostic.
+depends = ["build"]
+run = "node {{config_root}}/packages/flume-hr/dist/index.js handbook validate"
+
+[tasks."org:roster"]
+description = "Every employee in the org chart, and everywhere the two registries disagree (read-only)"
+depends = ["build"]
+run = "node {{config_root}}/packages/flume-hr/dist/index.js roster"
+
+# Which build each employee actually runs, against the pin the host config
+# declares. Every git probe passes --no-optional-locks and the observed hermes
+# binary is classified by path, never executed.
+[tasks."org:record"]
+description = "Employment records: recorded pins against live builds (read-only)"
+depends = ["build"]
+run = "node {{config_root}}/packages/flume-hr/dist/index.js record"
+
+# Answers "is the workforce in good standing?" in ONE invocation: every employee
+# across all nine observation domains, plus the three-way verdict an aggregate
+# needs before it may claim health over a workforce it did not fully read --
+# in good standing / on notice / unable to assess.
+#
+# The third verdict is the point. An observation that could not be trusted is
+# neither a pass nor a failure, and collapsing it into either is how a report
+# starts lying.
+#
+# Deliberately does NOT pass --exit-code: a gate that is permanently red on the
+# real workforce teaches an operator to ignore it.
+[tasks."org:review"]
+description = "Performance review across all nine observation domains (read-only)"
+depends = ["build"]
+run = "node {{config_root}}/packages/flume-hr/dist/index.js review"
+
+[tasks."org:check"]
+description = "Report drift between deployed employees and the job descriptions (dry run)"
+run = "{{config_root}}/templates/hermes-agent/scripts/fleet-sync.sh"
+
+[tasks."org:sync"]
+description = "Reconcile every deployed employee with the current job description and handbook"
+run = "{{config_root}}/templates/hermes-agent/scripts/fleet-sync.sh --apply"

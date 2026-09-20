@@ -9,7 +9,7 @@
     "flume-mcp": "dist/mcp-server.js"
   },
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist",
+    "build": "esbuild src/index.ts src/mcp-server.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

@@ -16,6 +16,8 @@ import { recipeRegistry } from "./parity/catalog";
 import { lifecycleContext, runAudit, runMigrationForRules } from "./parity/index";
 import { formatAuditReport, formatMigrationReport } from "./parity/rules";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
+import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
+import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 
 const program = new Command();
 
@@ -108,11 +110,46 @@ async function runHire(title: string, options: Record<string, unknown>): Promise
   }
 }
 
+program
+  .command("offboard")
+  .argument("<employee>", "Employee id, e.g. 33god-pm")
+  .description("Remove an employee's record from the org chart")
+  .option("--apply", "Write the change (default is a dry run)")
+  .option("--json", "Output machine-parseable JSON")
+  .action((employee: string, options) => {
+    const result = offboardEmployee(employee, { apply: Boolean(options.apply) });
+    process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
+    process.exitCode = result.ok ? 0 : 1;
+  });
+
 // ============================================================================
 // THE ORG CHART, RECORDS, REVIEWS, THE HANDBOOK
 // ============================================================================
 
 registerOrgCli(program);
+
+// `handbook bootstrap` hangs off the namespace registerOrgCli created.
+//
+// It is not optional politeness: EnsureTemplateConfig writes "Bootstrapped by
+// `flume handbook bootstrap`" into the header of the host config it generates,
+// so the file names this command. It was `pj config bootstrap`.
+const handbookCmd = program.commands.find((command) => command.name() === "handbook");
+if (!handbookCmd) throw new Error("registerOrgCli did not register the handbook namespace");
+handbookCmd
+  .command("bootstrap")
+  .description("Create ~/.config/hermes-agent-template/config.toml with host-correct defaults if missing")
+  .option("--force", "Merge missing pinned-schema fields without replacing existing values")
+  .option("--dry-run", "Show what would be written without writing")
+  .action(async (options) => {
+    const ctx: HermesAgentContext = {
+      targetDir: process.cwd(),
+      dryRun: Boolean(options.dryRun ?? false),
+      forceConfig: Boolean(options.force ?? false),
+    };
+    const result = await new EnsureTemplateConfig(ctx).invoke();
+    if (result.message) (result.success ? console.log : console.error)(result.message);
+    if (!result.success) process.exitCode = 1;
+  });
 
 // ============================================================================
 // COMPLIANCE

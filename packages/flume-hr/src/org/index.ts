@@ -187,7 +187,7 @@ export {
   type ResolvedStatusScope,
 } from "./status";
 
-export { registerFleetMcpTools } from "./mcp";
+export { registerOrgMcpTools } from "./mcp";
 
 export {
   FLEET_COMMANDS,

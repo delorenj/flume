@@ -632,7 +632,7 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
 
   const headline = health.healthy
     ? `${green(glyph.pass)} ${bold("Fleet inventory healthy")}`
-    : `${red(glyph.fail)} ${bold("Fleet inventory UNHEALTHY")}`;
+    : `${red(glyph.fail)} ${bold("Org chart ON NOTICE")}`;
   const tally = [
     `${totals.observed} of ${totals.source_rows} rows`,
     health.conflicts ? red(`${health.conflicts} unpermitted conflict${health.conflicts === 1 ? "" : "s"}`) : green("0 unpermitted conflicts"),
@@ -770,7 +770,7 @@ export function formatFleetProvenanceReport(provenance: FleetProvenance): string
 
   const headline = health.healthy
     ? `${green(glyph.pass)} ${bold("Fleet provenance healthy")}`
-    : `${red(glyph.fail)} ${bold("Fleet provenance UNHEALTHY")}`;
+    : `${red(glyph.fail)} ${bold("Employment records ON NOTICE")}`;
   lines.push(`  ${headline}  ${dim(glyph.dot)}  ${joinDot([
     `${totals.emitted_facts} of ${totals.facts} facts`,
     `${totals.agents} agent${totals.agents === 1 ? "" : "s"}`,
@@ -991,7 +991,7 @@ function agentLine(agent: FleetStatusAgent, width: number, domains: readonly Fle
   });
   const head = `    ${statusGlyph(agent.state)}  ${padVisible(bounded(agent.agent_id), width)}  ${statusColor(agent.state)(agent.state)}`
     + `  ${dim(glyph.dot)}  ${dim(agent.member_class)}`
-    + `  ${dim(glyph.dot)}  ${agent.healthy ? dim("healthy") : red("UNHEALTHY")}`
+    + `  ${dim(glyph.dot)}  ${agent.healthy ? dim("in good standing") : red("ON NOTICE")}`
     + `  ${dim(glyph.dot)}  ${agent.complete ? dim("complete") : yellow("incomplete")}`;
   const lines = [head, `       ${dim(glyph.arrow)} ${joinDot(cells)}`];
   // Four separate values, printed as four separate values. Collapsing any two
@@ -1092,8 +1092,8 @@ export function formatFleetStatusReport(status: FleetStatus): string {
   const lines = [""];
 
   const verdictLabel = health.verdict === "healthy"
-    ? "Fleet status HEALTHY"
-    : health.verdict === "unhealthy" ? "Fleet status UNHEALTHY" : "Fleet status UNPROVEN";
+    ? "Workforce IN GOOD STANDING"
+    : health.verdict === "unhealthy" ? "Workforce ON NOTICE" : "Workforce UNABLE TO ASSESS";
   const paint = verdictColor(health.verdict);
   const headline = `${health.verdict === "healthy" ? green(glyph.pass) : health.verdict === "unhealthy" ? red(glyph.fail) : yellow(glyph.warn)} ${bold(paint(verdictLabel))}`;
   lines.push(`  ${headline}  ${dim(glyph.dot)}  ${joinDot([

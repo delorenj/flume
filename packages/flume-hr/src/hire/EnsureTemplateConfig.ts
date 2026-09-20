@@ -68,11 +68,21 @@ function hostSchema(): ConfigSchema {
       values: [
         ["hermes_bin", quote(hermes.bin)],
         ["hermes_repo", quote(hermes.repo)],
-        ["pjangler_bin", quote("pj")],
+        // BOTH keys, both "flume", and the order matters.
+        //
+        // `_lib.sh` resolves fleet.flume_bin and falls back to
+        // fleet.pjangler_bin, but a role directory rendered before the split only
+        // knows the old key -- 74 copies of 20-runtime-repo.sh on this host
+        // against 25 rows in the registry, which is all fleet-sync iterates.
+        // Emitting `pjangler_bin = "pj"` on a fresh host would point every one of
+        // them back at a binary that no longer owns the hermes.* rules, quietly
+        // restoring the cycle this split exists to break.
+        ["flume_bin", quote("flume")],
+        ["pjangler_bin", quote("flume")],
         ["hermes_git_url", quote(HERMES_GIT_URL)],
         ["hermes_git_ref", quote(HERMES_GIT_REF)],
         ["hermes_git_sha", quote(HERMES_GIT_SHA)],
-        ["runtime_scaffold_dir", quote(join(home, "code", "hermes-agent-template", "runtime-scaffold"))],
+        ["runtime_scaffold_dir", quote(join(home, "code", "33GOD", "flume", "templates", "hermes-agent", "runtime-scaffold"))],
         ["fleet_env", quote("~/.hermes/fleet.env")],
         ["registry_file", quote("~/.hermes/agents-registry.yaml")],
         ["oauth_file", quote("~/.hermes/auth.json")],
