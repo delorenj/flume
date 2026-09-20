@@ -1162,8 +1162,15 @@ try {
     // from. So this asserts on the value.
     const repo = join(temp, "manifest-repo");
     mkdirSync(repo, { recursive: true });
-    const victim = liveIds[0];
     const registryText = YAML.parse(readFileSync(REAL_AGENT_REGISTRY, "utf8"));
+    // An agent that actually HAS a board binding, not just the first row.
+    //
+    // `compare()` skips every field whose registry side is null, so an agent with
+    // no `plane` block has nothing for a manifest to contradict and `agrees`
+    // comes back true whatever the manifest says. Three of the 25 live agents
+    // are like that and one of them (`dumply`) now sorts first, so `liveIds[0]`
+    // had quietly turned this case into a no-op.
+    const victim = liveIds.find((id) => registryText.agents[id]?.plane?.identifier) ?? liveIds[0];
     const declared = registryText.agents[victim]?.plane?.identifier ?? null;
     writeFileSync(join(repo, ".project.json"), `${JSON.stringify({
       project_name: "contradiction",

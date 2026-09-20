@@ -342,9 +342,37 @@ async function withSignals<T>(deadlineMs: number | undefined, body: (ctx: FleetR
 /** The read-only org commands, which all promise the same JSON envelope. */
 const ORG_COMMAND_WORDS = new Set(["roster", "org", "record", "review", "handbook"]);
 
-/** Whether these argv words are an org invocation that promised JSON. */
+/**
+ * Every command word Flume answers to. Used only to tell "an org command the
+ * parser rejected" from "a word this CLI has never heard of" -- both of which
+ * owe a `--json` caller an envelope, and neither of which may be trusted.
+ */
+const KNOWN_COMMAND_WORDS = new Set([
+  ...ORG_COMMAND_WORDS,
+  "hire", "onboard", "offboard", "audit", "remediate", "migrate", "help",
+]);
+
+/**
+ * Whether these argv words promised JSON and are owed an envelope.
+ *
+ * TWO cases, and the second is easy to lose. An ORG command Commander rejected
+ * is obvious. But an UNKNOWN root word is too: `flume constructor --json` asked
+ * for JSON, and answering it with zero bytes and a bare exit code puts the CLI
+ * outside its own exit taxonomy for exactly the hostile input the null-prototype
+ * lookup in `orgParserFailureEnvelope` was written to survive.
+ *
+ * Under the old `fleet <sub>` namespace this was free: `fleet` was the gate and
+ * the attacker-shaped word sat at `words[1]`. Hanging the commands off the root
+ * moved that word to `args[0]`, and gating on a membership test alone silently
+ * dropped it -- which made that guard unreachable code for its own use case.
+ *
+ * A known NON-org command (`hire --json`) is deliberately excluded: those do not
+ * speak the envelope, so inventing one for them would be the opposite lie.
+ */
 export function isOrgJsonInvocation(args: readonly string[]): boolean {
-  return args[0] !== undefined && ORG_COMMAND_WORDS.has(args[0]) && args.includes("--json");
+  const word = args[0];
+  if (word === undefined || word.startsWith("-") || !args.includes("--json")) return false;
+  return ORG_COMMAND_WORDS.has(word) || !KNOWN_COMMAND_WORDS.has(word);
 }
 
 /**

@@ -8,6 +8,26 @@ import type { AuditReport, MigrationReport } from "./rules";
 export { recipeRegistry };
 
 /**
+ * `recipeId` is an INTERNAL field. It names which recipe owns a rule, which is
+ * how `ownerOf` routes a migration -- and it is nobody's business on the wire.
+ * pjangler stripped it from both reports and the strippers did not come across
+ * with the move, so `flume audit --json` started shipping it.
+ */
+function publicAudit(report: Awaited<ReturnType<typeof recipeRegistry.auditRecipes>>): AuditReport {
+  return {
+    ...report,
+    rules: report.rules.map(({ recipeId: _recipeId, ...finding }) => finding),
+  } as AuditReport;
+}
+
+function publicMigration(report: Awaited<ReturnType<typeof recipeRegistry.migrateRules>>): MigrationReport {
+  return {
+    ...report,
+    results: report.results.map(({ recipeId: _recipeId, ...result }) => result),
+  } as MigrationReport;
+}
+
+/**
  * The context every employee rule runs against.
  *
  * `flumeRoot` replaces pjangler's `pjanglerRoot`: the rules resolve the vendored
@@ -49,9 +69,9 @@ export async function runAudit(
   registryPath?: string,
   ruleIds?: readonly string[],
 ): Promise<AuditReport> {
-  const report = await recipeRegistry.auditRecipes(
+  const report = publicAudit(await recipeRegistry.auditRecipes(
     lifecycleContext(repoArg, true, false, registryPath ? { registryPath } : {}),
-  );
+  ));
   if (!ruleIds || ruleIds.length === 0) return report;
   const known = new Set(recipeRegistry.listRuleIds());
   const unknown = ruleIds.filter((id) => !known.has(id));
@@ -68,8 +88,8 @@ export async function runMigrationForRules(
   acceptRegistryMatches = false,
   registryPath?: string,
 ): Promise<MigrationReport> {
-  return recipeRegistry.migrateRules(
+  return publicMigration(await recipeRegistry.migrateRules(
     lifecycleContext(repoArg, dryRun, acceptRegistryMatches, registryPath ? { registryPath } : {}),
     ruleIds,
-  );
+  ));
 }
