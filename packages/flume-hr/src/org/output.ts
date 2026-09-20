@@ -456,8 +456,8 @@ export function formatFleetContractReport(inspection: FleetContractInspection): 
   const lines = [""];
 
   const headline = ok
-    ? `${green(glyph.pass)} ${bold("Fleet contract valid")}`
-    : `${red(glyph.fail)} ${bold("Fleet contract invalid")}`;
+    ? `${green(glyph.pass)} ${bold("Handbook valid")}`
+    : `${red(glyph.fail)} ${bold("Handbook invalid")}`;
   const tally = ok
     ? [green(`${inspection.authorities.length} authorities`), green(`${inspection.classifications.length} lifecycle classes`)]
     : [red(`${inspection.diagnostics.length} finding${inspection.diagnostics.length === 1 ? "" : "s"}`)];
@@ -631,7 +631,7 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
   const lines = [""];
 
   const headline = health.healthy
-    ? `${green(glyph.pass)} ${bold("Fleet inventory healthy")}`
+    ? `${green(glyph.pass)} ${bold("Org chart in good standing")}`
     : `${red(glyph.fail)} ${bold("Org chart ON NOTICE")}`;
   const tally = [
     `${totals.observed} of ${totals.source_rows} rows`,
@@ -769,7 +769,7 @@ export function formatFleetProvenanceReport(provenance: FleetProvenance): string
   const lines = [""];
 
   const headline = health.healthy
-    ? `${green(glyph.pass)} ${bold("Fleet provenance healthy")}`
+    ? `${green(glyph.pass)} ${bold("Employment records in good standing")}`
     : `${red(glyph.fail)} ${bold("Employment records ON NOTICE")}`;
   lines.push(`  ${headline}  ${dim(glyph.dot)}  ${joinDot([
     `${totals.emitted_facts} of ${totals.facts} facts`,

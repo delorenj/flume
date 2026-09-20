@@ -10,6 +10,8 @@
 
 import { Command, CommanderError } from "commander";
 
+import { guardBrokenPipe, writeStdout, exitAfterFlush } from "./utils/stdout";
+
 import { registerOrgCli, isOrgJsonInvocation, orgParserFailureEnvelope } from "./org/cli";
 import { fleetEnvelopeExitCode, renderFleetJson } from "./org/output";
 import { recipeRegistry } from "./parity/catalog";
@@ -20,6 +22,20 @@ import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 
 const program = new Command();
+const commandArgs = process.argv.slice(2);
+
+// BEFORE any .command() call, and that is the whole point.
+//
+// Commander copies inherited settings into a subcommand when the subcommand is
+// CREATED. Calling exitOverride() after the tree is built leaves every
+// subcommand exiting the process itself, so the catch below never runs and a
+// rejected `--json` invocation writes zero bytes -- the exact defect the
+// envelope exists to prevent. Measured: `flume roster --json --bogus` printed
+// nothing at all until this moved up here.
+program.exitOverride();
+program.configureOutput({
+  writeErr: (text) => { if (!isOrgJsonInvocation(commandArgs)) process.stderr.write(text); },
+});
 
 program
   .name("flume")
@@ -116,10 +132,11 @@ program
   .description("Remove an employee's record from the org chart")
   .option("--apply", "Write the change (default is a dry run)")
   .option("--json", "Output machine-parseable JSON")
-  .action((employee: string, options) => {
+  .action(async (employee: string, options) => {
+    guardBrokenPipe();
     const result = offboardEmployee(employee, { apply: Boolean(options.apply) });
-    process.stdout.write(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
-    process.exitCode = result.ok ? 0 : 1;
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
   });
 
 // ============================================================================
@@ -161,11 +178,23 @@ program
   .description("Compliance audit: every employee invariant this repository is subject to")
   .option("--rules <ids>", "Comma-separated rule ids; report only these")
   .option("--json", "Output machine-parseable JSON")
+  // `guardBrokenPipe` BEFORE the first write, and `writeStdout` + a flushing
+  // exit after it. Neither is decoration.
+  //
+  // On Linux `process.stdout` is asynchronous for a PIPE, so a bare write
+  // followed by an exit discards whatever is still queued -- and still exits 0.
+  // A small report hides it by fitting the pipe buffer; a multi-megabyte one
+  // does not. And `flume audit --json | head -c 10` closes the pipe mid-write,
+  // which without the guard reaches the process as an unhandled 'error' event
+  // and a stack trace. This is the exact defect the fleet epic was written to
+  // stop reproducing, and it was reintroduced here by a plain
+  // `process.stdout.write`.
   .action(async (repo: string | undefined, options) => {
+    guardBrokenPipe();
     const ruleIds = String(options.rules ?? "").split(",").map((id: string) => id.trim()).filter(Boolean);
     const report = await runAudit(repo, undefined, ruleIds);
-    process.stdout.write(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatAuditReport(report)}\n`);
-    process.exitCode = report.ok ? 0 : 1;
+    await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatAuditReport(report)}\n`);
+    await exitAfterFlush(report.ok ? 0 : 1);
   });
 
 program
@@ -185,15 +214,14 @@ program
   .option("--dry-run", "Report what would change without changing it")
   .option("--json", "Output machine-parseable JSON")
   .action(async (finding: string, repo: string | undefined, options) => {
+    guardBrokenPipe();
     const report = await runMigrationForRules([finding], repo, Boolean(options.dryRun));
-    process.stdout.write(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatMigrationReport(report)}\n`);
-    process.exitCode = report.ok ? 0 : 1;
+    await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatMigrationReport(report)}\n`);
+    await exitAfterFlush(report.ok ? 0 : 1);
   });
 
 // ============================================================================
 
-const commandArgs = process.argv.slice(2);
-program.exitOverride();
 try {
   await program.parseAsync(process.argv);
 } catch (error) {

@@ -75,14 +75,24 @@ export function ticketProviderFleetEnvPath(env: NodeJS.ProcessEnv = process.env)
 /**
  * Locate Flume's own install root.
  *
- * The pjangler original anchored on `templates/commonproject/copier.yml`.
- * Flume anchors on the job descriptions it renders from instead, so a stray
- * pjangler checkout above us can never be mistaken for our root.
+ * Anchored on `contracts/handbook.yaml`, and that choice is load-bearing.
+ *
+ * The obvious marker is `templates/hermes-agent/copier.yml`, the job
+ * descriptions we render from. It is wrong: that file lives INSIDE the
+ * submodule. A clone without `--recurse-submodules`, or a `git submodule
+ * deinit`, makes the walk find nothing and silently fall through to
+ * `process.cwd()` -- so Flume reports template and profile facts about
+ * whatever directory the operator happened to be standing in, with no error
+ * and no diagnostic. pjangler never had this problem because it anchored on
+ * `templates/commonproject/copier.yml`, which is tracked in its main repo.
+ *
+ * The handbook is tracked at this same root, is what `org/contract.ts` already
+ * walks up for, and cannot go missing when a submodule is not initialised.
  */
 export function resolveFlumeRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   while (dir !== dirname(dir)) {
-    if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "templates", "hermes-agent", "copier.yml"))) return dir;
+    if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "contracts", "handbook.yaml"))) return dir;
     dir = dirname(dir);
   }
   return resolve(process.cwd());
@@ -122,4 +132,24 @@ export function readShellAssignments(path: string, keys: string[]): Record<strin
     if (value) found[key] = value;
   }
   return found;
+}
+
+/**
+ * Locate the directory this build's `dist/` sits beside.
+ *
+ * NOT the same as `resolveFlumeRoot()`. Flume is an npm-workspaces monorepo:
+ * the repo root holds `contracts/` and `templates/`, while `dist/index.js` and
+ * `dist/mcp-server.js` are emitted under `packages/flume-hr/`. pjangler was a
+ * single package, so its one root answered both questions and code that moved
+ * across kept asking the wrong one -- `<repo>/dist/index.js` does not exist,
+ * so `flume review --live` could never spawn its audit child and reported
+ * `audit-cli-unavailable` on every invocation.
+ */
+export function resolveFlumePackageRoot(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  while (dir !== dirname(dir)) {
+    if (existsSync(join(dir, "package.json"))) return dir;
+    dir = dirname(dir);
+  }
+  return resolve(process.cwd());
 }

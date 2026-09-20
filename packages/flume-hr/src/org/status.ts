@@ -7,7 +7,7 @@
 // all of them together.
 //
 // This module is that traversal. One core, two thin adapters
-// (`pjangler fleet status`, MCP `pjangler_fleet_status`), one aggregate plus one
+// (`flume review`, MCP `flume_review`), one aggregate plus one
 // stable per-agent record covering ALL NINE domains -- each either observed or
 // carrying an explicit `unobserved`/`unsupported` observation with a reason.
 //
@@ -147,7 +147,7 @@ import {
   type FleetStatusTransition,
 } from "./types";
 import { resolveTemplateConfigPath } from "../kernel/host-config";
-import { resolveFlumeRoot } from "../kernel/paths";
+import { resolveFlumeRoot, resolveFlumePackageRoot } from "../kernel/paths";
 import { recipeRegistry } from "../parity/catalog";
 
 /**
@@ -669,7 +669,7 @@ function statusFindingId(
  * different, smaller thing than the record they were reading.
  */
 function retrievalFor(agentId: string | null, domain: FleetStatusDomain | null, live: boolean): string {
-  const parts = ["pjangler fleet status"];
+  const parts = ["flume review"];
   if (agentId) parts.push(`--agent ${agentId}`);
   if (domain) parts.push(`--domain ${domain}`);
   if (live) parts.push("--live");
@@ -2099,9 +2099,9 @@ export function agentLifecycle(
  * `PJ_FLEET_CLI_ENTRY` is the DOCUMENTED observation-injection seam, and it is
  * what makes this story's child-failure, child-timeout and cancellation cases
  * real subprocesses rather than mocks. Unset, the entry is this build's own
- * `dist/index.js`, resolved from the package root -- both `dist/index.js` and
- * `dist/mcp-server.js` live there, so the CLI and MCP adapters resolve the same
- * one regardless of cwd.
+ * `dist/index.js`, resolved from the PACKAGE root (packages/flume-hr) rather
+ * than the repo root -- both `dist/index.js` and `dist/mcp-server.js` live
+ * there, so the CLI and MCP adapters resolve the same one regardless of cwd.
  *
  * A missing entry is a CATEGORIZED COLLECTION ERROR, never a crash and never a
  * silent skip: the caller gets `null` and reports every audit-fed domain
@@ -2109,7 +2109,7 @@ export function agentLifecycle(
  */
 export function resolveAuditCli(env: NodeJS.ProcessEnv = process.env): string | null {
   const override = nonEmptyString(env[CLI_ENTRY_ENV]);
-  const entry = override ?? join(resolveFlumeRoot(), "dist", "index.js");
+  const entry = override ?? join(resolveFlumePackageRoot(), "dist", "index.js");
   if (!isAbsolute(entry)) return null;
   return existsSync(entry) ? entry : null;
 }
@@ -3303,7 +3303,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     truncated.push(
       `agents: ${agentIds.length - FLEET_STATUS_MAX_AGENTS} of ${agentIds.length} agent records dropped; `
       + "every one of them is still counted in totals, by_state and health; "
-      + "retrieve a dropped record with `pjangler fleet status --agent <id> --json`",
+      + "retrieve a dropped record with `flume review --agent <id> --json`",
     );
   }
 
