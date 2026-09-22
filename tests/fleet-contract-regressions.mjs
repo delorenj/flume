@@ -261,7 +261,7 @@ try {
     // this one states.
     assert.match(out, /schema 5/, "report must name the effective schema version");
     assert.match(out, /contract 1\.\d+\.\d+/, "report must name the contract version");
-    for (const owner of ["project-registry", "agent-registry", "hermes-profile-renderer", "hermes-agent-template", "hermes-fleet-provisioner", "fleet-observer"]) {
+    for (const owner of ["project-registry", "agent-registry", "runtime-template"]) {
       assert.ok(out.includes(owner), `report must name authority owner ${owner}`);
     }
     for (const klass of ["managed_agent", "managed_shared_service", "intentionally_unmanaged", "retired", "unclassified"]) {
@@ -292,9 +292,15 @@ try {
     assert.notEqual(parsed.data, null, "data must be populated on success");
     // Exact, not `>=`. The contract declares a fixed set; a loose bound would
     // stay green if a whole authority block were dropped.
-    // Nine since story 1.7: `provisioned_profile_state` owns the three
-    // provisioned profile leaves beside the renderer's four.
-    assert.equal(parsed.data.authorities.length, 9, "envelope must carry exactly the declared authorities");
+    // Seven since the 2026-09-22 trim. Nine before it: `live_process_observations`
+    // declared read_only with zero writable fields so nothing could ever write it,
+    // and `generated_profile_inputs`/`provisioned_profile_state` were one store
+    // split across two invented owners purely to win a namespace-majority tiebreak.
+    // Seven is the floor, not a preference -- an authority declares exactly ONE
+    // store, and the remaining five stores need seven blocks because `agent-registry`
+    // carries three: its own records, the board projection (a DIFFERENT owner), and
+    // the bloodbank gate, which contract.ts:624 requires to be alone in its block.
+    assert.equal(parsed.data.authorities.length, 7, "envelope must carry exactly the declared authorities");
     assert.equal(parsed.data.projections.length, 6, "envelope must carry exactly the declared projections");
     assert.equal(parsed.data.classifications.length, 5, "envelope must carry five lifecycle classes");
     assert.equal(parsed.data.retired.length, 5, "envelope must carry exactly the declared retired modes");
@@ -565,7 +571,7 @@ try {
       document.getIn(["classifications", "retired", "entries"]).add({
         id: "stale-consumer-sighting",
         kind: "systemd-unit",
-        owner: "hermes-fleet-provisioner",
+        owner: "runtime-template",
         source: "units.hermes-example-pm-consumer.service",
         lifecycle_state: "retired",
         rationale: "Left by a pre-2026-07 template; a drain is planned.",
@@ -1485,8 +1491,19 @@ try {
     assert.equal(manifest.renderer.submodule, contract.scaffold_manifest.template_submodule);
     assert.deepEqual(manifest.renderer.check_argv, ["check", "--profile", "{profile_name}"]);
     assert.deepEqual(manifest.skill_core.required, [], "no mandatory global skill projection");
-    assert.deepEqual(contract.authorities.provisioned_profile_state.writable_fields, [
-      "profiles.{profile_name}.profile.yaml", "profiles.{profile_name}.hindsight.config.json", "profiles.{profile_name}.skills",
+    // The three provisioned leaves moved into `agent_profile_state` in the
+    // 2026-09-22 trim -- they were split from the renderer's four only to win a
+    // namespace-majority tiebreak, which one block does not need. The point of
+    // this assertion is that all seven are still DECLARED writable by somebody,
+    // so it now checks the merged block rather than the deleted one.
+    assert.deepEqual(contract.authorities.agent_profile_state.writable_fields, [
+      "profiles.{profile_name}.config.yaml",
+      "profiles.{profile_name}.config.delta.memory.provider",
+      "profiles.{profile_name}.config.delta.memory.memory_enabled",
+      "profiles.{profile_name}.config.delta.memory.user_profile_enabled",
+      "profiles.{profile_name}.profile.yaml",
+      "profiles.{profile_name}.hindsight.config.json",
+      "profiles.{profile_name}.skills",
     ]);
     assert.equal(
       contract.health_policy.deferred_capabilities.some((entry) => entry.capability === "profile.render_generation"), false,

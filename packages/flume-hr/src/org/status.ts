@@ -282,9 +282,11 @@ const PROVENANCE_FED_DOMAINS: ReadonlySet<FleetStatusDomain> = new Set<FleetStat
  * of them under `scaffold` (the first draft) told a reader that a notebook
  * binding rule was about the role scaffold, which is worse than saying nothing.
  *
- * `processes.{agent_id}` resolves to no owner on purpose: the contract declares
- * `live_process_observations` read-only with an empty `writable_fields`, so
- * nothing may write it and nothing here invents someone who can.
+ * `processes.{agent_id}` resolves to no owner on purpose: nothing writes a
+ * process table, and nothing here invents someone who can. The authority that
+ * used to say so was deleted in the 2026-09-22 trim -- it declared read_only
+ * with zero writable fields, which is the same statement with a block around
+ * it.
  */
 const DOMAIN_FIELD: Readonly<Record<FleetStatusDomain, string>> = Object.freeze({
   registry: "agents.{agent_id}",
@@ -339,10 +341,15 @@ const DOMAIN_AUTHORITY_BLOCK: Readonly<Record<FleetStatusDomain, string>> = Obje
   registry: "agent_operational_records",
   project_binding: "project_identity",
   template_scaffold: "tracked_role_scaffold",
-  profile: "generated_profile_inputs",
+  profile: "agent_profile_state",
   runtime: "agent_operational_records",
   systemd: "systemd_lifecycle",
-  live_process: "live_process_observations",
+  // `live_process_observations` was deleted in the 2026-09-22 trim: it declared
+  // read_only with zero writable fields, so `ownerOf` resolved it to nobody and
+  // this table existed largely to paper over that. A live-process finding about
+  // an agent is ultimately a claim about that agent's record, which has a real
+  // owner that can actually be asked to act.
+  live_process: "agent_operational_records",
   bloodbank: "agent_operational_records",
   release_provenance: "agent_operational_records",
 });
@@ -494,7 +501,7 @@ const SYSTEMD_UNREGISTERED_RULE_ID = "systemd.unregistered";
  *
  * Two registry fields and three unit names, and every one of them is declared
  * writable under the contract's `systemd_lifecycle` authority -- so `ownerOf`
- * answers `hermes-fleet-provisioner` for each and no finding ships without an
+ * answers `runtime-template` for each and no finding ships without an
  * owner. Never `agents.{agent_id}.systemd.gateway_unit` ALONE for all five: the
  * three unit leaves are about units on this manager and the two registry leaves
  * are about the row, and `by_state` counts agents per aspect only when the

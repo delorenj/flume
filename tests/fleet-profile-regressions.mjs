@@ -903,11 +903,16 @@ try {
       assert.equal(field.evidence, "direct");
       assert.equal(field.justification, null);
     }
-    assert.equal(fieldOf(agent, FIELDS.config).owner, "hermes-profile-renderer");
-    assert.equal(fieldOf(agent, FIELDS.identity).owner, "hermes-agent-template");
-    assert.equal(fieldOf(agent, FIELDS.bank).owner, "hermes-agent-template");
-    assert.equal(fieldOf(agent, FIELDS.skills).owner, "hermes-agent-template");
-    assert.equal(fieldOf(agent, FIELDS.path).owner, "hermes-profile-renderer", "the directory resolves to the renderer by namespace majority");
+    assert.equal(fieldOf(agent, FIELDS.config).owner, "runtime-template");
+    // All three used to answer `hermes-agent-template` against the renderer's
+    // `hermes-profile-renderer`. Both were names for the same submodule, and the
+    // profile tree is one authority now, so every leaf answers the same owner.
+    assert.equal(fieldOf(agent, FIELDS.identity).owner, "runtime-template");
+    assert.equal(fieldOf(agent, FIELDS.bank).owner, "runtime-template");
+    assert.equal(fieldOf(agent, FIELDS.skills).owner, "runtime-template");
+    // One block owns the whole profile tree since the 2026-09-22 trim, so the
+    // directory resolves outright instead of by namespace majority.
+    assert.equal(fieldOf(agent, FIELDS.path).owner, "runtime-template", "the directory resolves to the one profile-tree authority");
     assert.equal(agent.profile.renderer.state, "in-sync");
     assert.deepEqual(agent.profile.renderer.sections, []);
     for (const side of ["base", "delta", "generated"]) assert.match(agent.profile.digests[side], /^[0-9a-f]{12}$/u, `${side} digest`);
@@ -1035,7 +1040,7 @@ try {
     assert.equal(renderer.state, "error");
     assert.equal(renderer.observed, "renderer-source-mismatched");
     assert.equal(renderer.domain, "profile");
-    assert.equal(renderer.owner, "hermes-profile-renderer");
+    assert.equal(renderer.owner, "runtime-template");
     assert.equal(data.profile.renderer.source, "renderer-source-mismatched");
     assert.equal(data.profile.renderer.python, "not-probed");
     assert.equal(data.profile.renderer.gitlink, TEMPLATE_HEAD, "the committed gitlink is still reported; the worktree is what is wrong");
@@ -2240,7 +2245,7 @@ try {
   check("a schema-3 contract with no profile_manifest loads and reports every field unsupported under profile.manifest", () => {
     const bare = policyContract((document) => {
       delete document.profile_manifest;
-      delete document.authorities.provisioned_profile_state;
+      delete document.authorities.agent_profile_state;
       document.schema_version = 3;
       document.compatibility.max_schema_version = 3;
     });
@@ -2311,7 +2316,11 @@ try {
     // not touch.
     assert.ok(Number.parseInt(contract.contract_version.split(".")[1] ?? "0", 10) >= 4, contract.contract_version);
     assert.equal(contract.health_policy.deferred_capabilities.some((entry) => entry.capability === "profile.render_generation"), false, "the profile.render_generation deferral is gone: the observer answers it");
-    assert.deepEqual(contract.authorities.provisioned_profile_state.writable_fields, [FIELDS.identity, FIELDS.bank, FIELDS.skills]);
+    // The three provisioned leaves merged into `agent_profile_state` beside the
+    // renderer's four; they are still declared, just not in their own block.
+    for (const leaf of [FIELDS.identity, FIELDS.bank, FIELDS.skills]) {
+      assert.ok(contract.authorities.agent_profile_state.writable_fields.includes(leaf), `agent_profile_state must still declare ${leaf}`);
+    }
     const script = pinned(PROFILE_SCRIPT_REL).toString("utf8");
     assert.doesNotMatch(script, /CORE_RUNTIME_SKILLS=/, "the template delegates selection to Skillex");
     assert.deepEqual(contract.profile_manifest.skill_core.required, [], "default fleet policy does not require a global projection");
