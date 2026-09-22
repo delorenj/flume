@@ -775,7 +775,7 @@ try {
       assert.equal(group.items, undefined, `${group.field} must carry no items key at all on a pass`);
       assert.equal(group.rule_scope, "project");
       assert.equal(group.rule_id, null);
-      assert.equal(group.owner, "hermes-agent-template", "the leaf is a declared writable field, so the owner is declared rather than walked up to");
+      assert.equal(group.owner, "runtime-template", "the leaf is a declared writable field, so the owner is declared rather than walked up to");
       assert.match(group.observed, /^\d+\/\d+ assets match$/u);
       assert.match(group.desired, /^every asset in scaffold\.[A-Za-z.-]+ at gitlink [0-9a-f]{12}$/u);
       assert.equal(group.evidence, "direct");
@@ -938,7 +938,7 @@ try {
     assert.ok(source, "source integrity is a host finding");
     assert.equal(source.state, "pass");
     assert.equal(source.domain, "template_scaffold");
-    assert.equal(source.owner, "hermes-agent-template");
+    assert.equal(source.owner, "runtime-template");
     for (const agent of data.agents) {
       assert.equal(agent.observations.some((item) => item.rule_id === "scaffold.source"), false, "the source finding never reaches an agent record");
     }

@@ -827,7 +827,7 @@ async function main() {
       // Every leaf resolves an owner: all five are declared writable under the
       // contract's `systemd_lifecycle` authority.
       for (const field of FIELD_ORDER) {
-        assert.equal(leafOf(agent, field).owner, "hermes-fleet-provisioner", `${id} ${field}`);
+        assert.equal(leafOf(agent, field).owner, "runtime-template", `${id} ${field}`);
         assert.equal(leafOf(agent, field).evidence, "direct", `${id} ${field} must be direct evidence, never derived`);
       }
     }
@@ -1287,7 +1287,7 @@ async function main() {
       document.classifications.managed_shared_service.entries.push({
         id: "fleet-observability-shim",
         kind: "shared-service",
-        owner: "hermes-fleet-provisioner",
+        owner: "runtime-template",
         source: "units.hermes-observability.service",
         lifecycle_state: "managed",
         rationale: "An operator declared this unit and the control plane leaves it alone.",
@@ -1355,7 +1355,7 @@ async function main() {
     assert.equal(data.health.proven, false);
     const ruled = writeContract("unregistered-allowed", (document) => {
       document.classifications.managed_shared_service.entries.push({
-        id: "fleet-observability-shim", kind: "shared-service", owner: "hermes-fleet-provisioner",
+        id: "fleet-observability-shim", kind: "shared-service", owner: "runtime-template",
         source: "units.hermes-observability.service", lifecycle_state: "managed",
         rationale: "An operator declared this unit and the control plane leaves it alone.",
         policy_domains: ["systemd"],
