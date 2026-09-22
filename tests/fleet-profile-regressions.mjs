@@ -29,7 +29,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync,
+  chmodSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync,
   readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir, userInfo } from "node:os";
@@ -1256,6 +1256,31 @@ try {
     assert.equal(agentNamed(data, "pinbad-pm").profile.bank.code, "pin-malformed");
     assert.equal(agentNamed(data, "alias-pm").profile.bank.code, "bank-alias");
     assert.equal(textOf(data).includes("secret memory"), false, "nothing under memories/ was read");
+  });
+
+  check("a named agent keeps its declared bank when its profile/post name changes, while the PM template remains compatible", () => {
+    requireRenderer("a named agent keeps its declared bank when its profile/post name changes, while the PM template remains compatible");
+    const alt = makeAltHome("named-bank");
+    const moved = join(alt.realProfiles, "cto");
+    renameSync(join(alt.realProfiles, "solo-pm"), moved);
+    writeFileSync(join(alt.realProfiles, ".cto.config.lock"), "", "utf8");
+    mkdirSync(join(moved, "hindsight"), { recursive: true });
+    writeFileSync(join(moved, "hindsight", "config.json"), `${JSON.stringify({ bank_id: "agent-grolf" }, null, 2)}\n`, "utf8");
+    const rows = [{ name: "solo-pm", rowOverrides: {
+      repo: "named-bank-solo",
+      project_path: join(reposRoot, "named-bank-solo"),
+      role_dir: join(reposRoot, "named-bank-solo", "agents", "hermes", "pm"),
+      profile_name: "cto",
+      identity: "grolf",
+      hindsight: { write_bank: "agent-grolf" },
+    } }];
+    const agents = writeAgentRegistry(join(alt.fleet, "agents-registry.yaml"), rows);
+    writeProjectRegistry(join(alt.home, ".config", "pjangler", "projects.yaml"), rows);
+    const data = status(cliAt(mainRoot, [...STATUS_ARGS, "--agent-registry", agents], alt.env));
+    const agent = agentNamed(data, "solo-pm");
+    assert.equal(agent.profile.profile_name, "cto");
+    assert.equal(fieldOf(agent, FIELDS.bank).state, "pass", JSON.stringify(fieldOf(agent, FIELDS.bank)));
+    assert.equal(agent.profile.bank.expected, "agent-grolf");
   });
 
   // -- AC5: the skill core by bytes -------------------------------------------

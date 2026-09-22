@@ -159,6 +159,10 @@ export interface FleetProfileAgentInput {
   agentId: string;
   /** The row's `profile_name`. Null when the row records none. */
   profileName: string | null;
+  /** Stable named-agent identity. Null means this is a post/profile row. */
+  stableIdentity?: string | null;
+  /** Exact bank declared by the registry's `hindsight.write_bank`, when present. */
+  declaredBank?: string | null;
   /** The row's `display_name`, compared against the identity file's when both exist. */
   displayName: string | null;
   /**
@@ -1087,39 +1091,50 @@ async function inspectAgent(ctx: FleetProfileContext, shared: Shared, input: Fle
 
   // -- the Hindsight bank pin ---------------------------------------------------
   const bankItems: FleetProfileItem[] = [];
-  const expectedBank = manifest.memory.bank_id_template.replaceAll("{profile_name}", name);
+  // A named agent owns a bank by identity, not by post. The explicit registry
+  // declaration wins for both named agents and existing special rows. Only a
+  // row with neither declaration nor stable identity uses the historical PM
+  // template, preserving agent-33god-pm and every other post bank.
+  const named = input.stableIdentity !== undefined && input.stableIdentity !== null;
+  const expectedBank = input.declaredBank !== undefined && input.declaredBank !== null
+    ? input.declaredBank
+    : named
+      ? null
+      : manifest.memory.bank_id_template.replaceAll("{profile_name}", name);
+  const expectedBankLabel = expectedBank ?? "declared personal bank";
   let observedBank: string | null = null;
   {
     const file = manifest.memory.pin_file;
     const full = join(profileDir, ...file.split("/"));
     const stat = entryStat(full);
-    if (stat.kind === "absent") bankItems.push({ path: file, kind: "pin-missing", desired: expectedBank, observed: "absent", detail: null });
-    else if (stat.kind === "symlink") bankItems.push({ path: file, kind: "pin-symlink", desired: expectedBank, observed: "symlink", detail: null });
-    else if (stat.kind === "unreadable") bankItems.push({ path: file, kind: "unreadable", desired: expectedBank, observed: "could not be lstat'ed", detail: null });
-    else if (stat.kind !== "file") bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBank, observed: stat.kind, detail: null });
+    if (stat.kind === "absent") bankItems.push({ path: file, kind: "pin-missing", desired: expectedBankLabel, observed: "absent", detail: null });
+    else if (stat.kind === "symlink") bankItems.push({ path: file, kind: "pin-symlink", desired: expectedBankLabel, observed: "symlink", detail: null });
+    else if (stat.kind === "unreadable") bankItems.push({ path: file, kind: "unreadable", desired: expectedBankLabel, observed: "could not be lstat'ed", detail: null });
+    else if (stat.kind !== "file") bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBankLabel, observed: stat.kind, detail: null });
     else {
       const read = readBounded(full, cap);
-      if ("error" in read) bankItems.push({ path: file, kind: read.error, desired: expectedBank, observed: read.error, detail: null });
+      if ("error" in read) bankItems.push({ path: file, kind: read.error, desired: expectedBankLabel, observed: read.error, detail: null });
       else {
         let parsed: unknown;
         let malformed = false;
         try { parsed = JSON.parse(read.bytes.toString("utf8")); } catch { malformed = true; }
         if (malformed || !isMapping(parsed)) {
-          bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBank, observed: "not a JSON object", detail: null });
+          bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBankLabel, observed: "not a JSON object", detail: null });
         } else {
           const id = parsed.bank_id;
           if (id === undefined) {
             // A generic template is not a pin: it is exactly the resolver
             // path that falls back to the shared bank.
-            bankItems.push({ path: file, kind: "bank-missing", desired: expectedBank, observed: "bank_id_template" in parsed ? "bank_id_template only" : "no bank_id", detail: "bank_id_template" in parsed ? "bank_id_template" : null });
+            bankItems.push({ path: file, kind: "bank-missing", desired: expectedBankLabel, observed: "bank_id_template" in parsed ? "bank_id_template only" : "no bank_id", detail: "bank_id_template" in parsed ? "bank_id_template" : null });
           } else if (typeof id !== "string") {
-            bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBank, observed: "bank_id is not a string", detail: null });
+            bankItems.push({ path: file, kind: "pin-malformed", desired: expectedBankLabel, observed: "bank_id is not a string", detail: null });
           } else {
             observedBank = word(id);
-            if (id === expectedBank) { /* pinned */ }
-            else if (manifest.memory.reserved_bank_ids.includes(id)) bankItems.push({ path: file, kind: "bank-custom", desired: expectedBank, observed: observedBank, detail: null });
-            else if (aliasKey(id) === aliasKey(expectedBank)) bankItems.push({ path: file, kind: "bank-alias", desired: expectedBank, observed: observedBank, detail: null });
-            else bankItems.push({ path: file, kind: "bank-mismatch", desired: expectedBank, observed: observedBank, detail: null });
+            if (expectedBank === null) bankItems.push({ path: file, kind: "bank-missing", desired: expectedBankLabel, observed: observedBank, detail: "registry bank declaration missing" });
+            else if (id === expectedBank) { /* pinned */ }
+            else if (manifest.memory.reserved_bank_ids.includes(id)) bankItems.push({ path: file, kind: "bank-custom", desired: expectedBankLabel, observed: observedBank, detail: null });
+            else if (aliasKey(id) === aliasKey(expectedBank)) bankItems.push({ path: file, kind: "bank-alias", desired: expectedBankLabel, observed: observedBank, detail: null });
+            else bankItems.push({ path: file, kind: "bank-mismatch", desired: expectedBankLabel, observed: observedBank, detail: null });
           }
         }
       }
@@ -1131,8 +1146,8 @@ async function inspectAgent(ctx: FleetProfileContext, shared: Shared, input: Fle
       bankState,
       bankItems,
       observedBank ?? bankItems.map((item) => item.observed ?? item.kind).join(", "),
-      expectedBank,
-      bankState === "pass" ? `the Hindsight bank is pinned to ${expectedBank}` : `${manifest.memory.pin_file}: ${bankItems.map((item) => item.kind).join(", ")}`,
+      expectedBankLabel,
+      bankState === "pass" ? `the Hindsight bank is pinned to ${expectedBankLabel}` : `${manifest.memory.pin_file}: ${bankItems.map((item) => item.kind).join(", ")}`,
     ),
     bankId: observedBank,
     expectedBank,

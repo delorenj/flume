@@ -386,6 +386,7 @@ export interface FleetProfileManifest {
   };
   memory: {
     pin_file: string;
+    /** Compatibility default for post/profile rows; named agents use their registry declaration. */
     bank_id_template: string;
     reserved_bank_ids: string[];
   };
@@ -669,6 +670,8 @@ export interface FleetInventoryRow {
   repo: FleetFieldValue<string>;
   repo_path: FleetFieldValue<string>;
   role: FleetFieldValue<string>;
+  /** Stable person/agent identity. Unlike profile_name, this survives a change of post. */
+  identity: FleetFieldValue<string>;
   /**
    * The agent's RUNTIME, as data rather than assumption. The registry encoded
    * hermes implicitly in ~6 places per row (profile_name, hermes.*,
@@ -678,6 +681,8 @@ export interface FleetInventoryRow {
   type: FleetFieldValue<string>;
   role_dir: FleetFieldValue<string>;
   profile_name: FleetFieldValue<string>;
+  /** Explicit personal-bank declaration for a named agent, when present. */
+  hindsight_write_bank: FleetFieldValue<string>;
   profile_path: FleetFieldValue<string>;
   runtime_path: FleetFieldValue<string>;
   expected_units: FleetFieldValue<string[]>;

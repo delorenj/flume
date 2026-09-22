@@ -110,10 +110,15 @@ authorities:
       - agents.{agent_id}.repo
       - agents.{agent_id}.role
       - agents.{agent_id}.type
+      # A travelling named agent keeps this identity when the profile/post
+      # changes. PM rows intentionally leave it absent and continue using the
+      # profile-derived compatibility bank below.
+      - agents.{agent_id}.identity
       - agents.{agent_id}.display_name
       - agents.{agent_id}.project_path
       - agents.{agent_id}.role_dir
       - agents.{agent_id}.profile_name
+      - agents.{agent_id}.hindsight.write_bank
       - agents.{agent_id}.provisioned_at
       - agents.{agent_id}.runtime_repo
       - agents.{agent_id}.telegram.provisioning_status
@@ -595,8 +600,11 @@ profile_manifest:
       - ui_meta
     inert_keys:
       - config
-  # The explicit bank pin. A generic `bank_id_template` never satisfies it, and
-  # the two reserved ids are what the resolver falls back to when identity is
+  # The explicit bank pin. A generic `bank_id_template` never satisfies it for
+  # a real profile. It remains the compatibility default for post/PM rows;
+  # travelling named agents declare their personal bank in
+  # agents.{agent_id}.hindsight.write_bank, so a post change does not move it.
+  # The two reserved ids are what the resolver falls back to when identity is
   # lost -- a profile pinned to either shares its private memory.
   memory:
     pin_file: hindsight/config.json

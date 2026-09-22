@@ -853,8 +853,26 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     return unresolved<string>(owner);
   };
 
+  const nestedScalar = (blockKey: string, key: string, path: string): FleetFieldValue<string> => {
+    const owner = own.ownerOf(path);
+    const block = raw[blockKey];
+    if (block === undefined) return unresolved<string>(owner);
+    if (!isRecord(block)) {
+      note("agent-field-malformed", `agents.{agent_id}.${blockKey}`, own.ownerOf(`agents.{agent_id}.${blockKey}`), "warn",
+        `${blockKey} is a ${typeof block}, not a mapping`);
+      return unresolved<string>(owner);
+    }
+    const value = block[key];
+    if (typeof value === "string" && value.trim() !== "") return field(bounded(value), owner, "resolved");
+    if (value !== undefined && typeof value !== "string") {
+      note("agent-field-malformed", path, owner, "warn", `${blockKey}.${key} is a ${typeof value}, not a string`);
+    }
+    return unresolved<string>(owner);
+  };
+
   const repo = scalar("repo", "agents.{agent_id}.repo");
   const role = scalar("role", "agents.{agent_id}.role");
+  const identity = scalar("identity", "agents.{agent_id}.identity");
   // The RUNTIME this row describes, read rather than assumed. Redis ASM already
   // keys agents by runtime type (hermes|claude|codex); the registry was the last
   // layer hard-coding hermes, so a row that does not state one is `unresolved`
@@ -863,6 +881,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   const projectPath = scalar("project_path", "agents.{agent_id}.project_path");
   const roleDir = scalar("role_dir", "agents.{agent_id}.role_dir");
   const profileName = scalar("profile_name", "agents.{agent_id}.profile_name");
+  const hindsightWriteBank = nestedScalar("hindsight", "write_bank", "agents.{agent_id}.hindsight.write_bank");
 
   // -- correlation: two registries only; the manifest is never a tiebreaker ---
   const projectSlugOwner = own.ownerOf("projects.{slug}.slug");
@@ -1094,11 +1113,13 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     repo,
     repo_path: repoPath,
     role,
+    identity,
     type,
     role_dir: roleDir.value
       ? field(shownPath(roleDir.value), roleDir.source, paths.role_dir.classification === "ok" ? "resolved" : "unresolved")
       : roleDir,
     profile_name: profileName,
+    hindsight_write_bank: hindsightWriteBank,
     profile_path: profilePath,
     runtime_path: runtimePath,
     expected_units: expectedUnits,
@@ -1147,8 +1168,9 @@ interface Dimension {
 }
 
 /**
- * The seven identity dimensions AC5 names, plus the project-registry-internal
- * duplicates `loadProjectRegistry` refuses to load past.
+ * The identity dimensions AC5 names, plus the stable named-agent identity and
+ * the project-registry-internal duplicates `loadProjectRegistry` refuses to
+ * load past.
  *
  * Every dimension gets its OWN field path so two dimensions can never mint the
  * same group id for the same value. `projects.{slug}` (a duplicate registry key)
@@ -1159,6 +1181,7 @@ const DIMENSIONS = {
   agentId: { key: "agent-id", field: "agents.{agent_id}", kind: "agent" },
   repo: { key: "repo", field: "agents.{agent_id}.repo", kind: "agent" },
   projectPath: { key: "project-path", field: "agents.{agent_id}.project_path", kind: "agent" },
+  stableIdentity: { key: "stable-identity", field: "agents.{agent_id}.identity", kind: "agent" },
   profileName: { key: "profile-name", field: "agents.{agent_id}.profile_name", kind: "agent" },
   boardIdentifier: { key: "board-identifier", field: "agents.{agent_id}.plane.identifier", kind: "agent" },
   bloodbankTarget: { key: "bloodbank-target", field: "agents.{agent_id}.bloodbank.target_agent_id", kind: "agent" },
@@ -1320,6 +1343,7 @@ export function detectConflicts(input: ConflictInput): FleetConflictGroup[] {
     // directory. Not `realpath` either -- following a link is what this command
     // must never do.
     claim(DIMENSIONS.projectPath, normalizePathValue(row.paths.project_path?.declared), agentId);
+    claim(DIMENSIONS.stableIdentity, row.identity.value, agentId);
     claim(DIMENSIONS.profileName, row.profile_name.value, agentId);
     claim(DIMENSIONS.boardIdentifier, row.board.value?.identifier ?? null, agentId);
     claim(DIMENSIONS.bloodbankTarget, row.bloodbank_target.value, agentId);
@@ -1404,6 +1428,7 @@ export function detectConflicts(input: ConflictInput): FleetConflictGroup[] {
 /** Every field of a row that carries the value a conflict dimension groups on. */
 const CONFLICT_FIELD_KEYS: Record<string, keyof FleetInventoryRow> = {
   "agents.{agent_id}.repo": "repo",
+  "agents.{agent_id}.identity": "identity",
   "agents.{agent_id}.profile_name": "profile_name",
   "agents.{agent_id}.plane.identifier": "board",
   "agents.{agent_id}.bloodbank.target_agent_id": "bloodbank_target",

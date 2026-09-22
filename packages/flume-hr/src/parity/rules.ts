@@ -1318,7 +1318,25 @@ function profileRendererPath(ctx: Context): string | null {
 // "config.yaml is a symlink to the fleet base" contract.
 //
 // Returns human-readable findings; empty means in parity.
-function profileConfigFindings(profileDir: string, profileName: string): string[] {
+/**
+ * Resolve the explicit bank declaration for a named registry row.
+ * `undefined` means no declaration exists and preserves the PM compatibility
+ * template; `null` means the row is named but forgot to declare its bank.
+ */
+function declaredPersonalBank(ctx: Context, agentId: string): string | null | undefined {
+  const entry = readRegistry(registryPath(ctx.homeDir))?.[agentId];
+  if (!entry || typeof entry !== "object") return undefined;
+  const row = entry as Record<string, unknown>;
+  const identity = typeof row.identity === "string" && row.identity.trim() !== "" ? row.identity : null;
+  const hindsight = row.hindsight;
+  const bank = typeof hindsight === "object" && hindsight !== null
+    ? (hindsight as Record<string, unknown>).write_bank
+    : undefined;
+  if (typeof bank === "string" && bank.trim() !== "") return bank;
+  return identity !== null ? null : undefined;
+}
+
+function profileConfigFindings(profileDir: string, profileName: string, declaredBank: string | null | undefined = undefined): string[] {
   const out: string[] = [];
   const cfg = join(profileDir, "config.yaml");
   const delta = join(profileDir, "config.delta.yaml");
@@ -1357,14 +1375,14 @@ function profileConfigFindings(profileDir: string, profileName: string): string[
   //    or an uppercase name silently yields the literal "custom", merging several
   //    agents' PRIVATE memory into one shared bank.
   const memCfg = join(profileDir, "hindsight", "config.json");
-  const wantBank = `agent-${profileName}`;
+  const wantBank = declaredBank === undefined ? `agent-${profileName}` : declaredBank ?? "declared personal bank";
   if (!existsSync(memCfg)) {
     out.push(`identity-memory bank not pinned (expected bank_id "${wantBank}"): ${memCfg}`);
   } else {
     try {
       const parsed = JSON.parse(readFileSync(memCfg, "utf8")) as Record<string, unknown>;
       const got = typeof parsed.bank_id === "string" ? parsed.bank_id : "";
-      if (got !== wantBank) {
+      if (declaredBank === null || got !== wantBank) {
         out.push(`identity-memory bank_id is ${got ? `"${got}"` : "unset"}, expected "${wantBank}": ${memCfg}`);
       }
     } catch {
@@ -2093,7 +2111,7 @@ return [
         });
         details.push(...skillDiagnostics(projection.findings));
         details.push(...(projection.data?.changes ?? []).map((change) => `profile skills ${change.action}: ${change.path}`));
-        details.push(...profileConfigFindings(plan.profileDir, profileNameOf(role)));
+        details.push(...profileConfigFindings(plan.profileDir, profileNameOf(role), declaredPersonalBank(ctx, role.agentId)));
       }
       return {
         id: "hermes.runtime-singleton",
@@ -2175,7 +2193,8 @@ return [
         // This deliberately does NOT symlink config.yaml (see
         // SHARED_PROFILE_ENTRIES): the renderer owns that file now.
         const profileName = profileNameOf(role);
-        if (profileConfigFindings(plan.profileDir, profileName).length) {
+        const explicitBank = declaredPersonalBank(ctx, role.agentId);
+        if (profileConfigFindings(plan.profileDir, profileName, explicitBank).length) {
           const renderer = profileRendererPath(ctx);
           if (!renderer) {
             details.push(`blocked: profile renderer not found (expected hermes-agent-template/scripts/hermes-profile-config.py); cannot render ${plan.profileDir}/config.yaml`);
@@ -2183,7 +2202,16 @@ return [
             details.push(`render config.yaml + pin memory bank for ${profileName}`);
             changedFiles.push(join(plan.profileDir, "config.yaml"), join(plan.profileDir, "config.delta.yaml"));
             if (!ctx.dryRun) {
-              for (const args of [["init", "--profile", profileName], ["memory-pin", "--profile", profileName]]) {
+              const memoryPinArgs = explicitBank === undefined
+                ? ["memory-pin", "--profile", profileName]
+                : explicitBank === null
+                  ? null
+                  : ["memory-pin", "--profile", profileName, "--bank-id", explicitBank];
+              if (memoryPinArgs === null) {
+                details.push(`blocked: named agent ${role.agentId} has no hindsight.write_bank declaration`);
+                continue;
+              }
+              for (const args of [["init", "--profile", profileName], memoryPinArgs]) {
                 const res = spawnSync("python3", [renderer, ...args], { encoding: "utf8" });
                 if (res.status !== 0) {
                   details.push(`blocked: ${basename(renderer)} ${args[0]} failed for ${profileName}: ${(res.stderr || res.stdout || "").trim().split("\n").slice(-2).join(" ")}`);

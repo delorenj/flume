@@ -2465,6 +2465,8 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   // one profile against a case-insensitive twin.
   const profileNameByAgent = new Map<string, string | null>();
   const displayNameByAgent = new Map<string, string | null>();
+  const stableIdentityByAgent = new Map<string, string | null>();
+  const declaredBankByAgent = new Map<string, string | null>();
   // The profile observer's role directory: the row's, else the canonical
   // default `<project_path>/agents/hermes/<role>` exactly as the scaffold
   // observer resolves it -- held apart from `roleDirByAgent`, which the
@@ -2487,6 +2489,9 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     if (!profileNameByAgent.has(entry.key)) {
       profileNameByAgent.set(entry.key, nonEmptyString(raw.profile_name));
       displayNameByAgent.set(entry.key, nonEmptyString(raw.display_name));
+      stableIdentityByAgent.set(entry.key, nonEmptyString(raw.identity));
+      const hindsight = isRecord(raw.hindsight) ? raw.hindsight : {};
+      declaredBankByAgent.set(entry.key, nonEmptyString(hindsight.write_bank));
       registeredAgentIds.push(entry.key);
     }
     if (!selectedAgents.has(entry.key) || rawRowByAgent.has(entry.key)) continue;
@@ -2798,6 +2803,8 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       agents: agentIds.map((agentId) => ({
         agentId,
         profileName: profileNameByAgent.get(agentId) ?? null,
+        stableIdentity: stableIdentityByAgent.get(agentId) ?? null,
+        declaredBank: declaredBankByAgent.get(agentId) ?? null,
         displayName: displayNameByAgent.get(agentId) ?? null,
         roleDir: profileRoleDirByAgent.get(agentId) ?? null,
       })),
