@@ -49,6 +49,7 @@ const QUARANTINED = new Map([
  * place and can never be silently dropped from the chain.
  */
 const SUITES = [
+  "tests/engagement-regressions.mjs",
   "tests/fleet-shared-bloodbank-regressions.mjs",
   "tests/hermes-profile-inheritance-regressions.mjs",
   "tests/pjan-48-regressions.mjs",

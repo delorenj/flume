@@ -263,6 +263,121 @@ export interface ContractorRun {
 }
 
 /**
+ * Who may open an engagement: a PM, and only a PM.
+ *
+ * A director delegates unrestricted and could plausibly open engagements across
+ * departments -- which is exactly why it may not. Contractor spend is governed
+ * by the PM who owns the project the work lands in, so a director who wants a
+ * contractor goes through that PM. The delegation edge and the budget edge are
+ * then the same edge, and there is one person to ask why the money went.
+ *
+ * An IC cannot delegate at all, and a contractor opening engagements would be
+ * the unbounded fan-out this whole model exists to prevent.
+ */
+export function mayOpenEngagement(openerClass: EmploymentClass, contract: Contract): true | string {
+  if (openerClass !== "pm") {
+    return `${openerClass} may not open an engagement; contractor spend is governed by the project's PM`;
+  }
+  if (contract.acceptance.length === 0) {
+    return `contract ${contract.id} declares no acceptance criteria; completion would be self-reported`;
+  }
+  if (contract.scope.length === 0) {
+    return `contract ${contract.id} declares no scope; an unscoped contractor is an unbounded one`;
+  }
+  return true;
+}
+
+/**
+ * What a closed engagement leaves behind.
+ *
+ * The ledger is archived -- who worked, when, and how it went is an accounting
+ * record, and accounting records are closed, not deleted.
+ */
+export interface EngagementArchive {
+  readonly engagementId: string;
+  readonly client: string;
+  readonly project: string;
+  readonly closedAt: string;
+  readonly runs: readonly ContractorRun[];
+  readonly delivered: number;
+  readonly rejected: number;
+  readonly abandoned: number;
+}
+
+/**
+ * Close an engagement: archive the ledger, KEEP the substrate.
+ *
+ * This asymmetry is the whole point. The ledger is about the contractors and
+ * they are gone; the substrate is about the client and the client is not. A
+ * firm that deleted its client file every time an engagement ended would
+ * re-learn the same codebase at full price forever -- which is precisely the
+ * cost that binding an ephemeral agent exists to avoid.
+ *
+ * Returns the closed engagement and the archive separately so a caller can
+ * store them apart: the archive is append-only history, the engagement is a
+ * live record that `reopenEngagement` can build on.
+ */
+export function closeEngagement(
+  engagement: Engagement,
+  closedAt: string,
+): { readonly engagement: Engagement; readonly archive: EngagementArchive } {
+  const runs = engagement.ledger;
+  const count = (outcome: ContractorRun["outcome"]) => runs.filter((run) => run.outcome === outcome).length;
+  return {
+    engagement: {
+      ...engagement,
+      closedAt,
+      // Emptied here, preserved in the archive. Substrate is passed through
+      // untouched by construction -- spreading `engagement` carries it.
+      ledger: [],
+    },
+    archive: {
+      engagementId: engagement.id,
+      client: engagement.client,
+      project: engagement.project,
+      closedAt,
+      runs,
+      delivered: count("delivered"),
+      rejected: count("rejected"),
+      abandoned: count("abandoned"),
+    },
+  };
+}
+
+/**
+ * Re-engage a client on work you have done before, carrying the substrate.
+ *
+ * Without this, keeping the substrate on close is inert -- nothing would ever
+ * read it again. This is where the compounding actually lands: the new
+ * engagement starts with the banks, the notebook and both skill scopes the
+ * previous one accumulated, so the first contractor of the second engagement
+ * ramps like the last contractor of the first.
+ *
+ * A fresh contract is mandatory. Prior work does not license future work, and
+ * the scope that was right last quarter is not automatically right now.
+ */
+export function reopenEngagement(
+  prior: Engagement,
+  contract: Contract,
+  openedAt: string,
+  openerClass: EmploymentClass,
+): Engagement | string {
+  const permitted = mayOpenEngagement(openerClass, contract);
+  if (permitted !== true) return permitted;
+  if (!prior.closedAt) return `engagement ${prior.id} is still open; close it before re-engaging`;
+  return {
+    ...prior,
+    id: `${prior.id}+${openedAt}`,
+    contract,
+    openedAt,
+    closedAt: undefined,
+    ledger: [],
+    // The reason any of this exists.
+    substrate: prior.substrate,
+  };
+}
+
+/**
  * The guard. A contractor may only be spawned into an open engagement whose
  * contract has not lapsed.
  *
