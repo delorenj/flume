@@ -25,7 +25,7 @@ mechanical mapping is exact:
 
 ```
 flume hire <title>                 bring on a new employee for this repo (title defaults to pm)
-flume onboard [title]              re-run the onboarding checklist; convergent by contract
+flume onboard [title]              re-run the onboarding checklist (refuses a provisioned role dir; see below)
 flume roster  (alias: flume org)   the org chart, and every disagreement between the two registries
 flume record                       which build each employee actually runs, against the configured pin
 flume review [--agent <id>]        performance review across all nine observation domains
@@ -40,6 +40,25 @@ the same option surface (`--agent`, `--contract`, `--project-registry`,
 workforce is in bad shape. Only a command failure, a blown `--deadline-ms`, or a
 cancellation is nonzero — `flume review --exit-code` opts into projecting the
 verdict onto the process exit (10 on notice, 11 unable to assess).
+
+`flume onboard` is `runHire(force: false)`, and hire refuses any non-empty role
+dir, so on an employee that is already deployed it stops at "Hermes target
+directory is not empty" (every PM does this, 2026-09-23). To converge a deployed
+employee, run its own marker-guarded steps from the role dir instead, then
+`flume audit` + `flume review`:
+
+```bash
+cd <repo>/agents/hermes/pm
+SKIP_TELEGRAM=1 bash .scripts/30-telegram.sh   # record the channel as deferred (or omit SKIP_* to wire a token; it prompts)
+bash .scripts/70-systemd.sh                     # unit, heartbeat retired, gateway active|deferred from provisioning_status
+bash .scripts/80-registry.sh                    # project the row
+```
+
+`80-registry.sh` re-dumps the WHOLE registry through `yaml.safe_dump`, which
+requotes and re-indents every other row. When you need a one-row change,
+simulate it first (`REGISTRY_FILE=<scratch copy> bash .scripts/80-registry.sh`),
+back up `~/.hermes/agents-registry.yaml`, edit only that row to match, and
+re-parse to prove every other row is unchanged.
 
 `flume remediate` keeps `migrate` as a frozen hidden alias. 74 copies of
 `20-runtime-repo.sh` on this machine run
@@ -242,6 +261,27 @@ process control, service changes, board changes, or Bloodbank activation.
   `platforms.telegram.enabled: false` and `platforms.slack.enabled: false` so a
   fleet-base enable cannot leak through; only verified credential ownership may
   flip one true.
+- The deferred state has four parts, and `flume review` passes it:
+  `telegram.provisioning_status: deferred` in role.yaml AND in the registry row,
+  `platforms.telegram.enabled: false` in the delta, and the unit disabled +
+  inactive. A gateway left running without a `verified` platform is a finding,
+  not health: `undeclared` when the row names no status (voxxy-pm), and a
+  contract violation when it says `disabled`/`deferred` (deckard-pm). Give the
+  role's `telegram:` block all three keys (`provisioning_status`, `bot_username`,
+  `bot_id`). Before template 7c3b6b5 the channel writer appended any key the
+  block lacked to the LAST block in role.yaml (tonnybox-pm got
+  `service_state.provisioning_status`).
+- A disabled PM gateway is usually a dead bot, not a dead project. Test the
+  vaulted token with getMe, feeding the URL on stdin
+  (`printf 'url = "https://api.telegram.org/bot%s/getMe"\n' "$tok" | curl -s --config -`),
+  and open `https://t.me/<handle>`. A 401, plus a t.me page with no bot title,
+  means the bot was deleted. Only the operator can mint a new one (BotFather
+  `/newbot`). Then run `bash .scripts/30-telegram.sh` (it prompts for the token
+  and stages it in 1Password), followed by `70-systemd.sh` and `80-registry.sh`.
+  Never re-enable the unit against the dead token. tonnybox-pm was parked this way
+  on 2026-08-27, and pjangler also listed it in `DEAD_AGENT_IDS` because its role
+  pointed at a hard-deleted board while `.project.json` still named the live
+  one (PJAN-136). Check the Plane DB before you call a project dead.
 - Service proof uses a bounded stabilization window over `Result`,
   `ExecMainStatus`, and `NRestarts`; one `is-active` sample is not success.
 - The runtime skill core is pinned by `[fleet] symlinked_runtime_skills` in
