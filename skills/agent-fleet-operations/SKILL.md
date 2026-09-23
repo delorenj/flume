@@ -46,6 +46,15 @@ verdict onto the process exit (10 on notice, 11 unable to assess).
 `<bin> migrate hermes.runtime-singleton <path> [--dry-run] --json`, so that argv
 must keep working; write `remediate` in anything new.
 
+`flume remediate hermes.pm-scaffold <repo>` does more than refresh scripts: it
+also composes SOUL.md (tracked and runtime), rewrites the `hermes` wrapper and
+`.gitignore`, seeds the runtime and adds missing registry rows. To land a
+template change that only touched `.scripts/`, pass `--scripts-only`. It refreshes
+the verbatim `.scripts/**` and the rendered `.scripts/sentinel.prompt.md` and
+writes nothing else. Either mode still preserves a *locally-modified* script,
+meaning bytes the template never shipped. Diff each one against its nearest
+template version before you overwrite it by hand.
+
 `pj audit` still exists and owns the PROJECT rules (`mise.*`, `bmad.*`, `sot.*`,
 `secrets.env-op`, `provenance.copier`, `skills.project-manifest`, `notebook.*`,
 `momo-lifecycle-plane`, `board.schema`). It gained `--rules <comma,ids>` too.

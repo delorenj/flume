@@ -212,6 +212,46 @@ try {
     assert.equal(readFileSync(forceRecord, "utf8"), "1", "systemd provisioning must receive FORCE_SYSTEMD=1");
   }
 
+  {
+    // `--scripts-only` refreshes .scripts/ and writes nothing else: no SOUL,
+    // no wrapper, no .gitignore, no runtime seed, no registry row. A template
+    // bump that only touched scripts must not compose every soul in the fleet.
+    const repo = makeRepo("scripts-only");
+    const home = makeHome("scripts-only");
+    const agentId = "pjan48-scripts-pm";
+    const roleDir = makeRole(repo, agentId);
+    const templateScripts = join(root, "templates", "hermes-agent", "template", ".scripts");
+    const registryPath = join(home, ".hermes", "agents-registry.yaml");
+
+    const refused = spawnSync("node", [cli, "remediate", "hermes.registry-parity", repo, "--scripts-only", "--json"], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, HOME: home, XDG_CACHE_HOME: join(home, ".cache") },
+    });
+    assert.equal(refused.status, 1, "--scripts-only must refuse any rule but hermes.pm-scaffold");
+    assert.match(refused.stderr, /--scripts-only narrows hermes\.pm-scaffold only/);
+
+    const planned = jsonCommand(["remediate", "hermes.pm-scaffold", repo, "--scripts-only", "--dry-run", "--json"], { cwd: repo, home }).json;
+    const plan = migrationResult(planned, "hermes.pm-scaffold");
+    assert.ok(plan.changedFiles.length > 0, JSON.stringify(plan));
+    assert.equal(existsSync(join(roleDir, ".scripts", "_lib.sh")), false, "a dry run writes nothing");
+
+    const applied = jsonCommand(["remediate", "hermes.pm-scaffold", repo, "--scripts-only", "--json"], { cwd: repo, home }).json;
+    const result = migrationResult(applied, "hermes.pm-scaffold");
+    assert.deepEqual(result.changedFiles, plan.changedFiles, "the dry run is the plan");
+    for (const path of result.changedFiles) {
+      assert.ok(path.startsWith(join(roleDir, ".scripts") + "/"), `scripts-only wrote outside .scripts/: ${path}`);
+    }
+    assert.match(result.details.join("\n"), /scripts-only/);
+    assert.equal(readFileSync(join(roleDir, ".scripts", "_lib.sh"), "utf8"), readFileSync(join(templateScripts, "_lib.sh"), "utf8"));
+    assert.equal(readFileSync(join(roleDir, ".scripts", "80-registry.sh"), "utf8"), readFileSync(join(templateScripts, "80-registry.sh"), "utf8"));
+    assert.equal(existsSync(join(roleDir, ".scripts", "sentinel.prompt.md")), true, "the rendered sentinel prompt is part of .scripts/");
+    for (const untouched of ["SOUL.md", "hermes", ".gitignore", ".runtime-scaffold", "runtime"]) {
+      assert.equal(existsSync(join(roleDir, untouched)), false, `scripts-only must not write ${untouched}`);
+    }
+    assert.equal(existsSync(registryPath), false, "scripts-only must not add a registry row");
+  }
+
   console.log("PJAN-48 regressions: passed");
 } finally {
   for (const path of cleanup.reverse()) rmSync(path, { recursive: true, force: true });

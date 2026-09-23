@@ -603,6 +603,22 @@ export function composeSoul(flumeRoot: string, identity: SoulIdentity, deployed:
  */
 export const SOUL_COMPOSED_MARKER = "Composed by flume from roles/";
 
+
+/**
+ * The opt-in that narrows `hermes.pm-scaffold` to a scripts-only refresh.
+ *
+ * A full remediation also composes SOUL.md (tracked and runtime), rewrites the
+ * `hermes` wrapper and `.gitignore`, seeds the ignored runtime, upserts
+ * `runtime/profile.yaml` metadata and adds missing registry rows. Each of those
+ * has its own owner and its own moment; a fleet-wide template bump that only
+ * changed `.scripts/` must be able to land without composing every soul in the
+ * fleet as a side effect. `flume remediate hermes.pm-scaffold --scripts-only`
+ * sets this for the process: the verbatim `.scripts/**` and the rendered
+ * `.scripts/sentinel.prompt.md` are refreshed, locally-modified scripts are
+ * still preserved, and nothing outside `.scripts/` is written.
+ */
+export const SCAFFOLD_SCRIPTS_ONLY_ENV = "FLUME_SCAFFOLD_SCRIPTS_ONLY";
+
 /** The `## ` headings every generation of the three renderers emitted. */
 const SOUL_RENDERED_SPINE = ["## Identity", "## Tone", "## Role-specific behavior"];
 
@@ -1782,51 +1798,55 @@ return [
       // assets are rewritten unconditionally, exactly as before.
       const inLineage = templateLineageProbe(join(ctx.pjanglerRoot, "templates", "hermes-agent"));
       const preserved: string[] = [];
+      const scriptsOnly = process.env[SCAFFOLD_SCRIPTS_ONLY_ENV] === "1";
+      if (scriptsOnly) details.push("scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone");
       const managedScripts = templateFiles(join(templateRoleDir, ".scripts"))
         .filter((rel) => rel !== "sentinel.prompt.md.jinja");
       for (const role of selection.roles) {
         const prefix = role.agentId || role.role;
-        const retirement = retireRuntimeSubmodule(ctx.repoRoot, role, changedFiles, ctx.dryRun);
-        details.push(...retirement.details);
-        if (!retirement.ok) {
-          return { id: finding.id, title: finding.title, status: "blocked", summary: `Failed to retire ${role.role} runtime submodule metadata safely`, changedFiles, details: [retirement.error ?? "unknown runtime retirement failure"] };
-        }
-        // THE RE-RENDER PATH. This is the thing that did not exist: `hire`
-        // refuses a provisioned role dir, `onboard` is `runHire(force:false)`
-        // and this line used to be `if (!existsSync(...))` -- so no path in the
-        // product could ever update a deployed soul. It is convergent now, and
-        // it writes `runtime/SOUL.md` as well as the tracked copy, because the
-        // runtime one is what Hermes loads and a write that skipped it would
-        // change no agent's behaviour at all.
-        //
-        // `flume remediate hermes.pm-scaffold <repo> --dry-run` shows the diff
-        // before anything is written; remediate applies only without it.
-        if (existsSync(soulRolesDir(ctx.pjanglerRoot))) {
-          const { tracked, runtime } = soulPaths(role);
-          try {
-            const before = changedFiles.length;
-            const deployed = safeReadText(runtime) ?? safeReadText(tracked);
-            const composed = composeSoul(ctx.pjanglerRoot, soulIdentityOf(role), deployed);
-            // A hand-written soul is preserved, named, and left alone -- the
-            // same contract the managed scripts keep. `writeIfDifferent` keeps
-            // no backup, so clobbering one destroys the only copy.
-            for (const [path, label] of [[tracked, "SOUL.md"], [runtime, "runtime/SOUL.md"]] as const) {
-              if (path === runtime && !existsSync(dirname(runtime))) continue;
-              const seen = safeReadText(path);
-              if (!soulIsReplaceable(seen)) { preserved.push(`${prefix}: preserved hand-written ${label}`); continue; }
-              writeIfDifferent(path, composed.text, ctx.dryRun, changedFiles);
-            }
-            if (changedFiles.length > before) {
-              details.push(`${prefix}: composed SOUL from roles/${basename(composed.source)} (tone ${composed.tone.key}, ${composed.tone.origin})`);
-            }
-          } catch (error) {
-            return { id: finding.id, title: finding.title, status: "blocked", summary: `Cannot compose ${prefix}'s SOUL`, changedFiles, details: [...details, error instanceof Error ? error.message : String(error)] };
+        if (!scriptsOnly) {
+          const retirement = retireRuntimeSubmodule(ctx.repoRoot, role, changedFiles, ctx.dryRun);
+          details.push(...retirement.details);
+          if (!retirement.ok) {
+            return { id: finding.id, title: finding.title, status: "blocked", summary: `Failed to retire ${role.role} runtime submodule metadata safely`, changedFiles, details: [retirement.error ?? "unknown runtime retirement failure"] };
           }
+          // THE RE-RENDER PATH. This is the thing that did not exist: `hire`
+          // refuses a provisioned role dir, `onboard` is `runHire(force:false)`
+          // and this line used to be `if (!existsSync(...))` -- so no path in the
+          // product could ever update a deployed soul. It is convergent now, and
+          // it writes `runtime/SOUL.md` as well as the tracked copy, because the
+          // runtime one is what Hermes loads and a write that skipped it would
+          // change no agent's behaviour at all.
+          //
+          // `flume remediate hermes.pm-scaffold <repo> --dry-run` shows the diff
+          // before anything is written; remediate applies only without it.
+          if (existsSync(soulRolesDir(ctx.pjanglerRoot))) {
+            const { tracked, runtime } = soulPaths(role);
+            try {
+              const before = changedFiles.length;
+              const deployed = safeReadText(runtime) ?? safeReadText(tracked);
+              const composed = composeSoul(ctx.pjanglerRoot, soulIdentityOf(role), deployed);
+              // A hand-written soul is preserved, named, and left alone -- the
+              // same contract the managed scripts keep. `writeIfDifferent` keeps
+              // no backup, so clobbering one destroys the only copy.
+              for (const [path, label] of [[tracked, "SOUL.md"], [runtime, "runtime/SOUL.md"]] as const) {
+                if (path === runtime && !existsSync(dirname(runtime))) continue;
+                const seen = safeReadText(path);
+                if (!soulIsReplaceable(seen)) { preserved.push(`${prefix}: preserved hand-written ${label}`); continue; }
+                writeIfDifferent(path, composed.text, ctx.dryRun, changedFiles);
+              }
+              if (changedFiles.length > before) {
+                details.push(`${prefix}: composed SOUL from roles/${basename(composed.source)} (tone ${composed.tone.key}, ${composed.tone.origin})`);
+              }
+            } catch (error) {
+              return { id: finding.id, title: finding.title, status: "blocked", summary: `Cannot compose ${prefix}'s SOUL`, changedFiles, details: [...details, error instanceof Error ? error.message : String(error)] };
+            }
+          }
+          writeIfDifferent(join(role.roleDir, "hermes"), renderHermesWrapper(role, templateRoleDir), ctx.dryRun, changedFiles, 0o755);
+          writeIfDifferent(join(role.roleDir, ".gitignore"), readText(join(templateRoleDir, ".gitignore.jinja")).replace(/\{\{\s*role\s*\}\}/g, role.role), ctx.dryRun, changedFiles);
+          copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, ".runtime-scaffold"), changedFiles, ctx.dryRun);
+          copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, "runtime"), changedFiles, ctx.dryRun);
         }
-        writeIfDifferent(join(role.roleDir, "hermes"), renderHermesWrapper(role, templateRoleDir), ctx.dryRun, changedFiles, 0o755);
-        writeIfDifferent(join(role.roleDir, ".gitignore"), readText(join(templateRoleDir, ".gitignore.jinja")).replace(/\{\{\s*role\s*\}\}/g, role.role), ctx.dryRun, changedFiles);
-        copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, ".runtime-scaffold"), changedFiles, ctx.dryRun);
-        copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, "runtime"), changedFiles, ctx.dryRun);
         for (const rel of managedScripts) {
           const source = join(templateRoleDir, ".scripts", rel);
           const executable = (lstatSync(source).mode & 0o111) !== 0;
@@ -1841,6 +1861,7 @@ return [
           writeIfDifferent(target, readText(source), ctx.dryRun, changedFiles, executable ? 0o755 : undefined);
         }
         writeIfDifferent(join(role.roleDir, ".scripts", "sentinel.prompt.md"), renderSentinelPrompt(role, templateRoleDir), ctx.dryRun, changedFiles);
+        if (scriptsOnly) continue;
         const profileMetaUpdated = upsertInheritedProfileMeta(join(role.roleDir, "runtime", "profile.yaml"), changedFiles, ctx.dryRun);
         if (profileMetaUpdated) details.push(`updated ${profileMetaUpdated}`);
         const registryUpdated = upsertRegistryEntry(role, ctx.homeDir, changedFiles, ctx.dryRun);

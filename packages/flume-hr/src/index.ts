@@ -16,7 +16,7 @@ import { registerOrgCli, isOrgJsonInvocation, orgParserFailureEnvelope } from ".
 import { fleetEnvelopeExitCode, renderFleetJson } from "./org/output";
 import { recipeRegistry } from "./parity/catalog";
 import { lifecycleContext, runAudit, runMigrationForRules } from "./parity/index";
-import { formatAuditReport, formatMigrationReport, type MigrationReport } from "./parity/rules";
+import { formatAuditReport, formatMigrationReport, SCAFFOLD_SCRIPTS_ONLY_ENV, type MigrationReport } from "./parity/rules";
 import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
@@ -235,6 +235,7 @@ program
   .description("Correct a finding, or every finding this run can correct (--all)")
   .option("--all", "Correct every fixable failing rule, and report each one it may not touch")
   .option("--register-projects", "Authorize org.project-records to create the project records it reports; without it that rule only says what it would register")
+  .option("--scripts-only", "hermes.pm-scaffold only: refresh the role's .scripts/ and nothing else (no SOUL compose, wrapper, .gitignore, runtime seed, profile metadata or registry row)")
   .option("--dry-run", "Report what would change without changing it")
   .option("--json", "Output machine-parseable JSON")
   .action(async (finding: string | undefined, repo: string | undefined, options) => {
@@ -243,7 +244,9 @@ program
       ? "--all corrects every rule; drop the rule id, or drop --all"
       : !options.all && !finding
         ? "name a rule id to correct, or pass --all"
-        : null;
+        : options.scriptsOnly && finding !== "hermes.pm-scaffold"
+          ? "--scripts-only narrows hermes.pm-scaffold only; name that rule and drop --all"
+          : null;
     if (usage) {
       await writeStdout(options.json ? `${JSON.stringify({ ok: false, error: usage }, null, 2)}\n` : "");
       console.error(`\u2717 ${usage}`);
@@ -254,6 +257,7 @@ program
     // rather than the lifecycle context because the context is the engine's
     // shape, shared by every recipe, and this authorization belongs to one rule.
     if (options.registerProjects) process.env[REGISTER_PROJECTS_ENV] = "1";
+    if (options.scriptsOnly) process.env[SCAFFOLD_SCRIPTS_ONLY_ENV] = "1";
     const report = options.all
       ? await runFullRemediation(repo, Boolean(options.dryRun))
       : await runMigrationForRules([finding!], repo, Boolean(options.dryRun));
