@@ -789,7 +789,9 @@ retired:
     detect:
       - 'n8n'
   - id: activation-by-discovery
-    reason: A resolvable target is not the gate; the activation flag is (absent means enabled, an explicit false quarantines), and nothing may rewrite it from discovery.
+    reason: A resolvable target is not the gate; the activation flag is (absent
+      means enabled, an explicit false quarantines), and nothing may rewrite it
+      from discovery.
     superseded_by: activation.execution_authority
     detect:
       - 'activation_by_discovery'
