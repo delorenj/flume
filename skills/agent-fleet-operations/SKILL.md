@@ -53,7 +53,13 @@ template change that only touched `.scripts/`, pass `--scripts-only`. It refresh
 the verbatim `.scripts/**` and the rendered `.scripts/sentinel.prompt.md` and
 writes nothing else. Either mode still preserves a *locally-modified* script,
 meaning bytes the template never shipped. Diff each one against its nearest
-template version before you overwrite it by hand.
+template version before you overwrite it by hand, and fold real behaviour into
+the template as configuration (e.g. the extended ticket states are role.yaml
+`ticket_provider:` keys) rather than keeping a per-repo fork. When you copy a
+template file over one, copy its mode too: a 0644 `credential-launch.sh` kills
+its gateway with `status=203/EXEC` on the next restart. A hand-written SOUL.md
+(no composer marker, none of the rendered headings) is preserved and audits as
+`soul-authored`; that is the intended steady state, not drift to clear.
 
 `pj audit` still exists and owns the PROJECT rules (`mise.*`, `bmad.*`, `sot.*`,
 `secrets.env-op`, `provenance.copier`, `skills.project-manifest`, `notebook.*`,
@@ -119,7 +125,10 @@ absent or `true` (**no key means enabled**; only an explicit `false`
 quarantines, and a present non-boolean is invalid, treated as disabled and
 logged at ERROR), `gateway_scope: fleet`, matching `target_agent_id`, and a
 nonblank `profile_name` in the current registry. The same rule holds in
-`role.yaml`: `80-registry.sh` projects an absent key as `true`. A past `completed` row in
+`role.yaml`: `80-registry.sh` projects an absent key as `true`, and both it and
+flume read the key with a YAML parser, so `enabled: "false"`, `enabled: ""`,
+a bare `enabled:` and `True`/`yes` are all invalid (a blocked remediation), never
+a quarantine or an enable. A past `completed` row in
 the execution journal proves historical execution only.
 
 ## Reading a review verdict
