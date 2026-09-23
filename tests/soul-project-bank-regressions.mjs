@@ -1,7 +1,7 @@
-// The composed SOUL names the Hindsight PROJECT bank. Banks are case-sensitive
-// and every agent resolves its active bank as the basename of the repo's git
-// toplevel, so the 33GOD PM must be told `33GOD` -- not the registry slug
-// `33god`, which silently creates a new, empty bank.
+// The composed SOUL names the Hindsight PROJECT bank. It must be the bank the
+// memory hooks write (~/.claude/hooks/lib/hindsight-bank.sh: override file,
+// origin remote name, checkout basename). Banks are case-sensitive: telling the
+// 33GOD PM `33god` (the registry slug) silently creates a new, empty bank.
 //
 // Bundles the composer from source with esbuild (no dist entry exports it).
 import assert from "node:assert/strict";
@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildSync } from "esbuild";
+import { spawnSync } from "node:child_process";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "flume-soul-bank-"));
@@ -24,21 +25,38 @@ try {
     nodePaths: [join(root, "node_modules"), join(root, "packages/flume-hr/node_modules")] });
   const { composeSoul, projectBankFor } = await import(pathToFileURL(out).href);
 
-  // A checkout named with capitals, a role dir three levels down.
-  const repo = join(work, "33GOD");
-  const roleDir = join(repo, "agents/hermes/pm");
-  mkdirSync(join(repo, ".git"), { recursive: true });
-  mkdirSync(roleDir, { recursive: true });
-  assert.equal(projectBankFor(roleDir, "33god"), "33GOD", "bank is the git toplevel basename, case preserved");
+  const git = (cwd, ...args) => {
+    const run = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
+    assert.equal(run.status, 0, `git ${args.join(" ")}: ${run.stderr}`);
+  };
+  const checkout = (name) => {
+    const dir = join(work, name);
+    mkdirSync(join(dir, "agents/hermes/pm"), { recursive: true });
+    git(dir, "init", "-q");
+    return dir;
+  };
 
-  // A submodule carries a .git FILE; its own basename wins over the superproject's.
-  const sub = join(repo, "bloodbank");
-  mkdirSync(join(sub, "agents/hermes/pm"), { recursive: true });
-  writeFileSync(join(sub, ".git"), "gitdir: ../.git/modules/bloodbank\n");
-  assert.equal(projectBankFor(join(sub, "agents/hermes/pm"), "bb"), "bloodbank");
+  // 4. No remote: the checkout root's basename, case preserved.
+  const bare = checkout("33GOD");
+  assert.equal(projectBankFor(join(bare, "agents/hermes/pm"), "33god"), "33GOD");
 
-  // No checkout anywhere above: fall back to the registry slug.
-  assert.equal(projectBankFor("/", "loose-slug"), "loose-slug");
+  // 3. The origin remote's repo name wins over the directory name (~/docker -> DeLoContainers).
+  const docker = checkout("docker");
+  git(docker, "remote", "add", "origin", "git@github.com:delorenj/DeLoContainers.git");
+  assert.equal(projectBankFor(join(docker, "agents/hermes/pm"), "delocontainers"), "DeLoContainers");
+  const https = checkout("keepy");
+  git(https, "remote", "add", "origin", "https://github.com/delorenj/keepy-money");
+  assert.equal(projectBankFor(join(https, "agents/hermes/pm"), "x"), "keepy-money");
+
+  // 1. An explicit .hindsight/bank override beats the remote; comments and blanks are skipped.
+  mkdirSync(join(docker, ".hindsight"));
+  writeFileSync(join(docker, ".hindsight/bank"), "# routed by hand\n docker \n");
+  assert.equal(projectBankFor(join(docker, "agents/hermes/pm"), "x"), "docker");
+
+  // Outside any checkout: the registry slug.
+  const loose = join(work, "loose");
+  mkdirSync(loose);
+  assert.equal(projectBankFor(loose, "loose-slug"), "loose-slug");
 
   const identity = { agentId: "33god-pm", role: "pm", repo: "33god", displayName: "33GOD PM", profileName: "33god-pm", purpose: "", botHandle: "", soulTone: "", projectBank: "33GOD" };
   const { text } = composeSoul(root, identity);
@@ -49,7 +67,7 @@ try {
   // Without a resolvable checkout the composer falls back to the slug rather than failing.
   const { text: fallback } = composeSoul(root, { ...identity, projectBank: undefined });
   assert.match(fallback, /hindsight memory retain 33god /);
-  console.log("soul-project-bank: 7 assertions passed");
+  console.log("soul-project-bank: all assertions passed");
 } finally {
   rmSync(work, { recursive: true, force: true });
   rmSync(join(root, "node_modules/.cache/flume-soul-bank"), { recursive: true, force: true });

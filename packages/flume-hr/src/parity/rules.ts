@@ -726,15 +726,35 @@ function soulIdentityOf(role: RoleMeta): SoulIdentity {
   };
 }
 
-/** Basename of the git toplevel holding `start` (a `.git` dir, or a submodule's `.git` file). */
+/**
+ * The Hindsight project bank for a checkout, resolved exactly the way the
+ * memory hooks resolve it (~/.claude/hooks/lib/hindsight-bank.sh), so the SOUL
+ * names the bank the hooks actually write:
+ *   1. `.hindsight/bank` in the main checkout root (explicit override)
+ *   2. the origin remote's repo name (`delorenj/DeLoContainers` -> `DeLoContainers`)
+ *   3. the main checkout root's basename (worktrees anchor to the main checkout)
+ * The per-shell HINDSIGHT_BANK override is deliberately not consulted: a SOUL is
+ * static. Falls back to `fallback` outside a git checkout.
+ */
 export function projectBankFor(start: string, fallback: string): string {
-  let dir = resolve(start);
-  for (;;) {
-    if (existsSync(join(dir, ".git"))) return basename(dir);
-    const parent = dirname(dir);
-    if (parent === dir) return fallback;
-    dir = parent;
+  const git = (...args: string[]) => {
+    const run = spawnSync("git", ["-C", start, ...args], { encoding: "utf8" });
+    return run.status === 0 ? run.stdout.trim() : "";
+  };
+  const common = git("rev-parse", "--path-format=absolute", "--git-common-dir");
+  if (!common) return fallback;
+  const root = dirname(common);
+  const overrideFile = join(root, ".hindsight", "bank");
+  if (existsSync(overrideFile)) {
+    const override = readFileSync(overrideFile, "utf8").split("\n")
+      .map((line) => line.replace(/\s+/gu, ""))
+      .find((line) => line && !line.startsWith("#"));
+    if (override) return override;
   }
+  const url = git("remote", "get-url", "origin").replace(/\.git$/u, "");
+  const name = url.split(/[/:]/u).pop() ?? "";
+  if (name) return name;
+  return basename(root);
 }
 
 
