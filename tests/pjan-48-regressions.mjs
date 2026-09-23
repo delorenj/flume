@@ -139,6 +139,47 @@ try {
       const blocked = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
       assert.equal(migrationResult(blocked, "hermes.registry-parity").status, "blocked");
       assert.equal(readFileSync(registryPath, "utf8"), beforeMalformed);
+
+      // A present value that is not the plain YAML boolean is invalid, exactly
+      // as the template's 80-registry.sh (StrictRoleLoader) refuses it. The
+      // old line scanner stripped quotes, so `"false"` quarantined while `""`
+      // and a bare `enabled:` read as ENABLED.
+      const baseRole = `repo: fixture\nrole: ${roleName}\nagent_id: ${agentId}\nprofile: ${agentId}\n`;
+      for (const [label, block] of [
+        ["quoted false", `bloodbank:\n  enabled: "false"\n`],
+        ["quoted true", `bloodbank:\n  enabled: 'true'\n`],
+        ["empty string", `bloodbank:\n  enabled: ""\n`],
+        ["bare key (null)", `bloodbank:\n  enabled:\n`],
+        ["capitalised True", `bloodbank:\n  enabled: True\n`],
+        ["scalar block", `bloodbank: false\n`],
+        ["duplicate block", `bloodbank:\n  enabled: false\nbloodbank:\n  gateway_scope: fleet\n`],
+      ]) {
+        writeFileSync(join(roleDir, "role.yaml"), `${baseRole}${block}`);
+        const before = readFileSync(registryPath, "utf8");
+        const audit = finding(jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json, "hermes.registry-parity");
+        assert.equal(audit.status, "fail", `${label}: ${JSON.stringify(audit)}`);
+        assert.equal(audit.fixable, false, label);
+        assert.match(audit.details.join("\n"), /strict YAML boolean/, label);
+        const refused = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
+        assert.equal(migrationResult(refused, "hermes.registry-parity").status, "blocked", label);
+        assert.equal(readFileSync(registryPath, "utf8"), before, `${label}: registry must be untouched`);
+      }
+
+      // Indentation is the file's, not an assumed two spaces: a 4-space block's
+      // `false` is a quarantine, never "absent, so enabled".
+      writeFileSync(join(roleDir, "role.yaml"), `${baseRole}bloodbank:\n    enabled: false\n    gateway_scope: fleet\n`);
+      const fourSpace = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
+      assert.notEqual(migrationResult(fourSpace, "hermes.registry-parity").status, "blocked");
+      assert.match(readFileSync(registryPath, "utf8"), /enabled: false/);
+      writeFileSync(join(roleDir, "role.yaml"), `${baseRole}bloodbank:\n    enabled: true\n`);
+      jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home });
+      assert.match(readFileSync(registryPath, "utf8"), /enabled: true/);
+
+      // A null block (`bloodbank:` with nothing under it) is absent: enabled.
+      writeFileSync(join(roleDir, "role.yaml"), `${baseRole}bloodbank:\nreconcile:\n  enabled: false\n`);
+      const nullBlock = finding(jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json, "hermes.registry-parity");
+      assert.doesNotMatch(nullBlock.details.join("\n"), /strict YAML boolean/);
+      assert.doesNotMatch(nullBlock.details.join("\n"), /must match role value/);
     }
   }
 

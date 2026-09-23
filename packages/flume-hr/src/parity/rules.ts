@@ -192,31 +192,86 @@ function yamlGet(text: string, keyPath: string): string {
   const parts = keyPath.split(".");
   const lines = text.split("\n");
   let start = 0;
+  // The indentation of the block being searched. The top level is 0; a child
+  // block's is whatever its FIRST line uses, never an assumed parent + 2 -- a
+  // 4-space `bloodbank:` block read as absent under that assumption, i.e.
+  // enabled.
   let indent = 0;
+  let parentIndent = -1;
   for (let idx = 0; idx < parts.length; idx += 1) {
     const key = parts[idx]!;
     let found = false;
+    let blockIndent: number | null = idx === 0 ? indent : null;
     for (let i = start; i < lines.length; i += 1) {
       const line = lines[i]!;
       if (!line.trim() || line.trim().startsWith("#")) continue;
       const match = line.match(/^(\s*)([^:#]+):\s*(.*)$/);
+      const currentIndent = line.length - line.trimStart().length;
+      if (idx > 0 && currentIndent <= parentIndent) break;
+      if (blockIndent === null) blockIndent = currentIndent;
       if (!match) continue;
-      const currentIndent = match[1]!.length;
       const currentKey = match[2]!.trim();
       const rest = match[3]!.trim();
-      if (idx > 0 && currentIndent < indent) break;
-      if (currentIndent !== indent || currentKey !== key) continue;
+      if (currentIndent !== blockIndent || currentKey !== key) continue;
       found = true;
       if (idx === parts.length - 1) {
         return yamlScalarText(rest);
       }
       start = i + 1;
-      indent = currentIndent + 2;
+      parentIndent = currentIndent;
+      indent = currentIndent;
       break;
     }
     if (!found) return "";
   }
   return "";
+}
+
+
+/**
+ * A role's `bloodbank.enabled`, read by a YAML parser exactly as the
+ * template's 80-registry.sh reads it (StrictRoleLoader), so flume and the
+ * registry writer cannot disagree:
+ *
+ * - absent `bloodbank` block, a null block, or no `enabled` key -> "" (the
+ *   no-key-means-enabled default);
+ * - the plain YAML booleans `true` / `false` -> themselves;
+ * - ANY other present value -> "invalid": a quoted "false", `""`, a bare
+ *   `enabled:` (null), `yes`/`True` (YAML 1.1/1.2 coercions the template
+ *   refuses), a non-mapping block, a duplicated key, or a role.yaml that is not
+ *   valid YAML. Callers treat "invalid" as a malformed gate, which blocks
+ *   remediation and routes nothing -- the gateway's fail-closed reading.
+ *
+ * The line scanner stripped quotes, so `enabled: "false"` quarantined while
+ * `enabled: ""` and a bare `enabled:` read as enabled; 80-registry.sh refuses
+ * all three.
+ */
+function roleBloodbankEnabledText(text: string): string {
+  let doc: ReturnType<typeof YAML.parseDocument>;
+  try {
+    doc = YAML.parseDocument(text, { uniqueKeys: true });
+  } catch {
+    return "invalid";
+  }
+  if (doc.errors.length > 0) return "invalid";
+  const root = doc.contents;
+  if (root === null) return "";
+  if (!YAML.isMap(root)) return "invalid";
+  const block = root.get("bloodbank", true);
+  if (block === undefined || block === null) return "";
+  if (YAML.isScalar(block) && block.value === null) return "";
+  if (!YAML.isMap(block)) return "invalid";
+  if (!block.has("enabled")) return "";
+  const node = block.get("enabled", true);
+  if (
+    YAML.isScalar(node) &&
+    node.type === "PLAIN" &&
+    typeof node.value === "boolean" &&
+    (node.source === "true" || node.source === "false")
+  ) {
+    return node.source;
+  }
+  return "invalid";
 }
 
 
@@ -247,7 +302,7 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
         ticketProviderName: yamlGet(text, "ticket_provider.name"),
         ticketProviderBoardId: yamlGet(text, "ticket_provider.board_id"),
         ticketProviderIdentifier: yamlGet(text, "plane.identifier"),
-        bloodbankEnabled: yamlGet(text, "bloodbank.enabled"),
+        bloodbankEnabled: roleBloodbankEnabledText(text),
         deploymentSystemd: yamlGet(text, "deployment.systemd"),
         serviceStateGateway: yamlGet(text, "service_state.gateway"),
         serviceStateHeartbeat: yamlGet(text, "service_state.heartbeat"),
@@ -1045,8 +1100,9 @@ function upsertRegistryEntry(role: RoleMeta, homeDir: string, changedFiles: stri
 /**
  * A role's effective Bloodbank activation. No key means enabled: an ABSENT
  * `bloodbank.enabled` is `true`, exactly as 80-registry.sh projects it and the
- * fleet gateway routes it. Only an explicit `false` quarantines. Any other
- * present value is malformed (`null`), which callers report as a blocker.
+ * fleet gateway routes it. Only an explicit plain `false` quarantines. Any
+ * other present value (see `roleBloodbankEnabledText`) is malformed (`null`),
+ * which callers report as a blocker -- effectively disabled, like the gateway.
  */
 function roleBloodbankEnabled(role: RoleMeta): boolean | null {
   if (role.bloodbankEnabled === "" || role.bloodbankEnabled === "true") return true;
