@@ -45,6 +45,7 @@ drops in by name:
 | `{{ default_execution }}` | `default_execution:` scalar | verbatim |
 | `{{ repo }}` `{{ role }}` `{{ agent_id }}` `{{ display_name }}` `{{ profile }}` `{{ telegram }}` `{{ purpose }}` | the agent's `role.yaml` | verbatim |
 | `{{ project_bank }}` | basename of the role dir's git toplevel (`33GOD`, `bloodbank`); falls back to `repo` | verbatim — the Hindsight project bank, which is case-sensitive |
+| `{{ named_intro }}` `{{ identity_rows }}` `{{ identity_bank }}` `{{ identity_wiring }}` `{{ identity_keyed_to }}` `{{ recall_note }}` | role.yaml `identity:` (named agents) | `_base.md` only. For an unnamed post they reproduce the historical prose exactly (empty inserts, `agent-<agent_id>`, `bank_id_template` wording), so naming one agent drifts no other soul |
 
 `purpose_template` supplies the agent's one-line purpose when hire was not given
 one; `{repo}` and `{role}` interpolate. `behavior:` is structured data for
@@ -73,6 +74,16 @@ turns these files into a SOUL, and every path goes through it:
 `templates/hermes-agent/scripts/momo-unify-agent.py` was the third renderer. It
 had no caller and it has been deleted; `~/code/33GOD/momo/spec/momo-agent.spec.yaml`
 is the ancestor of the file format here.
+
+## Named agents
+
+A role directory is a **post** (`agent_id` / `profile`). A post held by a
+**named agent** carries an `identity:` block in `role.yaml` (`name`,
+`write_bank: agent-<name>`, `recall_banks`). The composer then addresses the
+agent by `display_name`, adds a `Name` row to the identity table, says the
+agent id is only the post it holds, names the personal bank in the memory
+table, and lists the history banks it should recall explicitly. The first one
+is Grolf, holding the `33god-pm` post.
 
 ## Tone
 

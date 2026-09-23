@@ -88,6 +88,8 @@ interface RoleMeta {
   displayName: string;
   purpose: string;
   botHandle: string;
+  /** The named-agent declaration in role.yaml `identity:`; `none` for an unnamed post. */
+  identity: RoleIdentity;
   runtimeRepo: string;
   runtimeOwner: string;
   planeWorkspace: string;
@@ -275,6 +277,81 @@ function roleBloodbankEnabledText(text: string): string {
 }
 
 
+/**
+ * A named agent, as role.yaml declares it.
+ *
+ * A role directory is a POST: `agent_id`/`profile` (`33god-pm`) route units,
+ * registry rows and Bloodbank commands. Most posts are held by an unnamed agent
+ * (`none`) whose identity memory is the compatibility bank `agent-<profile>`.
+ * A NAMED agent declares who it is:
+ *
+ *     identity:
+ *       name: grolf
+ *       write_bank: agent-grolf      # optional; always agent-<name>
+ *       recall_banks: [agent-33god-pm]
+ *
+ * Validation mirrors hermes-agent-template `.scripts/lib/role-identity.py`
+ * exactly (the provisioner pins and projects from THAT answer): a name that is
+ * never the post id -- `agent-<post>` is the bank the next unnamed holder
+ * inherits -- a write bank of exactly `agent-<name>`, recall banks that are
+ * valid ids and never the shared fallback. `recallBanks` always leads with the
+ * write bank and carries no duplicates.
+ */
+export type RoleIdentity =
+  | { state: "none" }
+  | { state: "named"; name: string; writeBank: string; recallBanks: string[] }
+  | { state: "invalid"; reason: string };
+
+const IDENTITY_NAME = /^[a-z0-9][a-z0-9_-]{0,57}$/u;
+const IDENTITY_BANK = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
+const IDENTITY_KEYS = new Set(["name", "write_bank", "recall_banks"]);
+const IDENTITY_RESERVED_BANKS = new Set(["custom", "hermes"]);
+const IDENTITY_MAX_RECALL_BANKS = 16;
+
+export function readRoleIdentity(text: string, agentId: string, profileName: string): RoleIdentity {
+  let doc: ReturnType<typeof YAML.parseDocument>;
+  try {
+    doc = YAML.parseDocument(text, { uniqueKeys: true });
+  } catch {
+    return { state: "invalid", reason: "role.yaml is not valid YAML" };
+  }
+  if (doc.errors.length > 0) return { state: "invalid", reason: "role.yaml is not valid YAML" };
+  const root = doc.toJS() as unknown;
+  if (root === null || root === undefined) return { state: "none" };
+  if (typeof root !== "object" || Array.isArray(root)) return { state: "invalid", reason: "role.yaml root must be a mapping" };
+  const block = (root as Record<string, unknown>).identity;
+  if (block === undefined || block === null) return { state: "none" };
+  if (typeof block !== "object" || Array.isArray(block)) return { state: "invalid", reason: "identity must be a mapping with a `name`" };
+  const fields = block as Record<string, unknown>;
+  const unknown = Object.keys(fields).filter((key) => !IDENTITY_KEYS.has(key)).sort();
+  if (unknown.length) return { state: "invalid", reason: `identity carries unsupported key(s): ${unknown.join(", ")}` };
+  const name = fields.name;
+  if (typeof name !== "string" || !IDENTITY_NAME.test(name)) {
+    return { state: "invalid", reason: "identity.name must be a lower-case id ([a-z0-9][a-z0-9_-]*, at most 58 chars)" };
+  }
+  if (name === agentId || name === profileName) {
+    return { state: "invalid", reason: `identity.name "${name}" is a post id; a named agent needs a name of its own` };
+  }
+  const expected = `agent-${name}`;
+  const writeBank = fields.write_bank === undefined ? expected : fields.write_bank;
+  if (writeBank !== expected) return { state: "invalid", reason: `identity.write_bank must be "${expected}"` };
+  const rawRecall = fields.recall_banks === undefined || fields.recall_banks === null ? [] : fields.recall_banks;
+  if (!Array.isArray(rawRecall)) return { state: "invalid", reason: "identity.recall_banks must be a list of bank ids" };
+  const recallBanks = [expected];
+  for (const bank of rawRecall) {
+    if (typeof bank !== "string" || !IDENTITY_BANK.test(bank)) {
+      return { state: "invalid", reason: `identity.recall_banks entry ${JSON.stringify(bank)} is not a lower-case bank id` };
+    }
+    if (IDENTITY_RESERVED_BANKS.has(bank)) return { state: "invalid", reason: `identity.recall_banks may not name the shared fallback bank "${bank}"` };
+    if (!recallBanks.includes(bank)) recallBanks.push(bank);
+  }
+  if (recallBanks.length > IDENTITY_MAX_RECALL_BANKS) {
+    return { state: "invalid", reason: `identity.recall_banks names more than ${IDENTITY_MAX_RECALL_BANKS} banks` };
+  }
+  return { state: "named", name, writeBank: expected, recallBanks };
+}
+
+
 function discoverRoles(repoRoot: string): RoleMeta[] {
   const rolesDir = join(repoRoot, "agents", "hermes");
   if (!existsSync(rolesDir)) return [];
@@ -296,6 +373,7 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
         displayName: yamlGet(text, "display_name"),
         purpose: yamlGet(text, "purpose"),
         botHandle: yamlGet(text, "telegram.bot_username"),
+        identity: readRoleIdentity(text, yamlGet(text, "agent_id"), yamlGet(text, "profile") || yamlGet(text, "agent_id")),
         runtimeRepo: runtimeRepoRaw.includes("/") ? runtimeRepoRaw.split("/").slice(-1)[0] ?? runtimeRepoRaw : runtimeRepoRaw,
         runtimeOwner: yamlGet(text, "runtime.github_owner"),
         planeWorkspace: yamlGet(text, "ticket_provider.workspace") || yamlGet(text, "plane.workspace"),
@@ -329,6 +407,42 @@ function registryPath(homeDir: string): string {
 // tests/fleet-shared-bloodbank-regressions.mjs enforces that scoping so the
 // legacy contract can be detected and cleaned but never provisioned again.
 const LEGACY_SYSTEMD_KEYS = ["consumer_unit", "checkpoint_timer"] as const;
+
+
+/**
+ * How a registry row's named-agent projection disagrees with role.yaml.
+ *
+ * role.yaml `identity:` is the SSOT and 80-registry.sh projects it into
+ * `agents.<id>.identity` + `agents.<id>.hindsight.{write_bank,recall_banks}`.
+ * A named role whose row lacks the projection leaves every registry reader
+ * (the profile observer, 10-hermes-profile.sh's fallback) on the post's
+ * compatibility bank; a row that still names an agent the role no longer
+ * declares pins the post to somebody's private bank. Both are drift.
+ */
+function registryIdentityDrift(role: RoleMeta, entry: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  if (role.identity.state === "invalid") return out;
+  const hindsight = (typeof entry.hindsight === "object" && entry.hindsight !== null && !Array.isArray(entry.hindsight))
+    ? entry.hindsight as Record<string, unknown>
+    : {};
+  const rowIdentity = typeof entry.identity === "string" && entry.identity.trim() !== "" ? entry.identity : undefined;
+  if (role.identity.state === "named") {
+    const { name, writeBank, recallBanks } = role.identity;
+    if (rowIdentity !== name) {
+      out.push(`registry identity for ${role.agentId} is ${rowIdentity ? `"${rowIdentity}"` : "absent"} (role.yaml names "${name}")`);
+    }
+    if (hindsight.write_bank !== writeBank) {
+      out.push(`registry hindsight.write_bank for ${role.agentId} is ${typeof hindsight.write_bank === "string" ? `"${hindsight.write_bank}"` : "absent"} (role.yaml declares "${writeBank}")`);
+    }
+    const rowRecall = Array.isArray(hindsight.recall_banks) ? hindsight.recall_banks : [];
+    if (JSON.stringify(rowRecall) !== JSON.stringify(recallBanks)) {
+      out.push(`registry hindsight.recall_banks for ${role.agentId} is [${rowRecall.join(", ")}] (role.yaml declares [${recallBanks.join(", ")}])`);
+    }
+  } else if (rowIdentity !== undefined) {
+    out.push(`registry names ${role.agentId} "${rowIdentity}" but ${role.role}/role.yaml declares no identity`);
+  }
+  return out;
+}
 
 
 function legacyConsumerUnitPath(homeDir: string, agentId: string): string {
@@ -474,6 +588,14 @@ export interface SoulIdentity {
    * bank. Falls back to `repo` when the checkout cannot be located.
    */
   projectBank?: string;
+  /**
+   * The named-agent identity (role.yaml `identity:`), absent for an unnamed
+   * post. A named agent is addressed by name, told that the agent id is only
+   * the post it holds, and shown its personal bank plus the history banks it
+   * may recall. An unnamed post composes byte-identically to before names
+   * existed.
+   */
+  named?: { name: string; writeBank: string; recallBanks: string[] };
 }
 
 export interface SoulComposition {
@@ -609,6 +731,60 @@ function resolveSoulTone(book: ToneBook, identity: SoulIdentity, deployed: strin
 
 
 /**
+ * The `_base.md` inputs that differ between a named agent and an unnamed post.
+ *
+ * Every value is chosen so an UNNAMED post renders exactly the prose it always
+ * did (empty inserts, the historical bank/wiring wording) -- adding names to the
+ * fleet must not drift 60 deployed souls that have none.
+ */
+function namedAgentSoulInputs(identity: SoulIdentity): Record<string, string> {
+  const named = identity.named;
+  if (!named) {
+    return {
+      named_intro: "",
+      identity_rows: "",
+      identity_bank: `agent-${identity.agentId}`,
+      identity_wiring: "(`memory.bank_id_template: agent-{profile}`)",
+      identity_keyed_to: "your profile name",
+      recall_note: "",
+    };
+  }
+  const shown = identity.displayName.trim() || named.name;
+  const post = identity.agentId;
+  const history = named.recallBanks.filter((bank) => bank !== named.writeBank);
+  const recallNote = history.length === 0 ? "" : [
+    "",
+    "",
+    "Your personal bank starts with your name. What you learned before that",
+    "still lives in the bank it was written to, and the provider will not",
+    "recall it for you -- when a question is about your own history, recall it",
+    "explicitly:",
+    "",
+    "```bash",
+    ...history.map((bank) => `hindsight memory recall ${bank} "<question>"`),
+    "```",
+  ].join("\n");
+  return {
+    named_intro: [
+      "",
+      "",
+      `You are a **named agent**. *${shown}* (\`${named.name}\`) is who you are;`,
+      `\`${post}\` is only the post you currently hold. Your name, your personal`,
+      `memory (\`${named.writeBank}\`) and your chat identity travel with you if you`,
+      "ever change posts; the repo, its board and its project memory stay with the",
+      `post. Answer to ${shown}. The agent id \`${post}\` remains your routing and`,
+      "provenance key in every envelope, unit and registry row.",
+    ].join("\n"),
+    identity_rows: `\n| Name | **${shown}** (\`${named.name}\`) — a named agent holding the \`${post}\` post |`,
+    identity_bank: named.writeBank,
+    identity_wiring: `(pinned to your personal bank \`${named.writeBank}\` in your profile's \`hindsight/config.json\`)`,
+    identity_keyed_to: `your name (\`${named.name}\`), not to the post you hold`,
+    recall_note: recallNote,
+  };
+}
+
+
+/**
  * Compose one agent's SOUL from `<flumeRoot>/roles/`.
  *
  * `deployed` is the soul currently on disk, when there is one. It is read for
@@ -629,6 +805,7 @@ export function composeSoul(flumeRoot: string, identity: SoulIdentity, deployed:
   const purposeTemplate = soulScalar(definition.front.purpose_template) || "{role} agent for {repo}";
   const purpose = identity.purpose.trim() || fillPurposeTemplate(purposeTemplate, identity);
   const shared: Record<string, string | null> = {
+    ...namedAgentSoulInputs(identity),
     repo: identity.repo,
     project_bank: identity.projectBank?.trim() || identity.repo,
     role: identity.role,
@@ -723,6 +900,9 @@ function soulIdentityOf(role: RoleMeta): SoulIdentity {
     botHandle: role.botHandle,
     soulTone: yamlGet(safeReadText(role.roleYamlPath) ?? "", "soul_tone"),
     projectBank: projectBankFor(role.roleDir, role.repo),
+    ...(role.identity.state === "named"
+      ? { named: { name: role.identity.name, writeBank: role.identity.writeBank, recallBanks: role.identity.recallBanks } }
+      : {}),
   };
 }
 
@@ -1129,7 +1309,11 @@ function upsertRegistryEntry(role: RoleMeta, homeDir: string, changedFiles: stri
   if (current.includes(`${role.agentId}:`)) return null;
   const enabled = roleBloodbankEnabled(role);
   if (enabled === null) return null;
-  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n    systemd:\n      gateway_unit: hermes-${role.agentId}-gateway.service\n      heartbeat_timer: hermes-${role.agentId}-heartbeat.timer\n`;
+  if (role.identity.state === "invalid") return null;
+  const identityBlock = role.identity.state === "named"
+    ? `    identity: ${role.identity.name}\n    hindsight:\n      write_bank: ${role.identity.writeBank}\n      recall_banks:\n${role.identity.recallBanks.map((bank) => `        - ${bank}\n`).join("")}`
+    : "";
+  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n${identityBlock}    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n    systemd:\n      gateway_unit: hermes-${role.agentId}-gateway.service\n      heartbeat_timer: hermes-${role.agentId}-heartbeat.timer\n`;
   const next = current.includes("agents: {}") ? current.replace("agents: {}", `agents:\n${block}`) : `${current.replace(/\s*$/, "\n")}${block}`;
   changedFiles.push(path);
   if (!dryRun) writeText(path, next);
@@ -1465,11 +1649,20 @@ function profileRendererPath(ctx: Context): string | null {
 //
 // Returns human-readable findings; empty means in parity.
 /**
- * Resolve the explicit bank declaration for a named registry row.
+ * Resolve the explicit personal-bank declaration for a role.
+ *
+ * role.yaml `identity:` is the source: a named role's bank is its write bank.
+ * A role.yaml whose identity block is malformed is `null` (named, but no bank
+ * can be trusted) so the audit fails and the remediation refuses to pin
+ * anything rather than guessing. Only a role with no identity block falls back
+ * to the registry row, which covers rows named before role.yaml carried it.
  * `undefined` means no declaration exists and preserves the PM compatibility
  * template; `null` means the row is named but forgot to declare its bank.
  */
-function declaredPersonalBank(ctx: Context, agentId: string): string | null | undefined {
+function declaredPersonalBank(ctx: Context, role: RoleMeta): string | null | undefined {
+  if (role.identity.state === "named") return role.identity.writeBank;
+  if (role.identity.state === "invalid") return null;
+  const agentId = role.agentId;
   const entry = readRegistry(registryPath(ctx.homeDir))?.[agentId];
   if (!entry || typeof entry !== "object") return undefined;
   const row = entry as Record<string, unknown>;
@@ -2262,7 +2455,10 @@ return [
         });
         details.push(...skillDiagnostics(projection.findings));
         details.push(...(projection.data?.changes ?? []).map((change) => `profile skills ${change.action}: ${change.path}`));
-        details.push(...profileConfigFindings(plan.profileDir, profileNameOf(role), declaredPersonalBank(ctx, role.agentId)));
+        if (role.identity.state === "invalid") {
+          details.push(`${relative(ctx.repoRoot, role.roleYamlPath)}: ${role.identity.reason}`);
+        }
+        details.push(...profileConfigFindings(plan.profileDir, profileNameOf(role), declaredPersonalBank(ctx, role)));
       }
       return {
         id: "hermes.runtime-singleton",
@@ -2344,7 +2540,7 @@ return [
         // This deliberately does NOT symlink config.yaml (see
         // SHARED_PROFILE_ENTRIES): the renderer owns that file now.
         const profileName = profileNameOf(role);
-        const explicitBank = declaredPersonalBank(ctx, role.agentId);
+        const explicitBank = declaredPersonalBank(ctx, role);
         if (profileConfigFindings(plan.profileDir, profileName, explicitBank).length) {
           const renderer = profileRendererPath(ctx);
           if (!renderer) {
@@ -2359,7 +2555,9 @@ return [
                   ? null
                   : ["memory-pin", "--profile", profileName, "--bank-id", explicitBank];
               if (memoryPinArgs === null) {
-                details.push(`blocked: named agent ${role.agentId} has no hindsight.write_bank declaration`);
+                details.push(role.identity.state === "invalid"
+                  ? `blocked: ${relative(ctx.repoRoot, role.roleYamlPath)} ${role.identity.reason}`
+                  : `blocked: named agent ${role.agentId} has no hindsight.write_bank declaration`);
                 continue;
               }
               for (const args of [["init", "--profile", profileName], memoryPinArgs]) {
@@ -2770,6 +2968,10 @@ return [
           details.push(`${relative(ctx.repoRoot, role.roleYamlPath)} bloodbank.enabled must be the strict YAML boolean true or false`);
           malformedRoleGate = true;
         }
+        if (role.identity.state === "invalid") {
+          details.push(`${relative(ctx.repoRoot, role.roleYamlPath)} ${role.identity.reason}`);
+          malformedRoleGate = true;
+        }
         const entry = registry[role.agentId] as Record<string, unknown> | undefined;
         if (!entry) {
           details.push(`registry is missing an entry for ${role.agentId}`);
@@ -2799,6 +3001,7 @@ return [
         if (bloodbank.gateway_scope !== "fleet" || bloodbank.target_agent_id !== role.agentId) {
           details.push(`registry entry for ${role.agentId} must advertise bloodbank { gateway_scope: fleet, target_agent_id: ${role.agentId} }`);
         }
+        details.push(...registryIdentityDrift(role, entry));
         const systemd = (entry.systemd ?? {}) as Record<string, unknown>;
         for (const key of LEGACY_SYSTEMD_KEYS) {
           if (systemd[key] !== undefined) {
@@ -2828,6 +3031,19 @@ return [
         return { id: finding.id, title: finding.title, status: "blocked", summary: `registry unreadable at ${registryPath}`, changedFiles, details };
       }
       const roles = discoverRoles(ctx.repoRoot);
+      const invalidIdentities = roles.filter((role) => role.identity.state === "invalid");
+      if (invalidIdentities.length > 0) {
+        return {
+          id: finding.id,
+          title: finding.title,
+          status: "blocked",
+          summary: "Registry parity is blocked by a malformed role identity",
+          changedFiles,
+          details: invalidIdentities.map((role) =>
+            `${relative(ctx.repoRoot, role.roleYamlPath)} ${role.identity.state === "invalid" ? role.identity.reason : ""}`
+          ),
+        };
+      }
       const malformedRoleGates = roles.filter((role) => roleBloodbankEnabled(role) === null);
       if (malformedRoleGates.length > 0) {
         return {
@@ -2919,6 +3135,24 @@ return [
           details.push(`normalize fleet bloodbank routing for ${role.agentId} with enabled=${expectedBloodbankEnabled}`);
           entry.bloodbank = { ...bloodbank, enabled: expectedBloodbankEnabled, gateway_scope: "fleet", target_agent_id: role.agentId };
           dirty = true;
+        }
+        // Named agents: project role.yaml identity exactly as 80-registry.sh does.
+        if (registryIdentityDrift(role, entry).length > 0) {
+          const hindsight = (typeof entry.hindsight === "object" && entry.hindsight !== null && !Array.isArray(entry.hindsight))
+            ? { ...(entry.hindsight as Record<string, unknown>) }
+            : {};
+          if (role.identity.state === "named") {
+            details.push(`project named identity "${role.identity.name}" (bank ${role.identity.writeBank}) onto ${role.agentId}`);
+            entry.identity = role.identity.name;
+            entry.hindsight = { ...hindsight, write_bank: role.identity.writeBank, recall_banks: [...role.identity.recallBanks] };
+            dirty = true;
+          } else if (role.identity.state === "none" && typeof entry.identity === "string") {
+            const prior = entry.identity;
+            details.push(`drop stale identity "${prior}" from ${role.agentId} (role.yaml declares none)`);
+            delete entry.identity;
+            if (hindsight.write_bank === `agent-${prior}`) delete entry.hindsight;
+            dirty = true;
+          }
         }
         const systemd = entry.systemd as Record<string, unknown> | undefined;
         if (systemd) {

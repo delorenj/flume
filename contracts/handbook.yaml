@@ -111,14 +111,21 @@ authorities:
       - agents.{agent_id}.role
       - agents.{agent_id}.type
       # A travelling named agent keeps this identity when the profile/post
-      # changes. PM rows intentionally leave it absent and continue using the
-      # profile-derived compatibility bank below.
+      # changes. The SOURCE is the role's role.yaml `identity:` block
+      # (name, write_bank: agent-<name>, recall_banks); 80-registry.sh and
+      # `flume remediate hermes.registry-parity` project it here. An unnamed
+      # post leaves it absent and keeps the profile-derived compatibility bank
+      # below. A PM post may be held by a named agent: the first is `grolf`,
+      # holding `33god-pm` (agent_id/profile stay the post's routing key).
       - agents.{agent_id}.identity
       - agents.{agent_id}.display_name
       - agents.{agent_id}.project_path
       - agents.{agent_id}.role_dir
       - agents.{agent_id}.profile_name
       - agents.{agent_id}.hindsight.write_bank
+      # Read-only history banks a named agent recalls explicitly (write bank
+      # first). The SOUL composer lists them; the memory provider does not.
+      - agents.{agent_id}.hindsight.recall_banks
       - agents.{agent_id}.provisioned_at
       - agents.{agent_id}.runtime_repo
       - agents.{agent_id}.telegram.provisioning_status
@@ -607,8 +614,9 @@ profile_manifest:
     inert_keys:
       - config
   # The explicit bank pin. A generic `bank_id_template` never satisfies it for
-  # a real profile. It remains the compatibility default for post/PM rows;
-  # travelling named agents declare their personal bank in
+  # a real profile. It remains the compatibility default for unnamed posts;
+  # travelling named agents declare their personal bank (always agent-<name>,
+  # never agent-<post>) in role.yaml `identity:`, projected to
   # agents.{agent_id}.hindsight.write_bank, so a post change does not move it.
   # The two reserved ids are what the resolver falls back to when identity is
   # lost -- a profile pinned to either shares its private memory.
