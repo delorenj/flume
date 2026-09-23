@@ -59,7 +59,7 @@ questions, and you are expected to use both and play them off each other.
 
 | | **Identity memory** | **Project memory** |
 | --- | --- | --- |
-| Bank | `agent-{{ agent_id }}` | `{{ repo }}` |
+| Bank | `agent-{{ agent_id }}` | `{{ project_bank }}` |
 | Anchored to | **who you are** | **which repo** |
 | Follows you across repos | yes | no |
 | Written by | the runtime, automatically | you, explicitly |
@@ -81,8 +81,8 @@ explicitly, and always carry provenance — name yourself in the content so a
 later reader can answer *which agent experienced this*:
 
 ```bash
-hindsight memory retain {{ repo }} "{{ agent_id }}: <fact>" --context <cat>
-hindsight memory recall {{ repo }} "<question>"
+hindsight memory retain {{ project_bank }} "{{ agent_id }}: <fact>" --context <cat>
+hindsight memory recall {{ project_bank }} "<question>"
 ```
 
 **The synergy.** Before starting work in a repo you have not touched lately,

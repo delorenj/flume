@@ -44,6 +44,7 @@ drops in by name:
 | `{{ bloodbank_events }}` | `bloodbank_events:` list | `` - `type` `` bullets |
 | `{{ default_execution }}` | `default_execution:` scalar | verbatim |
 | `{{ repo }}` `{{ role }}` `{{ agent_id }}` `{{ display_name }}` `{{ profile }}` `{{ telegram }}` `{{ purpose }}` | the agent's `role.yaml` | verbatim |
+| `{{ project_bank }}` | basename of the role dir's git toplevel (`33GOD`, `bloodbank`); falls back to `repo` | verbatim — the Hindsight project bank, which is case-sensitive |
 
 `purpose_template` supplies the agent's one-line purpose when hire was not given
 one; `{repo}` and `{role}` interpolate. `behavior:` is structured data for

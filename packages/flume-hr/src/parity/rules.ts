@@ -467,6 +467,13 @@ export interface SoulIdentity {
    * whole fleet to `direct`.
    */
   soulTone: string;
+  /**
+   * The Hindsight project bank: the basename of the repo's git toplevel
+   * (`33GOD`, `bloodbank`), which is how every agent resolves its active bank.
+   * `repo` is the registry slug (`33god`) and naming it creates a new, empty
+   * bank. Falls back to `repo` when the checkout cannot be located.
+   */
+  projectBank?: string;
 }
 
 export interface SoulComposition {
@@ -623,6 +630,7 @@ export function composeSoul(flumeRoot: string, identity: SoulIdentity, deployed:
   const purpose = identity.purpose.trim() || fillPurposeTemplate(purposeTemplate, identity);
   const shared: Record<string, string | null> = {
     repo: identity.repo,
+    project_bank: identity.projectBank?.trim() || identity.repo,
     role: identity.role,
     agent_id: identity.agentId,
     display_name: identity.displayName || identity.agentId,
@@ -714,7 +722,19 @@ function soulIdentityOf(role: RoleMeta): SoulIdentity {
     purpose: role.purpose,
     botHandle: role.botHandle,
     soulTone: yamlGet(safeReadText(role.roleYamlPath) ?? "", "soul_tone"),
+    projectBank: projectBankFor(role.roleDir, role.repo),
   };
+}
+
+/** Basename of the git toplevel holding `start` (a `.git` dir, or a submodule's `.git` file). */
+export function projectBankFor(start: string, fallback: string): string {
+  let dir = resolve(start);
+  for (;;) {
+    if (existsSync(join(dir, ".git"))) return basename(dir);
+    const parent = dirname(dir);
+    if (parent === dir) return fallback;
+    dir = parent;
+  }
 }
 
 

@@ -9,7 +9,7 @@ import YAML from "yaml";
 import { Command, type InvokeResult } from "../engine/Command";
 import { HERMES_AGENT_TEMPLATE, deriveAgentId, deriveProfileName, type HermesAgentContext } from "./types";
 import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../kernel/paths";
-import { composeSoul, soulIsReplaceable, soulRolesDir } from "../parity/rules";
+import { composeSoul, projectBankFor, soulIsReplaceable, soulRolesDir } from "../parity/rules";
 import { verifyTrustedCopierIdentity } from "../kernel/preflight";
 import { existingRoleRefusal } from "./ValidateHermesOptions";
 
@@ -351,6 +351,7 @@ export class RunCopierTemplate extends Command {
             purpose: String(manifest.purpose ?? ""),
             botHandle: String(telegram.bot_username ?? ""),
             soulTone: String(manifest.soul_tone ?? soulTone ?? ""),
+            projectBank: projectBankFor(dirname(roleManifest), String(manifest.repo ?? targetRepo)),
           });
         } catch (error) {
           return error instanceof Error ? error : new Error(String(error));
