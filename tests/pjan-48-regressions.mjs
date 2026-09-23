@@ -113,6 +113,19 @@ try {
       assert.equal(migrationResult(quarantineMigration, "hermes.registry-parity").status, "applied");
       assert.match(readFileSync(registryPath, "utf8"), /enabled: false/);
 
+      // A trailing comment is not part of the scalar: `false  # why` is the
+      // quarantine it says, exactly as the template's shell yaml_get reads it,
+      // never a malformed gate.
+      writeFileSync(
+        join(roleDir, "role.yaml"),
+        readFileSync(join(roleDir, "role.yaml"), "utf8").replace("  enabled: false\n", "  enabled: false  # quarantined by the operator\n"),
+      );
+      const commentedAudit = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
+      assert.doesNotMatch(finding(commentedAudit, "hermes.registry-parity").details.join("\n"), /strict YAML boolean/);
+      const commentedMigration = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
+      assert.notEqual(migrationResult(commentedMigration, "hermes.registry-parity").status, "blocked");
+      assert.match(readFileSync(registryPath, "utf8"), /enabled: false/);
+
       const beforeMalformed = readFileSync(registryPath, "utf8");
       writeFileSync(
         join(roleDir, "role.yaml"),

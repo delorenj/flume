@@ -169,6 +169,25 @@ function tryParseJson(text: string | null): Record<string, unknown> | null {
 }
 
 
+/**
+ * One YAML scalar as text: surrounding quotes removed, a trailing `# comment`
+ * dropped. Matches the template's shell `yaml_get` (hermes-agent-template
+ * 4582731), so `enabled: false  # why` is the quarantine it says on both sides;
+ * kept verbatim here it read `false  # why`, which `roleBloodbankEnabled`
+ * called malformed while 80-registry.sh projects a quarantine.
+ */
+function yamlScalarText(rest: string): string {
+  const raw = rest.trim();
+  if (raw === "" || raw.startsWith("#")) return "";
+  const doubled = /^"((?:[^"\\]|\\.)*)"(?:[ \t]+#.*)?$/.exec(raw);
+  if (doubled) return doubled[1]!;
+  const single = /^'((?:[^']|'')*)'(?:[ \t]+#.*)?$/.exec(raw);
+  if (single) return single[1]!.replace(/''/g, "'");
+  if (raw.startsWith('"') || raw.startsWith("'")) return raw.replace(/^['"]|['"]$/g, "").trim();
+  return raw.replace(/[ \t]+#.*$/, "").trim();
+}
+
+
 function yamlGet(text: string, keyPath: string): string {
   const parts = keyPath.split(".");
   const lines = text.split("\n");
@@ -189,7 +208,7 @@ function yamlGet(text: string, keyPath: string): string {
       if (currentIndent !== indent || currentKey !== key) continue;
       found = true;
       if (idx === parts.length - 1) {
-        return rest.replace(/^['"]|['"]$/g, "").trim();
+        return yamlScalarText(rest);
       }
       start = i + 1;
       indent = currentIndent + 2;
