@@ -1350,22 +1350,23 @@ export function observeFromInventory(
     //
     // Held apart from the routing record above because the contract holds them
     // apart: `activation.execution_authority` is a separate authority block
-    // with `strict: true, default: deny`, and folding the flag into the record
+    // with `strict: true, default: allow` (no key means enabled; an explicit
+    // `false` quarantines), and folding the flag into the record
     // is how "we can resolve a target" becomes "we may dispatch to it". It is
     // also what makes the `approval-gated` repair class reachable -- the class
     // is derived from the FIELD matching the contract's gate, not from a
     // keyword in a summary.
     out.push(observation(ctx, {
       domain: "bloodbank", agentId,
-      state: row.activation.value === null ? "warn" : "pass",
+      state: row.activation.value === null ? "fail" : "pass",
       field: ctx.activationField,
       summary: row.activation.value === null
-        ? "the strict activation flag is absent or not a boolean; the contract's declared default is deny"
-        : `execution authority is ${row.activation.value ? "granted" : "denied"} by the strict flag the contract declares`,
-      details: [`${row.activation_field.value ?? ctx.activationField} owned by ${ctx.activationOwner}, strict, default deny`],
+        ? "the activation flag is present but not a strict boolean; it is treated as disabled"
+        : `execution authority is ${row.activation.value ? "granted" : "denied"} by the strict flag the contract declares (an absent flag means enabled)`,
+      details: [`${row.activation_field.value ?? ctx.activationField} owned by ${ctx.activationOwner}, strict, default allow: no key means enabled, an explicit false quarantines`],
       source: SOURCE_REGISTRY,
-      observed: row.activation.value === null ? "absent or not a boolean" : row.activation.value ? "true" : "false",
-      desired: "an explicit boolean, written only by the declared execution-authority owner",
+      observed: row.activation.value === null ? "present but not a boolean" : row.activation.value ? "true" : "false",
+      desired: "absent (enabled) or a strict boolean, written only by the declared execution-authority owner",
       evidence: "declared",
     }));
     // Liveness is a SECOND observation, not a modifier on the record above: the
@@ -2118,8 +2119,9 @@ function classifyFact(ctx: FleetStatusContext, fact: FleetProvenanceFact): { dom
  *   capability_readiness whether routing readiness was proven. Never `ready`
  *                        here: a `declared` registry field is not a direct
  *                        observation of the shared gateway.
- *   activation           the strict flag, read verbatim. The contract's
- *                        declared default is deny.
+ *   activation           the effective strict flag. The contract's declared
+ *                        default is allow: no key means enabled; a present
+ *                        non-boolean is invalid and reads as `denied`.
  */
 export function agentLifecycle(
   row: FleetInventoryRow,
@@ -2166,7 +2168,9 @@ export function agentLifecycle(
     desired_state: desired,
     observed_state: observed,
     capability_readiness: readiness,
-    activation: row.activation.value === true ? "granted" : row.activation.value === false ? "denied" : "undeclared",
+    // `null` now means a PRESENT non-boolean (absent resolves to true), which
+    // the gateway treats as disabled -- so it reads as denied, not undeclared.
+    activation: row.activation.value === true ? "granted" : "denied",
   };
 }
 

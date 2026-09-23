@@ -1323,8 +1323,8 @@ export const FLEET_STATUS_SEVERITY_PRECEDENCE = [
  * `automatic`       an audit rule that reports `fixable` on a project scope --
  *                   `flume remediate` has a recipe for it.
  * `approval-gated`  it touches `activation.execution_authority`, which the
- *                   contract declares `strict: true, default: deny`. No
- *                   repository change grants it.
+ *                   contract declares `strict: true, default: allow` (no key
+ *                   means enabled). Only its declared owner may rewrite it.
  * `blocked`         a contract-declared deferred capability. Nothing to run in
  *                   this release; the action names the owning story.
  * `other-owner`     a host-scoped rule. No amount of work in any repository
@@ -1513,7 +1513,11 @@ export interface FleetStatusLifecycle {
    * the shared gateway, and a `declared` registry field is not one.
    */
   capability_readiness: FleetStatusReadiness;
-  /** The strict execution-authority flag, read verbatim. The contract's default is deny. */
+  /**
+   * The effective strict execution-authority flag. The contract's default is
+   * allow: an absent flag is `granted`; a present non-boolean is `denied`.
+   * `undeclared` is retained for wire compatibility and no longer emitted.
+   */
   activation: "granted" | "denied" | "undeclared";
 }
 

@@ -91,27 +91,32 @@ try {
       const registryPath = join(home, ".hermes", "agents-registry.yaml");
       writeFileSync(
         registryPath,
-        `agents:\n  ${agentId}:\n    project_path: ${repo}\n    role_dir: ${roleDir}\n    bloodbank:\n      enabled: true\n      gateway_scope: fleet\n      target_agent_id: ${agentId}\n`,
+        `agents:\n  ${agentId}:\n    project_path: ${repo}\n    role_dir: ${roleDir}\n    bloodbank:\n      enabled: false\n      gateway_scope: fleet\n      target_agent_id: ${agentId}\n`,
       );
 
+      // No key means enabled: the role declares no bloodbank.enabled, so the
+      // registry's `false` is drift and remediation projects `true`.
       const plannedAudit = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
-      assert.equal(finding(plannedAudit, "hermes.registry-parity").status, "fail");
+      const plannedFinding = finding(plannedAudit, "hermes.registry-parity");
+      assert.equal(plannedFinding.status, "fail");
+      assert.match(plannedFinding.details.join("\n"), /must match role value true \(an absent key means true\)/);
       const plannedMigration = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
       assert.equal(migrationResult(plannedMigration, "hermes.registry-parity").status, "applied");
-      assert.match(readFileSync(registryPath, "utf8"), /enabled: false/);
+      assert.match(readFileSync(registryPath, "utf8"), /enabled: true/);
 
+      // An explicit false still quarantines.
       writeFileSync(
         join(roleDir, "role.yaml"),
-        `${readFileSync(join(roleDir, "role.yaml"), "utf8")}bloodbank:\n  enabled: true\n`,
+        `${readFileSync(join(roleDir, "role.yaml"), "utf8")}bloodbank:\n  enabled: false\n`,
       );
-      const activeMigration = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
-      assert.equal(migrationResult(activeMigration, "hermes.registry-parity").status, "applied");
-      assert.match(readFileSync(registryPath, "utf8"), /enabled: true/);
+      const quarantineMigration = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home }).json;
+      assert.equal(migrationResult(quarantineMigration, "hermes.registry-parity").status, "applied");
+      assert.match(readFileSync(registryPath, "utf8"), /enabled: false/);
 
       const beforeMalformed = readFileSync(registryPath, "utf8");
       writeFileSync(
         join(roleDir, "role.yaml"),
-        readFileSync(join(roleDir, "role.yaml"), "utf8").replace("enabled: true", "enabled: yes"),
+        readFileSync(join(roleDir, "role.yaml"), "utf8").replace("enabled: false", "enabled: yes"),
       );
       const malformedAudit = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
       const malformedFinding = finding(malformedAudit, "hermes.registry-parity");

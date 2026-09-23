@@ -235,8 +235,14 @@ authorities:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
     notes:
-      - The single field that can grant execution authority. Held apart from the
-        operational records so discovery can never widen into dispatch.
+      - The single field that can quarantine or grant execution authority. Held
+        apart from the operational records so routing metadata can never be
+        mistaken for the gate.
+      - No key means enabled (2026-09-22). An ABSENT bloodbank.enabled, in the
+        registry row or in role.yaml, means true; only an explicit YAML false
+        quarantines. A present non-boolean is invalid, treated as disabled, and
+        reported loudly. Absent-means-false silently disabled 33god-pm after an
+        accidental re-provision, which is why the default flipped.
     writable_fields:
       - agents.{agent_id}.bloodbank.enabled
 
@@ -754,7 +760,8 @@ activation:
     field: agents.{agent_id}.bloodbank.enabled
     owner: agent-registry
     strict: true
-    default: deny
+    # No key means enabled: absent -> true. Explicit false quarantines.
+    default: allow
   routing_prerequisites:
     - field: agents.{agent_id}.bloodbank.gateway_scope
       constraint: equals-fleet
@@ -782,7 +789,7 @@ retired:
     detect:
       - 'n8n'
   - id: activation-by-discovery
-    reason: A resolvable target is not permission to dispatch to it.
+    reason: A resolvable target is not the gate; the activation flag is (absent means enabled, an explicit false quarantines), and nothing may rewrite it from discovery.
     superseded_by: activation.execution_authority
     detect:
       - 'activation_by_discovery'

@@ -1025,16 +1025,19 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     ? field(bounded(bloodbank.target_agent_id as string), targetOwner, "resolved")
     : unresolved<string>(targetOwner);
 
-  // The contract declares strict: true and default: deny. A non-boolean is
-  // therefore not "probably false" -- it is unresolved, and default-deny is what
-  // an unresolved activation flag means.
-  const activationRaw = isRecord(raw.bloodbank) ? raw.bloodbank.enabled : undefined;
+  // The contract declares strict: true and default: allow. No key means
+  // enabled: an ABSENT flag resolves to the declared default, `true` -- the
+  // value the shared gateway routes on. A PRESENT non-boolean is not "probably
+  // true" or "probably false": it is unresolved, the gateway treats it as
+  // disabled, and it is reported loudly as an error.
+  const activationPresent = isRecord(raw.bloodbank) && "enabled" in raw.bloodbank && raw.bloodbank.enabled !== undefined;
+  const activationRaw = activationPresent ? (raw.bloodbank as Record<string, unknown>).enabled : true;
   const activation = typeof activationRaw === "boolean"
     ? field(activationRaw, ctx.activationOwner, "resolved")
     : unresolved<boolean>(ctx.activationOwner);
   if (activation.value === null) {
-    note("activation-flag-unresolved", ctx.activationField, ctx.activationOwner, "warn",
-      "the strict activation flag is absent or not a boolean; the contract's declared default is deny");
+    note("activation-flag-invalid", ctx.activationField, ctx.activationOwner, "error",
+      "the activation flag is present but not a strict boolean; it is treated as disabled (an absent flag would mean enabled)");
   }
   const activationField = field(bounded(ctx.activationField), ctx.activationOwner, "resolved");
 

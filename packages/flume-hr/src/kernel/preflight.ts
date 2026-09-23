@@ -453,8 +453,15 @@ export function preflightHermesTemplate(pjanglerRoot: string, env: NodeJS.Proces
   if (!required.ok) return required;
 
   const role = readFileSync(join(templateRoot, "template", "role.yaml.jinja"), "utf8");
-  if (!/^bloodbank:\s*$[\s\S]*?^\s+enabled:\s+(?:true|false)\s*$/m.test(role)) {
-    return { ok: false, error: "Hermes role projection must declare bloodbank.enabled as a strict boolean" };
+  // No key means enabled: the projection may omit bloodbank.enabled (absent is
+  // true), but when the bloodbank block declares it, it must be a strict boolean.
+  const bloodbankBlock = /^bloodbank:\s*$\n((?:^(?:[ \t]+.*|[ \t]*#.*|)$\n?)*)/m.exec(role)?.[1] ?? null;
+  if (bloodbankBlock === null) {
+    return { ok: false, error: "Hermes role projection must declare a bloodbank block" };
+  }
+  const declaredEnabled = /^\s+enabled:(.*)$/m.exec(bloodbankBlock);
+  if (declaredEnabled && !/^\s+(?:true|false)\s*(?:#.*)?$/.test(declaredEnabled[1] ?? "")) {
+    return { ok: false, error: "Hermes role projection must declare bloodbank.enabled as a strict boolean when present" };
   }
   const library = readFileSync(join(templateRoot, "template", ".scripts", "_lib.sh"), "utf8");
   if (!library.includes("PJANGLER_PROJECT_ROOT") || !library.includes('"$explicit"/agents/hermes/*')) {
@@ -543,8 +550,13 @@ export function preflightRenderedHermes(options: RenderedHermesEligibilityOption
     return { ok: false, error: "rendered Hermes role identity does not match the requested repo/role/agent" };
   }
   const bloodbank = role.bloodbank as Record<string, unknown> | undefined;
-  if (!bloodbank || typeof bloodbank.enabled !== "boolean") {
-    return { ok: false, error: "rendered Hermes bloodbank.enabled must be a strict boolean" };
+  // No key means enabled: an absent bloodbank.enabled is valid (true); a present
+  // one must be a strict boolean.
+  if (!bloodbank || typeof bloodbank !== "object" || Array.isArray(bloodbank)) {
+    return { ok: false, error: "rendered Hermes role.yaml must contain a bloodbank mapping" };
+  }
+  if ("enabled" in bloodbank && typeof bloodbank.enabled !== "boolean") {
+    return { ok: false, error: "rendered Hermes bloodbank.enabled must be a strict boolean when present" };
   }
   const deployment = role.deployment as Record<string, unknown> | undefined;
   if (!deployment || deployment.local_only !== true || deployment.systemd !== "deferred") {

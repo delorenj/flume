@@ -1057,8 +1057,8 @@ try {
     const agents = join(temp, "activated-agents.yaml");
     writeAgentRegistry(agents, SLUGS, (rows) => {
       rows["alpha-pm"].bloodbank = { enabled: true, gateway_scope: "fleet", target_agent_id: "alpha-pm" };
-      // `beta` declares a routing record with NO activation flag at all, which
-      // is the third value the pair `true`/`false` cannot express.
+      // `beta` declares a routing record with NO activation flag at all. No key
+      // means enabled: the contract's default is allow, so it is granted.
       rows["beta-pm"].bloodbank = { gateway_scope: "fleet", target_agent_id: "beta-pm" };
     });
     const data = status(cli(["review", "--json", "--contract", cleanContract, "--agent-registry", agents]));
@@ -1080,16 +1080,31 @@ try {
     assert.equal(routing.evidence, "declared", "a registry field nothing verified is declared evidence, never direct");
 
     const beta = agentNamed(data, "beta-pm");
-    assert.equal(beta.lifecycle.activation, "undeclared");
-    assert.equal(beta.lifecycle.desired_state, "routing_ready");
-    const gate = beta.observations.find((item) => item.field === "agents.{agent_id}.bloodbank.enabled");
+    assert.equal(beta.lifecycle.activation, "granted", "no key means enabled");
+    assert.equal(beta.lifecycle.desired_state, "activated");
+    const absentGate = beta.observations.find((item) => item.field === "agents.{agent_id}.bloodbank.enabled");
+    assert.ok(absentGate, "the execution-authority field must be observed on its own");
+    assert.equal(absentGate.state, "pass", "an absent flag is the declared default, not a finding");
+    assert.equal(absentGate.observed, "true");
+    rmSync(agents, { force: true });
+
+    // A PRESENT non-boolean is the one invalid shape: treated as disabled and
+    // reported loudly, and only the declared owner may rewrite it.
+    const invalidAgents = join(temp, "invalid-activation-agents.yaml");
+    writeAgentRegistry(invalidAgents, SLUGS, (rows) => {
+      rows["beta-pm"].bloodbank = { enabled: "yes", gateway_scope: "fleet", target_agent_id: "beta-pm" };
+    });
+    const invalid = agentNamed(status(cli(["review", "--json", "--contract", cleanContract, "--agent-registry", invalidAgents])), "beta-pm");
+    assert.equal(invalid.lifecycle.activation, "denied", "a present non-boolean is treated as disabled");
+    assert.equal(invalid.lifecycle.desired_state, "routing_ready");
+    const gate = invalid.observations.find((item) => item.field === "agents.{agent_id}.bloodbank.enabled");
     assert.ok(gate, "the execution-authority field must be observed on its own");
-    assert.equal(gate.state, "warn");
+    assert.equal(gate.state, "fail", "an invalid activation flag is loud, not a warning");
     assert.equal(gate.repair, "approval-gated", "the contract's own gate field decides the repair class");
     assert.equal(gate.next_action_class, "requires-authorization");
     assert.match(gate.next_action, /agents\.\{agent_id\}\.bloodbank\.enabled/u, "the action must name the authorization");
-    assert.match(gate.next_action, /deny/u, "and the default it has to overcome");
-    rmSync(agents, { force: true });
+    assert.match(gate.next_action, /absent flag means enabled/u, "and the default an absent flag would take");
+    rmSync(invalidAgents, { force: true });
   });
 
   // -- AC6: a contradiction is recorded, never resolved ---------------------

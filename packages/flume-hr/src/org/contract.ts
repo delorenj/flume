@@ -759,21 +759,24 @@ function validateClassifications(contract: FleetContract): FleetDiagnostic[] {
 function validateRetiredModes(contract: FleetContract): FleetDiagnostic[] {
   const findings: FleetDiagnostic[] = [];
 
-  // Default-deny is the whole point of the activation gate. A contract that
-  // relaxes either half has re-declared activation-by-discovery as healthy.
+  // No key means enabled. Default-deny is RETIRED: an absent flag that read as
+  // "disabled" is exactly how an accidental re-provision that dropped the key
+  // silently quarantined 33god-pm's grooming (2026-09-17). The gate stays
+  // strict -- only an explicit `false` quarantines, and a present non-boolean
+  // is invalid rather than coerced either way.
   const authority = contract.activation.execution_authority;
-  if (authority.default !== "deny") {
+  if (authority.default !== "allow") {
     findings.push({
       code: "RETIRED_MODE",
       path: "activation.execution_authority.default",
-      message: `activation-by-discovery: execution authority defaults to "${authority.default}" instead of deny`,
+      message: `quarantine-by-omission: execution authority defaults to "${authority.default}" instead of allow; an absent flag must mean enabled`,
     });
   }
   if (authority.strict !== true) {
     findings.push({
       code: "RETIRED_MODE",
       path: "activation.execution_authority.strict",
-      message: "activation-by-discovery: execution authority must be strict, so an absent or coercible flag never grants dispatch",
+      message: "activation-by-coercion: execution authority must be strict, so a present non-boolean flag is invalid and never coerced into a grant or a quarantine",
     });
   }
 

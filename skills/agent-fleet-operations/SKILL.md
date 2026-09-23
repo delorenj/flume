@@ -105,9 +105,12 @@ producer → bloodbank.cmd.agent.invocation.start
 
 Commands are short-lived intent and do not become Candystore rows directly.
 The gateway's lifecycle **events** are the durable audit trail. A running gateway
-does not prove a target is routable: eligibility is default-deny and requires
-`bloodbank.enabled: true`, `gateway_scope: fleet`, matching `target_agent_id`,
-and a nonblank `profile_name` in the current registry. A past `completed` row in
+does not prove a target is routable: eligibility requires `bloodbank.enabled`
+absent or `true` (**no key means enabled**; only an explicit `false`
+quarantines, and a present non-boolean is invalid, treated as disabled and
+logged at ERROR), `gateway_scope: fleet`, matching `target_agent_id`, and a
+nonblank `profile_name` in the current registry. The same rule holds in
+`role.yaml`: `80-registry.sh` projects an absent key as `true`. A past `completed` row in
 the execution journal proves historical execution only.
 
 ## Reading a review verdict

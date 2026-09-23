@@ -1007,10 +1007,25 @@ function upsertRegistryEntry(role: RoleMeta, homeDir: string, changedFiles: stri
 }
 
 
+/**
+ * A role's effective Bloodbank activation. No key means enabled: an ABSENT
+ * `bloodbank.enabled` is `true`, exactly as 80-registry.sh projects it and the
+ * fleet gateway routes it. Only an explicit `false` quarantines. Any other
+ * present value is malformed (`null`), which callers report as a blocker.
+ */
 function roleBloodbankEnabled(role: RoleMeta): boolean | null {
-  if (role.bloodbankEnabled === "" || role.bloodbankEnabled === "false") return false;
-  if (role.bloodbankEnabled === "true") return true;
+  if (role.bloodbankEnabled === "" || role.bloodbankEnabled === "true") return true;
+  if (role.bloodbankEnabled === "false") return false;
   return null;
+}
+
+/**
+ * A registry row's effective Bloodbank activation, by the same rule: an absent
+ * `enabled` is `true`, a strict boolean is itself, anything else is `null`.
+ */
+function registryBloodbankEnabled(bloodbank: Record<string, unknown>): boolean | null {
+  if (!("enabled" in bloodbank) || bloodbank.enabled === undefined) return true;
+  return typeof bloodbank.enabled === "boolean" ? bloodbank.enabled : null;
 }
 
 
@@ -2636,10 +2651,14 @@ return [
         // Every agent entry advertises fleet routing; none carries the retired
         // per-agent consumer/checkpoint contract in the registry or on disk.
         const bloodbank = (entry.bloodbank ?? {}) as Record<string, unknown>;
-        if (typeof bloodbank.enabled !== "boolean") {
-          details.push(`registry entry for ${role.agentId} bloodbank.enabled must be a strict boolean`);
-        } else if (expectedBloodbankEnabled !== null && bloodbank.enabled !== expectedBloodbankEnabled) {
-          details.push(`registry entry for ${role.agentId} bloodbank.enabled must match explicit role value ${expectedBloodbankEnabled}`);
+        // No key means enabled, on both sides: an absent registry flag and an
+        // absent role flag are each `true`, so only an effective disagreement
+        // (or a present non-boolean) is drift.
+        const registryEnabled = registryBloodbankEnabled(bloodbank);
+        if (registryEnabled === null) {
+          details.push(`registry entry for ${role.agentId} bloodbank.enabled must be a strict boolean when present`);
+        } else if (expectedBloodbankEnabled !== null && registryEnabled !== expectedBloodbankEnabled) {
+          details.push(`registry entry for ${role.agentId} bloodbank.enabled must match role value ${expectedBloodbankEnabled} (an absent key means true)`);
         }
         if (bloodbank.gateway_scope !== "fleet" || bloodbank.target_agent_id !== role.agentId) {
           details.push(`registry entry for ${role.agentId} must advertise bloodbank { gateway_scope: fleet, target_agent_id: ${role.agentId} }`);

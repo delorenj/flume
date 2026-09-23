@@ -469,15 +469,17 @@ function deriveRepair(
   }
 
   // The gate, and it is the contract's own field -- not a keyword and not the
-  // domain. `strict: true, default: deny` means no repository change can grant
-  // it, so the action has to NAME the authority that can, or the label is the
-  // only thing between an operator and a command they cannot run.
+  // domain. `strict: true, default: allow`: an absent flag means enabled, so a
+  // non-pass here is a PRESENT non-boolean, which the gateway treats as
+  // disabled. Only the declared owner may rewrite it, so the action has to NAME
+  // that authority, or the label is the only thing between an operator and a
+  // command they cannot run.
   if (input.field === input.activationField) {
     return {
       repair: "approval-gated",
       next_action: bounded(
-        `Request execution authority from ${input.activationOwner}: ${input.activationField} is strict with a declared default of deny, `
-        + "and no change in any repository grants it",
+        `Request execution authority from ${input.activationOwner}: ${input.activationField} is strict (default allow -- an absent flag means enabled); `
+        + "fix the present non-boolean to true or false, or delete it to enable",
       ),
       next_action_class: "requires-authorization",
     };

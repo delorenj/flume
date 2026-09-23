@@ -611,8 +611,10 @@ try {
     assert.equal(result.status, 4);
   });
 
-  check("activation-by-discovery fails: default-allow and non-strict both", () => {
-    for (const [key, value] of [["default", "allow"], ["strict", false]]) {
+  check("quarantine-by-omission and activation-by-coercion fail: default-deny and non-strict both", () => {
+    // No key means enabled. Default-deny is the retired mode now: an absent
+    // flag that read as disabled silently quarantined 33god-pm (2026-09-17).
+    for (const [key, value, mode] of [["default", "deny", "quarantine-by-omission"], ["strict", false, "activation-by-coercion"]]) {
       const path = mutated(`retired-activation-${key}`, (document) => {
         document.setIn(["activation", "execution_authority", key], value);
       });
@@ -620,20 +622,20 @@ try {
       const parsed = envelope(result);
       assert.equal(errorCode(parsed), "RETIRED_MODE", `execution_authority.${key} = ${value} must be rejected`);
       assert.equal(result.status, 4);
-      assert.ok(JSON.stringify(parsed.error).includes("activation-by-discovery"));
+      assert.ok(JSON.stringify(parsed.error).includes(mode));
     }
   });
 
   // -- activation is its own authority ---------------------------------------
 
-  check("five distinct states, one strict default-deny execution field", () => {
+  check("five distinct states, one strict default-allow execution field", () => {
     const parsed = envelope(cli(["handbook", "validate", "--json"]));
     assert.deepEqual(parsed.data.activation.states, ["discovered", "installed", "healthy", "routing_ready", "activated"]);
     const authority = parsed.data.activation.execution_authority;
     assert.equal(authority.field, "agents.{agent_id}.bloodbank.enabled");
     assert.equal(authority.owner, "agent-registry");
     assert.equal(authority.strict, true);
-    assert.equal(authority.default, "deny");
+    assert.equal(authority.default, "allow", "no key means enabled");
     // The gate is only real if its owner is the declared writer of the field.
     const owning = parsed.data.authorities.filter((item) => item.writable_fields.includes(authority.field));
     assert.equal(owning.length, 1, "exactly one authority may write the activation flag");

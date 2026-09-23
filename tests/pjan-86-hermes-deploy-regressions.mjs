@@ -650,7 +650,8 @@ def loads(_source):
   assert.match(roleContract, /telegram:\n\s+provisioning_status: "deferred"/);
   assert.match(roleContract, /slack:\n\s+provisioning_status: "deferred"/);
   assert.match(roleContract, /reconcile:[\s\S]*?explicit_opt_out:/);
-  assert.match(roleContract, /bloodbank:\n[\s\S]*?\n\s+enabled: false/);
+  // No key means enabled: the projection renders activation on by default.
+  assert.match(roleContract, /bloodbank:\n[\s\S]*?\n\s+enabled: true/);
   assert.match(roleContract, /service_state:\n\s+gateway: "pending"\n\s+heartbeat: "pending"/);
   // A skipped channel still records explicit disabled state. The write moved
   // out of the shell (profile_channel_enabled_set / <channel>_yaml_update are

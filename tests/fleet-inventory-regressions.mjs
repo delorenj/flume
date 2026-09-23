@@ -1321,9 +1321,11 @@ try {
     // The AC3 shape sweep accepts `{value: null, state: "unresolved"}` for every
     // cell, so forcing the activation flag and both Bloodbank cells to null left
     // the suite green while the command reported a fully activated fleet as
-    // default-deny -- which stories 1.3-1.10 would consume as fleet truth.
+    // unresolved -- which stories 1.3-1.10 would consume as fleet truth. No key
+    // means enabled, so an ABSENT flag also resolves (to true); only a present
+    // non-boolean stays unresolved.
     const agents = YAML.parse(readFileSync(REAL_AGENT_REGISTRY, "utf8"))?.agents ?? {};
-    const withActivation = Object.entries(agents).filter(([, row]) => typeof row?.bloodbank?.enabled === "boolean");
+    const withActivation = Object.entries(agents).filter(([, row]) => typeof row?.bloodbank?.enabled === "boolean" || row?.bloodbank?.enabled === undefined);
     const withScope = Object.entries(agents).filter(([, row]) => typeof row?.bloodbank?.gateway_scope === "string");
     if (!withActivation.length || !withScope.length) { skip("the stored activation flag is actually read", "no live agent stores a Bloodbank block"); return; }
 
@@ -1336,7 +1338,7 @@ try {
     assert.equal(resolvedActivation.length, withActivation.length, "every stored boolean activation flag must be read as resolved");
     for (const [id, row] of withActivation) {
       const emitted = data.rows.find((item) => item.agent_id.value === id);
-      assert.equal(emitted.activation.value, row.bloodbank.enabled, `${id} activation must be the STORED value`);
+      assert.equal(emitted.activation.value, row?.bloodbank?.enabled ?? true, `${id} activation must be the STORED value (absent means true)`);
     }
     assert.equal(
       data.rows.filter((row) => row.bloodbank_scope.state === "resolved").length,
