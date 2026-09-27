@@ -77,6 +77,8 @@ export interface ValidationOptions {
   resolveSkills?: boolean;
   /** Override the skillex registry root (e.g. for testing) */
   skillexRoot?: string;
+  /** Override the desk root directory (e.g. for testing) */
+  deskRoot?: string;
   /** Home directory to resolve ~ against */
   home?: string;
 }

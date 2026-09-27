@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import YAML from "yaml";
@@ -28,6 +28,14 @@ export function resolveDeskPath(
   options: DeskProvisionOptions = {},
 ): string {
   const home = options.home ?? homedir();
+  if (
+    options.deskRoot &&
+    (!contract.desk?.path ||
+      contract.desk.path === `~/.agents/workforce/${contract.id}` ||
+      contract.desk.path === join(home, ".agents", "workforce", contract.id))
+  ) {
+    return join(options.deskRoot, contract.id);
+  }
   if (contract.desk?.path) {
     const expanded = expandHome(contract.desk.path, home);
     if (isAbsolute(expanded)) return expanded;
@@ -52,12 +60,15 @@ export async function provisionDesk(
   contractInput: NamedAgentContract | ResolvedNamedAgentContract | string,
   options: DeskProvisionOptions = {},
 ): Promise<DeskProvisionResult> {
+  const shouldResolveSkills = !options.resolvedSkills;
   let resolvedContract: ResolvedNamedAgentContract;
 
   if (typeof contractInput === "string") {
     resolvedContract = await validateNamedAgent(contractInput, {
       skillexRoot: options.skillexRoot,
       home: options.home,
+      deskRoot: options.deskRoot,
+      resolveSkills: shouldResolveSkills,
     });
   } else if ("resolvedSkills" in contractInput && Array.isArray((contractInput as ResolvedNamedAgentContract).resolvedSkills)) {
     resolvedContract = contractInput as ResolvedNamedAgentContract;
@@ -65,6 +76,8 @@ export async function provisionDesk(
     resolvedContract = await validateNamedAgent(contractInput, {
       skillexRoot: options.skillexRoot,
       home: options.home,
+      deskRoot: options.deskRoot,
+      resolveSkills: shouldResolveSkills,
     });
   }
 
@@ -72,19 +85,91 @@ export async function provisionDesk(
   const deskPath = resolveDeskPath(resolvedContract, options);
   const skillsDir = join(deskPath, ".agents", "skills");
 
+  // 1. Pre-validate skill targets before mutating filesystem
+  for (const skill of resolvedSkills) {
+    const skillMd = join(skill.path, "SKILL.md");
+    if (!existsSync(skill.path) || !existsSync(skillMd)) {
+      throw new Error(
+        `Canonical skill "${skill.name}" is missing SKILL.md at ${skill.path}`,
+      );
+    }
+  }
+
+  // 2. Accurate diff inspection in dryRun mode
   if (options.dryRun) {
+    const desiredSkills = new Map<string, string>();
+    for (const skill of resolvedSkills) {
+      desiredSkills.set(skill.name, skill.path);
+    }
+
+    let dryCreated = 0;
+    let dryUpdated = 0;
+    let dryPreserved = 0;
+    let dryRemoved = 0;
+
+    if (existsSync(skillsDir)) {
+      let existingEntries: Dirent[];
+      try {
+        existingEntries = readdirSync(skillsDir, { withFileTypes: true });
+      } catch {
+        existingEntries = [];
+      }
+      const seen = new Set<string>();
+
+      for (const entry of existingEntries) {
+        if (entry.name.startsWith(".")) continue;
+        const entryPath = join(skillsDir, entry.name);
+
+        if (desiredSkills.has(entry.name)) {
+          seen.add(entry.name);
+          const desiredTarget = desiredSkills.get(entry.name)!;
+
+          if (entry.isSymbolicLink()) {
+            let currentTarget = "";
+            try {
+              currentTarget = readlinkSync(entryPath);
+            } catch {
+              // Ignore read error
+            }
+            const resolvedCurrent = isAbsolute(currentTarget)
+              ? resolve(currentTarget)
+              : resolve(skillsDir, currentTarget);
+            const resolvedDesired = resolve(desiredTarget);
+
+            if (resolvedCurrent === resolvedDesired) {
+              dryPreserved++;
+            } else {
+              dryUpdated++;
+            }
+          } else {
+            dryUpdated++;
+          }
+        } else if (entry.isSymbolicLink()) {
+          dryRemoved++;
+        }
+      }
+
+      for (const name of desiredSkills.keys()) {
+        if (!seen.has(name)) {
+          dryCreated++;
+        }
+      }
+    } else {
+      dryCreated = resolvedSkills.length;
+    }
+
     return {
       deskPath,
       skillsDir,
-      created: resolvedSkills.length,
-      updated: 0,
-      preserved: 0,
-      removed: 0,
+      created: dryCreated,
+      updated: dryUpdated,
+      preserved: dryPreserved,
+      removed: dryRemoved,
       skills: resolvedSkills.map((s) => ({ name: s.name, target: s.path })),
     };
   }
 
-  // 1. Create desk root and .agents/skills
+  // 3. Create desk root and .agents/skills
   try {
     mkdirSync(deskPath, { recursive: true });
   } catch (err) {
@@ -101,7 +186,7 @@ export async function provisionDesk(
     );
   }
 
-  // 2. Reconcile symlinks in .agents/skills
+  // 4. Reconcile symlinks in .agents/skills
   const desiredSkills = new Map<string, string>();
   for (const skill of resolvedSkills) {
     desiredSkills.set(skill.name, skill.path);
@@ -113,8 +198,7 @@ export async function provisionDesk(
   let removed = 0;
   const finalSkills: Array<{ name: string; target: string }> = [];
 
-  // Read existing entries in .agents/skills
-  let existingEntries;
+  let existingEntries: Dirent[];
   try {
     existingEntries = readdirSync(skillsDir, { withFileTypes: true });
   } catch (err) {
@@ -199,27 +283,18 @@ export async function provisionDesk(
     }
   }
 
-  // 3. Verify all symlinks point to valid canonical targets with SKILL.md
-  for (const skill of finalSkills) {
-    const skillMd = join(skill.target, "SKILL.md");
-    if (!existsSync(skillMd)) {
-      throw new Error(
-        `Canonical skill "${skill.name}" is missing SKILL.md at ${skill.target}`,
-      );
-    }
-  }
-
-  // 4. Save contract.yaml in desk directory
+  // 5. Save contract.yaml in desk directory without runtime-only fields
   try {
     const contractPath = join(deskPath, "contract.yaml");
-    writeFileSync(contractPath, YAML.stringify(resolvedContract), "utf8");
+    const { resolvedSkills: _, ...cleanContract } = resolvedContract as unknown as { resolvedSkills?: unknown };
+    writeFileSync(contractPath, YAML.stringify(cleanContract), "utf8");
   } catch (err) {
     throw new Error(
       `Filesystem error writing contract.yaml at "${deskPath}": ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
-  // 5. Log reconciliation counts
+  // 6. Log reconciliation counts
   console.log(
     `[workforce] Desk provisioned at ${deskPath}: ${created} created, ${updated} updated, ${preserved} preserved, ${removed} removed`,
   );

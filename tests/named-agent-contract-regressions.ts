@@ -443,7 +443,137 @@ memory:
 
   // Restore permissions so cleanup works
   chmodSync(readOnlyParent, 0o777);
-  console.log("  ok: filesystem creation error reported on permission denied");
+  // ==========================================================================
+  // Test 9: Persisted contract.yaml Schema Validity
+  // ==========================================================================
+  const persistedRaw = readFileSync(join(expectedDeskPath, "contract.yaml"), "utf8");
+  const persistedParsed = parseNamedAgentYaml(persistedRaw);
+  assert.equal(
+    (persistedParsed as any).resolvedSkills,
+    undefined,
+    "Persisted contract.yaml must omit resolvedSkills",
+  );
+  // Must pass validateNamedAgentSchema without error
+  const validatedPersisted = validateNamedAgentSchema(persistedParsed);
+  assert.equal(validatedPersisted.id, "n8n-specialist");
+  console.log("  ok: persisted contract.yaml parses and passes schema validation");
+
+  // ==========================================================================
+  // Test 10: options.deskRoot Isolation Override
+  // ==========================================================================
+  const isolatedDeskRoot = join(work, "isolated-desks");
+  const isolatedResult = await provisionDesk(noDeskYaml, {
+    deskRoot: isolatedDeskRoot,
+    skillexRoot,
+    home: fixtureHome,
+  });
+  const expectedIsolatedDesk = join(isolatedDeskRoot, "n8n-specialist");
+  assert.equal(isolatedResult.deskPath, expectedIsolatedDesk);
+  assert.ok(existsSync(join(expectedIsolatedDesk, ".agents", "skills", "n8n-workflow-design")));
+  console.log("  ok: options.deskRoot overrides desk location when desk is omitted");
+
+  // ==========================================================================
+  // Test 11: Accurate dryRun Diff Counting
+  // ==========================================================================
+  // 11a. dryRun on new desk
+  const dryNewRoot = join(work, "dry-run-new");
+  const dryNew = await provisionDesk(validYaml, {
+    deskRoot: dryNewRoot,
+    skillexRoot,
+    home: fixtureHome,
+    dryRun: true,
+  });
+  assert.equal(dryNew.created, 2);
+  assert.equal(dryNew.preserved, 0);
+  assert.equal(dryNew.updated, 0);
+  assert.equal(dryNew.removed, 0);
+  assert.ok(!existsSync(dryNewRoot), "dryRun must not create directories");
+
+  // 11b. dryRun on existing unchanged desk
+  const dryExisting = await provisionDesk(updatedYaml, {
+    skillexRoot,
+    home: fixtureHome,
+    dryRun: true,
+  });
+  assert.equal(dryExisting.created, 0);
+  assert.equal(dryExisting.preserved, 2);
+  assert.equal(dryExisting.updated, 0);
+  assert.equal(dryExisting.removed, 0);
+
+  // 11c. dryRun on existing desk with diffs (switching back to pack 1)
+  const dryDiff = await provisionDesk(validYaml, {
+    skillexRoot,
+    home: fixtureHome,
+    dryRun: true,
+  });
+  assert.equal(dryDiff.created, 1, "dryRun reports 1 to create (n8n-node-builder)");
+  assert.equal(dryDiff.preserved, 1, "dryRun reports 1 to preserve (n8n-workflow-design)");
+  assert.equal(dryDiff.removed, 1, "dryRun reports 1 to remove (n8n-community-nodes)");
+  // Ensure dryRun did not mutate the existing directory
+  assert.ok(existsSync(join(skillsDir, "n8n-community-nodes")), "dryRun must not mutate filesystem");
+  assert.ok(!existsSync(join(skillsDir, "n8n-node-builder")), "dryRun must not mutate filesystem");
+  console.log("  ok: dryRun accurately reports created, preserved, and removed diff counts");
+
+  // ==========================================================================
+  // Test 12: options.resolvedSkills Bypasses Catalog Resolution
+  // ==========================================================================
+  const explicitSkills = [
+    { name: "n8n-workflow-design", path: join(skillexRoot, "all-skills", "n8n-workflow-design") },
+  ];
+  const explicitResult = await provisionDesk(
+    {
+      schema_version: 1,
+      id: "explicit-agent",
+      display_name: "Explicit Agent",
+      role: "test-role",
+      charter: { purpose: "Test explicit skills" },
+      skills: { pack: "non-existent-pack-in-catalog" },
+      memory: { write_bank: "agent-explicit" },
+    },
+    {
+      deskRoot: join(work, "explicit-desk"),
+      resolvedSkills: explicitSkills,
+      home: fixtureHome,
+    },
+  );
+  assert.equal(explicitResult.created, 1);
+  assert.ok(existsSync(join(explicitResult.skillsDir, "n8n-workflow-design")));
+  console.log("  ok: options.resolvedSkills bypasses catalog pack resolution");
+
+  // ==========================================================================
+  // Test 13: Fail-Fast Validation Before Filesystem Mutation
+  // ==========================================================================
+  const failFastRoot = join(work, "fail-fast-desk");
+  const invalidSkills = [
+    { name: "missing-skill", path: join(skillexRoot, "all-skills", "non-existent-path") },
+  ];
+  await assert.rejects(
+    async () => {
+      await provisionDesk(
+        {
+          schema_version: 1,
+          id: "fail-fast-agent",
+          display_name: "Fail Fast",
+          role: "test-role",
+          charter: { purpose: "Test fail fast" },
+          skills: { pack: "dummy" },
+          memory: { write_bank: "agent-fail-fast" },
+        },
+        {
+          deskRoot: failFastRoot,
+          resolvedSkills: invalidSkills,
+          home: fixtureHome,
+        },
+      );
+    },
+    (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /Canonical skill "missing-skill" is missing SKILL\.md/);
+      return true;
+    },
+  );
+  assert.ok(!existsSync(failFastRoot), "Must not create desk directory on validation failure");
+  console.log("  ok: pre-validation fails fast before mutating filesystem");
 
   console.log("named-agent-contract regressions: all assertions passed");
 } finally {

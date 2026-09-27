@@ -198,8 +198,8 @@ export async function validateNamedAgent(
 ): Promise<ResolvedNamedAgentContract> {
   const contract = validateNamedAgentSchema(input);
 
-  // Resolve default desk path if omitted
-  const deskPath = contract.desk?.path ?? `~/.agents/workforce/${contract.id}`;
+  // Resolve desk path: prioritize options.deskRoot when contract omits desk
+  const deskPath = contract.desk?.path ?? (options.deskRoot ? join(options.deskRoot, contract.id) : `~/.agents/workforce/${contract.id}`);
 
   let resolvedSkills: ResolvedSkill[] = [];
   if (options.resolveSkills !== false) {

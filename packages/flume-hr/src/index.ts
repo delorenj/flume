@@ -8,7 +8,7 @@
  * project.
  */
 
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 
@@ -272,13 +272,21 @@ program
 
 // ============================================================================
 
+const thisFile = resolve(fileURLToPath(import.meta.url));
+const thisDir = dirname(thisFile);
+const pkgRoot = resolve(thisDir, "..");
+const validEntries = new Set([
+  thisFile,
+  resolve(pkgRoot, "dist", "index.js"),
+  resolve(pkgRoot, "src", "index.ts"),
+]);
+const arg1 = process.argv[1] ? resolve(process.argv[1]) : "";
+const arg1Base = arg1 ? basename(arg1) : "";
 const isCliEntry = Boolean(
-  process.argv[1] && (
-    resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url)) ||
-    process.argv[1].endsWith("flume") ||
-    process.argv[1].endsWith("fl") ||
-    resolve(process.argv[1]).endsWith("dist/index.js") ||
-    resolve(process.argv[1]).endsWith("src/index.ts")
+  arg1 && (
+    validEntries.has(arg1) ||
+    arg1Base === "flume" ||
+    arg1Base === "fl"
   )
 );
 
