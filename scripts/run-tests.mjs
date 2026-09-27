@@ -61,6 +61,7 @@ const SUITES = [
   "tests/fleet-scaffold-regressions.mjs",
   "tests/soul-project-bank-regressions.mjs",
   "tests/named-agent-regressions.mjs",
+  "tests/named-agent-contract-regressions.ts",
   "tests/fleet-profile-regressions.mjs",
   "tests/fleet-systemd-regressions.mjs",
   "tests/pjan-86-hermes-deploy-regressions.mjs",
@@ -76,7 +77,7 @@ const skipBuild = args.includes("--no-build");
 const selects = (name) => filters.length === 0 || filters.some((f) => name.includes(f));
 
 const steps = SUITES.filter((script) => selects(script)).map((script) => ({
-  name: script.replace(/^tests\//, "").replace(/\.mjs$/, ""),
+  name: script.replace(/^tests\//, "").replace(/\.(mjs|ts)$/, ""),
   script,
   kind: "suite",
 }));

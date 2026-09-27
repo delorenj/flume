@@ -8,9 +8,14 @@
  * project.
  */
 
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
 
 import { guardBrokenPipe, writeStdout, exitAfterFlush } from "./utils/stdout";
+
+// Workforce portable named agents API
+export * from "./workforce/index";
 
 import { registerOrgCli, isOrgJsonInvocation, orgParserFailureEnvelope } from "./org/cli";
 import { fleetEnvelopeExitCode, renderFleetJson } from "./org/output";
@@ -267,22 +272,34 @@ program
 
 // ============================================================================
 
-try {
-  await program.parseAsync(process.argv);
-} catch (error) {
-  if (error instanceof CommanderError
-      && (error.code === "commander.helpDisplayed" || error.code === "commander.version")) {
-    process.exitCode = error.exitCode;
-  } else if (isOrgJsonInvocation(commandArgs)) {
-    // A caller that asked for --json gets JSON even when Commander is the one
-    // refusing. Without this the org commands answered a rejected argument list
-    // with zero bytes and exit 1 -- outside their own exit taxonomy.
-    const envelope = orgParserFailureEnvelope(commandArgs);
-    process.stdout.write(renderFleetJson(envelope));
-    process.exitCode = fleetEnvelopeExitCode(envelope);
-  } else if (error instanceof CommanderError) {
-    process.exitCode = error.exitCode;
-  } else {
-    throw error;
+const isCliEntry = Boolean(
+  process.argv[1] && (
+    resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url)) ||
+    process.argv[1].endsWith("flume") ||
+    process.argv[1].endsWith("fl") ||
+    resolve(process.argv[1]).endsWith("dist/index.js") ||
+    resolve(process.argv[1]).endsWith("src/index.ts")
+  )
+);
+
+if (isCliEntry) {
+  try {
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    if (error instanceof CommanderError
+        && (error.code === "commander.helpDisplayed" || error.code === "commander.version")) {
+      process.exitCode = error.exitCode;
+    } else if (isOrgJsonInvocation(commandArgs)) {
+      // A caller that asked for --json gets JSON even when Commander is the one
+      // refusing. Without this the org commands answered a rejected argument list
+      // with zero bytes and exit 1 -- outside their own exit taxonomy.
+      const envelope = orgParserFailureEnvelope(commandArgs);
+      process.stdout.write(renderFleetJson(envelope));
+      process.exitCode = fleetEnvelopeExitCode(envelope);
+    } else if (error instanceof CommanderError) {
+      process.exitCode = error.exitCode;
+    } else {
+      throw error;
+    }
   }
 }
