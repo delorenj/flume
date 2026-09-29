@@ -5,7 +5,7 @@
 //
 // Bundles the composer from source with esbuild (no dist entry exports it).
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,14 +16,19 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const work = mkdtempSync(join(tmpdir(), "flume-soul-bank-"));
 try {
   const entry = join(work, "entry.ts");
-  writeFileSync(entry, `export { composeSoul, projectBankFor } from ${JSON.stringify(join(root, "packages/flume-hr/src/parity/rules.ts"))};\n`);
+  writeFileSync(entry, `export { composeSoul, projectBankFor, soulIsReplaceable } from ${JSON.stringify(join(root, "packages/flume-hr/src/parity/rules.ts"))};\n`);
   // Emit inside node_modules so the external packages (yaml, skillex) resolve.
   const cache = join(root, "node_modules/.cache/flume-soul-bank");
   mkdirSync(cache, { recursive: true });
   const out = join(cache, `bundle-${process.pid}.mjs`);
   buildSync({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", packages: "external", outfile: out, logLevel: "silent",
     nodePaths: [join(root, "node_modules"), join(root, "packages/flume-hr/node_modules")] });
-  const { composeSoul, projectBankFor } = await import(pathToFileURL(out).href);
+  const { composeSoul, projectBankFor, soulIsReplaceable } = await import(pathToFileURL(out).href);
+
+  // A fresh hire must replace Copier's identity stub with the PM charter.
+  const placeholder = readFileSync(join(root, "templates/hermes-agent/template/SOUL.md.jinja"), "utf8");
+  assert.equal(soulIsReplaceable(placeholder), true, "Copier's SOUL placeholder must be composed during hiring");
+  assert.equal(soulIsReplaceable("# My PM\n\nOperator-authored instructions.\n"), false, "an authored soul must remain protected");
 
   const git = (cwd, ...args) => {
     const run = spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });

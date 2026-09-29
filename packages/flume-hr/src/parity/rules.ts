@@ -876,13 +876,15 @@ const SOUL_RENDERED_SPINE = ["## Identity", "## Tone", "## Role-specific behavio
  *
  * So the composer refuses, exactly as the scaffold migration refuses to
  * overwrite a locally-modified script: a soul is replaceable only when it says
- * this composer wrote it, or when it still carries the three headings every
+ * this composer wrote it, when it is Copier's explicitly marked placeholder,
+ * or when it still carries the three headings every
  * generation of the three renderers emitted. Anything else is somebody's work,
  * and it is reported by name rather than repaired.
  */
 export function soulIsReplaceable(deployed: string | null): boolean {
   if (deployed === null || deployed.trim() === "") return true;
   if (deployed.includes(SOUL_COMPOSED_MARKER)) return true;
+  if (deployed.includes("<!-- FLUME SOUL PLACEHOLDER -- not the agent's soul.")) return true;
   const headings = new Set(deployed.split("\n").map((line) => line.trimEnd()));
   return SOUL_RENDERED_SPINE.every((heading) => headings.has(heading));
 }

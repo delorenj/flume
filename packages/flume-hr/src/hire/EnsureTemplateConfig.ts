@@ -115,6 +115,7 @@ function hostSchema(): ConfigSchema {
         ["workspace", quote("33god")],
       ],
     },
+    { section: "hindsight", values: [["agent_bank_template", quote("")]] },
   ];
 }
 
