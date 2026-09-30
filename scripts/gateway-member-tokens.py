@@ -6,7 +6,7 @@ Policy: all agent inference goes through api.automaticai.io (skills
 The fleet base (~/.hermes/config.yaml) maps AUTOMATICAI_GATEWAY_KEY to the FLEET token
 (`hermes-fleet-workers`), so a desk with no override of its own inherits it. This script
 adds per-member tracking: for each fleet member it mints a consumer token named
-`hermes-<profile>` (scoped to the routes in --models) and overrides that one variable in
+`hermes-<profile>` (shortened with a hash when the profile name is long) (scoped to the routes in --models) and overrides that one variable in
 the member's config.delta.yaml with its own `op://` reference.
 
 Only references are ever written. Token values are never read into this process's output.
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import re
 import subprocess
 import sys
@@ -45,6 +46,22 @@ COMMENT = (
     "# Per-member AutomaticAI gateway token (tracking). Overrides the fleet token the base maps\n"
     f"# to {ENV_NAME}; delete this line to fall back to the fleet key. Reference only.\n"
 )
+
+
+# The gateway names a token `aai:<consumer>:<19-digit id>` and refuses names over 50 characters
+# (POST /api/token/ answers "gateway refused operation"), so a consumer name may not exceed
+# 26 characters even though gateway-tokens.py itself allows 40.
+MAX_CONSUMER = 26
+
+
+def consumer_name(profile: str) -> str:
+    """`hermes-<profile>`, shortened deterministically (with a hash suffix) when too long."""
+    name = f"hermes-{profile}"
+    if len(name) <= MAX_CONSUMER:
+        return name
+    digest = hashlib.sha1(profile.encode()).hexdigest()[:4]
+    keep = MAX_CONSUMER - len("hermes-") - 1 - len(digest)
+    return f"hermes-{profile[:keep].rstrip('-_')}-{digest}"
 
 
 def members() -> list[str]:
@@ -170,7 +187,7 @@ def main() -> int:
     todo = [m.strip() for m in args.members.split(",")] if args.members else members()
     failures = 0
     for profile in todo:
-        consumer = f"hermes-{profile}"
+        consumer = consumer_name(profile)
         delta = HERMES / "profiles" / profile / "config.delta.yaml"
         if not delta.exists():
             print(f"{profile:28s} SKIP no config.delta.yaml (not under inheritance)")

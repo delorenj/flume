@@ -477,9 +477,20 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
     show it). The fleet Bloodbank gateway hydrates each target profile's secrets once
     per process, so a token changed in a delta needs that gateway restarted, as does
     the desk's own Telegram/Slack gateway.
-  - **The gateway's login is rate-limited** (about 20 per 20 minutes; `gateway-tokens.py`
-    logs in on every call). 26 mints span two windows. A 429, and a burst of 409s
-    right after a success, are transient: wait, don't fail.
+  - **The gateway's login is the bottleneck for minting tokens.** `gateway-tokens.py`
+    logs in as `delo-relay` on every call and never logs out, which hits three limits:
+    a fixed-window login limiter (429, roughly 20 per 20 minutes, so 26 mints span two
+    or three windows: the script waits them out), a cap of **50 active sessions** (409
+    `AUTH_SESSION_LIMIT`; sessions live 30 days and each call leaks one), and a token
+    name limit (`aai:<consumer>:<19 digits>` over 50 characters is refused with "gateway
+    refused operation", so a consumer name may not exceed 26 characters; the script
+    shortens long profile names with a hash). When the cap is hit, revoke the idle leaked
+    sessions with exactly what the application writes: `update user_sessions set
+    status='revoked', revoked_at=<now>, revoked_reason='gateway_ops_leaked_session'` for
+    `delo-relay`, active and idle for ten minutes or more, in one transaction (the API only
+    lets a user revoke their own sessions, and the admin paths reset passwords or demote).
+    API-key traffic does not depend on login sessions and is unaffected. Do it after a
+    mint batch, not during one.
   - **Prove it from the gateway ledger, not the config:**
     `docker exec newapi-postgres psql -U newapi -d newapi`, table `logs`,
     `token_name like 'aai:hermes-<profile>:%'`; `other::json` carries
