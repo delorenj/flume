@@ -497,9 +497,33 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
     `automaticai_account`, `upstream_model_name`, `automaticai_requested_effort` and
     `automaticai_effort_defaulted`. Expect `kimi-personal`, `kimi-for-coding`, `high`,
     `defaulted=false`, quota 0 (subscription), and the member's own consumer name.
-  Still direct on every desk: the primary model, both fallbacks and about sixteen
-  `auxiliary.*` selectors (mostly paid OpenRouter); see the plan for the decision.
-  Measure worker speed as `assistant`-to-`assistant` gaps in the worker's session
+  - **The primary model and the fallback chain go through the gateway too (2026-09-30).**
+    One ordered list: `model:` is entry 1 (`provider: automaticai`), `fallback_providers`
+    the rest. The owner's order: `sol-6.1`, `claude-sonnet-5.5` (personal, pending
+    DELO-8), `glm-5.3`, `claude-sonnet-5.5` (Intelliforia, pending DELO-8), `kimi-2.8`
+    LAST. Live today: `sol-6.1`, `glm-5.3`, `kimi-2.8`. Facts that shaped it:
+    - **Kimi's weekly limit exhausts all three Kimi routes at once** (HTTP 403, one
+      `kimi-personal` account; recurring since 09-09) and every PM primary was direct
+      Kimi, so every Bloodbank turn failed. Until then the fleet had NO working
+      fallback (`openai-codex` was `relogin_required`, no OpenRouter key reached the
+      gateway process), which is why it never fired.
+    - **Hermes calls a 403 "non-retryable" but still tries the fallback.** Proved live:
+      primary `kimi-2.8` 403, then `Fallback activated: kimi-2.8 -> glm-5.3` in
+      `agent.log`, and both rows in the gateway ledger under the desk's own consumer.
+      To prove a change, force one desk's primary onto a route that is 403 right now.
+    - **Under the multiplexed Bloodbank gateway the chain comes from the GATEWAY
+      PROCESS's own `config.yaml`** (`gateway/run.py` `_refresh_fallback_model` reads the
+      process-level `_hermes_home`), not from the target desk's. After a base chain change
+      re-render `fleet-bloodbank-gateway`; a per-desk chain override only reaches that
+      desk's OWN gateway, not Bloodbank turns. The primary `model:` IS read per target desk.
+    - **Effort differs by path.** Provider `extra_body.reasoning_effort` is not sent on
+      the fallback path (ledger `automaticai_effort_defaulted=true`: the route default
+      applies, `glm-5.3` = max), and `agent.reasoning_effort: max` in the base applies to
+      every main agent, so a PM on `sol-6.1` thinks at max.
+    - **Every route must exist in the gateway catalog** (`ops/routes.json`); an unknown name
+      answers 400 and, in a fallback, stays silent until the fallback is needed.
+  Still direct: `auxiliary.*` tasks, MoA, and any desk whose delta pins its own primary
+  (`james-brennan-pm`: `openai-codex`). Measure worker speed as `assistant`-to-`assistant` gaps in the worker's session
   (`sessions.parent_session_id` = the PM's session) before promising a task will finish.
 
 ## Named agents (posts vs. people)
