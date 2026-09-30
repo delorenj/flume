@@ -91,7 +91,7 @@ const BASE_CONFIG = {
   // Three entries so a delta can drop some without dropping all of them.
   plugins: { enabled: ["tts/vox", "telegram-platform", "openai-codex"] },
   // An OBJECT-valued list, the shape real deltas carry for providers.
-  fallback_providers: [{ provider: "openai-codex", model: "gpt-5.6-sol" }],
+  fallback_providers: [{ model: "automaticai/personal/kimi-2.8", provider: "automaticai" }],
   // What a Bloodbank-dispatched PM turn gets. Without it Hermes resolves the
   // platform to a nonexistent "hermes-bloodbank" toolset (MCP tools only).
   platform_toolsets: {
@@ -242,6 +242,11 @@ const { repo } = makeRepo();
 // 5. A healthy fleet base reports none of the above — guards against a rule
 //    that "passes" by matching everything.
 {
+  const out = audit(repo, makeFleet({ overrides: { fallback_providers: [{ provider: "openai-codex", model: "gpt-5.6-sol" }] } }));
+  assert.match(out, /fallback_providers entry openai-codex\/gpt-5\.6-sol leaves AutomaticAI: a failed route must preserve its account and fail rather than switch providers/,
+    "a direct fallback chain must be reported as a gateway bypass");
+}
+{
   const out = audit(repo, makeFleet({}));
   for (const pattern of [/tts\.provider is/, /no hooks: block/, /disabled_toolsets contains/, /external_dirs is empty/]) {
     assert.doesNotMatch(out, pattern, `healthy fleet base must not trip ${pattern}`);
@@ -310,7 +315,7 @@ const { repo } = makeRepo();
 //     a false positive in exactly the place the rule is most likely believed.
 {
   const out = audit(repo, makeFleet({
-    delta: { fallback_providers: [{ model: "gpt-5.6-sol", provider: "openai-codex" }] },
+    delta: { fallback_providers: [{ provider: "automaticai", model: "automaticai/personal/kimi-2.8" }] },
   }));
   assert.doesNotMatch(out, /fallback_providers drops/,
     "entry identity must ignore object key order");

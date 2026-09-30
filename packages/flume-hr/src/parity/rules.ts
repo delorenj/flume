@@ -2924,6 +2924,13 @@ return [
         if (!String(d.model ?? "").startsWith("automaticai/")) problems.push(`delegation.model is "${d.model ?? ""}", not a canonical automaticai/<account>/<model> route`);
         if (!blank(d.base_url)) problems.push(`delegation.base_url is set ("${d.base_url}"): it overrides the provider, and with no api_key the child inherits the PARENT's key`);
         if (!blank(d.api_key)) problems.push(`delegation.api_key is set: a literal or \${VAR} here reads plain os.environ, which never holds a desk's own key in the multiplexed gateway; use providers.${GATEWAY_PROVIDER}.key_env`);
+        const fallbacks = Array.isArray(cfg?.fallback_providers) ? cfg.fallback_providers : [];
+        const routingModels = new Set<string>(Array.isArray(provider?.models) ? provider.models.map(String) : []);
+        for (const fallback of fallbacks) {
+          if (fallback?.provider !== GATEWAY_PROVIDER || !routingModels.has(String(fallback?.model ?? ""))) {
+            problems.push(`fallback_providers entry ${fallback?.provider ?? ""}/${fallback?.model ?? ""} leaves AutomaticAI: a failed route must preserve its account and fail rather than switch providers`);
+          }
+        }
         const mapped = keyEnv ? cfg?.secrets?.onepassword?.env?.[String(keyEnv)] : undefined;
         if (!blank(keyEnv) && blank(mapped)) problems.push(`secrets.onepassword.env maps no ${keyEnv}, so the gateway key is never injected`);
         else if (!blank(mapped) && !isOpRef(mapped)) problems.push(`secrets.onepassword.env.${keyEnv} is not an op:// reference (a raw key must never be written to config)`);
