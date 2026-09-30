@@ -439,13 +439,44 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   ticket In Progress without a worker (the prompt's rule is prose only).
   `max_inflight: 4` is a fleet-wide cap and a worker holds a slot for its whole
   run. `agent.gateway_timeout: 1800` caps one turn at 30 minutes, so a delegation
-  that needs longer is cut regardless of the tool deadline. **Worker speed is the
-  practical limit:** workers run on `delegation.model` (`deepseek/deepseek-v4-flash`
-  via OpenRouter), measured at a median 41 s and mean 94 s per call (max 319 s)
-  against 12 s for a PM's own model, so a task that needs tens of steps does not fit
-  in one turn. Measure `assistant`-to-`assistant` gaps in the worker's session
-  (`sessions.parent_session_id` = the PM's session) before promising a task will
-  finish.
+  that needs longer is cut regardless of the tool deadline.
+- **Workers go through the AutomaticAI gateway, not a direct provider.** Policy: all
+  agent inference uses `api.automaticai.io` (skills `automaticai-provider-gateway`
+  and `automaticai-provider-gateway-lazy-migration-strategy`). A worker's model is
+  `delegation.*`, and the stock value was `deepseek/deepseek-v4-flash` via paid
+  OpenRouter: median 41 s per call, max 319 s, so a reconcile-sized task took ~36
+  min and outlived its turn. Now (staged on `flume-pm`): `model:
+  automaticai/personal/kimi-2.8`, `base_url: https://api.automaticai.io/v1`,
+  `api_mode: chat_completions`, `reasoning_effort: high`, `provider: ''`,
+  `api_key: ${AUTOMATICAI_GATEWAY_KEY}`; the same task took ~4 min. Traps:
+  - **`delegation.api_key` is mandatory.** With `base_url` set and no `api_key`,
+    Hermes has the child inherit the PARENT's key, so a desk's direct Kimi key would
+    be sent to the gateway.
+  - **`${VAR}` needs the variable in the process.** An unset variable stays a literal
+    `${...}` string and the gateway answers 401. Secrets from
+    `secrets.onepassword.env` are applied at process START, so map
+    `AUTOMATICAI_GATEWAY_KEY` (an `op://` reference, never a value) in the delta of
+    **every process that runs the desk**: the desk's own gateway AND
+    `fleet-bloodbank-gateway` (it runs all Bloodbank turns), then restart both.
+    `/proc/<pid>/environ` will not show it (injection is in-process); the startup
+    line `1Password: applied N secrets` in `logs/gateway.systemd.log` should rise by one.
+  - **Do not flip the fleet base at once.** Delegation is used on Telegram, Slack,
+    CLI and cron paths; any gateway not yet restarted would send the literal
+    placeholder. Stage per desk, then promote with rolling restarts.
+  - **Use `automaticai/personal/kimi-2.8` at `high`,** not the default: the alias
+    defaults to `max`, which spent a whole 600-token budget thinking. It is the same
+    `kimi-for-coding` the PMs run. Mint the token per consumer with
+    `python3 ops/gateway-tokens.py mint <name> --models <routes>` in
+    `~/docker/stacks/ai/newapi` (name used: `hermes-fleet-workers`).
+  - **Prove it from the gateway ledger, not the config:**
+    `docker exec newapi-postgres psql -U newapi -d newapi` on `logs` filtered by
+    `token_name like 'aai:hermes-fleet-workers%'`; `other::json` carries
+    `automaticai_account`, `upstream_model_name` and `automaticai_effective_effort`
+    (expect `kimi-personal`, `kimi-for-coding`, `high`, quota 0 = subscription).
+  Still direct on every desk: the primary model, both fallbacks and about sixteen
+  `auxiliary.*` selectors (mostly paid OpenRouter); see the plan for the decision.
+  Measure worker speed as `assistant`-to-`assistant` gaps in the worker's session
+  (`sessions.parent_session_id` = the PM's session) before promising a task will finish.
 
 ## Named agents (posts vs. people)
 
