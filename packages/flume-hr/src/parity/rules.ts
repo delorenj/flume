@@ -1600,6 +1600,25 @@ function fleetHome(ctx: Context): string {
 const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
 // The power a non-PM employee must NOT gain on an unattended turn.
 const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
+// A PM blocks inside delegate_task until its worker returns, and Hermes bounds
+// every tool call by timeouts.tools.{sequential_call,concurrent_batch}
+// (stock 420 s, 0 disables). A real delegation outlasts that: the call errors,
+// the worker keeps running detached, and the PM -- seeing the worker alive --
+// claims the ticket and ends its turn, so the lease lapses while work goes on.
+// Found on FLUME-25 (2026-09-30). 1800 matches agent.gateway_timeout.
+const BLOODBANK_MIN_TOOL_DEADLINE_S = 900;
+const BLOODBANK_TOOL_DEADLINE_KEYS = ["sequential_call", "concurrent_batch"] as const;
+
+/** Why a config's tool deadline cannot carry a delegation, or null when it can. */
+function toolDeadlineProblem(cfg: any): string | null {
+  const bad: string[] = [];
+  for (const key of BLOODBANK_TOOL_DEADLINE_KEYS) {
+    const raw = cfg?.timeouts?.tools?.[key];
+    if (typeof raw !== "number") bad.push(`${key} is unset (stock 420 s)`);
+    else if (raw > 0 && raw < BLOODBANK_MIN_TOOL_DEADLINE_S) bad.push(`${key} is ${raw} s`);
+  }
+  return bad.length ? `timeouts.tools: ${bad.join(", ")}; a delegation longer than that errors out while its worker keeps running detached, and the PM claims the ticket and ends its turn (want >= ${BLOODBANK_MIN_TOOL_DEADLINE_S}, set 1800 = agent.gateway_timeout, or 0 to disable)` : null;
+}
 
 
 function fleetBinPath(ctx: Context): string {
@@ -2754,6 +2773,8 @@ return [
           details.push(`fleet base platform_toolsets.bloodbank is missing ${missing.join(", ")} -- a PM on a Bloodbank turn cannot delegate a worker without them: ${basePath}`);
         }
       }
+      const baseDeadline = toolDeadlineProblem(base);
+      if (baseDeadline) details.push(`fleet base ${baseDeadline}: ${basePath}`);
 
       const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
       for (const [agentId, raw] of Object.entries(registry ?? {})) {
@@ -2784,6 +2805,8 @@ return [
             const missing = BLOODBANK_PM_TOOLSETS.filter((t) => !list.includes(t));
             if (missing.length) details.push(`${agentId}: platform_toolsets.bloodbank is missing ${missing.join(", ")}; re-render or fix its delta: hermes-profile-config.py render --profile ${profile}`);
           }
+          const deadline = toolDeadlineProblem(cfg);
+          if (deadline) details.push(`${agentId}: ${deadline}; re-render: hermes-profile-config.py render --profile ${profile}`);
         } else if (list !== null) {
           const power = BLOODBANK_POWER_TOOLSETS.filter((t) => list.includes(t));
           if (power.length) {

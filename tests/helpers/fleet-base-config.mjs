@@ -44,6 +44,8 @@ export function fleetBaseConfig(homeDir) {
     platform_toolsets: {
       bloodbank: ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"],
     },
+    // Stock tool deadline is 420 s; a delegation blocks its PM for longer.
+    timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
   };
 }
 

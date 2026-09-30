@@ -272,7 +272,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `systemd.sentinel` | host | gateway unit installed and matching each role's declared `service_state` |
   | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection, generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
   | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher, `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
-  | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills; every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
+  | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills and `timeouts.tools.{sequential_call,concurrent_batch}` is ≥ 900 s (or 0); every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
@@ -391,6 +391,17 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   todo, session_search, terminal, file, web`. Deliberately absent: `clarify` (no
   human is present), `cronjob`, `kanban`, `code_execution`, `browser`.
   `hermes.bloodbank-toolsets` asserts it.
+- **The tool deadline must outlast a delegation.** Hermes cuts every tool call at
+  `timeouts.tools.sequential_call` / `concurrent_batch` (stock **420 s**, `0`
+  disables, no per-tool key). A PM blocks inside `delegate_task` until its worker
+  returns, so a real worker outlasts 420 s: the call errors with `timed out after
+  420.0s`, **the worker keeps running detached**, and the PM, finding it still
+  alive, claims the ticket In Progress and ends its turn. `invocation.completed`
+  then fires while the work continues and nothing is left holding the lease. The
+  fleet base sets both to `1800` (= `agent.gateway_timeout`). It is generic, not
+  per tool, so it applies to every platform. A trivial worker finishes under 420 s
+  and hides the bug: prove dispatch with a worker that takes longer than seven
+  minutes.
 - **Delegation is synchronous here.** The adapter declares
   `supports_async_delivery = False`, so `delegate_task` runs inline: the PM's
   turn blocks until the worker returns and `invocation.completed` fires when the
@@ -427,7 +438,8 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
 - **Known gaps.** Nothing structural stops a delegation turn from claiming a
   ticket In Progress without a worker (the prompt's rule is prose only).
   `max_inflight: 4` is a fleet-wide cap and a worker holds a slot for its whole
-  run. `agent.gateway_timeout: 1800` caps one turn at 30 minutes.
+  run. `agent.gateway_timeout: 1800` caps one turn at 30 minutes, so a delegation
+  that needs longer is cut regardless of the tool deadline.
 
 ## Named agents (posts vs. people)
 

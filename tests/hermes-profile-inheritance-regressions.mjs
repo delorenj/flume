@@ -85,6 +85,9 @@ const BASE_CONFIG = {
   platform_toolsets: {
     bloodbank: ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"],
   },
+  // Hermes bounds every tool call (stock 420 s). A PM blocks in delegate_task until
+  // its worker returns, so the stock bound cuts a real delegation short.
+  timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
 };
 
 function yamlDump(obj) {
@@ -366,6 +369,39 @@ const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodba
   addProfile(fleet, "pinned", withBloodbank([]));
   writeRegistry(fleet, { pinned: { ...routable("director"), profile_name: "pinned" } });
   assert.doesNotMatch(audit(repo, fleet), /pinned \(role/, "a restricted employee pinned to no toolsets must not be reported");
+}
+
+// 17. The tool deadline. A PM blocks inside delegate_task until its worker
+//     returns, and Hermes cuts any tool call at 420 s by default. FLUME-25's real
+//     worker outlasted it: the call errored, the worker kept running detached, and
+//     the PM -- seeing it alive -- claimed the ticket and ended its turn.
+{
+  const out = audit(repo, makeFleet({ overrides: { timeouts: null } }));
+  assert.match(out, /fleet base timeouts\.tools: sequential_call is unset \(stock 420 s\), concurrent_batch is unset/,
+    "a base with no tool deadline must be reported with both keys");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { timeouts: { tools: { sequential_call: 420, concurrent_batch: 1800 } } } }));
+  assert.match(out, /sequential_call is 420 s/, "a stock-length deadline must be reported with its value");
+  assert.doesNotMatch(out, /concurrent_batch is/, "only the key that is too short is named");
+}
+{
+  // 0 disables the bound, which carries a delegation fine.
+  const out = audit(repo, makeFleet({ overrides: { timeouts: { tools: { sequential_call: 0, concurrent_batch: 0 } } } }));
+  assert.doesNotMatch(out, /timeouts\.tools/, "a disabled deadline must not be reported");
+}
+{
+  const out = audit(repo, makeFleet({}));
+  assert.doesNotMatch(out, /timeouts\.tools/, "a healthy base must not trip the deadline check");
+}
+{
+  // The base can be right while a desk was rendered before the deadline existed.
+  const fleet = makeFleet({});
+  addProfile(fleet, "slow-pm", { ...withBloodbank(PM_LIST), timeouts: undefined });
+  writeRegistry(fleet, { "slow-pm": { ...routable("pm"), profile_name: "slow-pm" } });
+  const out = audit(repo, fleet);
+  assert.match(out, /slow-pm: timeouts\.tools: sequential_call is unset/, "a stale routable PM must be reported by name");
+  assert.match(out, /render --profile slow-pm/, "the report must give the exact re-render command");
 }
 
 for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });
