@@ -439,7 +439,13 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   ticket In Progress without a worker (the prompt's rule is prose only).
   `max_inflight: 4` is a fleet-wide cap and a worker holds a slot for its whole
   run. `agent.gateway_timeout: 1800` caps one turn at 30 minutes, so a delegation
-  that needs longer is cut regardless of the tool deadline.
+  that needs longer is cut regardless of the tool deadline. **Worker speed is the
+  practical limit:** workers run on `delegation.model` (`deepseek/deepseek-v4-flash`
+  via OpenRouter), measured at a median 41 s and mean 94 s per call (max 319 s)
+  against 12 s for a PM's own model, so a task that needs tens of steps does not fit
+  in one turn. Measure `assistant`-to-`assistant` gaps in the worker's session
+  (`sessions.parent_session_id` = the PM's session) before promising a task will
+  finish.
 
 ## Named agents (posts vs. people)
 
