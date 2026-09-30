@@ -17,20 +17,26 @@ import YAML from "yaml";
  * Each key here maps to one invariant the rule enforces, and each of those
  * exists because a real fleet lost the capability silently:
  *   - tts.provider must be the registry key "vox", not the service name;
- *   - all four Bloodbank lifecycle hooks must call the canonical publisher;
+ *   - all four Bloodbank lifecycle hooks must call the canonical publisher,
+ *     the hook-hub client `bb-hook --cli hermes --native <event>` (publish.py
+ *     is a legacy forwarder);
  *   - memory.provider must be set, and "memory" must not be muzzled in
  *     agent.disabled_toolsets;
  *   - skills.external_dirs must be non-empty or no agent sees any skill;
  *   - platform_toolsets.bloodbank must list delegation, terminal, file and
  *     skills (`hermes.bloodbank-toolsets`), or a Bloodbank-dispatched PM turn
  *     resolves to no native tools and cannot delegate a worker;
- *   - providers.automaticai + delegation.provider + the mapped fleet token
- *     (`hermes.gateway-routing`), or delegated workers call a provider directly.
+ *   - providers.automaticai + delegation.provider + the mapped fleet token,
+ *     and the main model, every auxiliary task (auxiliary.free_only: true) and
+ *     every enabled MoA slot on the gateway (`hermes.gateway-routing`), or some
+ *     inference path calls a provider directly;
+ *   - an enabled wake word must not start a new session
+ *     (`hermes.wake-word-session`), or a wake silently resets the model.
  */
 export function fleetBaseConfig(homeDir) {
-  const publisher = join(homeDir, ".agents", "hooks", "bloodbank", "publish.py");
+  const publisher = join(homeDir, ".agents", "hooks", "bb-hook");
   const hook = (name) => [
-    { command: `python3 ${publisher} --client hermes --hook ${name}`, timeout: 5 },
+    { command: `${publisher} --cli hermes --native ${name}`, timeout: 5 },
   ];
   const gatewayModels = [
     "automaticai/personal/sol-6.1",
@@ -44,7 +50,19 @@ export function fleetBaseConfig(homeDir) {
     "automaticai/personal/glm-5.3",
     "automaticai/personal/glm-5.3-flash",
   ];
+  const auxTasks = [
+    "vision", "web_extract", "compression", "skills_hub", "approval", "mcp", "title_generation",
+    "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer", "profile_describer",
+    "goal_judge", "curator", "monitor", "background_review", "session_search", "flush_memories",
+  ];
   return {
+    model: { provider: "automaticai", default: "automaticai/personal/kimi-2.8", base_url: "", api_mode: "chat_completions" },
+    auxiliary: {
+      free_only: true,
+      ...Object.fromEntries(auxTasks.map((task) => [task, { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" }])),
+    },
+    moa: { presets: { default: { enabled: false } } },
+    wake_word: { enabled: false, start_new_session: false },
     tts: { provider: "vox", vox: { voice: "carlin" } },
     hooks: {
       on_session_start: hook("on_session_start"),

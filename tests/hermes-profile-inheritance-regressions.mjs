@@ -19,7 +19,7 @@
 // These assert the audit REPORTS those states — a rule that only ever passes
 // is indistinguishable from a rule that does nothing.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -62,7 +62,11 @@ function makeRepo() {
 // placeholder from a leaked developer path -- and rightly so, since neither is
 // portable off this machine.
 const FLEET_HOME = mkdtempSync(join(tmpdir(), "hermes-fleet-home-"));
+// The canonical publisher is the hook-hub client (bloodbank agent-hooks
+// hooks.master.json: hermes publisher "bb-hook"); publish.py is legacy.
 const hookCommand = (hook) =>
+  `${join(FLEET_HOME, ".agents", "hooks", "bb-hook")} --cli hermes --native ${hook}`;
+const legacyHookCommand = (hook) =>
   `python3 ${join(FLEET_HOME, ".agents", "hooks", "bloodbank", "publish.py")} --client hermes --hook ${hook}`;
 const GATEWAY_MODELS = [
   "automaticai/personal/sol-6.1",
@@ -77,7 +81,32 @@ const GATEWAY_MODELS = [
   "automaticai/personal/glm-5.3-flash",
 ];
 
+// Every auxiliary task Hermes routes through call_llm; an absent one is "auto".
+const AUX_TASKS = [
+  "vision", "web_extract", "compression", "skills_hub", "approval", "mcp", "title_generation",
+  "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer", "profile_describer",
+  "goal_judge", "curator", "monitor", "background_review", "session_search", "flush_memories",
+];
+const GATEWAY_AUX = Object.fromEntries(AUX_TASKS.map((task) => [task, { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash", timeout: 30 }]));
+
 const BASE_CONFIG = {
+  // The main agent calls the gateway (`hermes.gateway-routing`: all inference).
+  model: { provider: "automaticai", default: "automaticai/personal/kimi-2.8", base_url: "", api_mode: "chat_completions" },
+  auxiliary: { free_only: true, ...GATEWAY_AUX },
+  moa: {
+    default_preset: "default",
+    presets: {
+      default: {
+        reference_models: [
+          { provider: "automaticai", model: "automaticai/personal/sol" },
+          { provider: "custom:automaticai", model: "automaticai/personal/glm-5.3" },
+        ],
+        aggregator: { provider: "automaticai", model: "automaticai/personal/claude-opus-5.5" },
+      },
+    },
+  },
+  // Enabled, and pinned to the current session (`hermes.wake-word-session`).
+  wake_word: { enabled: true, start_new_session: false },
   tts: { provider: "vox", vox: { voice: "carlin" } },
   hooks: {
     on_session_start: [{ command: hookCommand("on_session_start"), timeout: 5 }],
@@ -125,11 +154,11 @@ function yamlDump(obj) {
 
 // Build a fleet home. `overrides` mutates the base config; `profileMode`
 // selects the profile-side topology under test.
-function makeFleet({ overrides = {}, profileMode = "rendered", profile = "demo-pm", delta = {}, linkProfile = false } = {}) {
+function makeFleet({ overrides = {}, profileMode = "rendered", profile = "demo-pm", delta = {}, linkProfile = false, env = "" } = {}) {
   const fleet = tmp("pjangler-inherit-fleet-");
   const cfg = { ...BASE_CONFIG, ...overrides };
   writeFileSync(join(fleet, "config.yaml"), yamlDump(cfg));
-  writeFileSync(join(fleet, ".env"), "");
+  writeFileSync(join(fleet, ".env"), env, { mode: 0o600 });
   mkdirSync(join(fleet, "skills"), { recursive: true });
   const pdir = join(fleet, "profiles", profile);
   // The legacy topology: profiles/<name> is a SYMLINK to a repo-local runtime
@@ -529,6 +558,282 @@ const OWN_TOKEN = { ...BASE_CONFIG, secrets: { onepassword: { enabled: true, env
   const out = audit(repo, fleet);
   assert.match(out, /raw-pm: secrets\.onepassword\.env\.AUTOMATICAI_GATEWAY_KEY is not an op:\/\/ reference/, "a raw member key must be reported by name");
   assert.doesNotMatch(out, /sk-raw-member-key/, "the report must never echo a member's raw key");
+}
+
+// ---------------------------------------------------------------------------
+// The helpers below read ONE rule's finding as JSON, so an assertion can name
+// the rule it is about and check its status, not just grep the whole report.
+function auditRule(repo, fleet, rule) {
+  const r = spawnSync("node", [cli, "audit", "--rules", rule, "--json"], {
+    cwd: repo,
+    encoding: "utf8",
+    env: { ...process.env, HERMES_FLEET_HOME: fleet },
+  });
+  const report = JSON.parse(r.stdout);
+  const finding = report.rules.find((f) => f.id === rule);
+  assert.ok(finding, `${rule} must be reported`);
+  return { ...finding, text: [finding.summary, ...finding.details].join("\n") };
+}
+
+function remediate(repo, fleet, rule, extra = []) {
+  const r = spawnSync("node", [cli, "remediate", rule, ...extra, "--json"], {
+    cwd: repo,
+    encoding: "utf8",
+    env: { ...process.env, HERMES_FLEET_HOME: fleet },
+  });
+  return JSON.parse(r.stdout);
+}
+
+const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter(([k]) => k !== key));
+
+// 20. The canonical Bloodbank publisher is the hook-hub client. bloodbank's
+//     agent-hooks hooks.master.json names `bb-hook` as Hermes' publisher and
+//     lists bloodbank/publish.py as a LEGACY forwarder; the rule used to require
+//     publish.py, so it failed the correctly wired live fleet.
+{
+  const f = auditRule(repo, makeFleet({}), "hermes.fleet-config");
+  assert.equal(f.status, "pass", `bb-hook --cli hermes --native <event> is the canonical publisher:\n${f.text}`);
+}
+{
+  const hooks = Object.fromEntries(["on_session_start", "on_session_end", "pre_tool_call", "post_tool_call"]
+    .map((h) => [h, [{ command: legacyHookCommand(h), timeout: 5 }]]));
+  const f = auditRule(repo, makeFleet({ overrides: { hooks } }), "hermes.fleet-config");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /do not call the canonical publisher \(~\/\.agents\/hooks\/bb-hook --cli hermes --native <event>\) for: on_session_start, on_session_end, pre_tool_call, post_tool_call -- bloodbank\/publish\.py is a legacy publisher/,
+    "a fleet still on the legacy publisher must be reported, naming every event");
+}
+{
+  // A bb-hook call for the WRONG native event is not the canonical call for this one.
+  const hooks = { ...BASE_CONFIG.hooks, post_tool_call: [{ command: hookCommand("pre_tool_call"), timeout: 5 }] };
+  const f = auditRule(repo, makeFleet({ overrides: { hooks } }), "hermes.fleet-config");
+  assert.match(f.text, /canonical publisher .* for: post_tool_call$/m, "only the miswired event is named");
+}
+
+// 21. ALL inference routes through the gateway, not just delegated workers.
+{
+  const f = auditRule(repo, makeFleet({}), "hermes.gateway-routing");
+  assert.equal(f.status, "pass", `a fully routed base must pass:\n${f.text}`);
+  assert.match(f.summary, /Main, auxiliary, delegated, fallback and MoA inference route through the gateway/);
+  assert.equal(f.title, "All agent inference routes through the AutomaticAI gateway");
+}
+{
+  // The live shape that shipped: main model on direct Kimi Coding.
+  const f = auditRule(repo, makeFleet({ overrides: { model: { provider: "kimi-coding", default: "kimi-for-coding", base_url: "https://api.kimi.com/coding?token=sk-leaky-query", api_mode: "anthropic_messages" } } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /fleet base: model\.provider is "kimi-coding", not "automaticai": the main agent calls a provider directly/);
+  assert.match(f.text, /model\.base_url points at api\.kimi\.com, not the api\.automaticai\.io gateway/);
+  assert.match(f.text, /model\.default is "kimi-for-coding", not a canonical automaticai\/<account>\/<model> route/);
+  assert.doesNotMatch(f.text, /sk-leaky-query/, "only the host of a base_url is ever reported");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { model: "kimi-for-coding" } }), "hermes.gateway-routing");
+  assert.match(f.text, /model is the bare string "kimi-for-coding": Hermes auto-detects its provider/);
+}
+{
+  // custom:automaticai names the same gateway provider, and a gateway base_url is fine.
+  const f = auditRule(repo, makeFleet({ overrides: { model: { provider: "custom:automaticai", default: "automaticai/personal/glm-5.3", base_url: "https://api.automaticai.io/v1" } } }), "hermes.gateway-routing");
+  assert.doesNotMatch(f.text, /model\.(provider|base_url|default)/, "custom:automaticai on the gateway URL is compliant");
+}
+{
+  // The live shape: helpers on openrouter, one on auto, one task never configured.
+  const auxiliary = {
+    ...withoutKey(GATEWAY_AUX, "memory_query_rewrite"),
+    free_only: true,
+    vision: { provider: "openrouter", model: "qwen/qwen3.7-flash" },
+    compression: { provider: "auto", model: "" },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /auxiliary task\(s\) do not name the "automaticai" provider: vision \(openrouter\), compression \(auto\), memory_query_rewrite \(unset = auto\) -- "auto" tries the main provider and then falls through OpenRouter/,
+    "configured, auto and ABSENT tasks are all reported in one line");
+  assert.doesNotMatch(f.text, /title_generation \(|free_only/, "compliant tasks and a true free_only are not reported");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary: null } }), "hermes.gateway-routing");
+  assert.match(f.text, /vision \(unset = auto\), web_extract \(unset = auto\).*flush_memories \(unset = auto\)/, "an absent auxiliary block leaves every task on auto");
+  assert.match(f.text, /auxiliary\.free_only is unset \(Hermes default false\): any auxiliary call that falls through to "auto" can engage a PAID OpenRouter model/,
+    "the hidden paid OpenRouter lane must be reported");
+}
+{
+  const auxiliary = {
+    ...GATEWAY_AUX,
+    free_only: true,
+    title_generation: { enabled: false, provider: "openrouter", model: "x/y" },
+    curator: { provider: "custom:automaticai", model: "automaticai/personal/kimi-k3" },
+    web_extract: { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash", base_url: "https://openrouter.ai/api/v1" },
+    approval: { provider: "automaticai", model: "deepseek/deepseek-v4-flash" },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.doesNotMatch(f.text, /title_generation|curator/, "a disabled task and a custom:automaticai task are compliant");
+  assert.match(f.text, /set a base_url that is not the api\.automaticai\.io gateway, and base_url takes precedence over the provider: web_extract \(openrouter\.ai\)/);
+  assert.match(f.text, /name a model that is not an automaticai\/<account>\/<model> route: approval \(deepseek\/deepseek-v4-flash\)/);
+}
+{
+  // The live MoA shape: direct references, and an aggregator with a model but no
+  // provider -- which Hermes silently replaces with its stock openrouter slot.
+  // The top-level enabled flag is ignored once presets exist.
+  const moa = {
+    enabled: false,
+    presets: {
+      default: {
+        reference_models: [
+          { provider: "openai-codex", model: "gpt-5.5" },
+          { provider: "openrouter", model: "deepseek/deepseek-v4-pro" },
+          { provider: "openrouter", model: "z-ai/glm-5.1", enabled: false },
+        ],
+        aggregator: { model: "deepseek/deepseek-v4-pro" },
+      },
+      quiet: { enabled: false, reference_models: [{ provider: "openrouter", model: "a/b" }], aggregator: { provider: "openrouter", model: "a/b" } },
+    },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { moa } }), "hermes.gateway-routing");
+  assert.match(f.text, /moa preset "default" is enabled and leaves AutomaticAI: reference openai-codex\/gpt-5\.5, reference openrouter\/deepseek\/deepseek-v4-pro, aggregator openrouter\/anthropic\/claude-opus-4\.8 \(Hermes' stock slot: the configured aggregator has no provider or model\)/);
+  assert.match(f.text, /moa\.enabled at the top level is ignored when presets exist/);
+  assert.doesNotMatch(f.text, /z-ai\/glm-5\.1|preset "quiet"/, "a disabled slot and a disabled preset make no call");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { moa: null } }), "hermes.gateway-routing");
+  assert.match(f.text, /no moa block, so Hermes' stock preset is enabled and leaves AutomaticAI: reference openai-codex\/gpt-5\.5 \(Hermes' stock slot/,
+    "an absent moa block is Hermes' stock preset, enabled, on direct providers");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { moa: { enabled: false, reference_models: [{ provider: "openrouter", model: "a/b" }] } } }), "hermes.gateway-routing");
+  assert.doesNotMatch(f.text, /moa/, "a disabled flat MoA config makes no call");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { fallback_model: { provider: "openrouter", model: "deepseek/deepseek-v4-flash" } } }), "hermes.gateway-routing");
+  assert.match(f.text, /fallback_providers entry openrouter\/deepseek\/deepseek-v4-flash leaves AutomaticAI/, "the legacy fallback_model feeds the same chain");
+}
+
+// 22. A broken base is reported ONCE: members that merely inherit it are folded
+//     into a count, while a member's own drift is still named.
+{
+  const kimi = { provider: "kimi-coding", default: "kimi-for-coding", base_url: "", api_mode: "anthropic_messages" };
+  const fleet = makeFleet({ overrides: { model: kimi } });
+  addProfile(fleet, "inherit-a", { ...BASE_CONFIG, model: kimi });
+  addProfile(fleet, "inherit-b", { ...BASE_CONFIG, model: kimi });
+  addProfile(fleet, "drift-pm", { ...BASE_CONFIG, model: kimi, auxiliary: { ...BASE_CONFIG.auxiliary, vision: { provider: "openrouter", model: "q/q" } } });
+  writeRegistry(fleet, {
+    "inherit-a": { role: "pm", profile_name: "inherit-a" },
+    "inherit-b": { role: "pm", profile_name: "inherit-b" },
+    "drift-pm": { role: "pm", profile_name: "drift-pm" },
+  });
+  const f = auditRule(repo, fleet, "hermes.gateway-routing");
+  assert.match(f.text, /fleet base: model\.provider is "kimi-coding"/);
+  assert.doesNotMatch(f.text, /inherit-[ab]:/, "a member that only inherits the base's problem is not repeated");
+  assert.match(f.text, /3 member desk\(s\) inherit the fleet base problem\(s\) above; fix the base, then re-render/);
+  assert.match(f.text, /drift-pm: auxiliary task\(s\) do not name the "automaticai" provider: vision \(openrouter\) -- .*; re-render: hermes-profile-config\.py render --profile drift-pm/,
+    "a member's own drift is still reported by name");
+}
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "stale-model-pm", { ...BASE_CONFIG, model: { provider: "kimi-coding", default: "kimi-for-coding" } });
+  writeRegistry(fleet, { "stale-model-pm": { role: "pm", profile_name: "stale-model-pm" } });
+  const f = auditRule(repo, fleet, "hermes.gateway-routing");
+  assert.match(f.text, /stale-model-pm: model\.provider is "kimi-coding".*render --profile stale-model-pm/, "a desk rendered before the base moved is named");
+  assert.doesNotMatch(f.text, /inherit the fleet base/, "a compliant base has nothing to inherit");
+}
+
+// 23. A wake word must not rotate the session: every wake -- false triggers
+//     included -- called new_session(silent=True), which reset a /model switch
+//     to model.default while the stale switch note was still sent.
+{
+  const f = auditRule(repo, makeFleet({}), "hermes.wake-word-session");
+  assert.equal(f.status, "pass", "an enabled wake word pinned to the current session is fine");
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { wake_word: { enabled: true } } }), "hermes.wake-word-session");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /fleet base: wake_word\.enabled is true and wake_word\.start_new_session is unset \(Hermes default true\): every wake, a false trigger included, calls new_session\(silent=True\)/);
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { wake_word: { enabled: true, start_new_session: true } } }), "hermes.wake-word-session");
+  assert.match(f.text, /start_new_session is true:/);
+}
+{
+  const f = auditRule(repo, makeFleet({ overrides: { wake_word: { enabled: false, start_new_session: true } } }), "hermes.wake-word-session");
+  assert.equal(f.status, "pass", "a disabled wake word never fires");
+}
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "voice-pm", { ...BASE_CONFIG, wake_word: { enabled: true, start_new_session: true } });
+  writeRegistry(fleet, { "voice-pm": { role: "pm", profile_name: "voice-pm" } });
+  const f = auditRule(repo, fleet, "hermes.wake-word-session");
+  assert.match(f.text, /voice-pm: wake_word\.enabled is true .*render --profile voice-pm/, "a member enabling its own wake word is named");
+}
+
+// 24. A literal op:// value in a Hermes .env is sent as the key: every import
+//     after the first reloads .env with override=True while the 1Password
+//     source applies once per HERMES_HOME. Only variable NAMES are reported.
+const OP_ENV = [
+  "PLAIN_SETTING=keep-me",
+  "KIMI_API_KEY=op://vault/kimi/credential",
+  'export GLM_API_KEY="op://vault/glm/credential"',
+  "UNMAPPED_KEY='op://vault/other/credential' # a comment",
+  "CONFLICT_KEY=op://vault/one/credential",
+  "",
+].join("\n");
+const OP_SECRETS = (enabled = true) => ({
+  onepassword: {
+    enabled,
+    env: {
+      AUTOMATICAI_GATEWAY_KEY: "op://vault/tokens/hermes-fleet-workers",
+      KIMI_API_KEY: "op://vault/kimi/credential",
+      GLM_API_KEY: "op://vault/glm/credential",
+      CONFLICT_KEY: "op://vault/two/credential",
+    },
+  },
+});
+{
+  const f = auditRule(repo, makeFleet({}), "hermes.dotenv-no-op-refs");
+  assert.equal(f.status, "pass", `a clean .env passes:\n${f.text}`);
+}
+{
+  const fleet = makeFleet({ env: OP_ENV, overrides: { secrets: OP_SECRETS() } });
+  const f = auditRule(repo, fleet, "hermes.dotenv-no-op-refs");
+  assert.equal(f.status, "fail");
+  assert.equal(f.fixable, true, "redundant lines are safe to remove");
+  assert.match(f.text, /\.env: KIMI_API_KEY, GLM_API_KEY already mapped to the same reference in secrets\.onepassword\.env/);
+  assert.match(f.text, /\.env: UNMAPPED_KEY not mapped in .*config\.yaml -- move each reference into secrets\.onepassword\.env/);
+  assert.match(f.text, /\.env: CONFLICT_KEY mapped to a DIFFERENT reference/);
+  assert.doesNotMatch(f.text, /op:\/\/vault/, "a reference is compared, never printed");
+  assert.doesNotMatch(f.text, /profiles\/demo-pm\/\.env/, "a profile .env symlinked to the fleet .env is the same file, reported once");
+
+  // Dry run changes nothing.
+  const before = readFileSync(join(fleet, ".env"), "utf8");
+  remediate(repo, fleet, "hermes.dotenv-no-op-refs", ["--dry-run"]);
+  assert.equal(readFileSync(join(fleet, ".env"), "utf8"), before, "a dry run must not touch the .env");
+
+  // Remediation deletes ONLY the redundant lines and keeps the file private.
+  const report = remediate(repo, fleet, "hermes.dotenv-no-op-refs");
+  const after = readFileSync(join(fleet, ".env"), "utf8");
+  assert.doesNotMatch(after, /KIMI_API_KEY|GLM_API_KEY/, "redundant op:// lines are removed");
+  assert.match(after, /^PLAIN_SETTING=keep-me$/m, "unrelated lines survive");
+  assert.match(after, /^UNMAPPED_KEY=/m, "an unmapped reference is never deleted (it would be lost)");
+  assert.match(after, /^CONFLICT_KEY=/m, "a conflicting reference is an operator decision");
+  assert.equal(statSync(join(fleet, ".env")).mode & 0o777, 0o600, "the .env keeps its private mode");
+  assert.ok(lstatSync(join(fleet, "profiles", "demo-pm", ".env")).isSymbolicLink(), "the profile's .env symlink is not replaced by a file");
+  const result = report.results.find((r) => r.id === "hermes.dotenv-no-op-refs");
+  assert.equal(result.status, "partial", "lines an operator must move keep the rule failing");
+  assert.doesNotMatch(JSON.stringify(report), /op:\/\/vault/, "the remediation report never prints a reference");
+}
+{
+  // With the 1Password source off, nothing in config is resolved: never auto-delete.
+  const fleet = makeFleet({ env: OP_ENV, overrides: { secrets: OP_SECRETS(false) } });
+  const f = auditRule(repo, fleet, "hermes.dotenv-no-op-refs");
+  assert.equal(f.fixable, false);
+  assert.match(f.text, /secrets\.onepassword\.enabled is not true/);
+  remediate(repo, fleet, "hermes.dotenv-no-op-refs");
+  assert.match(readFileSync(join(fleet, ".env"), "utf8"), /^KIMI_API_KEY=/m, "a disabled source blocks every deletion");
+}
+{
+  // A profile .env that is its own file is scanned against that profile's config.
+  const fleet = makeFleet({});
+  const envPath = join(fleet, "profiles", "demo-pm", ".env");
+  rmSync(envPath);
+  writeFileSync(envPath, "SLACK_BOT_TOKEN=op://vault/slack/bot\n", { mode: 0o600 });
+  const f = auditRule(repo, fleet, "hermes.dotenv-no-op-refs");
+  assert.match(f.text, /profiles\/demo-pm\/\.env: SLACK_BOT_TOKEN not mapped in .*profiles\/demo-pm\/config\.yaml -- move each reference into secrets\.onepassword\.env of .*profiles\/demo-pm\/config\.delta\.yaml, re-render \(hermes-profile-config\.py render --profile demo-pm\)/);
 }
 
 for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });

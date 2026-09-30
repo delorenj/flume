@@ -228,12 +228,14 @@ mise run deploy
 mise run health:hooks:check
 ```
 
-Existing Hermes runtimes should then call
-`~/.agents/hooks/bloodbank/publish.py --client hermes --hook <event>`. Only do a
-runtime backfill when health shows an old config missed the generated fan-out.
-`hermes.fleet-config` requires the base `hooks:` block to carry all four events
-(`on_session_start`, `on_session_end`, `pre_tool_call`, `post_tool_call`) and to
-call that canonical publisher.
+Existing Hermes runtimes should then call the hook-hub client
+`~/.agents/hooks/bb-hook --cli hermes --native <event>` (bloodbank
+`services/agent-hooks/hooks.master.json` names `bb-hook` as Hermes' publisher;
+`bloodbank/publish.py` and `hermes/publish.py` are legacy forwarders to the hub).
+Only do a runtime backfill when health shows an old config missed the generated
+fan-out. `hermes.fleet-config` requires the base `hooks:` block to carry all four
+events (`on_session_start`, `on_session_end`, `pre_tool_call`, `post_tool_call`)
+and each of them to call that canonical publisher for its own native event.
 
 ## Verify
 

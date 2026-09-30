@@ -262,7 +262,7 @@ process control, service changes, board changes, or Bloodbank activation.
 - Never duplicate fleet `mcp_servers` into a delta; the base owns them. A delta
   that redeclares a base LIST replaces it rather than extending it, which is what
   `hermes.delta-list-override` exists to catch.
-- **`flume audit` enforces all of this.** The ten employee rules and what each
+- **`flume audit` enforces all of this.** The twelve employee rules and what each
   one actually reads:
 
   | rule | scope | reads |
@@ -271,9 +271,11 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.untracked-runtimes` | project | runtime is untracked + gitignored, no gitlink, no stale `.gitmodules` |
   | `systemd.sentinel` | host | gateway unit installed and matching each role's declared `service_state` |
   | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection, generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
-  | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher, `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
+  | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher `~/.agents/hooks/bb-hook --cli hermes --native <event>` (bloodbank `hooks.master.json`; `publish.py` is a legacy forwarder), `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
   | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills and `timeouts.tools.{sequential_call,concurrent_batch}` is ≥ 900 s (or 0); every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
-  | `hermes.gateway-routing` | host | delegated workers route through the AutomaticAI gateway: `providers.automaticai` with `key_env` and an explicit `extra_body.reasoning_effort`, `delegation.provider: automaticai` with a canonical route, no `delegation.base_url`/`api_key`, the key variable mapped to an `op://` reference in the base and in every member's generated config |
+  | `hermes.gateway-routing` | host | ALL inference routes through the AutomaticAI gateway, in the base and every member's generated config (members that only inherit a broken base are folded into one count): `model.provider` is `automaticai`/`custom:automaticai` with an `automaticai/<account>/<model>` `model.default` and no non-gateway `model.base_url`; every auxiliary task (vision, web_extract, compression, skills_hub, approval, mcp, title_generation, memory_query_rewrite, tts_audio_tags, triage_specifier, kanban_decomposer, profile_describer, goal_judge, curator, monitor, background_review, session_search, flush_memories -- an ABSENT task is `auto`, which falls through OpenRouter/Nous/direct keys) names the gateway; `auxiliary.free_only: true` (no hidden paid OpenRouter lane); every enabled MoA preset's references and aggregator are gateway routes (an absent `moa` block, or a slot with no provider, is Hermes' stock openrouter/openai-codex slot); `fallback_providers`/`fallback_model` stay on the gateway; `providers.automaticai` with `key_env` and an explicit `extra_body.reasoning_effort`, `delegation.provider: automaticai` with a canonical route, no `delegation.base_url`/`api_key`, the key variable mapped to an `op://` reference |
+  | `hermes.dotenv-no-op-refs` | host | neither `~/.hermes/.env` nor any profile `.env` that is its own file holds a literal `op://` value (names only are reported). Hermes reloads `.env` with `override=True` on every import while the 1Password source applies once, so the literal reference is sent as the key (401). `flume remediate hermes.dotenv-no-op-refs` deletes the lines already mapped to the identical reference in that config's `secrets.onepassword.env`; unmapped or conflicting ones need the operator to map them first |
+  | `hermes.wake-word-session` | host | an enabled `wake_word` in the base or any member config sets `start_new_session: false`; otherwise every wake (false triggers too) calls `new_session(silent=True)`, which resets the model to `model.default` and silently undoes a `/model` switch |
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
@@ -365,9 +367,9 @@ process control, service changes, board changes, or Bloodbank activation.
   `dataschema` / `schemaref` (§13 of `bloodbank/docs/event-naming.md`).
 - Bloodbank hook install is owned by Bloodbank's fan-out
   (`~/code/33GOD/bloodbank/services/agent-hooks/sync.py --install`). Generated
-  Hermes configs should call
-  `~/.agents/hooks/bloodbank/publish.py --client hermes --hook <event>`, not a
-  Hermes-local publisher.
+  Hermes configs should call the hook-hub client
+  `~/.agents/hooks/bb-hook --cli hermes --native <event>` (the legacy
+  `bloodbank/publish.py` only forwards to the hub), not a Hermes-local publisher.
 - Before a live command proof, audit the current target's Bloodbank registry
   eligibility. Never enable a target merely to make a smoke test pass; command
   dispatch invokes a real agent and requires explicit operational authority.
@@ -450,7 +452,10 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   `key_env: AUTOMATICAI_GATEWAY_KEY`, `extra_body: {reasoning_effort: high}`), and
   `delegation.provider: automaticai`, `delegation.model: automaticai/personal/kimi-2.8`
   with `base_url` and `api_key` left EMPTY. The same task takes ~4 min.
-  `hermes.gateway-routing` asserts all of it. Why it is built this way, and what each
+  `hermes.gateway-routing` asserts all of it -- and, since 2026-09-30, every OTHER
+  inference path too: the main `model`, every `auxiliary.<task>` (absent = `auto`),
+  `auxiliary.free_only: true`, enabled MoA presets and the fallback chain.
+  Why it is built this way, and what each
   wrong turn does:
   - **Named provider + `key_env`, never `base_url` + `${VAR}`.** `key_env` resolves
     through Hermes' per-turn, per-profile secret scope, so under the multiplexed

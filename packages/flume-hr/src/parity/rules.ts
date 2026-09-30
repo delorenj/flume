@@ -1636,6 +1636,407 @@ function toolDeadlineProblem(cfg: any): string | null {
 }
 
 
+// ---------------------------------------------------------------------------
+// All-inference gateway routing (`hermes.gateway-routing`).
+//
+// Policy: every agent inference path goes through api.automaticai.io -- the main
+// model, every auxiliary side task, delegated workers, fallbacks and MoA. The
+// checks below mirror how the running Hermes release RESOLVES each path, not how
+// the config reads, because every bypass found so far was a default nobody wrote:
+// an absent auxiliary task is "auto" (the main provider, then OpenRouter, Nous,
+// a custom endpoint and direct-key discovery), and an MoA slot with no provider
+// is silently replaced by Hermes' stock openrouter/openai-codex slot.
+// ---------------------------------------------------------------------------
+
+/**
+ * Every auxiliary task Hermes routes through call_llm. An ABSENT task is not
+ * "off": Hermes defaults it to provider "auto", so it is checked exactly like a
+ * configured one. A task with `enabled: false` makes no call and is skipped.
+ */
+const GATEWAY_AUX_TASKS = [
+  "vision",
+  "web_extract",
+  "compression",
+  "skills_hub",
+  "approval",
+  "mcp",
+  "title_generation",
+  "memory_query_rewrite",
+  "tts_audio_tags",
+  "triage_specifier",
+  "kanban_decomposer",
+  "profile_describer",
+  "goal_judge",
+  "curator",
+  "monitor",
+  "background_review",
+  "session_search",
+  "flush_memories",
+] as const;
+
+// hermes_cli/moa_config.py: what Hermes substitutes when a preset has no complete
+// reference slot, or an aggregator with no provider or model.
+const MOA_STOCK_REFERENCES = [
+  { provider: "openai-codex", model: "gpt-5.5" },
+  { provider: "openrouter", model: "deepseek/deepseek-v4-pro" },
+] as const;
+const MOA_STOCK_AGGREGATOR = { provider: "openrouter", model: "anthropic/claude-opus-4.8" } as const;
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function blankValue(value: unknown): boolean {
+  return value === undefined || value === null || String(value).trim() === "";
+}
+
+/** `automaticai` and `custom:automaticai` both name the gateway provider. */
+function isGatewayProvider(value: unknown): boolean {
+  return String(value ?? "").trim().toLowerCase().replace(/^custom:/u, "") === GATEWAY_PROVIDER;
+}
+
+function isGatewayRoute(value: unknown): boolean {
+  return String(value ?? "").trim().startsWith(`${GATEWAY_PROVIDER}/`);
+}
+
+/** The host of a configured URL -- never the whole value, which may carry a query token. */
+function urlHost(value: unknown): string {
+  try {
+    return new URL(String(value).trim()).host.toLowerCase();
+  } catch {
+    return "an unparseable URL";
+  }
+}
+
+function isGatewayUrl(value: unknown): boolean {
+  return urlHost(value) === GATEWAY_HOST;
+}
+
+/** Python truthiness, which is what Hermes applies to these flags. */
+function pyTruthy(value: unknown): boolean {
+  if (value === undefined || value === null || value === false || value === 0 || value === "") return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isPlainObject(value)) return Object.keys(value).length > 0;
+  return true;
+}
+
+/** hermes_cli/moa_config.py `_coerce_bool`. */
+function moaBool(value: unknown, fallback: boolean): boolean {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const text = value.trim().toLowerCase();
+    if (["0", "false", "no", "off"].includes(text)) return false;
+    if (["1", "true", "yes", "on"].includes(text)) return true;
+    return fallback;
+  }
+  return pyTruthy(value);
+}
+
+/** hermes_cli/moa_config.py `_clean_slot`: a slot Hermes keeps, or null when it drops it. */
+function moaSlot(slot: unknown): { provider: string; model: string; enabled: boolean } | null {
+  if (!isPlainObject(slot)) return null;
+  const provider = String(slot.provider ?? "").trim();
+  const model = String(slot.model ?? "").trim();
+  if (!provider || !model || provider.toLowerCase() === "moa") return null;
+  return { provider, model, enabled: moaBool(slot.enabled, true) };
+}
+
+/** The main agent's own provider, endpoint and route. */
+function mainModelProblems(cfg: any): string[] {
+  const model = cfg?.model;
+  if (typeof model === "string" && model.trim() !== "") {
+    return [`model is the bare string "${model.trim()}": Hermes auto-detects its provider instead of calling "${GATEWAY_PROVIDER}"; set model.provider: ${GATEWAY_PROVIDER} and model.default to an ${GATEWAY_PROVIDER}/<account>/<model> route`];
+  }
+  if (!isPlainObject(model)) {
+    return [`model is unset: Hermes auto-detects the main provider instead of calling "${GATEWAY_PROVIDER}"`];
+  }
+  const problems: string[] = [];
+  if (!isGatewayProvider(model.provider)) {
+    problems.push(`model.provider is "${model.provider ?? ""}", not "${GATEWAY_PROVIDER}": the main agent calls a provider directly`);
+  }
+  if (!blankValue(model.base_url) && !isGatewayUrl(model.base_url)) {
+    problems.push(`model.base_url points at ${urlHost(model.base_url)}, not the ${GATEWAY_HOST} gateway: it overrides the provider's endpoint`);
+  }
+  if (!isGatewayRoute(model.default)) {
+    problems.push(`model.default is "${model.default ?? ""}", not a canonical ${GATEWAY_PROVIDER}/<account>/<model> route`);
+  }
+  if (!blankValue(model.api_key)) {
+    problems.push(`model.api_key is set: a key literal in config bypasses the per-profile secret scope; use providers.${GATEWAY_PROVIDER}.key_env`);
+  }
+  return problems;
+}
+
+/** Every auxiliary side task, the hidden paid OpenRouter lane included. */
+function auxiliaryProblems(cfg: any): string[] {
+  const aux = isPlainObject(cfg?.auxiliary) ? cfg.auxiliary : {};
+  const offGateway: string[] = [];
+  const offRoute: string[] = [];
+  const offHost: string[] = [];
+  const withKey: string[] = [];
+  for (const task of GATEWAY_AUX_TASKS) {
+    const entry = isPlainObject(aux[task]) ? aux[task] : null;
+    if (entry && entry.enabled === false) continue;
+    const provider = entry && !blankValue(entry.provider) ? String(entry.provider).trim() : "";
+    if (!isGatewayProvider(provider)) {
+      offGateway.push(entry === null ? `${task} (unset = auto)` : `${task} (${provider || "auto"})`);
+    } else if (!blankValue(entry?.model) && !isGatewayRoute(entry?.model)) {
+      offRoute.push(`${task} (${String(entry?.model).trim()})`);
+    }
+    if (entry && !blankValue(entry.base_url) && !isGatewayUrl(entry.base_url)) offHost.push(`${task} (${urlHost(entry.base_url)})`);
+    if (entry && !blankValue(entry.api_key)) withKey.push(task);
+  }
+  const problems: string[] = [];
+  if (offGateway.length) {
+    problems.push(`auxiliary task(s) do not name the "${GATEWAY_PROVIDER}" provider: ${offGateway.join(", ")} -- "auto" tries the main provider and then falls through OpenRouter, Nous, a custom endpoint and direct-key discovery; set auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route`);
+  }
+  if (offRoute.length) problems.push(`auxiliary task(s) on the gateway name a model that is not an ${GATEWAY_PROVIDER}/<account>/<model> route: ${offRoute.join(", ")}`);
+  if (offHost.length) problems.push(`auxiliary task(s) set a base_url that is not the ${GATEWAY_HOST} gateway, and base_url takes precedence over the provider: ${offHost.join(", ")}`);
+  if (withKey.length) problems.push(`auxiliary task(s) carry an api_key in config (a literal bypasses the per-profile secret scope): ${withKey.join(", ")}`);
+  if (aux.free_only !== true) {
+    problems.push(`auxiliary.free_only is ${aux.free_only === undefined ? "unset (Hermes default false)" : JSON.stringify(aux.free_only)}: any auxiliary call that falls through to "auto" can engage a PAID OpenRouter model (stock google/gemini-3.6-flash) as a hidden backup lane; set auxiliary.free_only: true`);
+  }
+  return problems;
+}
+
+/** Legacy `fallback_model` (a dict or a list) feeds the same chain as fallback_providers. */
+function fallbackEntries(cfg: any): any[] {
+  const out: any[] = [];
+  for (const key of ["fallback_providers", "fallback_model"]) {
+    const value = cfg?.[key];
+    if (Array.isArray(value)) out.push(...value);
+    else if (isPlainObject(value) && (!blankValue(value.provider) || !blankValue(value.model))) out.push(value);
+  }
+  return out;
+}
+
+/**
+ * Mixture-of-Agents presets, resolved the way hermes_cli/moa_config.py does:
+ * named presets win and the flat top-level shape is used only when there are
+ * none; a preset is enabled unless it says otherwise; a preset with no complete
+ * reference slot gets Hermes' stock direct references, and an aggregator with no
+ * provider or model gets the stock openrouter aggregator. An absent moa block is
+ * therefore the stock preset, enabled, calling openai-codex and openrouter.
+ */
+function moaProblems(cfg: any): string[] {
+  const raw = isPlainObject(cfg?.moa) ? cfg.moa : {};
+  let presets: [string, any][] = isPlainObject(raw.presets)
+    ? Object.entries(raw.presets).filter(([name]) => String(name).trim() !== "")
+    : [];
+  const flat = presets.length === 0;
+  if (flat) presets = [["default", raw]];
+  const problems: string[] = [];
+  for (const [name, rawPreset] of presets) {
+    const preset = isPlainObject(rawPreset) ? rawPreset : {};
+    if (!moaBool(preset.enabled, true)) continue;
+    let rawRefs: unknown = preset.reference_models;
+    if (typeof rawRefs === "string") {
+      try { rawRefs = JSON.parse(rawRefs); } catch { rawRefs = []; }
+    }
+    const refList = Array.isArray(rawRefs) ? rawRefs : isPlainObject(rawRefs) ? [rawRefs] : [];
+    const kept = refList.map(moaSlot).filter((slot): slot is NonNullable<ReturnType<typeof moaSlot>> => slot !== null);
+    const stockRefs = kept.length === 0;
+    const refs = stockRefs ? MOA_STOCK_REFERENCES.map((slot) => ({ ...slot, enabled: true })) : kept;
+    const bad: string[] = [];
+    for (const ref of refs) {
+      if (!ref.enabled) continue;
+      if (!isGatewayProvider(ref.provider) || !isGatewayRoute(ref.model)) {
+        bad.push(`reference ${ref.provider}/${ref.model}${stockRefs ? " (Hermes' stock slot: no complete reference is configured)" : ""}`);
+      }
+    }
+    const aggregator = moaSlot(preset.aggregator);
+    if (aggregator === null) {
+      bad.push(`aggregator ${MOA_STOCK_AGGREGATOR.provider}/${MOA_STOCK_AGGREGATOR.model} (Hermes' stock slot: the configured aggregator has no provider or model)`);
+    } else if (!isGatewayProvider(aggregator.provider) || !isGatewayRoute(aggregator.model)) {
+      bad.push(`aggregator ${aggregator.provider}/${aggregator.model}`);
+    }
+    if (!bad.length) continue;
+    const where = !isPlainObject(cfg?.moa) ? "no moa block, so Hermes' stock preset" : flat ? "moa (flat preset)" : `moa preset "${name}"`;
+    const topLevelNote = !flat && raw.enabled !== undefined && !moaBool(raw.enabled, true)
+      ? "; moa.enabled at the top level is ignored when presets exist"
+      : "";
+    problems.push(`${where} is enabled and leaves AutomaticAI: ${bad.join(", ")} -- route every slot through ${GATEWAY_PROVIDER} or set ${flat ? "moa.enabled" : `moa.presets.${name}.enabled`}: false${topLevelNote}`);
+  }
+  return problems;
+}
+
+/** The command strings of one Hermes hook entry list (or a bare string). */
+function hookCommands(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : [value];
+  return list
+    .map((entry) => (typeof entry === "string" ? entry : isPlainObject(entry) ? String(entry.command ?? "") : ""))
+    .filter((command) => command.trim() !== "");
+}
+
+/** `bb-hook --cli hermes --native <event>` (or the positional `bb-hook hermes <event>`). */
+function callsCanonicalPublisher(command: string, event: string): boolean {
+  if (!/(?:^|[\s/"'])bb-hook(?=$|[\s"'])/u.test(command)) return false;
+  const flagged = /--cli\s+hermes(?=$|\s)/u.test(command) && new RegExp(`--native\\s+${event}(?=$|\\s)`, "u").test(command);
+  const positional = new RegExp(`bb-hook["']?\\s+hermes\\s+${event}(?=$|\\s)`, "u").test(command);
+  return flagged || positional;
+}
+
+/**
+ * Whether a config's wake word silently rotates the session.
+ *
+ * On every wake -- a false trigger included -- Hermes calls new_session(silent=
+ * True) unless wake_word.start_new_session is false (stock default: true).
+ * new_session resets the model to model.default but never clears the pending
+ * "[Note: model was just switched ...]" message, so a /model switch is silently
+ * undone while the next turn still claims the switched model.
+ */
+function wakeWordProblem(cfg: any): string | null {
+  const wake = cfg?.wake_word;
+  if (!isPlainObject(wake) || !pyTruthy(wake.enabled)) return null;
+  if (wake.start_new_session === false) return null;
+  const current = wake.start_new_session === undefined ? "unset (Hermes default true)" : JSON.stringify(wake.start_new_session);
+  return `wake_word.enabled is true and wake_word.start_new_session is ${current}: every wake, a false trigger included, calls new_session(silent=True), which rotates the session and resets the model to model.default -- a /model switch is silently undone while the stale switch note is still sent; set wake_word.start_new_session: false`;
+}
+
+interface DotenvOpRef {
+  name: string;
+  ref: string;
+  /** Zero-based index into the file's lines. */
+  line: number;
+}
+
+/**
+ * `NAME=op://...` lines of a dotenv file. Only the NAME is ever reported: the
+ * reference is compared, never printed.
+ */
+function dotenvOpRefs(text: string): DotenvOpRef[] {
+  const out: DotenvOpRef[] = [];
+  normalizeNewlines(text).split("\n").forEach((raw, line) => {
+    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/u.exec(raw);
+    if (!match || match[1] === undefined) return;
+    let value = (match[2] ?? "").trim();
+    const quote = value[0];
+    const close = quote === '"' || quote === "'" ? value.indexOf(quote, 1) : -1;
+    if (close > 0) {
+      // A quoted value ends at its closing quote; anything after is a comment.
+      value = value.slice(1, close).trim();
+    } else {
+      value = value.replace(/\s+#.*$/u, "").trim();
+    }
+    if (value.startsWith("op://")) out.push({ name: match[1], ref: value, line });
+  });
+  return out;
+}
+
+interface DotenvTarget {
+  /** The .env as found (reported). */
+  path: string;
+  /** What to write: the file itself, never the symlink in front of it. */
+  realPath: string;
+  /** The config whose secrets.onepassword.env this .env feeds. */
+  configPath: string;
+  /** Where an operator adds a mapping: the base config, or the profile's delta. */
+  ownerPath: string;
+  profile: string | null;
+}
+
+/** ~/.hermes/.env plus every profile .env that is not the same file. */
+function dotenvTargets(fleetRoot: string): DotenvTarget[] {
+  const targets: DotenvTarget[] = [];
+  const seen = new Set<string>();
+  const add = (path: string, configPath: string, ownerPath: string, profile: string | null) => {
+    let real: string;
+    try { real = realpathSync(path); } catch { return; }
+    if (seen.has(real)) return;
+    seen.add(real);
+    targets.push({ path, realPath: real, configPath, ownerPath, profile });
+  };
+  const baseConfig = join(fleetRoot, "config.yaml");
+  add(join(fleetRoot, ".env"), baseConfig, baseConfig, null);
+  const profilesRoot = join(fleetRoot, "profiles");
+  let entries: string[] = [];
+  try { entries = readdirSync(profilesRoot).sort(); } catch { entries = []; }
+  for (const name of entries) {
+    const envPath = join(profilesRoot, name, ".env");
+    if (!existsSync(envPath)) continue;
+    const generated = join(profilesRoot, name, "config.yaml");
+    add(envPath, existsSync(generated) ? generated : baseConfig, join(profilesRoot, name, "config.delta.yaml"), name);
+  }
+  return targets;
+}
+
+interface DotenvClassified {
+  target: DotenvTarget;
+  refs: DotenvOpRef[];
+  /** Mapped to the identical reference in the effective config: the line is pure clobber. */
+  redundant: DotenvOpRef[];
+  /** Mapped to a different reference: which one wins is an operator decision. */
+  conflicting: DotenvOpRef[];
+  /** Not mapped at all: the reference has to move before the line can go. */
+  unmapped: DotenvOpRef[];
+  /** Whether the effective config's 1Password source is on (Hermes: enabled is True). */
+  sourceEnabled: boolean;
+}
+
+function classifyDotenv(target: DotenvTarget): DotenvClassified | null {
+  const text = safeReadText(target.realPath);
+  if (text === null) return null;
+  const refs = dotenvOpRefs(text);
+  if (!refs.length) return null;
+  let cfg: any = {};
+  try { cfg = YAML.parse(safeReadText(target.configPath) ?? "") ?? {}; } catch { cfg = {}; }
+  const source = isPlainObject(cfg?.secrets?.onepassword) ? cfg.secrets.onepassword : {};
+  const mapped = isPlainObject(source.env) ? source.env : {};
+  const result: DotenvClassified = { target, refs, redundant: [], conflicting: [], unmapped: [], sourceEnabled: source.enabled === true };
+  for (const ref of refs) {
+    if (!(ref.name in mapped) || blankValue(mapped[ref.name])) result.unmapped.push(ref);
+    else if (String(mapped[ref.name]).trim() === ref.ref) result.redundant.push(ref);
+    else result.conflicting.push(ref);
+  }
+  return result;
+}
+
+function namesOf(refs: DotenvOpRef[]): string {
+  return [...new Set(refs.map((ref) => ref.name))].join(", ");
+}
+
+/**
+ * Report member configs, folding those that only repeat the base's own problems.
+ *
+ * A desk rendered from a broken base inherits every one of its problems, and
+ * repeating them per member buries the one line that matters -- fix the base,
+ * then re-render. A problem the base does NOT have is member drift (a stale
+ * render or a delta) and is reported by name with the exact re-render command.
+ */
+function memberProblemDetails(fleetRoot: string, baseProblems: readonly string[], check: (cfg: any) => string[]): { details: string[]; members: number; inheriting: number; configs: Map<string, any> } {
+  const baseSet = new Set(baseProblems);
+  const details: string[] = [];
+  const configs = new Map<string, any>();
+  let members = 0;
+  let inheriting = 0;
+  const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+  for (const [agentId, raw] of Object.entries(registry ?? {})) {
+    const entry = (raw ?? {}) as Record<string, unknown>;
+    const profile = String(entry.profile_name || agentId);
+    const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
+    if (generated === null) continue;
+    let cfg: any = null;
+    try { cfg = YAML.parse(generated) ?? {}; } catch { cfg = null; }
+    if (cfg === null) continue;
+    members += 1;
+    configs.set(agentId, cfg);
+    let inherited = false;
+    for (const problem of check(cfg)) {
+      if (baseSet.has(problem)) {
+        inherited = true;
+        continue;
+      }
+      details.push(`${agentId}: ${problem}; re-render: hermes-profile-config.py render --profile ${profile}`);
+    }
+    if (inherited) inheriting += 1;
+  }
+  if (inheriting) {
+    details.push(`${inheriting} member desk(s) inherit the fleet base problem(s) above; fix the base, then re-render each: hermes-profile-config.py render --profile <name>`);
+  }
+  return { details, members, inheriting, configs };
+}
+
+
 function fleetBinPath(ctx: Context): string {
   const candidates = [
     process.env.HERMES_FLEET_BIN,
@@ -2682,9 +3083,16 @@ return [
         } else {
           const missing = REQUIRED_HOOKS.filter((h) => !hooks[h]);
           if (missing.length) details.push(`fleet base hooks missing event(s): ${missing.join(", ")}`);
-          const serialized = JSON.stringify(hooks);
-          if (!serialized.includes("hooks/bloodbank/publish.py")) {
-            details.push(`fleet base hooks do not call the canonical publisher (~/.agents/hooks/bloodbank/publish.py --client hermes)`);
+          // The canonical publisher is the hook-hub client, not publish.py.
+          // bloodbank/services/agent-hooks/hooks.master.json names `bb-hook` as
+          // Hermes' publisher (runner `{hooks_dir}/bb-hook --cli hermes --native
+          // <event>`) and lists hermes/publish.py and bloodbank/publish.py as
+          // LEGACY publishers that only forward to the hub. Checking for the
+          // legacy path failed a correctly wired fleet and passed a stale one.
+          const uncanonical = REQUIRED_HOOKS.filter((h) => hooks[h] && !hookCommands(hooks[h]).some((command) => callsCanonicalPublisher(command, h)));
+          if (uncanonical.length) {
+            const legacy = uncanonical.some((h) => hookCommands(hooks[h]).some((command) => /publish\.py/u.test(command)));
+            details.push(`fleet base hooks do not call the canonical publisher (~/.agents/hooks/bb-hook --cli hermes --native <event>) for: ${uncanonical.join(", ")}${legacy ? " -- bloodbank/publish.py is a legacy publisher that only forwards to the hook hub" : ""}`);
           }
         }
 
@@ -2854,10 +3262,14 @@ return [
     }),
   },
   {
-    // Policy: all agent inference goes through api.automaticai.io. Delegated
-    // workers were the first path moved (they ran on paid OpenRouter DeepSeek,
-    // ~36 min for a task that takes ~4 on Kimi), and each way of getting it
-    // wrong fails silently:
+    // Policy: ALL agent inference goes through api.automaticai.io -- the main
+    // model, every auxiliary side task, delegated workers, fallbacks and MoA.
+    // The main model and auxiliary tasks are the paths an agent actually spends
+    // on; a desk pinned to kimi-coding with openrouter helpers and an enabled
+    // openrouter MoA preset passed this rule for weeks because it only looked at
+    // delegation. Delegated workers were the first path moved (they ran on paid
+    // OpenRouter DeepSeek, ~36 min for a task that takes ~4 on Kimi), and each
+    // way of getting delegation wrong fails silently:
     //   - delegation.base_url set with no api_key makes the child INHERIT THE
     //     PARENT's key, so a desk's direct provider key is sent to the gateway;
     //   - a literal ${VAR} in delegation.api_key reads plain os.environ, which
@@ -2870,11 +3282,11 @@ return [
     // in its delta with its own token for tracking, and inherits the fleet token
     // otherwise. Only op:// references ever appear; a raw key is a failure.
     id: "hermes.gateway-routing",
-    title: "Delegated workers route through the AutomaticAI gateway",
+    title: "All agent inference routes through the AutomaticAI gateway",
     // Host-scoped: $HOME/.hermes/{config.yaml,agents-registry.yaml,profiles}.
     scope: "host",
     audit: (ctx) => {
-      const title = "Delegated workers route through the AutomaticAI gateway";
+      const title = "All agent inference routes through the AutomaticAI gateway";
       const roles = discoverRoles(ctx.repoRoot);
       if (!roles.length) {
         return { id: "hermes.gateway-routing", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
@@ -2924,40 +3336,33 @@ return [
         if (!String(d.model ?? "").startsWith("automaticai/")) problems.push(`delegation.model is "${d.model ?? ""}", not a canonical automaticai/<account>/<model> route`);
         if (!blank(d.base_url)) problems.push(`delegation.base_url is set ("${d.base_url}"): it overrides the provider, and with no api_key the child inherits the PARENT's key`);
         if (!blank(d.api_key)) problems.push(`delegation.api_key is set: a literal or \${VAR} here reads plain os.environ, which never holds a desk's own key in the multiplexed gateway; use providers.${GATEWAY_PROVIDER}.key_env`);
-        const fallbacks = Array.isArray(cfg?.fallback_providers) ? cfg.fallback_providers : [];
         const routingModels = new Set<string>(Array.isArray(provider?.models) ? provider.models.map(String) : []);
-        for (const fallback of fallbacks) {
-          if (fallback?.provider !== GATEWAY_PROVIDER || !routingModels.has(String(fallback?.model ?? ""))) {
+        for (const fallback of fallbackEntries(cfg)) {
+          if (!isGatewayProvider(fallback?.provider) || !routingModels.has(String(fallback?.model ?? ""))) {
             problems.push(`fallback_providers entry ${fallback?.provider ?? ""}/${fallback?.model ?? ""} leaves AutomaticAI: a failed route must preserve its account and fail rather than switch providers`);
           }
         }
         const mapped = keyEnv ? cfg?.secrets?.onepassword?.env?.[String(keyEnv)] : undefined;
         if (!blank(keyEnv) && blank(mapped)) problems.push(`secrets.onepassword.env maps no ${keyEnv}, so the gateway key is never injected`);
         else if (!blank(mapped) && !isOpRef(mapped)) problems.push(`secrets.onepassword.env.${keyEnv} is not an op:// reference (a raw key must never be written to config)`);
+        // Everything else an agent spends inference on: the main model, every
+        // auxiliary side task (absent = "auto"), and Mixture-of-Agents presets.
+        problems.push(...mainModelProblems(cfg), ...auxiliaryProblems(cfg), ...moaProblems(cfg));
         return problems;
       };
 
-      for (const problem of routingProblems(base)) details.push(`fleet base: ${problem}: ${basePath}`);
+      const baseProblems = routingProblems(base);
+      for (const problem of baseProblems) details.push(`fleet base: ${problem}: ${basePath}`);
 
-      const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+      // A member whose desk was rendered before the routing existed is stale, and
+      // the base check cannot see that. One inheriting a broken base is folded.
+      const scan = memberProblemDetails(fleetRoot, baseProblems, routingProblems);
+      details.push(...scan.details);
+      const members = scan.members;
       let onFleetKey = 0;
-      let members = 0;
       const baseKeyEnv = String(base?.providers?.[GATEWAY_PROVIDER]?.key_env ?? "");
       const fleetRef = baseKeyEnv ? base?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
-      for (const [agentId, raw] of Object.entries(registry ?? {})) {
-        const entry = (raw ?? {}) as Record<string, unknown>;
-        const profile = String(entry.profile_name || agentId);
-        const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
-        if (generated === null) continue;
-        let cfg: any = null;
-        try { cfg = YAML.parse(generated) ?? {}; } catch { cfg = null; }
-        if (cfg === null) continue;
-        members += 1;
-        // A member whose desk was rendered before the routing existed is stale, and
-        // the base check cannot see that.
-        for (const problem of routingProblems(cfg)) {
-          details.push(`${agentId}: ${problem}; re-render: hermes-profile-config.py render --profile ${profile}`);
-        }
+      for (const cfg of scan.configs.values()) {
         const own = baseKeyEnv ? cfg?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
         if (!blank(own) && own === fleetRef) onFleetKey += 1;
       }
@@ -2967,7 +3372,7 @@ return [
         title,
         status: details.length === 0 ? "pass" : "fail",
         summary: details.length === 0
-          ? `Delegated workers route through the gateway; ${members - onFleetKey} of ${members} members carry their own token, ${onFleetKey} use the fleet token`
+          ? `Main, auxiliary, delegated, fallback and MoA inference route through the gateway; ${members - onFleetKey} of ${members} members carry their own token, ${onFleetKey} use the fleet token`
           : `${details.length} gateway routing issue(s) detected`,
         details,
         // Fleet-wide, operator-owned values (and tokens are minted, not guessed).
@@ -2982,7 +3387,182 @@ return [
       changedFiles: [],
       details: [
         ...finding.details,
-        `Edit ${join(fleetHome(ctx), "config.yaml")} (providers.${GATEWAY_PROVIDER}, delegation, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.<task> for every task plus auxiliary.free_only: true, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
+      ],
+    }),
+  },
+  {
+    // A literal op:// reference in a Hermes .env is sent to providers AS THE KEY.
+    //
+    // load_hermes_dotenv() runs at import time from several modules (hermes_cli/
+    // main.py, cli.py, run_agent.py), and every call reloads <home>/.env with
+    // override=True -- but the 1Password source is applied only once per
+    // HERMES_HOME (the _APPLIED_HOMES guard). The second import therefore puts
+    // the literal "op://..." string back over the resolved secret, and Kimi,
+    // OpenRouter and GLM answer 401 ("API Key appears to be invalid", "Missing
+    // Authentication header") with nothing pointing at the .env. Upstream fixed
+    // the loader (NousResearch 303d839133, da2e571b98); the fleet's fork does not
+    // carry it, and no .env should depend on the loader either way: a reference
+    // belongs in secrets.onepassword.env, which resolves it in memory.
+    //
+    // Scans ~/.hermes/.env and every profile .env that is not the same file (a
+    // profile .env is normally a symlink to the fleet one). Only variable NAMES
+    // are ever reported; references are compared, never printed.
+    id: "hermes.dotenv-no-op-refs",
+    title: "Hermes .env files carry no literal op:// references",
+    // Host-scoped: $HOME/.hermes/.env and $HOME/.hermes/profiles/*/.env.
+    scope: "host",
+    audit: (ctx) => {
+      const title = "Hermes .env files carry no literal op:// references";
+      const roles = discoverRoles(ctx.repoRoot);
+      if (!roles.length) {
+        return { id: "hermes.dotenv-no-op-refs", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
+      }
+      const targets = dotenvTargets(fleetHome(ctx));
+      const classified = targets.map(classifyDotenv).filter((c): c is DotenvClassified => c !== null);
+      const details: string[] = [];
+      let fixable = false;
+      let variables = 0;
+      for (const c of classified) {
+        const { target } = c;
+        variables += c.refs.length;
+        const rerender = target.profile ? `, re-render (hermes-profile-config.py render --profile ${target.profile})` : "";
+        if (!c.sourceEnabled) {
+          details.push(`${target.path}: ${namesOf(c.refs)} hold a literal op:// value, and secrets.onepassword.enabled is not true in ${target.configPath}, so nothing there is ever resolved -- enable it, map each variable in secrets.onepassword.env of ${target.ownerPath}${rerender}, then delete the .env lines`);
+          continue;
+        }
+        if (c.redundant.length) {
+          fixable = true;
+          details.push(`${target.path}: ${namesOf(c.redundant)} already mapped to the same reference in secrets.onepassword.env of ${target.configPath} -- the .env line only overwrites the resolved secret with the literal reference; delete it (flume remediate hermes.dotenv-no-op-refs does)`);
+        }
+        if (c.unmapped.length) {
+          details.push(`${target.path}: ${namesOf(c.unmapped)} not mapped in ${target.configPath} -- move each reference into secrets.onepassword.env of ${target.ownerPath}${rerender}, then delete the .env line`);
+        }
+        if (c.conflicting.length) {
+          details.push(`${target.path}: ${namesOf(c.conflicting)} mapped to a DIFFERENT reference in ${target.configPath} -- decide which reference is right, set it in secrets.onepassword.env of ${target.ownerPath}${rerender}, then delete the .env line`);
+        }
+      }
+      return {
+        id: "hermes.dotenv-no-op-refs",
+        title,
+        status: details.length === 0 ? "pass" : "fail",
+        summary: details.length === 0
+          ? `No Hermes .env carries a literal op:// value (${targets.length} file(s) scanned)`
+          : `${variables} literal op:// value(s) in ${classified.length} .env file(s): every import after the first re-applies them over the resolved secrets, and the literal reference is sent as the key`,
+        details,
+        // Only the redundant lines (mapped to the identical reference, with the
+        // 1Password source on) are corrected automatically: deleting them loses
+        // nothing. Moving a reference into config, or choosing between two, is
+        // an operator decision.
+        fixable,
+      };
+    },
+    migrate: (ctx, finding) => {
+      const changedFiles: string[] = [];
+      const details: string[] = [];
+      if (finding.status === "skip") {
+        return { id: finding.id, title: finding.title, status: "noop", summary: finding.summary, changedFiles, details };
+      }
+      let blocked = false;
+      for (const c of dotenvTargets(fleetHome(ctx)).map(classifyDotenv)) {
+        if (c === null) continue;
+        const deletable = c.sourceEnabled ? c.redundant : [];
+        const kept = c.refs.filter((ref) => !deletable.includes(ref));
+        if (kept.length) {
+          blocked = true;
+          details.push(`blocked: ${c.target.path}: ${namesOf(kept)} need an operator to map them in secrets.onepassword.env of ${c.target.ownerPath} (the source must be enabled) before the .env line can go`);
+        }
+        if (!deletable.length) continue;
+        if (!ctx.dryRun) {
+          // Re-read at write time: other writers edit this file, and a line
+          // index from the audit pass must not delete someone else's line.
+          const text = readFileSync(c.target.realPath, "utf8");
+          const wanted = new Set(deletable.map((ref) => `${ref.name}\u0000${ref.ref}`));
+          const drop = new Set(dotenvOpRefs(text).filter((ref) => wanted.has(`${ref.name}\u0000${ref.ref}`)).map((ref) => ref.line));
+          if (!drop.size) continue;
+          const next = text.split("\n").filter((_, index) => !drop.has(index)).join("\n");
+          const mode = lstatSync(c.target.realPath).mode & 0o777;
+          const tmp = join(dirname(c.target.realPath), `.${basename(c.target.realPath)}.flume-${process.pid}.tmp`);
+          writeFileSync(tmp, next, { mode });
+          chmodSync(tmp, mode);
+          renameSync(tmp, c.target.realPath);
+        }
+        details.push(`${ctx.dryRun ? "would delete" : "deleted"} ${namesOf(deletable)} from ${c.target.path} (mapped to the same reference in ${c.target.configPath})`);
+        changedFiles.push(c.target.realPath);
+      }
+      return {
+        id: finding.id,
+        title: finding.title,
+        status: changedFiles.length ? (ctx.dryRun ? "skipped" : blocked ? "partial" : "applied") : blocked ? "blocked" : "noop",
+        summary: changedFiles.length
+          ? `${ctx.dryRun ? "Would remove" : "Removed"} redundant op:// lines from ${changedFiles.length} .env file(s)${blocked ? "; the rest need an operator" : ""}`
+          : blocked ? "Every remaining op:// line needs an operator to map it first" : "No changes required",
+        changedFiles,
+        details,
+      };
+    },
+  },
+  {
+    // A wake word must not rotate the session. On every wake -- a false trigger
+    // included -- Hermes calls new_session(silent=True) unless
+    // wake_word.start_new_session is false (stock default true). new_session
+    // resets the model to model.default and does not clear the pending
+    // "[Note: model was just switched ...]" message, so a /model switch to a
+    // gateway route was silently reverted to the direct default while the next
+    // turn still claimed the switched model. Reproduced 2026-09-30.
+    //
+    // The fleet base is also the interactive default profile's config
+    // (HERMES_HOME=~/.hermes), which is where the voice CLI runs; a member can
+    // enable its own wake word in its delta, so generated desks are checked too.
+    id: "hermes.wake-word-session",
+    title: "A wake word never silently rotates the session",
+    // Host-scoped: $HOME/.hermes/{config.yaml,agents-registry.yaml,profiles}.
+    scope: "host",
+    audit: (ctx) => {
+      const title = "A wake word never silently rotates the session";
+      const roles = discoverRoles(ctx.repoRoot);
+      if (!roles.length) {
+        return { id: "hermes.wake-word-session", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
+      }
+      const fleetRoot = fleetHome(ctx);
+      const basePath = join(fleetRoot, "config.yaml");
+      const rawBase = safeReadText(basePath);
+      if (rawBase === null) {
+        // hermes.fleet-config owns a missing base; reporting it twice is noise.
+        return { id: "hermes.wake-word-session", title, status: "skip", summary: `fleet base config missing: ${basePath}`, details: [], fixable: false };
+      }
+      let base: any;
+      try {
+        base = YAML.parse(rawBase) ?? {};
+      } catch (err) {
+        return { id: "hermes.wake-word-session", title, status: "warn", summary: `fleet base config is unparseable YAML: ${basePath} (${(err as Error).message})`, details: [], fixable: false };
+      }
+      const check = (cfg: any): string[] => {
+        const problem = wakeWordProblem(cfg);
+        return problem ? [problem] : [];
+      };
+      const baseProblems = check(base);
+      const details = baseProblems.map((problem) => `fleet base: ${problem}: ${basePath}`);
+      details.push(...memberProblemDetails(fleetRoot, baseProblems, check).details);
+      return {
+        id: "hermes.wake-word-session",
+        title,
+        status: details.length === 0 ? "pass" : "fail",
+        summary: details.length === 0 ? "No enabled wake word starts a new session" : `${details.length} wake-word session issue(s) detected`,
+        details,
+        // Operator-owned config: the fix is one line, but it is theirs to write.
+        fixable: false,
+      };
+    },
+    migrate: (ctx, finding) => ({
+      id: finding.id,
+      title: finding.title,
+      status: "blocked",
+      summary: "Wake-word behavior is operator-owned; pjangler will not edit the fleet base",
+      changedFiles: [],
+      details: [
+        ...finding.details,
+        `Set wake_word.start_new_session: false in ${join(fleetHome(ctx), "config.yaml")} (or in the member's config.delta.yaml), then re-render each named desk with hermes-profile-config.py render --profile <name>.`,
       ],
     }),
   },

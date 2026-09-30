@@ -200,8 +200,12 @@ const RULE_DOMAIN: Readonly<Record<string, FleetStatusDomain>> = Object.freeze({
   "hermes.fleet-config": "bloodbank",
   // What a Bloodbank-dispatched turn may do: can a PM delegate a worker.
   "hermes.bloodbank-toolsets": "bloodbank",
-  // Where delegated workers' inference goes (the AutomaticAI gateway).
+  // Where every inference path goes (the AutomaticAI gateway).
   "hermes.gateway-routing": "bloodbank",
+  // Literal op:// values in the fleet or a profile .env clobber resolved secrets.
+  "hermes.dotenv-no-op-refs": "profile",
+  // A wake word that rotates the session silently resets the model.
+  "hermes.wake-word-session": "profile",
   // Registry parity between the two canonical stores.
   "hermes.registry-parity": "registry",
   // The org-wide rules (`src/parity/reconcile.ts`), which answer for the
