@@ -1600,6 +1600,9 @@ function fleetHome(ctx: Context): string {
 const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
 // The power a non-PM employee must NOT gain on an unattended turn.
 const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
+// The named provider that carries delegated workers to the AutomaticAI gateway.
+const GATEWAY_PROVIDER = "automaticai";
+const GATEWAY_HOST = "api.automaticai.io";
 // A PM blocks inside delegate_task until its worker returns, and Hermes bounds
 // every tool call by timeouts.tools.{sequential_call,concurrent_batch}
 // (stock 420 s, 0 disables). A real delegation outlasts that: the call errors,
@@ -2835,6 +2838,126 @@ return [
       details: [
         ...finding.details,
         `Edit ${join(fleetHome(ctx), "config.yaml")} (platform_toolsets.bloodbank), then re-render each named desk with hermes-profile-config.py render --profile <name>. Do not use render --all while legacy profiles without a config.delta.yaml exist.`,
+      ],
+    }),
+  },
+  {
+    // Policy: all agent inference goes through api.automaticai.io. Delegated
+    // workers were the first path moved (they ran on paid OpenRouter DeepSeek,
+    // ~36 min for a task that takes ~4 on Kimi), and each way of getting it
+    // wrong fails silently:
+    //   - delegation.base_url set with no api_key makes the child INHERIT THE
+    //     PARENT's key, so a desk's direct provider key is sent to the gateway;
+    //   - a literal ${VAR} in delegation.api_key reads plain os.environ, which
+    //     never holds a desk's own key inside the multiplexed Bloodbank gateway,
+    //     and stays a literal string when unset (a 401, or a wrong key);
+    //   - a named provider WITHOUT key_env has no key at all.
+    // So the routing lives in a named provider (providers.automaticai, key_env),
+    // whose key Hermes resolves through the per-turn, per-profile secret scope.
+    // The base maps that variable to the FLEET token; a member overrides one line
+    // in its delta with its own token for tracking, and inherits the fleet token
+    // otherwise. Only op:// references ever appear; a raw key is a failure.
+    id: "hermes.gateway-routing",
+    title: "Delegated workers route through the AutomaticAI gateway",
+    // Host-scoped: $HOME/.hermes/{config.yaml,agents-registry.yaml,profiles}.
+    scope: "host",
+    audit: (ctx) => {
+      const title = "Delegated workers route through the AutomaticAI gateway";
+      const roles = discoverRoles(ctx.repoRoot);
+      if (!roles.length) {
+        return { id: "hermes.gateway-routing", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
+      }
+      const fleetRoot = fleetHome(ctx);
+      const basePath = join(fleetRoot, "config.yaml");
+      const rawBase = safeReadText(basePath);
+      if (rawBase === null) {
+        // hermes.fleet-config owns a missing base; reporting it twice is noise.
+        return { id: "hermes.gateway-routing", title, status: "skip", summary: `fleet base config missing: ${basePath}`, details: [], fixable: false };
+      }
+      let base: any;
+      try {
+        base = YAML.parse(rawBase) ?? {};
+      } catch (err) {
+        return { id: "hermes.gateway-routing", title, status: "warn", summary: `fleet base config is unparseable YAML: ${basePath} (${(err as Error).message})`, details: [], fixable: false };
+      }
+
+      const details: string[] = [];
+      const isOpRef = (value: unknown) => typeof value === "string" && /^op:\/\/\S+$/u.test(value);
+      const blank = (value: unknown) => value === undefined || value === null || String(value).trim() === "";
+
+      // What a config's delegation block and gateway provider must look like.
+      const routingProblems = (cfg: any): string[] => {
+        const problems: string[] = [];
+        const provider = cfg?.providers?.[GATEWAY_PROVIDER];
+        const keyEnv = provider?.key_env;
+        if (!provider || typeof provider !== "object") {
+          problems.push(`no providers.${GATEWAY_PROVIDER} entry`);
+        } else {
+          if (!String(provider.api ?? "").includes(GATEWAY_HOST)) problems.push(`providers.${GATEWAY_PROVIDER}.api is "${provider.api ?? ""}", not the ${GATEWAY_HOST} gateway`);
+          if (blank(keyEnv)) problems.push(`providers.${GATEWAY_PROVIDER} has no key_env, so no key reaches the gateway`);
+          // Hermes sends delegation.reasoning_effort only when the child's provider is literally
+          // "custom", and a delegated child gets the configured NAME, so the effort never reaches
+          // the gateway and the route default applies (kimi-2.8 = max: the whole budget spent
+          // thinking). Provider extra_body is merged into every request and does arrive.
+          if (blank(provider.extra_body?.reasoning_effort)) problems.push(`providers.${GATEWAY_PROVIDER}.extra_body.reasoning_effort is unset: Hermes never sends delegation.reasoning_effort for a named provider, so the route's default effort applies (kimi-2.8 defaults to max)`);
+        }
+        const d = cfg?.delegation ?? {};
+        if (d.provider !== GATEWAY_PROVIDER) problems.push(`delegation.provider is "${d.provider ?? ""}", not "${GATEWAY_PROVIDER}": workers call a provider directly`);
+        if (!String(d.model ?? "").startsWith("automaticai/")) problems.push(`delegation.model is "${d.model ?? ""}", not a canonical automaticai/<account>/<model> route`);
+        if (!blank(d.base_url)) problems.push(`delegation.base_url is set ("${d.base_url}"): it overrides the provider, and with no api_key the child inherits the PARENT's key`);
+        if (!blank(d.api_key)) problems.push(`delegation.api_key is set: a literal or \${VAR} here reads plain os.environ, which never holds a desk's own key in the multiplexed gateway; use providers.${GATEWAY_PROVIDER}.key_env`);
+        const mapped = keyEnv ? cfg?.secrets?.onepassword?.env?.[String(keyEnv)] : undefined;
+        if (!blank(keyEnv) && blank(mapped)) problems.push(`secrets.onepassword.env maps no ${keyEnv}, so the gateway key is never injected`);
+        else if (!blank(mapped) && !isOpRef(mapped)) problems.push(`secrets.onepassword.env.${keyEnv} is not an op:// reference (a raw key must never be written to config)`);
+        return problems;
+      };
+
+      for (const problem of routingProblems(base)) details.push(`fleet base: ${problem}: ${basePath}`);
+
+      const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+      let onFleetKey = 0;
+      let members = 0;
+      const baseKeyEnv = String(base?.providers?.[GATEWAY_PROVIDER]?.key_env ?? "");
+      const fleetRef = baseKeyEnv ? base?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
+      for (const [agentId, raw] of Object.entries(registry ?? {})) {
+        const entry = (raw ?? {}) as Record<string, unknown>;
+        const profile = String(entry.profile_name || agentId);
+        const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
+        if (generated === null) continue;
+        let cfg: any = null;
+        try { cfg = YAML.parse(generated) ?? {}; } catch { cfg = null; }
+        if (cfg === null) continue;
+        members += 1;
+        // A member whose desk was rendered before the routing existed is stale, and
+        // the base check cannot see that.
+        for (const problem of routingProblems(cfg)) {
+          details.push(`${agentId}: ${problem}; re-render: hermes-profile-config.py render --profile ${profile}`);
+        }
+        const own = baseKeyEnv ? cfg?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
+        if (!blank(own) && own === fleetRef) onFleetKey += 1;
+      }
+
+      return {
+        id: "hermes.gateway-routing",
+        title,
+        status: details.length === 0 ? "pass" : "fail",
+        summary: details.length === 0
+          ? `Delegated workers route through the gateway; ${members - onFleetKey} of ${members} members carry their own token, ${onFleetKey} use the fleet token`
+          : `${details.length} gateway routing issue(s) detected`,
+        details,
+        // Fleet-wide, operator-owned values (and tokens are minted, not guessed).
+        fixable: false,
+      };
+    },
+    migrate: (ctx, finding) => ({
+      id: finding.id,
+      title: finding.title,
+      status: "blocked",
+      summary: "Gateway routing is operator-owned; pjangler will not guess accounts, routes or tokens",
+      changedFiles: [],
+      details: [
+        ...finding.details,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (providers.${GATEWAY_PROVIDER}, delegation, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
       ],
     }),
   },

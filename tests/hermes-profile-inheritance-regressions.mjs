@@ -88,6 +88,20 @@ const BASE_CONFIG = {
   // Hermes bounds every tool call (stock 420 s). A PM blocks in delegate_task until
   // its worker returns, so the stock bound cuts a real delegation short.
   timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
+  // Delegated workers go through the AutomaticAI gateway via a NAMED provider whose
+  // key_env Hermes resolves through the per-turn, per-profile secret scope.
+  providers: {
+    automaticai: {
+      name: "AutomaticAI",
+      api: "https://api.automaticai.io/v1",
+      key_env: "AUTOMATICAI_GATEWAY_KEY",
+      default_model: "automaticai/personal/kimi-2.8",
+      api_mode: "chat_completions",
+      extra_body: { reasoning_effort: "high" },
+    },
+  },
+  delegation: { provider: "automaticai", model: "automaticai/personal/kimi-2.8", base_url: "", api_key: "", api_mode: "", reasoning_effort: "high" },
+  secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "op://vault/tokens/hermes-fleet-workers" } } },
 };
 
 function yamlDump(obj) {
@@ -402,6 +416,89 @@ const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodba
   const out = audit(repo, fleet);
   assert.match(out, /slow-pm: timeouts\.tools: sequential_call is unset/, "a stale routable PM must be reported by name");
   assert.match(out, /render --profile slow-pm/, "the report must give the exact re-render command");
+}
+
+// 18. Delegated workers route through the AutomaticAI gateway (policy: all agent
+//     inference does). Each way of getting it wrong is silent: a base_url with no
+//     api_key makes the child inherit the PARENT's key; a ${VAR} api_key reads plain
+//     os.environ, which never holds a desk's own key in the multiplexed gateway.
+{
+  const out = audit(repo, makeFleet({ overrides: { delegation: { provider: "openrouter", model: "deepseek/deepseek-v4-flash", base_url: "", api_key: "" } } }));
+  assert.match(out, /fleet base: delegation\.provider is "openrouter", not "automaticai": workers call a provider directly/,
+    "a base whose workers use a direct provider must be reported");
+  assert.match(out, /delegation\.model is "deepseek\/deepseek-v4-flash", not a canonical automaticai\/<account>\/<model> route/,
+    "the model must be a canonical gateway route");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { delegation: { ...BASE_CONFIG.delegation, base_url: "https://api.automaticai.io/v1" } } }));
+  assert.match(out, /delegation\.base_url is set .* the child inherits the PARENT's key/,
+    "a delegation base_url must be reported with the inherited-key hazard");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { delegation: { ...BASE_CONFIG.delegation, api_key: "${AUTOMATICAI_GATEWAY_KEY}" } } }));
+  assert.match(out, /delegation\.api_key is set: a literal or \$\{VAR\} here reads plain os\.environ/,
+    "a ${VAR} api_key must be reported: it never sees a desk's own key");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { providers: null } }));
+  assert.match(out, /fleet base: no providers\.automaticai entry/, "a missing gateway provider must be reported");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { providers: { automaticai: { ...BASE_CONFIG.providers.automaticai, key_env: "" } } } }));
+  assert.match(out, /providers\.automaticai has no key_env, so no key reaches the gateway/, "a provider with no key_env has no key");
+}
+{
+  // Hermes only sends delegation.reasoning_effort for a provider literally named "custom";
+  // a delegated child gets the configured name, so without a provider extra_body effort the
+  // gateway applies the route default (kimi-2.8 = max).
+  const { extra_body: _dropped, ...noEffort } = BASE_CONFIG.providers.automaticai;
+  const out = audit(repo, makeFleet({ overrides: { providers: { automaticai: noEffort } } }));
+  assert.match(out, /providers\.automaticai\.extra_body\.reasoning_effort is unset: Hermes never sends delegation\.reasoning_effort for a named provider/,
+    "a gateway provider with no explicit effort must be reported: the route default is max");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { secrets: { onepassword: { enabled: true, env: {} } } } }));
+  assert.match(out, /secrets\.onepassword\.env maps no AUTOMATICAI_GATEWAY_KEY/, "an unmapped key variable must be reported");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "sk-not-a-reference" } } } } }));
+  assert.match(out, /AUTOMATICAI_GATEWAY_KEY is not an op:\/\/ reference \(a raw key must never be written to config\)/,
+    "a raw key in config must be reported");
+  assert.doesNotMatch(out, /sk-not-a-reference/, "the report must never echo the offending value");
+}
+{
+  const out = audit(repo, makeFleet({}));
+  assert.doesNotMatch(out, /delegation\.(provider|model|base_url|api_key)|providers\.automaticai|maps no AUTOMATICAI/, "a healthy base must not trip the routing rule");
+}
+
+// 19. Per member. The base can be right while a desk was rendered before the routing
+//     existed, and a member may carry its own token or inherit the fleet one.
+const PRE_ROUTING = { ...BASE_CONFIG, delegation: { provider: "openrouter", model: "deepseek/deepseek-v4-flash", base_url: "", api_key: "" } };
+const OWN_TOKEN = { ...BASE_CONFIG, secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "op://vault/tokens/hermes-own-pm" } } } };
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "old-pm", PRE_ROUTING);
+  writeRegistry(fleet, { "old-pm": { role: "pm", profile_name: "old-pm" } });
+  const out = audit(repo, fleet);
+  assert.match(out, /old-pm: delegation\.provider is "openrouter"/, "a member rendered before the routing must be reported by name");
+  assert.match(out, /render --profile old-pm/, "the report must give the exact re-render command");
+}
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "own-pm", OWN_TOKEN);
+  addProfile(fleet, "fleet-key-pm", BASE_CONFIG);
+  writeRegistry(fleet, { "own-pm": { role: "pm", profile_name: "own-pm" }, "fleet-key-pm": { role: "pm", profile_name: "fleet-key-pm" } });
+  const out = audit(repo, fleet);
+  assert.doesNotMatch(out, /own-pm:|fleet-key-pm:/, "a member with its own token, and one inheriting the fleet token, are both fine");
+}
+{
+  // The member override must also be an op:// reference.
+  const fleet = makeFleet({});
+  addProfile(fleet, "raw-pm", { ...BASE_CONFIG, secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "sk-raw-member-key" } } } });
+  writeRegistry(fleet, { "raw-pm": { role: "pm", profile_name: "raw-pm" } });
+  const out = audit(repo, fleet);
+  assert.match(out, /raw-pm: secrets\.onepassword\.env\.AUTOMATICAI_GATEWAY_KEY is not an op:\/\/ reference/, "a raw member key must be reported by name");
+  assert.doesNotMatch(out, /sk-raw-member-key/, "the report must never echo a member's raw key");
 }
 
 for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });

@@ -220,7 +220,7 @@ cleaning tracked backups.
 
 After the command, directly re-read `.project.json`, the registry row, profile
 files, and systemd state. `flume hire` already runs its own postcondition pass —
-the nine employee rules, plus a `pj audit --rules mise.config-root,sot.project-json
+the ten employee rules, plus a `pj audit --rules mise.config-root,sot.project-json
 --json` probe for the two project contracts it changes or depends on. A probe
 that cannot reach `pj` reports **unable to assess**, is surfaced, and does not
 fail the hire; treat that as an unread surface you still owe evidence for.
@@ -228,7 +228,7 @@ fail the hire; treat that as an unread surface you still owe evidence for.
 Run the applicable read-only checks yourself:
 
 ```bash
-flume audit --json                 # the nine employee rules for this repo
+flume audit --json                 # the ten employee rules for this repo
 flume review --agent <agent-id>    # nine observation domains, read-only
 python3 ~/code/33GOD/hermes-agent-template/scripts/hermes-profile-config.py check
 ```

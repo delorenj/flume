@@ -20,6 +20,7 @@
     "hermes.runtime-singleton",
     "hermes.fleet-config",
     "hermes.bloodbank-toolsets",
+    "hermes.gateway-routing",
     "hermes.delta-list-override",
     "hermes.profile-wiring",
     "hermes.registry-parity"

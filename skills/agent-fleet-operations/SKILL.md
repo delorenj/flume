@@ -262,7 +262,7 @@ process control, service changes, board changes, or Bloodbank activation.
 - Never duplicate fleet `mcp_servers` into a delta; the base owns them. A delta
   that redeclares a base LIST replaces it rather than extending it, which is what
   `hermes.delta-list-override` exists to catch.
-- **`flume audit` enforces all of this.** The nine employee rules and what each
+- **`flume audit` enforces all of this.** The ten employee rules and what each
   one actually reads:
 
   | rule | scope | reads |
@@ -273,6 +273,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection, generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
   | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher, `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
   | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills and `timeouts.tools.{sequential_call,concurrent_batch}` is ≥ 900 s (or 0); every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
+  | `hermes.gateway-routing` | host | delegated workers route through the AutomaticAI gateway: `providers.automaticai` with `key_env` and an explicit `extra_body.reasoning_effort`, `delegation.provider: automaticai` with a canonical route, no `delegation.base_url`/`api_key`, the key variable mapped to an `op://` reference in the base and in every member's generated config |
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
@@ -442,37 +443,49 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   that needs longer is cut regardless of the tool deadline.
 - **Workers go through the AutomaticAI gateway, not a direct provider.** Policy: all
   agent inference uses `api.automaticai.io` (skills `automaticai-provider-gateway`
-  and `automaticai-provider-gateway-lazy-migration-strategy`). A worker's model is
-  `delegation.*`, and the stock value was `deepseek/deepseek-v4-flash` via paid
-  OpenRouter: median 41 s per call, max 319 s, so a reconcile-sized task took ~36
-  min and outlived its turn. Now (staged on `flume-pm`): `model:
-  automaticai/personal/kimi-2.8`, `base_url: https://api.automaticai.io/v1`,
-  `api_mode: chat_completions`, `reasoning_effort: high`, `provider: ''`,
-  `api_key: ${AUTOMATICAI_GATEWAY_KEY}`; the same task took ~4 min. Traps:
-  - **`delegation.api_key` is mandatory.** With `base_url` set and no `api_key`,
-    Hermes has the child inherit the PARENT's key, so a desk's direct Kimi key would
+  and `automaticai-provider-gateway-lazy-migration-strategy`). Workers used to run on
+  `deepseek/deepseek-v4-flash` via paid OpenRouter (median 41 s per call, max 319 s:
+  a reconcile-sized task took ~36 min and outlived its PM's turn). The fleet base now
+  has a **named provider**, `providers.automaticai` (`api: https://api.automaticai.io/v1`,
+  `key_env: AUTOMATICAI_GATEWAY_KEY`, `extra_body: {reasoning_effort: high}`), and
+  `delegation.provider: automaticai`, `delegation.model: automaticai/personal/kimi-2.8`
+  with `base_url` and `api_key` left EMPTY. The same task takes ~4 min.
+  `hermes.gateway-routing` asserts all of it. Why it is built this way, and what each
+  wrong turn does:
+  - **Named provider + `key_env`, never `base_url` + `${VAR}`.** `key_env` resolves
+    through Hermes' per-turn, per-profile secret scope, so under the multiplexed
+    Bloodbank gateway each desk's OWN key is used. A `${VAR}` in a config value reads
+    plain `os.environ`, which never holds a desk's own key there, and stays a literal
+    `${...}` string when unset. And with `delegation.base_url` set and no `api_key`,
+    Hermes has the child **inherit the PARENT's key**: a desk's direct Kimi key would
     be sent to the gateway.
-  - **`${VAR}` needs the variable in the process.** An unset variable stays a literal
-    `${...}` string and the gateway answers 401. Secrets from
-    `secrets.onepassword.env` are applied at process START, so map
-    `AUTOMATICAI_GATEWAY_KEY` (an `op://` reference, never a value) in the delta of
-    **every process that runs the desk**: the desk's own gateway AND
-    `fleet-bloodbank-gateway` (it runs all Bloodbank turns), then restart both.
-    `/proc/<pid>/environ` will not show it (injection is in-process); the startup
-    line `1Password: applied N secrets` in `logs/gateway.systemd.log` should rise by one.
-  - **Do not flip the fleet base at once.** Delegation is used on Telegram, Slack,
-    CLI and cron paths; any gateway not yet restarted would send the literal
-    placeholder. Stage per desk, then promote with rolling restarts.
-  - **Use `automaticai/personal/kimi-2.8` at `high`,** not the default: the alias
-    defaults to `max`, which spent a whole 600-token budget thinking. It is the same
-    `kimi-for-coding` the PMs run. Mint the token per consumer with
-    `python3 ops/gateway-tokens.py mint <name> --models <routes>` in
-    `~/docker/stacks/ai/newapi` (name used: `hermes-fleet-workers`).
+  - **Effort must ride on the provider.** Hermes sends `reasoning_effort` only when
+    the child's provider is literally `custom`, but a delegated child is handed the
+    configured NAME, so `delegation.reasoning_effort` never reaches the gateway and the
+    route default applies (`kimi-2.8` = `max`, which spent a whole 600-token budget
+    thinking). `extra_body` on the provider entry is merged into every request and does
+    arrive. It applies to any agent using that provider.
+  - **One token per fleet member, with a fleet fallback.** The base maps
+    `secrets.onepassword.env.AUTOMATICAI_GATEWAY_KEY` to the FLEET token
+    (`hermes-fleet-workers`). A member overrides that one line in its
+    `config.delta.yaml` with its own `op://.../hermes-<profile>` for per-member tracking;
+    a desk without one inherits the fleet token. `scripts/gateway-member-tokens.py`
+    mints the tokens and writes those lines (`--apply --render`; dry run by default; it
+    verifies its own delta edits and never restarts anything).
+  - **Restart to pick up a new key.** Secrets are applied at process start (`1Password:
+    applied N secrets` in `logs/gateway.systemd.log`; `/proc/<pid>/environ` will not
+    show it). The fleet Bloodbank gateway hydrates each target profile's secrets once
+    per process, so a token changed in a delta needs that gateway restarted, as does
+    the desk's own Telegram/Slack gateway.
+  - **The gateway's login is rate-limited** (about 20 per 20 minutes; `gateway-tokens.py`
+    logs in on every call). 26 mints span two windows. A 429, and a burst of 409s
+    right after a success, are transient: wait, don't fail.
   - **Prove it from the gateway ledger, not the config:**
-    `docker exec newapi-postgres psql -U newapi -d newapi` on `logs` filtered by
-    `token_name like 'aai:hermes-fleet-workers%'`; `other::json` carries
-    `automaticai_account`, `upstream_model_name` and `automaticai_effective_effort`
-    (expect `kimi-personal`, `kimi-for-coding`, `high`, quota 0 = subscription).
+    `docker exec newapi-postgres psql -U newapi -d newapi`, table `logs`,
+    `token_name like 'aai:hermes-<profile>:%'`; `other::json` carries
+    `automaticai_account`, `upstream_model_name`, `automaticai_requested_effort` and
+    `automaticai_effort_defaulted`. Expect `kimi-personal`, `kimi-for-coding`, `high`,
+    `defaulted=false`, quota 0 (subscription), and the member's own consumer name.
   Still direct on every desk: the primary model, both fallbacks and about sixteen
   `auxiliary.*` selectors (mostly paid OpenRouter); see the plan for the decision.
   Measure worker speed as `assistant`-to-`assistant` gaps in the worker's session

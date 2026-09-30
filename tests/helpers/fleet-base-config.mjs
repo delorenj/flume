@@ -23,7 +23,9 @@ import YAML from "yaml";
  *   - skills.external_dirs must be non-empty or no agent sees any skill;
  *   - platform_toolsets.bloodbank must list delegation, terminal, file and
  *     skills (`hermes.bloodbank-toolsets`), or a Bloodbank-dispatched PM turn
- *     resolves to no native tools and cannot delegate a worker.
+ *     resolves to no native tools and cannot delegate a worker;
+ *   - providers.automaticai + delegation.provider + the mapped fleet token
+ *     (`hermes.gateway-routing`), or delegated workers call a provider directly.
  */
 export function fleetBaseConfig(homeDir) {
   const publisher = join(homeDir, ".agents", "hooks", "bloodbank", "publish.py");
@@ -46,6 +48,19 @@ export function fleetBaseConfig(homeDir) {
     },
     // Stock tool deadline is 420 s; a delegation blocks its PM for longer.
     timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
+    // Delegated workers go through the AutomaticAI gateway (`hermes.gateway-routing`).
+    providers: {
+      automaticai: {
+        name: "AutomaticAI",
+        api: "https://api.automaticai.io/v1",
+        key_env: "AUTOMATICAI_GATEWAY_KEY",
+        default_model: "automaticai/personal/kimi-2.8",
+        api_mode: "chat_completions",
+        extra_body: { reasoning_effort: "high" },
+      },
+    },
+    delegation: { provider: "automaticai", model: "automaticai/personal/kimi-2.8", base_url: "", api_key: "", api_mode: "", reasoning_effort: "high" },
+    secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "op://vault/tokens/hermes-fleet-workers" } } },
   };
 }
 
