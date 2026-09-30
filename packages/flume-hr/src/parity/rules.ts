@@ -1589,6 +1589,18 @@ function fleetHome(ctx: Context): string {
   return process.env.HERMES_FLEET_HOME || join(ctx.homeDir, ".hermes");
 }
 
+// What a Bloodbank-dispatched turn needs for a PM to hand work to a worker.
+// The bloodbank plugin registers no toolset of its own and PM desks do not
+// enable it, so without an explicit platform_toolsets.bloodbank list Hermes
+// resolves the platform to a nonexistent "hermes-bloodbank" composite: MCP
+// tools only, no delegate_task, no file, no terminal, and no error anywhere.
+// delegate_task runs synchronously on this platform (the adapter declares
+// supports_async_delivery = False), and a worker inherits the PM turn's
+// toolsets, so terminal and file are here for the workers.
+const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
+// The power a non-PM employee must NOT gain on an unattended turn.
+const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
+
 
 function fleetBinPath(ctx: Context): string {
   const candidates = [
@@ -2685,6 +2697,122 @@ return [
       details: finding.details.length
         ? [...finding.details, `Edit ${join(ctx.homeDir, ".hermes", "config.yaml")} directly, then re-run audit`]
         : [`Edit ${join(ctx.homeDir, ".hermes", "config.yaml")} directly, then re-run audit`],
+    }),
+  },
+  {
+    // Every command sent to a PM over Bloodbank -- grooming, delegation, all of
+    // it -- runs as a turn on the "bloodbank" platform, and the toolsets that
+    // turn gets come from platform_toolsets.bloodbank in the TARGET profile's
+    // generated config. Nothing ever set the key, so for two months no PM could
+    // delegate a worker: grooming worked (it needs only the Plane MCP), the
+    // delegation lane was silently unable to, and the PM claimed the ticket
+    // anyway. Found on FLUME-25 (2026-09-29), fixed under FLUME-26.
+    //
+    // Three invariants, because each fails differently and none of them errors:
+    //   1. the fleet base carries the list (else the next render drops it);
+    //   2. every bloodbank-routable PM's GENERATED config carries it (a desk that
+    //      was never re-rendered is stale and the base check cannot see that);
+    //   3. no routable non-PM employee (reporter, legal, director) has
+    //      delegation, terminal or file: they have always had none, and a render
+    //      of the base must never quietly widen a least-privilege desk.
+    id: "hermes.bloodbank-toolsets",
+    title: "Bloodbank-dispatched PM turns can delegate a worker",
+    // Host-scoped: $HOME/.hermes/{config.yaml,agents-registry.yaml,profiles}.
+    scope: "host",
+    audit: (ctx) => {
+      const title = "Bloodbank-dispatched PM turns can delegate a worker";
+      const roles = discoverRoles(ctx.repoRoot);
+      if (!roles.length) {
+        return { id: "hermes.bloodbank-toolsets", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
+      }
+      const fleetRoot = fleetHome(ctx);
+      const basePath = join(fleetRoot, "config.yaml");
+      const rawBase = safeReadText(basePath);
+      if (rawBase === null) {
+        // hermes.fleet-config owns a missing base; reporting it twice is noise.
+        return { id: "hermes.bloodbank-toolsets", title, status: "skip", summary: `fleet base config missing: ${basePath}`, details: [], fixable: false };
+      }
+      let base: any;
+      try {
+        base = YAML.parse(rawBase) ?? {};
+      } catch (err) {
+        return { id: "hermes.bloodbank-toolsets", title, status: "warn", summary: `fleet base config is unparseable YAML: ${basePath} (${(err as Error).message})`, details: [], fixable: false };
+      }
+
+      const listOf = (cfg: any): string[] | null => {
+        const value = cfg?.platform_toolsets?.bloodbank;
+        return Array.isArray(value) ? value.map(String) : null;
+      };
+      const details: string[] = [];
+
+      const baseList = listOf(base);
+      if (baseList === null) {
+        details.push(`fleet base has no platform_toolsets.bloodbank list -- Bloodbank-dispatched turns resolve to the nonexistent hermes-bloodbank toolset (MCP tools only): no PM can delegate, read files or run commands, and nothing errors. Add [${BLOODBANK_PM_TOOLSETS.join(", ")}] (plus todo, session_search, web) to ${basePath}`);
+      } else {
+        const missing = BLOODBANK_PM_TOOLSETS.filter((t) => !baseList.includes(t));
+        if (missing.length) {
+          details.push(`fleet base platform_toolsets.bloodbank is missing ${missing.join(", ")} -- a PM on a Bloodbank turn cannot delegate a worker without them: ${basePath}`);
+        }
+      }
+
+      const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+      for (const [agentId, raw] of Object.entries(registry ?? {})) {
+        const entry = (raw ?? {}) as Record<string, unknown>;
+        const bloodbank = entry.bloodbank;
+        // The gateway's own routing gate: a bloodbank block, and `enabled`
+        // either absent (no key means enabled) or exactly true.
+        if (!bloodbank || typeof bloodbank !== "object") continue;
+        const gate = bloodbank as Record<string, unknown>;
+        if ("enabled" in gate && gate.enabled !== true) continue;
+
+        const profile = String(entry.profile_name || agentId);
+        const isPm = String(entry.role ?? "") === "pm";
+        const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
+        let cfg: any = null;
+        if (generated !== null) {
+          try { cfg = YAML.parse(generated) ?? {}; } catch { cfg = null; }
+        }
+        if (isPm && cfg === null) {
+          details.push(`${agentId}: routable PM with no readable generated config at ${join(fleetRoot, "profiles", profile, "config.yaml")}`);
+          continue;
+        }
+        const list = listOf(cfg);
+        if (isPm) {
+          if (list === null) {
+            details.push(`${agentId}: no platform_toolsets.bloodbank in its generated config -- its Bloodbank turns cannot delegate, read files or run commands, and nothing errors; re-render: hermes-profile-config.py render --profile ${profile}`);
+          } else {
+            const missing = BLOODBANK_PM_TOOLSETS.filter((t) => !list.includes(t));
+            if (missing.length) details.push(`${agentId}: platform_toolsets.bloodbank is missing ${missing.join(", ")}; re-render or fix its delta: hermes-profile-config.py render --profile ${profile}`);
+          }
+        } else if (list !== null) {
+          const power = BLOODBANK_POWER_TOOLSETS.filter((t) => list.includes(t));
+          if (power.length) {
+            details.push(`${agentId} (role ${String(entry.role ?? "unknown")}) is not a delegating PM but its Bloodbank turns can use ${power.join(", ")}; pin it in ${join(fleetRoot, "profiles", profile, "config.delta.yaml")} with x-pjangler-merge list_patches platform_toolsets.bloodbank remove`);
+          }
+        }
+      }
+
+      return {
+        id: "hermes.bloodbank-toolsets",
+        title,
+        status: details.length === 0 ? "pass" : "fail",
+        summary: details.length === 0 ? "Bloodbank-dispatched PM turns can delegate; restricted employees stay restricted" : `${details.length} Bloodbank toolset issue(s) detected`,
+        details,
+        // Fleet-wide, operator-owned values: a wrong guess would change what
+        // every agent can do at once, so this reports and lets the operator edit.
+        fixable: false,
+      };
+    },
+    migrate: (ctx, finding) => ({
+      id: finding.id,
+      title: finding.title,
+      status: "blocked",
+      summary: "Bloodbank toolsets are operator-owned; pjangler will not guess what an unattended turn may do",
+      changedFiles: [],
+      details: [
+        ...finding.details,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (platform_toolsets.bloodbank), then re-render each named desk with hermes-profile-config.py render --profile <name>. Do not use render --all while legacy profiles without a config.delta.yaml exist.`,
+      ],
     }),
   },
   {

@@ -20,7 +20,10 @@ import YAML from "yaml";
  *   - all four Bloodbank lifecycle hooks must call the canonical publisher;
  *   - memory.provider must be set, and "memory" must not be muzzled in
  *     agent.disabled_toolsets;
- *   - skills.external_dirs must be non-empty or no agent sees any skill.
+ *   - skills.external_dirs must be non-empty or no agent sees any skill;
+ *   - platform_toolsets.bloodbank must list delegation, terminal, file and
+ *     skills (`hermes.bloodbank-toolsets`), or a Bloodbank-dispatched PM turn
+ *     resolves to no native tools and cannot delegate a worker.
  */
 export function fleetBaseConfig(homeDir) {
   const publisher = join(homeDir, ".agents", "hooks", "bloodbank", "publish.py");
@@ -38,6 +41,9 @@ export function fleetBaseConfig(homeDir) {
     memory: { provider: "hindsight" },
     agent: { disabled_toolsets: [] },
     skills: { external_dirs: [join(homeDir, ".agents", "skills")] },
+    platform_toolsets: {
+      bloodbank: ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"],
+    },
   };
 }
 

@@ -198,6 +198,8 @@ const RULE_DOMAIN: Readonly<Record<string, FleetStatusDomain>> = Object.freeze({
   "systemd.sentinel": "systemd",
   // The fleet-shared Bloodbank gateway's own configuration.
   "hermes.fleet-config": "bloodbank",
+  // What a Bloodbank-dispatched turn may do: can a PM delegate a worker.
+  "hermes.bloodbank-toolsets": "bloodbank",
   // Registry parity between the two canonical stores.
   "hermes.registry-parity": "registry",
   // The org-wide rules (`src/parity/reconcile.ts`), which answer for the

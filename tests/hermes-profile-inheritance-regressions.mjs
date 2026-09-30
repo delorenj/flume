@@ -80,6 +80,11 @@ const BASE_CONFIG = {
   plugins: { enabled: ["tts/vox", "telegram-platform", "openai-codex"] },
   // An OBJECT-valued list, the shape real deltas carry for providers.
   fallback_providers: [{ provider: "openai-codex", model: "gpt-5.6-sol" }],
+  // What a Bloodbank-dispatched PM turn gets. Without it Hermes resolves the
+  // platform to a nonexistent "hermes-bloodbank" toolset (MCP tools only).
+  platform_toolsets: {
+    bloodbank: ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"],
+  },
 };
 
 function yamlDump(obj) {
@@ -129,6 +134,25 @@ function makeFleet({ overrides = {}, profileMode = "rendered", profile = "demo-p
   }
   return fleet;
 }
+
+// A registry in the fleet home, and extra rendered desks to match it. The
+// bloodbank-toolsets rule reads both from the fleet home, so a fixture never
+// touches the real ~/.hermes.
+function writeRegistry(fleet, agents) {
+  writeFileSync(join(fleet, "agents-registry.yaml"), yamlDump({ agents }));
+}
+
+function addProfile(fleet, name, cfg) {
+  const pdir = join(fleet, "profiles", name);
+  mkdirSync(pdir, { recursive: true });
+  writeFileSync(join(pdir, "config.yaml"), `# GENERATED FILE -- DO NOT EDIT.\n${yamlDump(cfg)}`);
+  writeFileSync(join(pdir, "config.delta.yaml"), "{}\n");
+}
+
+// A desk rendered before the list existed: the generated config has no bloodbank key.
+const NO_BLOODBANK = { ...BASE_CONFIG, platform_toolsets: undefined };
+const withBloodbank = (list) => ({ ...BASE_CONFIG, platform_toolsets: { bloodbank: list } });
+const PM_LIST = ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"];
 
 function audit(repo, fleet) {
   const r = spawnSync("node", [cli, "audit"], {
@@ -270,6 +294,78 @@ const { repo } = makeRepo();
   }));
   assert.match(out, /fallback_providers drops 1 fleet entry/,
     "a genuinely replaced object entry must still be reported");
+}
+
+// 14. Bloodbank-dispatched turns. The plugin registers no toolset and PM desks
+//     do not enable it, so with no platform_toolsets.bloodbank list Hermes falls
+//     back to a nonexistent "hermes-bloodbank" toolset: MCP tools only, nothing
+//     errors, and no PM can delegate a worker. FLUME-25 found it; FLUME-26.
+{
+  const out = audit(repo, makeFleet({ overrides: { platform_toolsets: null } }));
+  assert.match(out, /no platform_toolsets\.bloodbank list/, "a base with no bloodbank toolset list must be reported");
+  assert.match(out, /hermes-bloodbank/, "the report must name the nonexistent fallback so the reader knows why it is silent");
+}
+{
+  const out = audit(repo, makeFleet({ overrides: { platform_toolsets: { bloodbank: ["todo", "web"] } } }));
+  assert.match(out, /platform_toolsets\.bloodbank is missing delegation, terminal, file, skills/,
+    "a list without the delegating toolsets must name exactly what is missing");
+}
+{
+  const out = audit(repo, makeFleet({}));
+  assert.doesNotMatch(out, /platform_toolsets\.bloodbank/, "a healthy base must not trip the bloodbank toolset rule");
+}
+
+// 15. Per-employee. The base can be right while a desk was never re-rendered:
+//     a routable PM whose GENERATED config lacks the list is just as unable to
+//     delegate, and only a per-desk check can see it.
+const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodbank: { enabled: true, ...extra } });
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "stale-pm", NO_BLOODBANK); // rendered before the list existed
+  writeRegistry(fleet, { "stale-pm": { ...routable("pm"), profile_name: "stale-pm" } });
+  const out = audit(repo, fleet);
+  assert.match(out, /stale-pm: no platform_toolsets\.bloodbank in its generated config/,
+    "a routable PM that was never re-rendered must be reported by name");
+  assert.match(out, /render --profile stale-pm/, "the report must give the exact re-render command");
+}
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "fresh-pm", withBloodbank(PM_LIST));
+  writeRegistry(fleet, { "fresh-pm": { ...routable("pm"), profile_name: "fresh-pm" } });
+  assert.doesNotMatch(audit(repo, fleet), /fresh-pm:/, "a routable PM carrying the list must not be reported");
+}
+{
+  // `enabled` absent means enabled (the gateway's own gate), so it is routable.
+  const fleet = makeFleet({});
+  addProfile(fleet, "implicit-pm", NO_BLOODBANK);
+  writeRegistry(fleet, { "implicit-pm": { role: "pm", profile_name: "implicit-pm", bloodbank: { gateway_scope: "fleet" } } });
+  assert.match(audit(repo, fleet), /implicit-pm: no platform_toolsets\.bloodbank/,
+    "a bloodbank block with no enabled key is routable and must be checked");
+}
+{
+  // Routing switched off: the PM is not reachable over Bloodbank, so the list is moot.
+  const fleet = makeFleet({});
+  addProfile(fleet, "off-pm", NO_BLOODBANK);
+  writeRegistry(fleet, { "off-pm": { role: "pm", profile_name: "off-pm", bloodbank: { enabled: false } } });
+  assert.doesNotMatch(audit(repo, fleet), /off-pm:/, "a PM with routing disabled must not be reported");
+}
+
+// 16. Least privilege. A routable employee that is NOT a delegating PM has never
+//     had terminal, file or delegation on an unattended turn, and rendering the
+//     base must not quietly hand them over.
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "widened", withBloodbank(PM_LIST));
+  writeRegistry(fleet, { widened: { ...routable("reporter"), profile_name: "widened" } });
+  const out = audit(repo, fleet);
+  assert.match(out, /widened \(role reporter\) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file/,
+    "a restricted employee that gained the power trio must be reported");
+}
+{
+  const fleet = makeFleet({});
+  addProfile(fleet, "pinned", withBloodbank([]));
+  writeRegistry(fleet, { pinned: { ...routable("director"), profile_name: "pinned" } });
+  assert.doesNotMatch(audit(repo, fleet), /pinned \(role/, "a restricted employee pinned to no toolsets must not be reported");
 }
 
 for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });

@@ -262,7 +262,7 @@ process control, service changes, board changes, or Bloodbank activation.
 - Never duplicate fleet `mcp_servers` into a delta; the base owns them. A delta
   that redeclares a base LIST replaces it rather than extending it, which is what
   `hermes.delta-list-override` exists to catch.
-- **`flume audit` enforces all of this.** The eight employee rules and what each
+- **`flume audit` enforces all of this.** The nine employee rules and what each
   one actually reads:
 
   | rule | scope | reads |
@@ -272,6 +272,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `systemd.sentinel` | host | gateway unit installed and matching each role's declared `service_state` |
   | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection, generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
   | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher, `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
+  | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills; every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
@@ -369,6 +370,64 @@ process control, service changes, board changes, or Bloodbank activation.
 - Before a live command proof, audit the current target's Bloodbank registry
   eligibility. Never enable a target merely to make a smoke test pass; command
   dispatch invokes a real agent and requires explicit operational authority.
+
+## What a PM can do on an unattended Bloodbank turn
+
+Every command sent to a PM over Bloodbank (grooming, delegation, anything) runs
+as a turn on the `bloodbank` platform. The toolsets that turn gets come from
+`platform_toolsets.bloodbank` in the **target desk's generated `config.yaml`**
+(the gateway scopes each turn to the target profile, not to
+`fleet-bloodbank-gateway`).
+
+- **No list means no native tools, and nothing errors.** The bloodbank plugin
+  registers no toolset and PM desks do not enable it, so Hermes falls back to a
+  nonexistent `hermes-bloodbank` composite: MCP tools only. Grooming still works
+  (Plane MCP), so the fleet looked healthy while no PM could `delegate_task`,
+  read a file or run a command. Found on FLUME-25 (2026-09-29), fixed under
+  FLUME-26. Verify with Hermes' own resolver, not by reading YAML: run
+  `hermes_cli.tools_config._get_platform_tools(cfg, "bloodbank")` under the
+  target `HERMES_HOME`.
+- **Canonical list (fleet base, `~/.hermes/config.yaml`):** `delegation, skills,
+  todo, session_search, terminal, file, web`. Deliberately absent: `clarify` (no
+  human is present), `cronjob`, `kanban`, `code_execution`, `browser`.
+  `hermes.bloodbank-toolsets` asserts it.
+- **Delegation is synchronous here.** The adapter declares
+  `supports_async_delivery = False`, so `delegate_task` runs inline: the PM's
+  turn blocks until the worker returns and `invocation.completed` fires when the
+  work is done. A worker gets the PM turn's toolsets minus `delegation`,
+  `clarify`, `memory`, `send_message`, `cronjob` and `kanban`, so `terminal` and
+  `file` are on the PM's list **for its workers**. A worker can never exceed the
+  PM turn's own power.
+- **Routable non-PM employees stay restricted.** A reporter, legal assistant or
+  director that is routable over Bloodbank has always had no native tools. Pin
+  that in its `config.delta.yaml` with
+  `x-pjangler-merge: list_patches: platform_toolsets.bloodbank: remove: [...]`.
+  Do **not** write `platform_toolsets.bloodbank: []` in a delta: it works, but it
+  is exactly the list override `hermes.delta-list-override` reports.
+- **Rolling it out.** Edit the base, then `hermes-profile-config.py render
+  --profile <name>` per desk. Never `render --all` while legacy desks without a
+  `config.delta.yaml` exist (`check` lists them). If you script the loop in zsh,
+  iterate with `while IFS= read -r p`, not `for p in $VAR`: zsh does not
+  word-split, the whole list becomes one argument, and a `grep` on the error text
+  can look like success. Verify with `hermes-profile-config.py check`, not with
+  the renderer's own output line.
+- **Sessions are per ticket, so a config change reaches a ticket only when its
+  session rotates.** A ticket's grooming and delegation turns share one session
+  (`agent:<pm>:bloodbank:dm:bloodbank:<thread>`), and it keeps the tool schema it
+  was created with until `session_reset` (04:00 local or 24 h idle). A ticket
+  groomed before the fix cannot delegate after it, and looks exactly like the
+  bug. Prove a fix on a **fresh ticket**.
+- **Proving dispatch end to end.** File a ticket whose worker task has an answer
+  you compute yourself (e.g. `sha256sum` of a file and `wc -l` of another, read
+  only), move it to Todo, and read the PM's session from
+  `~/.hermes/profiles/fleet-bloodbank-gateway/state.db` (`sessions.title`,
+  `messages.tool_name`): expect a `delegate_task` call, a worker result matching
+  your numbers, a clean checkout, and a comment on the ticket. An `invocation.completed`
+  event alone proves nothing about the work.
+- **Known gaps.** Nothing structural stops a delegation turn from claiming a
+  ticket In Progress without a worker (the prompt's rule is prose only).
+  `max_inflight: 4` is a fleet-wide cap and a worker holds a slot for its whole
+  run. `agent.gateway_timeout: 1800` caps one turn at 30 minutes.
 
 ## Named agents (posts vs. people)
 

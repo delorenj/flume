@@ -19,6 +19,7 @@
     "systemd.sentinel",
     "hermes.runtime-singleton",
     "hermes.fleet-config",
+    "hermes.bloodbank-toolsets",
     "hermes.delta-list-override",
     "hermes.profile-wiring",
     "hermes.registry-parity"
