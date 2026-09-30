@@ -17,11 +17,19 @@
     "type": "plane",
     "workspace": "33god",
     "identifier": "FLUME",
-    "identifier_source": "proposed",
+    "identifier_source": "provider",
     "board_id": "bf5663f0-8d37-41c6-97a3-437d45d64523",
-    "state": "linked"
+    "state": "linked",
+    "identifier_fetched_at": "2026-09-29T23:48:39.969Z",
+    "board_confirmed_at": "2026-09-29T23:48:39.969Z"
   },
-  "agents": {},
+  "agents": {
+    "flume-pm": {
+      "role": "pm",
+      "role_dir": "agents/hermes/pm",
+      "provisioning_state": "provisioned"
+    }
+  },
   "notebook": {
     "binding": {
       "state": "planned",

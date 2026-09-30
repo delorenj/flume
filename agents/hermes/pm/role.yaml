@@ -1,0 +1,128 @@
+# Hermes agent role manifest.  Tracked in the PROJECT repository.
+# The agent's actual state (memory, sessions, evolving SOUL) lives in the
+# ignored local runtime. This file is the immutable contract for this role.
+
+repo: "flume"
+role: "pm"
+agent_id: "flume-pm"
+display_name: "Flume PM"
+purpose: "pm agent for flume"
+
+# Personality tone -- a key in the flume repo's `roles/_tones.yaml`.
+#
+# PERSISTED, and that is the point. Tone used to be a hire-time-only copier
+# variable that was written into SOUL.md prose and then forgotten, so
+# re-composing a deployed agent had no way to reproduce the operator's choice
+# and would silently normalise the whole fleet to `direct`. Roles provisioned
+# before this field existed are recovered by recognising the tone paragraph
+# already in their soul; every role provisioned from here carries its answer.
+soul_tone: "direct"
+
+# Process-local gateway inference target (empty = inherit from shared
+# ~/.hermes/config.yaml). key_env is a variable NAME only; its secret value is
+# injected at runtime and must never be written here.
+model:
+  provider: ""
+  name: ""
+  base_url: ""
+  api_mode: ""
+  key_env: ""
+
+# Hermes profile name. ~/.hermes/profiles/<name> is a REAL directory managed by
+# `flume remediate hermes.runtime-singleton`: shared config/auth/skills link to the
+# fleet root while role-owned state links into ./runtime. Never replace the
+# named profile with a symlink to runtime.
+profile: "flume-pm"
+
+# Telegram bot identity (one bot per agent — see docs/architecture.md).
+telegram:
+  provisioning_status: "verified"
+  bot_username: "flume_pm_bot"
+  bot_id: "8229944381"
+
+# Slack is opt-in. Credentials live in 1Password and the profile maps only
+# op:// references; this block records safe state and auth.test identity.
+slack:
+  provisioning_status: "deferred"
+  team_id: ""
+  team_name: ""
+  bot_user_id: ""
+  bot_id: ""
+  bot_username: ""
+
+# Ticket-provider binding (linear | plane | trello).
+# The heartbeat reconciliation pass talks ONLY to this via .scripts/lib/ticket-provider.sh;
+# swapping providers is a one-line change here. Filled in by 42-ticket-provider.sh.
+ticket_provider:
+  name: "plane"
+  board_id: "bf5663f0-8d37-41c6-97a3-437d45d64523"
+  workspace: "33god"
+  project: "bf5663f0-8d37-41c6-97a3-437d45d64523"
+  timezone: "" # IANA project calendar; empty = TICKET_PROVIDER_TIMEZONE, TZ, then host-local
+  # Optional normalized-state name overrides for non-standard boards.
+  backlog: "" # e.g. "Backlog"
+  unstarted: "" # e.g. "Todo"
+  started: "" # e.g. "In Progress"
+  in_review: "" # e.g. "In Review"
+  completed: "" # e.g. "Done"
+  cancelled: "" # e.g. "Cancelled"
+  # Optional extended transition targets. A role enables one by naming its
+  # lane here; left out, `tp transition <id> <state>` refuses it with
+  # "ticket_provider.<state> is required" (Plane defaults awaiting_decision to
+  # "Needs Attention"). Aliases: needs_attention/waiting_reply ->
+  # awaiting_decision, ready_for_e2e -> e2e_testing.
+  # awaiting_decision: ""        # started group, e.g. "Awaiting Decision"
+  # e2e_testing: ""              # started group, e.g. "E2E Testing & QA"
+  # ready_for_documentation: ""  # started group, e.g. "Ready for Documentation"
+  # needs_re_evaluation: ""      # unstarted group, e.g. "Needs Re-evaluation"
+
+  # Board-reconciliation knobs for the heartbeat sentinel pass.
+reconcile:
+  enabled: true
+  explicit_opt_out: false
+  grace_hours: 0 # 0 = no human-approval wait (adversarially-reviewed review-lane = done); set >0 to require a wait
+  auto_review: true # autonomous adversarial review (act, do not wait) on/off
+
+# Plane project (1:1 with this agent) — retained for fleet-registry back-compat.
+plane:
+  # Empty -> resolved from ~/.config/hermes-agent-template/config.toml [plane].workspace
+  workspace: "33god"
+  # identifier is set by .scripts/42-ticket-provider.sh after creation (plane only)
+  identifier: "FLUME"
+
+# Bloodbank ingress is owned by one fleet-shared Hermes gateway. The gateway
+# reads the fleet registry and routes canonical commands by target_agent_id;
+# this profile does not install its own NATS consumer or inbox bridge.
+bloodbank:
+  # Activation gate: default on. An absent key also means enabled; set this to
+  # false (the strict YAML boolean) to quarantine the agent from dispatch.
+  enabled: true
+  gateway_scope: fleet
+  target_agent_id: "flume-pm"
+  producer: "hermes-agent:flume-pm"
+
+# Reconciled by 70-systemd.sh. These are lifecycle observations, not desired
+# state: gateway stays deferred until a dedicated chat credential is verified;
+# heartbeat is independent and drives PM board reconciliation by default.
+service_state:
+  gateway: "active"
+  heartbeat: "retired"
+
+# Pure-local role-owned state. HERMES_HOME itself is the named profile directory
+# above; the legacy GitHub identity remains metadata-only for locating old
+# archives, and provisioning never creates or attaches a submodule.
+runtime:
+  # Empty owner -> resolved from config.toml [github].runtime_repo_owner.
+  github_owner: ""
+  github_repo: "agent-hm-flume-pm"
+  local_path: "./runtime"
+  checkpoint:
+    cadence: "disabled"
+    on_session_end: false
+
+# Provenance — managed by the template, do not hand-edit.
+provisioned_at: "2026-09-29T19:48:31Z"
+provisioned_by: hermes-agent-template
+deployment:
+  local_only: false
+  systemd: required
