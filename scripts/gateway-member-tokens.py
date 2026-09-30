@@ -40,7 +40,18 @@ ENV_NAME = "AUTOMATICAI_GATEWAY_KEY"
 # One shared 1Password item ("AutomaticAI Gateway Tokens"); each consumer's token is a
 # field named after the consumer. gateway-tokens.py prints the same reference on mint.
 TOKENS_ITEM = "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki"
-DEFAULT_MODELS = ["automaticai/personal/kimi-2.8", "automaticai/personal/kimi-k3"]
+DEFAULT_MODELS = [
+    "automaticai/personal/sol-6.1",
+    "automaticai/personal/sol",
+    "automaticai/personal/astra",
+    "automaticai/personal/claude-opus-5.5",
+    "automaticai/intelliforia/claude-opus-5.5",
+    "automaticai/personal/kimi-k3",
+    "automaticai/personal/kimi-k3s",
+    "automaticai/personal/kimi-2.8",
+    "automaticai/personal/glm-5.3",
+    "automaticai/personal/glm-5.3-flash",
+]
 REF_RE = re.compile(r"op://\S+")
 COMMENT = (
     "# Per-member AutomaticAI gateway token (tracking). Overrides the fleet token the base maps\n"

@@ -1603,6 +1603,18 @@ const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
 // The named provider that carries delegated workers to the AutomaticAI gateway.
 const GATEWAY_PROVIDER = "automaticai";
 const GATEWAY_HOST = "api.automaticai.io";
+const GATEWAY_MODELS = [
+  "automaticai/personal/sol-6.1",
+  "automaticai/personal/sol",
+  "automaticai/personal/astra",
+  "automaticai/personal/claude-opus-5.5",
+  "automaticai/intelliforia/claude-opus-5.5",
+  "automaticai/personal/kimi-k3",
+  "automaticai/personal/kimi-k3s",
+  "automaticai/personal/kimi-2.8",
+  "automaticai/personal/glm-5.3",
+  "automaticai/personal/glm-5.3-flash",
+] as const;
 // A PM blocks inside delegate_task until its worker returns, and Hermes bounds
 // every tool call by timeouts.tools.{sequential_call,concurrent_batch}
 // (stock 420 s, 0 disables). A real delegation outlasts that: the call errors,
@@ -2895,6 +2907,12 @@ return [
         } else {
           if (!String(provider.api ?? "").includes(GATEWAY_HOST)) problems.push(`providers.${GATEWAY_PROVIDER}.api is "${provider.api ?? ""}", not the ${GATEWAY_HOST} gateway`);
           if (blank(keyEnv)) problems.push(`providers.${GATEWAY_PROVIDER} has no key_env, so no key reaches the gateway`);
+          const configuredModels = new Set<string>(Array.isArray(provider.models) ? provider.models.map(String) : []);
+          const requiredModels = new Set<string>(GATEWAY_MODELS);
+          const missingModels = GATEWAY_MODELS.filter((model) => !configuredModels.has(model));
+          const extraModels = [...configuredModels].filter((model) => !requiredModels.has(model));
+          if (missingModels.length) problems.push(`providers.${GATEWAY_PROVIDER}.models omits ${missingModels.join(", ")}`);
+          if (extraModels.length) problems.push(`providers.${GATEWAY_PROVIDER}.models adds uncurated route(s): ${extraModels.join(", ")}`);
           // Hermes sends delegation.reasoning_effort only when the child's provider is literally
           // "custom", and a delegated child gets the configured NAME, so the effort never reaches
           // the gateway and the route default applies (kimi-2.8 = max: the whole budget spent

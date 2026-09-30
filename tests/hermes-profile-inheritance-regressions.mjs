@@ -64,6 +64,18 @@ function makeRepo() {
 const FLEET_HOME = mkdtempSync(join(tmpdir(), "hermes-fleet-home-"));
 const hookCommand = (hook) =>
   `python3 ${join(FLEET_HOME, ".agents", "hooks", "bloodbank", "publish.py")} --client hermes --hook ${hook}`;
+const GATEWAY_MODELS = [
+  "automaticai/personal/sol-6.1",
+  "automaticai/personal/sol",
+  "automaticai/personal/astra",
+  "automaticai/personal/claude-opus-5.5",
+  "automaticai/intelliforia/claude-opus-5.5",
+  "automaticai/personal/kimi-k3",
+  "automaticai/personal/kimi-k3s",
+  "automaticai/personal/kimi-2.8",
+  "automaticai/personal/glm-5.3",
+  "automaticai/personal/glm-5.3-flash",
+];
 
 const BASE_CONFIG = {
   tts: { provider: "vox", vox: { voice: "carlin" } },
@@ -98,6 +110,7 @@ const BASE_CONFIG = {
       default_model: "automaticai/personal/kimi-2.8",
       api_mode: "chat_completions",
       extra_body: { reasoning_effort: "high" },
+      models: GATEWAY_MODELS,
     },
   },
   delegation: { provider: "automaticai", model: "automaticai/personal/kimi-2.8", base_url: "", api_key: "", api_mode: "", reasoning_effort: "high" },
@@ -446,6 +459,18 @@ const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodba
 {
   const out = audit(repo, makeFleet({ overrides: { providers: { automaticai: { ...BASE_CONFIG.providers.automaticai, key_env: "" } } } }));
   assert.match(out, /providers\.automaticai has no key_env, so no key reaches the gateway/, "a provider with no key_env has no key");
+}
+{
+  const legacyCatalog = { ...BASE_CONFIG.providers.automaticai, models: ["automaticai/personal/kimi-2.8", "automaticai/personal/kimi-k3"] };
+  const out = audit(repo, makeFleet({ overrides: { providers: { automaticai: legacyCatalog } } }));
+  assert.match(out, /providers\.automaticai\.models omits automaticai\/personal\/sol-6\.1/,
+    "the legacy two-model Hermes catalog must be reported as incomplete");
+}
+{
+  const paidCatalog = { ...BASE_CONFIG.providers.automaticai, models: [...GATEWAY_MODELS, "automaticai/openrouter/claude-opus-5.5"] };
+  const out = audit(repo, makeFleet({ overrides: { providers: { automaticai: paidCatalog } } }));
+  assert.match(out, /providers\.automaticai\.models adds uncurated route\(s\): automaticai\/openrouter\/claude-opus-5\.5/,
+    "a paid route outside the curated Hermes catalog must be reported");
 }
 {
   // Hermes only sends delegation.reasoning_effort for a provider literally named "custom";

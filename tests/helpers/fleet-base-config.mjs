@@ -32,6 +32,18 @@ export function fleetBaseConfig(homeDir) {
   const hook = (name) => [
     { command: `python3 ${publisher} --client hermes --hook ${name}`, timeout: 5 },
   ];
+  const gatewayModels = [
+    "automaticai/personal/sol-6.1",
+    "automaticai/personal/sol",
+    "automaticai/personal/astra",
+    "automaticai/personal/claude-opus-5.5",
+    "automaticai/intelliforia/claude-opus-5.5",
+    "automaticai/personal/kimi-k3",
+    "automaticai/personal/kimi-k3s",
+    "automaticai/personal/kimi-2.8",
+    "automaticai/personal/glm-5.3",
+    "automaticai/personal/glm-5.3-flash",
+  ];
   return {
     tts: { provider: "vox", vox: { voice: "carlin" } },
     hooks: {
@@ -57,6 +69,7 @@ export function fleetBaseConfig(homeDir) {
         default_model: "automaticai/personal/kimi-2.8",
         api_mode: "chat_completions",
         extra_body: { reasoning_effort: "high" },
+        models: gatewayModels,
       },
     },
     delegation: { provider: "automaticai", model: "automaticai/personal/kimi-2.8", base_url: "", api_key: "", api_mode: "", reasoning_effort: "high" },
