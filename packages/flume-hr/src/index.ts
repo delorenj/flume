@@ -92,7 +92,7 @@ program
     // registry write is an upsert, so a second pass is a no-op that proves the
     // first one held. `--force` is deliberately not offered: onboarding an
     // employee must never be a way to overwrite one.
-    await runHire(title, { ...options, yes: true, force: false });
+    await runHire(title, { ...options, yes: true, force: false, onboard: true });
   });
 
 async function runHire(title: string, options: Record<string, unknown>): Promise<void> {
@@ -100,6 +100,7 @@ async function runHire(title: string, options: Record<string, unknown>): Promise
   const local = Boolean(options.local ?? false);
   const context: HermesAgentContext = {
     targetDir: process.cwd(),
+    onboard: Boolean(options.onboard),
     force: Boolean(options.force ?? false),
     dryRun: Boolean(options.dryRun ?? false),
     yes: Boolean(options.yes ?? false),

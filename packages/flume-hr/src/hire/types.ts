@@ -9,6 +9,7 @@ import type { TrustedCopierIdentity } from "../kernel/preflight";
  * fields populated before downstream commands run.
  */
 export interface HermesAgentContext extends CommandContext {
+  onboard?: boolean;
   // --- collected/provided ---
   targetRepo?: string;        // basename($PWD) by default
   role?: string;              // "pm" by default

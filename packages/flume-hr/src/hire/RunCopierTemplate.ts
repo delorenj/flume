@@ -141,6 +141,9 @@ export class RunCopierTemplate extends Command {
       "Hermes role directory",
     );
     ctx.roleDir = roleDir;
+    if (ctx.onboard && existsSync(join(roleDir, "role.yaml"))) {
+      return { success: true, outcome: "unchanged", message: `Onboarding existing role at ${roleDir}; Copier not re-run` };
+    }
     const nonInteractiveRefusal = (ctx.yes || ctx.quiet) && !ctx.force
       ? existingRoleRefusal(roleDir)
       : undefined;

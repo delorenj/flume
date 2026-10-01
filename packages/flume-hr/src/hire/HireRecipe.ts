@@ -1,3 +1,4 @@
+import { ProjectRoleDeclaration } from "./ProjectRoleDeclaration";
 import { Recipe, mergeInitResults } from "../engine/Recipe";
 import { EnsureTemplateConfig } from "./EnsureTemplateConfig";
 import { PromptForAgentConfig } from "./PromptForAgentConfig";
@@ -130,6 +131,7 @@ export class HireRecipe extends Recipe {
       UntrackHermesRuntimes,
       WireTelegram,
       WireEmail,
+      ProjectRoleDeclaration,
     ] as const;
     for (const [ingredientIndex, CommandClass] of ingredients.entries()) {
       if (typeof CommandClass !== "function") {

@@ -749,6 +749,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     const node = nodesById.get(agent.id);
     if (!node) continue;
 
+    node.department = placements.get(agent.id)?.department ?? null;
     // 1. the registry's own field wins outright.
     if (agent.reports_to) {
       const target = resolveTarget(agent, agent.reports_to);
@@ -757,7 +758,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
         node.edge = "registry";
         node.inferred = false;
         node.note = "reports_to recorded in the agent registry";
-        node.department = nodesById.get(target)?.department ?? null;
+        node.department = placements.get(agent.id)?.department ?? nodesById.get(target)?.department ?? null;
         parentOf.set(agent.id, target);
         ranks.set(agent.id, RANK_REGISTRY_EDGE);
         continue;

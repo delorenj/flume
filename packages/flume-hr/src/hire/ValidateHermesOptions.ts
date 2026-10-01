@@ -77,7 +77,7 @@ export class ValidateHermesOptions extends Command {
       join(ctx.targetDir, "agents", "hermes", role),
       "Hermes role directory",
     );
-    const refusal = (ctx.yes || ctx.quiet) && !ctx.force ? existingRoleRefusal(roleDir) : undefined;
+    const refusal = (ctx.yes || ctx.quiet) && !ctx.force && !ctx.onboard ? existingRoleRefusal(roleDir) : undefined;
     if (refusal) {
       return {
         success: false,
