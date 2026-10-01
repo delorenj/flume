@@ -1651,7 +1651,9 @@ function toolDeadlineProblem(cfg: any): string | null {
 /**
  * Every auxiliary task Hermes routes through call_llm. An ABSENT task is not
  * "off": Hermes defaults it to provider "auto", so it is checked exactly like a
- * configured one. A task with `enabled: false` makes no call and is skipped.
+ * configured one. Only title_generation honors `enabled` (agent/title_generator.py
+ * `_auto_title_enabled`); every other task ignores the key and still makes its
+ * call, so `enabled: false` there must not hide an off-gateway provider.
  */
 const GATEWAY_AUX_TASKS = [
   "vision",
@@ -1681,6 +1683,23 @@ const MOA_STOCK_REFERENCES = [
   { provider: "openrouter", model: "deepseek/deepseek-v4-pro" },
 ] as const;
 const MOA_STOCK_AGGREGATOR = { provider: "openrouter", model: "anthropic/claude-opus-4.8" } as const;
+// hermes_cli/config_defaults.py DEFAULT_CONFIG["moa"]. load_config() deep-merges
+// the user's config.yaml OVER this, so the stock "default" preset (enabled, on
+// openai-codex/openrouter) exists in every effective config unless config.yaml
+// overrides moa.presets.default itself -- a presets map without a "default" key,
+// or the legacy flat moa shape, leaves it enabled.
+const MOA_STOCK_BLOCK = {
+  presets: {
+    default: {
+      reference_models: MOA_STOCK_REFERENCES.map((slot) => ({ ...slot })),
+      aggregator: { ...MOA_STOCK_AGGREGATOR },
+      enabled: true,
+    },
+  },
+} as const;
+
+/** The only auxiliary tasks whose `enabled: false` actually suppresses the call. */
+const AUX_TASKS_HONORING_ENABLED = new Set<string>(["title_generation"]);
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1710,6 +1729,25 @@ function urlHost(value: unknown): string {
 
 function isGatewayUrl(value: unknown): boolean {
   return urlHost(value) === GATEWAY_HOST;
+}
+
+/** hermes_cli/config.py `_deep_merge`: dicts merge recursively, a null never replaces a dict, anything else replaces. */
+function hermesDeepMerge(base: Record<string, any>, override: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (key in result && isPlainObject(result[key]) && isPlainObject(value)) result[key] = hermesDeepMerge(result[key], value);
+    else if (key in result && isPlainObject(result[key]) && value === null) continue;
+    else result[key] = value;
+  }
+  return result;
+}
+
+/** utils.py `is_truthy_value`. */
+function hermesTruthy(value: unknown, fallback: boolean): boolean {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+  return pyTruthy(value);
 }
 
 /** Python truthiness, which is what Hermes applies to these flags. */
@@ -1776,7 +1814,7 @@ function auxiliaryProblems(cfg: any): string[] {
   const withKey: string[] = [];
   for (const task of GATEWAY_AUX_TASKS) {
     const entry = isPlainObject(aux[task]) ? aux[task] : null;
-    if (entry && entry.enabled === false) continue;
+    if (entry && AUX_TASKS_HONORING_ENABLED.has(task) && !hermesTruthy(entry.enabled, true)) continue;
     const provider = entry && !blankValue(entry.provider) ? String(entry.provider).trim() : "";
     if (!isGatewayProvider(provider)) {
       offGateway.push(entry === null ? `${task} (unset = auto)` : `${task} (${provider || "auto"})`);
@@ -1810,33 +1848,53 @@ function fallbackEntries(cfg: any): any[] {
   return out;
 }
 
+/** The complete reference slots of a preset's `reference_models` (a list, one mapping, or a JSON string). */
+function moaReferenceSlots(value: unknown): NonNullable<ReturnType<typeof moaSlot>>[] {
+  let refs = value;
+  if (typeof refs === "string") {
+    try { refs = JSON.parse(refs); } catch { refs = []; }
+  }
+  const list = Array.isArray(refs) ? refs : isPlainObject(refs) ? [refs] : [];
+  return list.map(moaSlot).filter((slot): slot is NonNullable<ReturnType<typeof moaSlot>> => slot !== null);
+}
+
 /**
- * Mixture-of-Agents presets, resolved the way hermes_cli/moa_config.py does:
- * named presets win and the flat top-level shape is used only when there are
- * none; a preset is enabled unless it says otherwise; a preset with no complete
- * reference slot gets Hermes' stock direct references, and an aggregator with no
- * provider or model gets the stock openrouter aggregator. An absent moa block is
- * therefore the stock preset, enabled, calling openai-codex and openrouter.
+ * Mixture-of-Agents presets, resolved the way Hermes does. load_config()
+ * deep-merges config.yaml OVER DEFAULT_CONFIG, whose moa block carries an
+ * enabled stock "default" preset on openai-codex/openrouter; only then does
+ * hermes_cli/moa_config.py normalize it: named presets win (and because the stock
+ * one always exists, the legacy flat top-level shape is ignored), a preset is
+ * enabled unless it says otherwise, a preset with no complete reference slot gets
+ * Hermes' stock direct references, and an aggregator with no provider or model
+ * gets the stock openrouter aggregator. So an absent moa block, a presets map
+ * without "default", and a flat moa block all leave the stock preset enabled.
  */
 function moaProblems(cfg: any): string[] {
-  const raw = isPlainObject(cfg?.moa) ? cfg.moa : {};
-  let presets: [string, any][] = isPlainObject(raw.presets)
-    ? Object.entries(raw.presets).filter(([name]) => String(name).trim() !== "")
+  const own = cfg?.moa;
+  // _deep_merge(DEFAULT_CONFIG, config.yaml): a null or absent moa keeps the stock
+  // block; any other non-mapping replaces it, and normalize_moa_config sees {}.
+  const effective: Record<string, any> = own === undefined || own === null
+    ? hermesDeepMerge({}, MOA_STOCK_BLOCK)
+    : isPlainObject(own) ? hermesDeepMerge(MOA_STOCK_BLOCK, own) : {};
+  const ownPresets: Record<string, any> = isPlainObject(own) && isPlainObject(own.presets) ? own.presets : {};
+  const ownFlat = isPlainObject(own) && !isPlainObject(own.presets)
+    && ["reference_models", "aggregator", "enabled"].some((key) => own[key] !== undefined);
+  let presets: [string, any][] = isPlainObject(effective.presets)
+    ? Object.entries(effective.presets).filter(([name]) => String(name).trim() !== "")
     : [];
   const flat = presets.length === 0;
-  if (flat) presets = [["default", raw]];
+  if (flat) presets = [["default", effective]];
   const problems: string[] = [];
   for (const [name, rawPreset] of presets) {
     const preset = isPlainObject(rawPreset) ? rawPreset : {};
     if (!moaBool(preset.enabled, true)) continue;
-    let rawRefs: unknown = preset.reference_models;
-    if (typeof rawRefs === "string") {
-      try { rawRefs = JSON.parse(rawRefs); } catch { rawRefs = []; }
-    }
-    const refList = Array.isArray(rawRefs) ? rawRefs : isPlainObject(rawRefs) ? [rawRefs] : [];
-    const kept = refList.map(moaSlot).filter((slot): slot is NonNullable<ReturnType<typeof moaSlot>> => slot !== null);
-    const stockRefs = kept.length === 0;
-    const refs = stockRefs ? MOA_STOCK_REFERENCES.map((slot) => ({ ...slot, enabled: true })) : kept;
+    // What config.yaml itself wrote for this preset; undefined = Hermes' built-in one.
+    const written: Record<string, any> | undefined = flat
+      ? (isPlainObject(own) ? own : undefined)
+      : isPlainObject(ownPresets[name]) ? ownPresets[name] : undefined;
+    const kept = moaReferenceSlots(preset.reference_models);
+    const refs = kept.length ? kept : MOA_STOCK_REFERENCES.map((slot) => ({ ...slot, enabled: true }));
+    const stockRefs = moaReferenceSlots(written?.reference_models).length === 0;
     const bad: string[] = [];
     for (const ref of refs) {
       if (!ref.enabled) continue;
@@ -1844,18 +1902,29 @@ function moaProblems(cfg: any): string[] {
         bad.push(`reference ${ref.provider}/${ref.model}${stockRefs ? " (Hermes' stock slot: no complete reference is configured)" : ""}`);
       }
     }
-    const aggregator = moaSlot(preset.aggregator);
-    if (aggregator === null) {
-      bad.push(`aggregator ${MOA_STOCK_AGGREGATOR.provider}/${MOA_STOCK_AGGREGATOR.model} (Hermes' stock slot: the configured aggregator has no provider or model)`);
-    } else if (!isGatewayProvider(aggregator.provider) || !isGatewayRoute(aggregator.model)) {
-      bad.push(`aggregator ${aggregator.provider}/${aggregator.model}`);
+    const aggregator = moaSlot(preset.aggregator) ?? { ...MOA_STOCK_AGGREGATOR, enabled: true };
+    if (!isGatewayProvider(aggregator.provider) || !isGatewayRoute(aggregator.model)) {
+      const note = written?.aggregator === undefined
+        ? " (Hermes' stock slot: no aggregator is configured)"
+        : moaSlot(written.aggregator) === null
+          ? " (the configured aggregator has no provider or model, so Hermes fills it from its stock openrouter slot)"
+          : "";
+      bad.push(`aggregator ${aggregator.provider}/${aggregator.model}${note}`);
     }
     if (!bad.length) continue;
-    const where = !isPlainObject(cfg?.moa) ? "no moa block, so Hermes' stock preset" : flat ? "moa (flat preset)" : `moa preset "${name}"`;
-    const topLevelNote = !flat && raw.enabled !== undefined && !moaBool(raw.enabled, true)
-      ? "; moa.enabled at the top level is ignored when presets exist"
-      : "";
-    problems.push(`${where} is enabled and leaves AutomaticAI: ${bad.join(", ")} -- route every slot through ${GATEWAY_PROVIDER} or set ${flat ? "moa.enabled" : `moa.presets.${name}.enabled`}: false${topLevelNote}`);
+    const where = !isPlainObject(own)
+      ? "no moa block, so Hermes' stock preset"
+      : flat
+        ? "moa (flat preset)"
+        : written === undefined
+          ? `moa preset "${name}" (Hermes' built-in preset: config.yaml does not override moa.presets.${name}, so load_config merges it in)`
+          : `moa preset "${name}"`;
+    const note = !flat && ownFlat
+      ? "; the flat moa.reference_models/aggregator/enabled keys are ignored because Hermes' built-in moa.presets.default always exists"
+      : !flat && isPlainObject(own) && own.enabled !== undefined && !moaBool(own.enabled, true)
+        ? "; moa.enabled at the top level is ignored when presets exist"
+        : "";
+    problems.push(`${where} is enabled and leaves AutomaticAI: ${bad.join(", ")} -- route every slot through ${GATEWAY_PROVIDER} or set ${flat ? "moa.enabled" : `moa.presets.${name}.enabled`}: false${note}`);
   }
   return problems;
 }

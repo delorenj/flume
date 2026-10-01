@@ -664,9 +664,23 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
     approval: { provider: "automaticai", model: "deepseek/deepseek-v4-flash" },
   };
   const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
-  assert.doesNotMatch(f.text, /title_generation|curator/, "a disabled task and a custom:automaticai task are compliant");
+  assert.doesNotMatch(f.text, /title_generation|curator/, "a disabled title_generation and a custom:automaticai task are compliant");
   assert.match(f.text, /set a base_url that is not the api\.automaticai\.io gateway, and base_url takes precedence over the provider: web_extract \(openrouter\.ai\)/);
   assert.match(f.text, /name a model that is not an automaticai\/<account>\/<model> route: approval \(deepseek\/deepseek-v4-flash\)/);
+}
+{
+  // Only title_generation honors `enabled` (agent/title_generator.py); every other
+  // auxiliary task ignores the key and still calls its configured provider.
+  const auxiliary = {
+    ...GATEWAY_AUX,
+    free_only: true,
+    vision: { enabled: false, provider: "openrouter", model: "qwen/qwen3.7-flash" },
+    compression: { enabled: "no", provider: "auto" },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /do not name the "automaticai" provider: vision \(openrouter\), compression \(auto\)/,
+    "enabled: false on a task Hermes never gates must not hide its off-gateway provider");
 }
 {
   // The live MoA shape: direct references, and an aggregator with a model but no
@@ -687,7 +701,9 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
     },
   };
   const f = auditRule(repo, makeFleet({ overrides: { moa } }), "hermes.gateway-routing");
-  assert.match(f.text, /moa preset "default" is enabled and leaves AutomaticAI: reference openai-codex\/gpt-5\.5, reference openrouter\/deepseek\/deepseek-v4-pro, aggregator openrouter\/anthropic\/claude-opus-4\.8 \(Hermes' stock slot: the configured aggregator has no provider or model\)/);
+  // load_config deep-merges the aggregator over the stock one: provider openrouter
+  // comes from Hermes, the model from config.yaml.
+  assert.match(f.text, /moa preset "default" is enabled and leaves AutomaticAI: reference openai-codex\/gpt-5\.5, reference openrouter\/deepseek\/deepseek-v4-pro, aggregator openrouter\/deepseek\/deepseek-v4-pro \(the configured aggregator has no provider or model, so Hermes fills it from its stock openrouter slot\)/);
   assert.match(f.text, /moa\.enabled at the top level is ignored when presets exist/);
   assert.doesNotMatch(f.text, /z-ai\/glm-5\.1|preset "quiet"/, "a disabled slot and a disabled preset make no call");
 }
@@ -697,8 +713,26 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
     "an absent moa block is Hermes' stock preset, enabled, on direct providers");
 }
 {
+  // DEFAULT_CONFIG always carries an enabled stock presets.default, and load_config
+  // deep-merges config.yaml over it -- so the legacy flat shape is IGNORED and a
+  // flat `enabled: false` disables nothing.
   const f = auditRule(repo, makeFleet({ overrides: { moa: { enabled: false, reference_models: [{ provider: "openrouter", model: "a/b" }] } } }), "hermes.gateway-routing");
-  assert.doesNotMatch(f.text, /moa/, "a disabled flat MoA config makes no call");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /moa preset "default" \(Hermes' built-in preset: config\.yaml does not override moa\.presets\.default, so load_config merges it in\) is enabled and leaves AutomaticAI: reference openai-codex\/gpt-5\.5 \(Hermes' stock slot/);
+  assert.match(f.text, /the flat moa\.reference_models\/aggregator\/enabled keys are ignored because Hermes' built-in moa\.presets\.default always exists/);
+}
+{
+  // A presets map without "default" still gets Hermes' stock default merged in.
+  const gw = { provider: "automaticai", model: "automaticai/personal/glm-5.3" };
+  const f = auditRule(repo, makeFleet({ overrides: { moa: { default_preset: "gw", presets: { gw: { reference_models: [gw], aggregator: gw } } } } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /moa preset "default" \(Hermes' built-in preset/, "the merged-in stock preset is reported");
+  assert.doesNotMatch(f.text, /preset "gw"/, "the gateway-routed preset is compliant");
+}
+{
+  // Overriding the stock preset itself is what turns it off.
+  const f = auditRule(repo, makeFleet({ overrides: { moa: { presets: { default: { enabled: false } } } } }), "hermes.gateway-routing");
+  assert.doesNotMatch(f.text, /moa/, "a disabled presets.default makes no call");
 }
 {
   const f = auditRule(repo, makeFleet({ overrides: { fallback_model: { provider: "openrouter", model: "deepseek/deepseek-v4-flash" } } }), "hermes.gateway-routing");
