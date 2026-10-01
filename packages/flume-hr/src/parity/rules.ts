@@ -1609,6 +1609,8 @@ const GATEWAY_MODELS = [
   "automaticai/personal/astra",
   "automaticai/personal/claude-opus-5.5",
   "automaticai/intelliforia/claude-opus-5.5",
+  "automaticai/personal/claude-sonnet-5.5",
+  "automaticai/intelliforia/claude-sonnet-5.5",
   "automaticai/personal/kimi-k3",
   "automaticai/personal/kimi-k3s",
   "automaticai/personal/kimi-2.8",
