@@ -77,7 +77,7 @@ invisible to every other agent working that repo.{{ recall_note }}
 
 **Project memory** is the shared, temporally-sequenced record of a repository,
 queried by many agents including the human-drivable Momo twin. Write it
-explicitly, and always carry provenance — name yourself in the content so a
+explicitly, and always carry provenance — sign the content with your agent id so a
 later reader can answer *which agent experienced this*:
 
 ```bash
