@@ -82,10 +82,11 @@ const GATEWAY_MODELS = [
 ];
 
 // Every auxiliary task Hermes routes through call_llm; an absent one is "auto".
+// session_search and flush_memories are not auxiliary tasks in the fork.
 const AUX_TASKS = [
   "vision", "web_extract", "compression", "skills_hub", "approval", "mcp", "title_generation",
   "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer", "profile_describer",
-  "goal_judge", "curator", "monitor", "background_review", "session_search", "flush_memories",
+  "goal_judge", "curator", "monitor", "background_review", "moa_reference", "moa_aggregator", "kanban_estimator",
 ];
 const GATEWAY_AUX = Object.fromEntries(AUX_TASKS.map((task) => [task, { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash", timeout: 30 }]));
 
@@ -644,13 +645,16 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
   };
   const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
   assert.equal(f.status, "fail");
-  assert.match(f.text, /auxiliary task\(s\) do not name the "automaticai" provider: vision \(openrouter\), compression \(auto\), memory_query_rewrite \(unset = auto\) -- "auto" tries the main provider and then falls through OpenRouter/,
-    "configured, auto and ABSENT tasks are all reported in one line");
+  assert.match(f.text, /auxiliary task\(s\) are pinned to a provider other than "automaticai": vision \(openrouter\) -- a pinned provider is called directly/,
+    "a pinned off-gateway task is reported on its own line");
+  assert.match(f.text, /auxiliary task\(s\) follow the main model \("auto"\): compression \(auto\), memory_query_rewrite \(unset = auto\) -- the main provider is the gateway, but a failed call falls through Hermes' auxiliary fallbacks .*; set auxiliary\.discovery: false: /,
+    "auto and ABSENT tasks are reported in one line, naming the one missing guard key");
   assert.doesNotMatch(f.text, /title_generation \(|free_only/, "compliant tasks and a true free_only are not reported");
 }
 {
   const f = auditRule(repo, makeFleet({ overrides: { auxiliary: null } }), "hermes.gateway-routing");
-  assert.match(f.text, /vision \(unset = auto\), web_extract \(unset = auto\).*flush_memories \(unset = auto\)/, "an absent auxiliary block leaves every task on auto");
+  assert.match(f.text, /follow the main model \("auto"\): vision \(unset = auto\), web_extract \(unset = auto\).*kanban_estimator \(unset = auto\) -- .*; set auxiliary\.free_only: true and auxiliary\.discovery: false: /,
+    "an absent auxiliary block leaves every task on auto, and both guard keys are named");
   assert.match(f.text, /auxiliary\.free_only is unset \(Hermes default false\): any auxiliary call that falls through to "auto" can engage a PAID OpenRouter model/,
     "the hidden paid OpenRouter lane must be reported");
 }
@@ -679,8 +683,66 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
   };
   const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
   assert.equal(f.status, "fail");
-  assert.match(f.text, /do not name the "automaticai" provider: vision \(openrouter\), compression \(auto\)/,
+  assert.match(f.text, /pinned to a provider other than "automaticai": vision \(openrouter\)/,
     "enabled: false on a task Hermes never gates must not hide its off-gateway provider");
+  assert.match(f.text, /follow the main model \("auto"\): compression \(auto\) -- /,
+    "enabled: false must not hide an unguarded auto task either");
+}
+{
+  // The owner's design: only vision pinned, every other helper follows the gateway
+  // main model ("auto", "main" or absent), with both fall-through lanes closed by
+  // auxiliary.free_only: true and the fork's auxiliary.discovery: false.
+  const auxiliary = {
+    free_only: true,
+    discovery: false,
+    vision: { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" },
+    compression: { provider: "auto", model: "" },
+    curator: { provider: "main" },
+    approval: { provider: "auto", model: "auto" },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "pass", `auto helpers behind a gateway main with free_only and discovery closed must pass:\n${f.text}`);
+}
+{
+  // Same design without the fork guard: the auto helpers are reported, and the hint
+  // names exactly the one key to set.
+  const auxiliary = { free_only: true, vision: { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" } };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /fleet base: auxiliary task\(s\) follow the main model \("auto"\): web_extract \(unset = auto\), .*kanban_estimator \(unset = auto\) -- the main provider is the gateway, but .*; set auxiliary\.discovery: false: /,
+    "a missing auxiliary.discovery: false is the one thing to set");
+  assert.doesNotMatch(f.text, /vision \(|pinned to a provider|free_only/, "the pinned gateway task and a true free_only are not reported");
+  // A string is not the YAML boolean the guard needs.
+  const g = auditRule(repo, makeFleet({ overrides: { auxiliary: { ...auxiliary, discovery: "false" } } }), "hermes.gateway-routing");
+  assert.match(g.text, /set auxiliary\.discovery: false: /, "discovery must be the literal boolean false");
+}
+{
+  // The guard does not excuse an explicit pin: a pinned openrouter task still fails.
+  const auxiliary = {
+    free_only: true,
+    discovery: false,
+    vision: { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" },
+    web_extract: { provider: "openrouter", model: "google/gemini-3.6-flash" },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /auxiliary task\(s\) are pinned to a provider other than "automaticai": web_extract \(openrouter\) -- /);
+  assert.doesNotMatch(f.text, /follow the main model/, "guarded auto tasks behind a gateway main are compliant");
+}
+{
+  // The guard only helps when the main model it inherits is itself on the gateway.
+  const auxiliary = { free_only: true, discovery: false };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary, model: { provider: "kimi-coding", default: "kimi-for-coding" } } }), "hermes.gateway-routing");
+  assert.match(f.text, /follow the main model \("auto"\), and the main provider is not the "automaticai" gateway: vision \(unset = auto\), .* -- put model\.provider on automaticai, or pin auxiliary\.<task>\.provider: automaticai/);
+  // A main on the gateway provider but a foreign base_url is not on the gateway either.
+  const g = auditRule(repo, makeFleet({ overrides: { auxiliary, model: { ...BASE_CONFIG.model, base_url: "https://openrouter.ai/api/v1" } } }), "hermes.gateway-routing");
+  assert.match(g.text, /and the main provider is not the "automaticai" gateway/);
+}
+{
+  // An auto helper sends its own model to the gateway main, so it must be a route.
+  const auxiliary = { free_only: true, discovery: false, compression: { provider: "auto", model: "google/gemini-3.6-flash" } };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.match(f.text, /name a model that is not an automaticai\/<account>\/<model> route: compression \(google\/gemini-3\.6-flash\)/);
 }
 {
   // The live MoA shape: direct references, and an aggregator with a model but no
@@ -756,7 +818,7 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
   assert.match(f.text, /fleet base: model\.provider is "kimi-coding"/);
   assert.doesNotMatch(f.text, /inherit-[ab]:/, "a member that only inherits the base's problem is not repeated");
   assert.match(f.text, /3 member desk\(s\) inherit the fleet base problem\(s\) above; fix the base, then re-render/);
-  assert.match(f.text, /drift-pm: auxiliary task\(s\) do not name the "automaticai" provider: vision \(openrouter\) -- .*; re-render: hermes-profile-config\.py render --profile drift-pm/,
+  assert.match(f.text, /drift-pm: auxiliary task\(s\) are pinned to a provider other than "automaticai": vision \(openrouter\) -- .*; re-render: hermes-profile-config\.py render --profile drift-pm/,
     "a member's own drift is still reported by name");
 }
 {

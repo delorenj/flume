@@ -1643,17 +1643,28 @@ function toolDeadlineProblem(cfg: any): string | null {
 // model, every auxiliary side task, delegated workers, fallbacks and MoA. The
 // checks below mirror how the running Hermes release RESOLVES each path, not how
 // the config reads, because every bypass found so far was a default nobody wrote:
-// an absent auxiliary task is "auto" (the main provider, then OpenRouter, Nous,
-// a custom endpoint and direct-key discovery), and an MoA slot with no provider
-// is silently replaced by Hermes' stock openrouter/openai-codex slot.
+// an absent auxiliary task is "auto" (the main provider, then -- on a failed call --
+// OpenRouter, Nous, a custom endpoint and direct-key discovery), and an MoA slot
+// with no provider is silently replaced by Hermes' stock openrouter/openai-codex slot.
+//
+// The owner's design leaves helpers on "auto" so they follow the main model, and
+// closes the fall-through with the fork's guard instead of pinning every task:
+// model.provider on the gateway + auxiliary.free_only: true + auxiliary.discovery:
+// false (delorenj/hermes-agent; Hermes default true = discovery on).
 // ---------------------------------------------------------------------------
 
 /**
- * Every auxiliary task Hermes routes through call_llm. An ABSENT task is not
- * "off": Hermes defaults it to provider "auto", so it is checked exactly like a
- * configured one. Only title_generation honors `enabled` (agent/title_generator.py
- * `_auto_title_enabled`); every other task ignores the key and still makes its
- * call, so `enabled: false` there must not hide an off-gateway provider.
+ * Every auxiliary task Hermes routes through call_llm: the DEFAULT_CONFIG
+ * auxiliary blocks (hermes_cli/config_defaults.py) plus kanban_estimator, which
+ * has no default block but calls call_llm(task="kanban_estimator") and so reads
+ * auxiliary.kanban_estimator (absent = "auto"). session_search and flush_memories
+ * are NOT auxiliary tasks in the fork (no default block, no call site).
+ *
+ * An ABSENT task is not "off": Hermes defaults it to provider "auto", so it is
+ * checked exactly like a configured one. Only title_generation honors `enabled`
+ * (agent/title_generator.py `_auto_title_enabled`); every other task ignores the
+ * key and still makes its call, so `enabled: false` there must not hide an
+ * off-gateway provider.
  */
 const GATEWAY_AUX_TASKS = [
   "vision",
@@ -1672,9 +1683,13 @@ const GATEWAY_AUX_TASKS = [
   "curator",
   "monitor",
   "background_review",
-  "session_search",
-  "flush_memories",
+  "moa_reference",
+  "moa_aggregator",
+  "kanban_estimator",
 ] as const;
+
+/** Providers that make an auxiliary task follow the main model instead of pinning one. */
+const AUX_INHERITING_PROVIDERS = new Set<string>(["", "auto", "main"]);
 
 // hermes_cli/moa_config.py: what Hermes substitutes when a preset has no complete
 // reference slot, or an aggregator with no provider or model.
@@ -1805,9 +1820,27 @@ function mainModelProblems(cfg: any): string[] {
   return problems;
 }
 
-/** Every auxiliary side task, the hidden paid OpenRouter lane included. */
+/**
+ * Every auxiliary side task, the hidden paid OpenRouter lane included.
+ *
+ * A task left unset, on "auto" or on "main" follows the main model. It is
+ * compliant iff the effective config puts the main model on the gateway AND
+ * closes both fall-through lanes: auxiliary.free_only: true (no paid OpenRouter
+ * backup) and auxiliary.discovery: false (the fork key that stops a failed call
+ * walking OpenRouter -> Nous -> custom -> direct-key discovery, which is how
+ * helpers landed on direct Gemini, z.ai and Kimi). An explicitly pinned task
+ * must name the gateway itself.
+ */
 function auxiliaryProblems(cfg: any): string[] {
   const aux = isPlainObject(cfg?.auxiliary) ? cfg.auxiliary : {};
+  const model = isPlainObject(cfg?.model) ? cfg.model : null;
+  const mainOnGateway = model !== null && isGatewayProvider(model.provider) && (blankValue(model.base_url) || isGatewayUrl(model.base_url));
+  // Hermes deep-merges config.yaml over DEFAULT_CONFIG: free_only defaults false,
+  // discovery defaults true. Only the literal YAML booleans close a lane.
+  const missingGuard: string[] = [];
+  if (aux.free_only !== true) missingGuard.push("auxiliary.free_only: true");
+  if (aux.discovery !== false) missingGuard.push("auxiliary.discovery: false");
+  const inheriting: string[] = [];
   const offGateway: string[] = [];
   const offRoute: string[] = [];
   const offHost: string[] = [];
@@ -1816,17 +1849,28 @@ function auxiliaryProblems(cfg: any): string[] {
     const entry = isPlainObject(aux[task]) ? aux[task] : null;
     if (entry && AUX_TASKS_HONORING_ENABLED.has(task) && !hermesTruthy(entry.enabled, true)) continue;
     const provider = entry && !blankValue(entry.provider) ? String(entry.provider).trim() : "";
-    if (!isGatewayProvider(provider)) {
-      offGateway.push(entry === null ? `${task} (unset = auto)` : `${task} (${provider || "auto"})`);
-    } else if (!blankValue(entry?.model) && !isGatewayRoute(entry?.model)) {
-      offRoute.push(`${task} (${String(entry?.model).trim()})`);
+    if (AUX_INHERITING_PROVIDERS.has(provider.toLowerCase())) {
+      if (!mainOnGateway || missingGuard.length) inheriting.push(entry === null ? `${task} (unset = auto)` : `${task} (${provider || "auto"})`);
+    } else if (!isGatewayProvider(provider)) {
+      offGateway.push(`${task} (${provider})`);
     }
+    // A model sent to the gateway (pinned, or inherited from a gateway main) must
+    // be one of its routes; model "auto" is Hermes' inherit-the-main-model sentinel.
+    const ownModel = entry && !blankValue(entry.model) ? String(entry.model).trim() : "";
+    const toGateway = isGatewayProvider(provider) || (AUX_INHERITING_PROVIDERS.has(provider.toLowerCase()) && mainOnGateway);
+    if (toGateway && ownModel && ownModel.toLowerCase() !== "auto" && !isGatewayRoute(ownModel)) offRoute.push(`${task} (${ownModel})`);
     if (entry && !blankValue(entry.base_url) && !isGatewayUrl(entry.base_url)) offHost.push(`${task} (${urlHost(entry.base_url)})`);
     if (entry && !blankValue(entry.api_key)) withKey.push(task);
   }
   const problems: string[] = [];
+  if (inheriting.length) {
+    const guard = missingGuard.length ? missingGuard.join(" and ") : "";
+    problems.push(mainOnGateway
+      ? `auxiliary task(s) follow the main model ("auto"): ${inheriting.join(", ")} -- the main provider is the gateway, but a failed call falls through Hermes' auxiliary fallbacks (paid OpenRouter, Nous, a custom endpoint and direct-key discovery); set ${guard}`
+      : `auxiliary task(s) follow the main model ("auto"), and the main provider is not the "${GATEWAY_PROVIDER}" gateway: ${inheriting.join(", ")} -- put model.provider on ${GATEWAY_PROVIDER}${guard ? ` and set ${guard}` : ""}, or pin auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route`);
+  }
   if (offGateway.length) {
-    problems.push(`auxiliary task(s) do not name the "${GATEWAY_PROVIDER}" provider: ${offGateway.join(", ")} -- "auto" tries the main provider and then falls through OpenRouter, Nous, a custom endpoint and direct-key discovery; set auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route`);
+    problems.push(`auxiliary task(s) are pinned to a provider other than "${GATEWAY_PROVIDER}": ${offGateway.join(", ")} -- a pinned provider is called directly; set auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route, or drop the pin so the task follows the gateway main model`);
   }
   if (offRoute.length) problems.push(`auxiliary task(s) on the gateway name a model that is not an ${GATEWAY_PROVIDER}/<account>/<model> route: ${offRoute.join(", ")}`);
   if (offHost.length) problems.push(`auxiliary task(s) set a base_url that is not the ${GATEWAY_HOST} gateway, and base_url takes precedence over the provider: ${offHost.join(", ")}`);
@@ -3456,7 +3500,7 @@ return [
       changedFiles: [],
       details: [
         ...finding.details,
-        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.<task> for every task plus auxiliary.free_only: true, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so unset/auto helpers stay on the gateway main model, any pinned auxiliary.<task> on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
       ],
     }),
   },

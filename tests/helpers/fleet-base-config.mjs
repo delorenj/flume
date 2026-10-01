@@ -27,7 +27,9 @@ import YAML from "yaml";
  *     skills (`hermes.bloodbank-toolsets`), or a Bloodbank-dispatched PM turn
  *     resolves to no native tools and cannot delegate a worker;
  *   - providers.automaticai + delegation.provider + the mapped fleet token,
- *     and the main model, every auxiliary task (auxiliary.free_only: true) and
+ *     and the main model, every auxiliary task (pinned to the gateway, or "auto"
+ *     behind a gateway main with auxiliary.free_only: true and auxiliary.discovery:
+ *     false) and
  *     every enabled MoA slot on the gateway (`hermes.gateway-routing`), or some
  *     inference path calls a provider directly;
  *   - an enabled wake word must not start a new session
@@ -50,16 +52,16 @@ export function fleetBaseConfig(homeDir) {
     "automaticai/personal/glm-5.3",
     "automaticai/personal/glm-5.3-flash",
   ];
-  const auxTasks = [
-    "vision", "web_extract", "compression", "skills_hub", "approval", "mcp", "title_generation",
-    "memory_query_rewrite", "tts_audio_tags", "triage_specifier", "kanban_decomposer", "profile_describer",
-    "goal_judge", "curator", "monitor", "background_review", "session_search", "flush_memories",
-  ];
   return {
     model: { provider: "automaticai", default: "automaticai/personal/kimi-2.8", base_url: "", api_mode: "chat_completions" },
+    // The owner's design: only vision is pinned; every other helper is absent
+    // ("auto") and follows the gateway main model, with both fall-through lanes
+    // closed (free_only: no paid OpenRouter backup; discovery: false, the fork key
+    // that stops a failed call walking direct-key discovery).
     auxiliary: {
       free_only: true,
-      ...Object.fromEntries(auxTasks.map((task) => [task, { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" }])),
+      discovery: false,
+      vision: { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash" },
     },
     moa: { presets: { default: { enabled: false } } },
     wake_word: { enabled: false, start_new_session: false },
