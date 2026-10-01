@@ -1830,6 +1830,13 @@ function mainModelProblems(cfg: any): string[] {
  * walking OpenRouter -> Nous -> custom -> direct-key discovery, which is how
  * helpers landed on direct Gemini, z.ai and Kimi). An explicitly pinned task
  * must name the gateway itself.
+ *
+ * discovery: false is required even when every task is pinned: call_llm and
+ * async_call_llm re-walk discovery (_try_payment_fallback, "stale fallback
+ * credential") for an explicit provider too, once its fallback candidate turns
+ * out to hold a stale credential. With discovery off, the only lanes left are
+ * the task's provider, its auxiliary.<task>.fallback_chain, the main model and
+ * fallback_providers, so every fallback_chain entry must be a gateway route.
  */
 function auxiliaryProblems(cfg: any): string[] {
   const aux = isPlainObject(cfg?.auxiliary) ? cfg.auxiliary : {};
@@ -1845,6 +1852,7 @@ function auxiliaryProblems(cfg: any): string[] {
   const offRoute: string[] = [];
   const offHost: string[] = [];
   const withKey: string[] = [];
+  const offChain: string[] = [];
   for (const task of GATEWAY_AUX_TASKS) {
     const entry = isPlainObject(aux[task]) ? aux[task] : null;
     if (entry && AUX_TASKS_HONORING_ENABLED.has(task) && !hermesTruthy(entry.enabled, true)) continue;
@@ -1861,6 +1869,18 @@ function auxiliaryProblems(cfg: any): string[] {
     if (toGateway && ownModel && ownModel.toLowerCase() !== "auto" && !isGatewayRoute(ownModel)) offRoute.push(`${task} (${ownModel})`);
     if (entry && !blankValue(entry.base_url) && !isGatewayUrl(entry.base_url)) offHost.push(`${task} (${urlHost(entry.base_url)})`);
     if (entry && !blankValue(entry.api_key)) withKey.push(task);
+    // agent/auxiliary_client.py _try_configured_fallback_chain/_resolve_fallback_entry:
+    // an entry with no provider or no model is skipped; any other one is called.
+    const chain: unknown[] = entry && Array.isArray(entry.fallback_chain) ? entry.fallback_chain : [];
+    chain.forEach((fb, i) => {
+      if (!isPlainObject(fb) || blankValue(fb.provider) || blankValue(fb.model)) return;
+      const fbProvider = String(fb.provider).trim();
+      const onGateway = isGatewayProvider(fbProvider) || (fbProvider.toLowerCase() === "main" && mainOnGateway);
+      if (!onGateway || !isGatewayRoute(fb.model) || (!blankValue(fb.base_url) && !isGatewayUrl(fb.base_url))) {
+        offChain.push(`${task} fallback_chain[${i}] (${fbProvider}/${String(fb.model).trim()}${blankValue(fb.base_url) ? "" : ` at ${urlHost(fb.base_url)}`})`);
+      }
+      if (!blankValue(fb.api_key)) withKey.push(`${task} fallback_chain[${i}]`);
+    });
   }
   const problems: string[] = [];
   if (inheriting.length) {
@@ -1874,7 +1894,12 @@ function auxiliaryProblems(cfg: any): string[] {
   }
   if (offRoute.length) problems.push(`auxiliary task(s) on the gateway name a model that is not an ${GATEWAY_PROVIDER}/<account>/<model> route: ${offRoute.join(", ")}`);
   if (offHost.length) problems.push(`auxiliary task(s) set a base_url that is not the ${GATEWAY_HOST} gateway, and base_url takes precedence over the provider: ${offHost.join(", ")}`);
+  if (offChain.length) problems.push(`auxiliary fallback_chain entr(ies) leave the gateway: ${offChain.join(", ")} -- a failed task tries its fallback_chain first; every entry needs provider: ${GATEWAY_PROVIDER}, an ${GATEWAY_PROVIDER}/<account>/<model> route and no non-gateway base_url`);
   if (withKey.length) problems.push(`auxiliary task(s) carry an api_key in config (a literal bypasses the per-profile secret scope): ${withKey.join(", ")}`);
+  // The follow-the-main line above already names the key when any task inherits.
+  if (aux.discovery !== false && !inheriting.length) {
+    problems.push(`auxiliary.discovery is ${aux.discovery === undefined ? "unset (fork default true)" : JSON.stringify(aux.discovery)}: a task pinned to the gateway still re-walks Hermes' provider discovery (OpenRouter, Nous, a custom endpoint, then direct keys such as GEMINI_API_KEY) when its fallback hits a stale credential; set auxiliary.discovery: false`);
+  }
   if (aux.free_only !== true) {
     problems.push(`auxiliary.free_only is ${aux.free_only === undefined ? "unset (Hermes default false)" : JSON.stringify(aux.free_only)}: any auxiliary call that falls through to "auto" can engage a PAID OpenRouter model (stock google/gemini-3.6-flash) as a hidden backup lane; set auxiliary.free_only: true`);
   }
@@ -3500,7 +3525,7 @@ return [
       changedFiles: [],
       details: [
         ...finding.details,
-        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so unset/auto helpers stay on the gateway main model, any pinned auxiliary.<task> on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so no auxiliary call walks provider discovery, any pinned auxiliary.<task> and its fallback_chain on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
       ],
     }),
   },

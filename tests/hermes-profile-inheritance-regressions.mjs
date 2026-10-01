@@ -93,7 +93,7 @@ const GATEWAY_AUX = Object.fromEntries(AUX_TASKS.map((task) => [task, { provider
 const BASE_CONFIG = {
   // The main agent calls the gateway (`hermes.gateway-routing`: all inference).
   model: { provider: "automaticai", default: "automaticai/personal/kimi-2.8", base_url: "", api_mode: "chat_completions" },
-  auxiliary: { free_only: true, ...GATEWAY_AUX },
+  auxiliary: { free_only: true, discovery: false, ...GATEWAY_AUX },
   moa: {
     default_preset: "default",
     presets: {
@@ -737,6 +737,40 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
   // A main on the gateway provider but a foreign base_url is not on the gateway either.
   const g = auditRule(repo, makeFleet({ overrides: { auxiliary, model: { ...BASE_CONFIG.model, base_url: "https://openrouter.ai/api/v1" } } }), "hermes.gateway-routing");
   assert.match(g.text, /and the main provider is not the "automaticai" gateway/);
+}
+{
+  // Pinning every task does not close discovery: a pinned task whose fallback hits a
+  // stale credential re-walks it (_try_payment_fallback), so the key is still required.
+  const auxiliary = withoutKey(BASE_CONFIG.auxiliary, "discovery");
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail", "a fully pinned base without auxiliary.discovery: false must fail");
+  assert.match(f.text, /fleet base: auxiliary\.discovery is unset \(fork default true\): a task pinned to the gateway still re-walks .*; set auxiliary\.discovery: false: /);
+  assert.doesNotMatch(f.text, /follow the main model|pinned to a provider/, "no task inherits and every pin is on the gateway");
+  const g = auditRule(repo, makeFleet({ overrides: { auxiliary: { ...auxiliary, discovery: true } } }), "hermes.gateway-routing");
+  assert.match(g.text, /auxiliary\.discovery is true: /, "an explicit true is reported as such");
+}
+{
+  // With discovery off, a task's own fallback_chain is one of the few lanes left.
+  const auxiliary = {
+    ...BASE_CONFIG.auxiliary,
+    compression: {
+      provider: "automaticai",
+      model: "automaticai/personal/glm-5.3-flash",
+      fallback_chain: [
+        { provider: "automaticai", model: "automaticai/personal/kimi-2.8" },
+        { provider: "gemini", model: "gemini-3.6-flash" },
+        { provider: "automaticai", model: "automaticai/personal/sol", base_url: "https://openrouter.ai/api/v1?key=sk-leaky" },
+        { provider: "openrouter" },
+      ],
+    },
+  };
+  const f = auditRule(repo, makeFleet({ overrides: { auxiliary } }), "hermes.gateway-routing");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /auxiliary fallback_chain entr\(ies\) leave the gateway: compression fallback_chain\[1\] \(gemini\/gemini-3\.6-flash\), compression fallback_chain\[2\] \(automaticai\/automaticai\/personal\/sol at openrouter\.ai\) -- /,
+    "off-gateway entries are named; a gateway entry and one Hermes skips (no model) are not");
+  assert.doesNotMatch(f.text, /sk-leaky/, "only the host of a base_url is ever reported");
+  const g = auditRule(repo, makeFleet({ overrides: { auxiliary: { ...auxiliary, compression: { ...auxiliary.compression, fallback_chain: [auxiliary.compression.fallback_chain[0]] } } } }), "hermes.gateway-routing");
+  assert.equal(g.status, "pass", `a gateway-only fallback_chain is compliant:\n${g.text}`);
 }
 {
   // An auto helper sends its own model to the gateway main, so it must be a route.
