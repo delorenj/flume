@@ -312,7 +312,7 @@ charter:
 skills:
   pack: agent-broken
 memory:
-  write_bank: agent-broken
+  write_bank: agent-broken-agent
 `;
   await assert.rejects(
     async () => {
@@ -528,7 +528,7 @@ memory:
       role: "test-role",
       charter: { purpose: "Test explicit skills" },
       skills: { pack: "non-existent-pack-in-catalog" },
-      memory: { write_bank: "agent-explicit" },
+      memory: { write_bank: "agent-explicit-agent" },
     },
     {
       deskRoot: join(work, "explicit-desk"),
@@ -557,7 +557,7 @@ memory:
           role: "test-role",
           charter: { purpose: "Test fail fast" },
           skills: { pack: "dummy" },
-          memory: { write_bank: "agent-fail-fast" },
+          memory: { write_bank: "agent-fail-fast-agent" },
         },
         {
           deskRoot: failFastRoot,

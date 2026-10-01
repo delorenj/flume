@@ -2,107 +2,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/named-agent.schema.json",
   "title": "Portable Named Agent Contract",
-  "description": "Canonical schema for repo-independent named agents with role, charter, Skillex pack binding, and traveling Hindsight memory.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "id",
-    "display_name",
-    "role",
-    "charter",
-    "skills",
-    "memory"
-  ],
-  "properties": {
-    "schema_version": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Version of the named agent contract schema."
-    },
-    "id": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+([-_][a-z0-9]+)*$",
-      "description": "Canonical unique identifier for the named agent."
-    },
-    "display_name": {
-      "type": "string",
-      "minLength": 1,
-      "description": "Human-readable display name for the agent."
-    },
-    "role": {
-      "type": "string",
-      "pattern": "^[a-z0-9]+([-_][a-z0-9]+)*$",
-      "description": "Role identifier for the specialist agent."
-    },
-    "charter": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["purpose"],
+  "required": ["schema_version", "id", "display_name", "role", "charter", "skills", "memory"],
+  "$defs": {
+    "identity": {
+      "type": "object", "additionalProperties": false, "required": ["name"],
       "properties": {
-        "purpose": {
-          "type": "string",
-          "minLength": 1,
-          "description": "One-line or short statement of agent purpose."
-        },
-        "directives": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "Guiding principles and operational directives for the agent."
-        },
-        "tone": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Personality and communication tone."
-        }
+        "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,57}$"},
+        "write_bank": {"type": "string"},
+        "recall_banks": {"type": "array", "items": {"type": "string"}}
       }
     },
     "skills": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["pack"],
+      "type": "object", "additionalProperties": false,
+      "anyOf": [{"required": ["pack"]}, {"required": ["packs"]}, {"required": ["set"]}],
       "properties": {
-        "pack": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Name or reference of the Skillex pack binding."
-        }
+        "pack": {"type": "string", "minLength": 1},
+        "packs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "set": {"type": "string", "minLength": 1}
       }
     },
     "memory": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["write_bank"],
+      "type": "object", "additionalProperties": false, "required": ["write_bank"],
       "properties": {
-        "write_bank": {
-          "type": "string",
-          "pattern": "^agent-[a-z0-9-_]+$",
-          "description": "Personal write memory bank, strictly formatted as agent-<name>."
-        },
-        "recall_banks": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "Ordered list of memory banks to recall, with personal write bank typically first."
-        }
+        "write_bank": {"type": "string", "pattern": "^agent-[a-z0-9-_]+$"},
+        "recall_banks": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {"type": "integer", "minimum": 1},
+    "id": {"$ref": "#/$defs/identity/properties/name"},
+    "identity": {"$ref": "#/$defs/identity"},
+    "display_name": {"type": "string", "minLength": 1},
+    "role": {"type": "string", "pattern": "^[a-z0-9]+([-_][a-z0-9]+)*$"},
+    "charter": {
+      "type": "object", "additionalProperties": false, "required": ["purpose"],
+      "properties": {
+        "purpose": {"type": "string", "minLength": 1},
+        "directives": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "tone": {"type": "string", "minLength": 1}
       }
     },
+    "skills": {"$ref": "#/$defs/skills"},
+    "memory": {"$ref": "#/$defs/memory"},
     "desk": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path"],
-      "properties": {
-        "path": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Filesystem path to the agent desk directory."
-        }
-      }
+      "type": "object", "additionalProperties": false, "required": ["path"],
+      "properties": {"path": {"type": "string", "minLength": 1}}
     }
   }
 }

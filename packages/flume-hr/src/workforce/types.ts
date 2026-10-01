@@ -9,7 +9,9 @@ export interface AgentCharter {
 }
 
 export interface AgentSkillsBinding {
-  pack: string;
+  pack?: string;
+  packs?: string[];
+  set?: string;
 }
 
 export interface AgentMemoryBinding {
@@ -22,6 +24,7 @@ export interface AgentDeskManifest {
 }
 
 export interface NamedAgentContract {
+  identity?: { name: string; write_bank?: string; recall_banks?: string[] };
   schema_version: number;
   id: string;
   display_name: string;
