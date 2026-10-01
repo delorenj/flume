@@ -124,7 +124,9 @@ export class HireRecipe extends Recipe {
     // that binding while the singleton catalog is being evaluated would store
     // `undefined` before the command module finishes initializing.
     const hireCtx = ctx as unknown as HermesAgentContext;
-    const ingredients = hireCtx.onboard && existsSync(join(ctx.targetDir,"agents","hermes",hireCtx.role??"pm","role.yaml"))
+    const onboardingExisting=hireCtx.onboard && existsSync(join(ctx.targetDir,"agents","hermes",hireCtx.role??"pm","role.yaml"));
+    if(onboardingExisting) hireCtx.roleDir=join(ctx.targetDir,"agents","hermes",hireCtx.role??"pm");
+    const ingredients = onboardingExisting
       ? [PromptForAgentConfig, ValidateHermesOptions, ProjectRoleDeclaration] as const
       : [
       PromptForAgentConfig,
@@ -215,6 +217,12 @@ export class HireRecipe extends Recipe {
       phases,
     };
     if (!commandResult.ok) return commandResult;
+    if(onboardingExisting) {
+      // Never rerun destructive provisioning or unrelated lifecycle migrations on an occupied desk.
+      hireCtx.deploymentOutcome="verified-deferred";
+      hireCtx.deploymentPostconditions=["Role skills/config/reporting projection converged; no service activation attempted"];
+      return mergeInitResults(this.metadata.id,false,[commandResult,await summaryResult(ctx)]);
+    }
     const lifecycle = await this.initializeOwnedChecks(ctx);
     const localResult = mergeInitResults(this.metadata.id, Boolean(ctx.dryRun), [commandResult, lifecycle]);
     if (!localResult.ok) return localResult;

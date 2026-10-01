@@ -3,6 +3,7 @@ import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,readdirSync,realpathSyn
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import YAML from 'yaml';
+import {spawnSync} from 'node:child_process';
 import { build } from 'esbuild';
 import {pathToFileURL} from 'node:url';
 const bundle = join(process.cwd(), 'tests', `.role-projection-${process.pid}.mjs`);
@@ -47,7 +48,16 @@ try {
   ]) {
     const findings=api.declarationProblems(negative,'demo-dev',options);
     assert.ok(findings.some(x=>x.includes(needle)),`${label}: ${findings}`);
-    console.log(`PASS AC-3 ${label}: ${findings.join('; ')}`);
+    const rolesRoot=join(work,'declarations');mkdirSync(join(rolesRoot,'roles'),{recursive:true});
+    writeFileSync(join(rolesRoot,'roles','dev.md'),'---\n'+YAML.stringify(negative)+'---\nfixture\n');
+    const repo=join(work,'repo');mkdirSync(join(repo,'agents','hermes','dev'),{recursive:true});
+    writeFileSync(join(repo,'agents','hermes','dev','role.yaml'),'agent_id: demo-dev\nprofile: demo-dev\nrole: dev\n');
+    const audit=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'audit',repo,'--rules','hermes.role-declaration','--json'],{encoding:'utf8',timeout:10000,env:{...process.env,PJ_SKILLS_REGISTRY_ROOT:skillex,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath}});
+    assert.ok(audit.stdout.trim(),`audit status=${audit.status} error=${audit.error} stderr=${audit.stderr}`);
+    const report=JSON.parse(audit.stdout);
+    const finding=report.rules.find(x=>x.id==='hermes.role-declaration');
+    assert.equal(finding.status,'fail');assert.ok(finding.details.some(x=>x.includes(needle)),JSON.stringify(finding));
+    console.log(`PASS AC-3 flume audit ${label}: ${finding.details.join('; ')}`);
   }
   const inherited={role:'dev',skills:{packs:['dev']},department:'engineering'};
   const secondDesk=join(fleet,'profiles','second-dev');mkdirSync(secondDesk,{recursive:true});
@@ -61,4 +71,17 @@ try {
   assert.equal(YAML.parse(readFileSync(join(secondDesk,'config.yaml'),'utf8')).model.default,'explicit-override');
   assert.equal(override.fallback_surface,'desk-gateway');
   console.log('PASS AC-4 runtime fleet inheritance, manager default and reported explicit override');
+  const rolesRoot=join(work,'declarations');
+  writeFileSync(join(rolesRoot,'roles','dev.md'),'---\n'+YAML.stringify(inherited)+'---\nfixture\n');
+  const repo=join(work,'repo');
+  const cliEnv={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath,PJ_SKILLS_REGISTRY_ROOT:skillex};
+  const beforeOrg=readFileSync(org,'utf8'), beforeCfg=readFileSync(join(desk,'config.yaml'),'utf8');
+  for(let i=0;i<2;i++) {
+    const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
+    assert.equal(onboard.status,0,`${onboard.stdout}\n${onboard.stderr}`);
+  }
+  assert.equal(readFileSync(org,'utf8'),beforeOrg);
+  assert.equal(readFileSync(join(desk,'config.yaml'),'utf8'),beforeCfg);
+  assert.deepEqual(readdirSync(join(desk,'.agents','skills')).sort(),['build','review']);
+  console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
 } finally {rmSync(work,{recursive:true,force:true});}

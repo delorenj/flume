@@ -20,7 +20,11 @@ try:
     ids={x['id'] for x in discovered['data']}
     assert all(x['model'] in ids for x in fallbacks)
     report['authenticated_models_verified']=True
+    fixture=pathlib.Path(os.environ['HERMES_HOME'])/'config.yaml'
+    fixture.write_text(yaml.safe_dump({'providers':base.get('providers',{}),'model':base['model'],'fallback_providers':fallbacks,'secrets':{'onepassword':{'enabled':False}}}))
     os.environ['AUTOMATICAI_GATEWAY_KEY']=key
+    import logging
+    logging.basicConfig(level=logging.WARNING)
     from run_agent import AIAgent
     from agent.chat_completion_helpers import build_api_kwargs
     import openai
@@ -40,8 +44,9 @@ try:
     report['outgoing_effort']={k:kwargs.get(k) for k in ('reasoning_effort','extra_body')}
     reply=agent.client.chat.completions.create(**kwargs)
     report['response_completed']=bool(reply.choices)
-    rows,_=proof.fetch_rows(Gateway(),since=start,token_name='hermes-flume-pm',route=agent.model,max_pages=2)
-    receipts=proof.match_receipts(rows,marker=marker,since=start,token_name='hermes-flume-pm',route=agent.model)
+    rows,_=proof.fetch_rows(Gateway(),since=start,route=agent.model,max_pages=2)
+    receipts=proof.match_receipts(rows,marker=marker,since=start,route=agent.model)
+    receipts=[x for x in receipts if str(x['token_name']).startswith('aai:hermes-flume-pm:') or x['token_name']=='hermes-flume-pm']
     for receipt in receipts:
         row=next(x for x in rows if x['id']==receipt['log_id']);other=json.loads(row.get('other') or '{}')
         receipt['effort_defaulted']=other.get('automaticai_effort_defaulted')

@@ -2,7 +2,7 @@ import {readFileSync,existsSync} from "node:fs";
 import {join} from "node:path";
 import {Command,type InvokeResult} from "../engine/Command";
 import {resolveFlumeRoot} from "../kernel/paths";
-import {readRoleDeclaration,projectRoleDeclaration} from "../workforce/role";
+import { projectRoleDeclaration, readRoleDeclaration } from "../workforce/role";
 import type {HermesAgentContext} from "./types";
 
 /** Role-owned projection, after the existing template has established the desk. */

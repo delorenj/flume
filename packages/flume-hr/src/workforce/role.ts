@@ -61,7 +61,6 @@ export function declarationProblems(role:RoleDeclaration, employee:string, optio
     try {const catalog=gatewayCatalog(options);for(const route of role.chain) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);}
     catch(error){problems.push(`${employee}: gateway catalog unavailable: ${(error as Error).message}`);}
   }
-  try {const catalog=gatewayCatalog({...options,catalogModels:undefined}); for(const route of role.chain ?? []) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);} catch(error) {if(role.chain) problems.push(`${employee}: gateway catalog unavailable: ${(error as Error).message}`);} 
   return problems;
 }
 function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocument>)=>void) {
@@ -85,6 +84,7 @@ async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T
   try {return await action();} finally {child.stdin.end('\n');await new Promise<void>(resolve=>child.once('close',()=>resolve()));}
 }
 export async function projectRoleDeclaration(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {
+  if(options.dryRun) return projectUnlocked(input,employee,profile,options);
   return withRegistryLock(paths(options).registry,()=>projectUnlocked(input,employee,profile,options));
 }
 async function projectUnlocked(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {

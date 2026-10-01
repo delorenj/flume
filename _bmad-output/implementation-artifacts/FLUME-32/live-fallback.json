@@ -1,0 +1,41 @@
+{
+  "verdict": "PASS_SEAM_ONLY",
+  "ingress": "isolated Hermes AIAgent fallback seam (not multiplexed Bloodbank)",
+  "consumer": "hermes-flume-pm",
+  "marker": "AAI_ROUTE_PROOF_2f23f7e7641ae86504c3c1209032064c",
+  "effective_chain": [
+    "automaticai/personal/glm-5.3",
+    "automaticai/personal/sol-6.1",
+    "automaticai/personal/kimi-2.8"
+  ],
+  "failure_injection": "primary client HTTP 503 simulated at isolated desk transport; no server mutation",
+  "authenticated_models_verified": true,
+  "activated_model": "automaticai/personal/sol-6.1",
+  "outgoing_effort": {
+    "reasoning_effort": null,
+    "extra_body": null
+  },
+  "response_completed": true,
+  "receipts": [
+    {
+      "log_id": 7296,
+      "request_id": "202610010224500790100858268d9d6JmQWi0qa",
+      "created_at": 1790821493,
+      "token_name": "aai:hermes-flume-pm:1790777406434714921",
+      "session_id": "",
+      "route": "automaticai/personal/sol-6.1",
+      "account": "openai-personal",
+      "native_model": "gpt-6.1-sol",
+      "channel": 8,
+      "requested_effort": "xhigh",
+      "effective_effort": "xhigh",
+      "prompt_tokens": 35,
+      "completion_tokens": 28,
+      "quota": 0,
+      "group_ratio": 1,
+      "model_ratio": 0,
+      "effort_defaulted": true,
+      "outgoing_reasoning_effort": "xhigh"
+    }
+  ]
+}
