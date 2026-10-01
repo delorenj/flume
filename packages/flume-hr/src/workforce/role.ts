@@ -1,7 +1,7 @@
-import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync} from "node:fs";
+import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync, readdirSync, realpathSync} from "node:fs";
 import {join, dirname, resolve} from "node:path";
 import {homedir} from "node:os";
-import {spawnSync} from "node:child_process";
+import {spawn,spawnSync} from "node:child_process";
 import YAML from "yaml";
 import {resolveFlumeRoot} from "../kernel/paths";
 import {validateRoleDeclaration, resolveSkillLoadout, type RoleDeclaration} from "./validator";
@@ -17,6 +17,15 @@ function paths(options:RoleProjectionOptions) {
   const home=options.home ?? homedir(), fleet=options.fleetRoot ?? process.env.HERMES_FLEET_HOME ?? join(home,".hermes");
   return {home,fleet,registry:options.registryPath ?? process.env.HERMES_AGENTS_REGISTRY ?? process.env.HERMES_FLEET_REGISTRY_FILE ?? join(fleet,"agents-registry.yaml"),
     org:options.orgPath ?? process.env.HERMES_ORG_PATH ?? join(fleet,"org.yaml")};
+}
+export async function auditRoleSkills(profileDir:string, declaration:RoleDeclaration, options:RoleProjectionOptions={}) {
+  const skills=declaration.skills?await resolveSkillLoadout(declaration.skills,{...options,skillexRoot:options.skillexRoot??process.env.PJ_SKILLS_REGISTRY_ROOT}):[];
+  const root=join(profileDir,'.agents','skills');
+  const errors:string[]=[];
+  const names=existsSync(root)?readdirSync(root).sort():[];
+  if(JSON.stringify(names)!==JSON.stringify(skills.map(s=>s.name).sort())) errors.push(`role managed skills differ at ${root}`);
+  for(const skill of skills) {const path=join(root,skill.name);if(!existsSync(path)||!lstatSync(path).isSymbolicLink()||realpathSync(path)!==realpathSync(skill.path)) errors.push(`role skill ${skill.name} is not a canonical symlink at ${path}`);}
+  return errors;
 }
 export function readRoleDeclaration(root:string, role:string, post="", profile=post): RoleDeclaration {
   if (!/^[a-z0-9][a-z0-9_-]*$/u.test(role)) throw new Error("Unsafe role filename");
@@ -52,6 +61,7 @@ export function declarationProblems(role:RoleDeclaration, employee:string, optio
     try {const catalog=gatewayCatalog(options);for(const route of role.chain) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);}
     catch(error){problems.push(`${employee}: gateway catalog unavailable: ${(error as Error).message}`);}
   }
+  try {const catalog=gatewayCatalog({...options,catalogModels:undefined}); for(const route of role.chain ?? []) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);} catch(error) {if(role.chain) problems.push(`${employee}: gateway catalog unavailable: ${(error as Error).message}`);} 
   return problems;
 }
 function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocument>)=>void) {
@@ -62,18 +72,39 @@ function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocum
   edit(doc);const after=String(doc);if(after!==before){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,after);}
 }
 /** The same projection runs on hire and onboard. Never writes the fleet base. */
+async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T> {
+  mkdirSync(dirname(path),{recursive:true});
+  const lock=path+'.lock';
+  if(existsSync(lock)&&lstatSync(lock).isSymbolicLink()) throw new Error(`Refusing registry lock symlink ${lock}`);
+  const child=spawn('flock',['-w','30',lock,'sh','-c','printf "locked\\n"; read release'],{stdio:['pipe','pipe','pipe']});
+  await new Promise<void>((resolve,reject)=>{
+    child.stdout.once('data',()=>resolve());
+    child.once('error',reject);
+    child.once('exit',code=>reject(new Error(`Registry lock unavailable (exit ${code})`)));
+  });
+  try {return await action();} finally {child.stdin.end('\n');await new Promise<void>(resolve=>child.once('close',()=>resolve()));}
+}
 export async function projectRoleDeclaration(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {
+  return withRegistryLock(paths(options).registry,()=>projectUnlocked(input,employee,profile,options));
+}
+async function projectUnlocked(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {
   const role=validateRoleDeclaration(input,employee,profile), p=paths(options);
   const errors=declarationProblems(role,employee,options);if(errors.length) throw new Error(errors.join("; "));
   const department=read(p.org).departments.find((d:any)=>d.id===role.department);
   const superior=role.reports_to ?? department.manager;
   const desk=options.deskPath ?? join(p.fleet,"profiles",profile);
   if(existsSync(desk)&&lstatSync(desk).isSymbolicLink()) throw new Error("desk must be a real directory");
-  const skills=role.skills ? await resolveSkillLoadout(role.skills,options) : [];
+  const skills=role.skills ? await resolveSkillLoadout(role.skills,{...options,skillexRoot:options.skillexRoot??process.env.PJ_SKILLS_REGISTRY_ROOT}) : [];
+  const flume=resolveFlumeRoot();
+  if(role.chain && !options.catalogModels) {
+    const current=read(join(desk,"config.yaml"));
+    const reference=current.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
+    const check=spawnSync("python3",[join(flume,"scripts/role-catalog-check.py")],{input:JSON.stringify({chain:role.chain,reference}),encoding:"utf8",timeout:40_000});
+    if(check.status!==0) throw new Error(String(check.stderr).trim()||"Authenticated catalog check failed");
+  }
   if(options.dryRun) return {department:role.department,reports_to:superior,skills,chain:role.chain??null,overrides:[]};
   mkdirSync(desk,{recursive:true});
   if(role.skills) await provisionDesk({schema_version:1,id:employee,display_name:employee,role:role.role,charter:{purpose:role.role},skills:role.skills,memory:{write_bank:`agent-${employee}`},desk:{path:desk}}, {resolvedSkills:skills,home:p.home});
-  const flume=resolveFlumeRoot();
   const configured=spawnSync("python3",[join(flume,"scripts/role-profile-config.py"),options.renderer??join(flume,"templates/hermes-agent/scripts/hermes-profile-config.py"),profile],
     {input:JSON.stringify({chain:role.chain,skills_dir:role.skills?join(desk,".agents","skills"):undefined}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
   if(configured.status!==0) throw new Error(`Role config projection failed: ${configured.stderr}`);

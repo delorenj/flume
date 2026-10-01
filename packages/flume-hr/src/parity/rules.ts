@@ -5,6 +5,9 @@ import { spawnSync } from "node:child_process";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
+import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration } from "../workforce/role";
+import { resolveFlumeRoot } from "../kernel/paths";
+import { roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
 import { showProfile, syncProfile } from "@delorenj/skillex";
 
@@ -2545,6 +2548,7 @@ function listOverrides(base: unknown, delta: unknown, path: string[] = []): List
 
 export function createHermesChecks(): RecipeOwnedCheck[] {
 return [
+  roleDeclarationCheck,
   {
     id: "hermes.pm-scaffold",
     title: "Hermes orchestrator scaffold parity",
@@ -2988,11 +2992,16 @@ return [
           const state = linkState(link.path, link.target);
           if (state !== "ok") details.push(`${state}: ${link.path} -> ${link.target}`);
         }
-        const projection = await showProfile(profileNameOf(role), {
-          ...skillCoreOptions(ctx), hermesRoot: plan.fleetRoot,
-        });
-        details.push(...skillDiagnostics(projection.findings));
-        details.push(...(projection.data?.changes ?? []).map((change) => `profile skills ${change.action}: ${change.path}`));
+        const declaration=readRoleDeclaration(process.env.FLUME_ROLES_ROOT??resolveFlumeRoot(),role.role,role.agentId,profileNameOf(role));
+        if(declaration.skills) {
+          details.push(...await auditRoleSkills(plan.profileDir,declaration,{home:ctx.homeDir}));
+        } else {
+          const projection = await showProfile(profileNameOf(role), {
+            ...skillCoreOptions(ctx), hermesRoot: plan.fleetRoot,
+          });
+          details.push(...skillDiagnostics(projection.findings));
+          details.push(...(projection.data?.changes ?? []).map((change) => `profile skills ${change.action}: ${change.path}`));
+        }
         if (role.identity.state === "invalid") {
           details.push(`${relative(ctx.repoRoot, role.roleYamlPath)}: ${role.identity.reason}`);
         }
@@ -3067,12 +3076,17 @@ return [
           details.push(`would project global + explicit project skills into ${plan.profileDir}/skills after creating the profile`);
           changedFiles.push(join(plan.profileDir, "skills"));
         } else {
+          const declaration=readRoleDeclaration(process.env.FLUME_ROLES_ROOT??resolveFlumeRoot(),role.role,role.agentId,profileNameOf(role));
+          if(declaration.skills) {
+            await projectRoleDeclaration(declaration,role.agentId,profileNameOf(role),{home:ctx.homeDir,dryRun:ctx.dryRun});
+          } else {
           const projection = await syncProfile(profileNameOf(role), {
             ...skillCoreOptions(ctx), hermesRoot: plan.fleetRoot, dryRun: Boolean(ctx.dryRun),
           });
           details.push(...skillDiagnostics(projection.findings).map((detail) => projection.ok ? detail : `blocked: ${detail}`));
           changedFiles.push(...(ctx.dryRun ? projection.data?.changes ?? [] : projection.data?.applied ?? []).map((change) => change.path));
           if (!projection.ok) details.push(`blocked: profile skill projection returned exit ${projection.exit}`);
+          }
         }
         // Render config.yaml from base+delta and pin the identity-memory bank.
         // This deliberately does NOT symlink config.yaml (see
@@ -3736,6 +3750,8 @@ return [
         const elide = (entries: string[], keep: number) =>
           entries.slice(0, keep).join(", ") + (entries.length > keep ? `, +${entries.length - keep} more` : "");
         for (const override of listOverrides(base, delta)) {
+          // A declared desk-gateway chain is an explicit replacement, not a shared-process chain.
+          if (override.path === "fallback_providers" && isPlainObject(delta) && delta["x-flume-fallback-override"] === "desk-gateway") continue;
           const shown = elide(override.lost, 4);
           // A delta that adds nothing is pure redundancy: deleting the key
           // restores inheritance outright. One that adds entries states a real

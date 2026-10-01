@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import * as api from '../packages/flume-hr/dist/index.js';
+const bundle = new URL(`./.role-contract-${process.pid}.mjs`, import.meta.url);
+await (await import('esbuild')).build({entryPoints:['packages/flume-hr/src/index.ts'],outfile:bundle.pathname,bundle:true,packages:'external',platform:'node',format:'esm',logLevel:'silent'});
+const api = await import(bundle.href);
+(await import('node:fs')).rmSync(bundle);
 
 assert.equal(typeof api.validateRoleDeclaration, 'function', 'role frontmatter must consume the named-agent definitions');
 const named = {schema_version:1,id:'alice',display_name:'Alice',role:'dev',charter:{purpose:'Build'},skills:{pack:'dev'},memory:{write_bank:'agent-alice',recall_banks:['custom']}};

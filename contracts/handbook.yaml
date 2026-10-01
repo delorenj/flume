@@ -109,6 +109,9 @@ authorities:
     writable_fields:
       - agents.{agent_id}.repo
       - agents.{agent_id}.role
+      # Role declaration projects these edges; subordinates are derived.
+      - agents.{agent_id}.department
+      - agents.{agent_id}.reports_to
       - agents.{agent_id}.type
       # A travelling named agent keeps this identity when the profile/post
       # changes. The SOURCE is the role's role.yaml `identity:` block

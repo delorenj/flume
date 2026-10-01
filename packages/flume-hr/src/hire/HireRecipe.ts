@@ -123,7 +123,10 @@ export class HireRecipe extends Recipe {
     // imports EnsureTemplateConfig directly for `config bootstrap`; capturing
     // that binding while the singleton catalog is being evaluated would store
     // `undefined` before the command module finishes initializing.
-    const ingredients = [
+    const hireCtx = ctx as unknown as HermesAgentContext;
+    const ingredients = hireCtx.onboard && existsSync(join(ctx.targetDir,"agents","hermes",hireCtx.role??"pm","role.yaml"))
+      ? [PromptForAgentConfig, ValidateHermesOptions, ProjectRoleDeclaration] as const
+      : [
       PromptForAgentConfig,
       ValidateHermesOptions,
       EnsureTemplateConfig,
