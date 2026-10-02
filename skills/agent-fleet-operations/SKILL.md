@@ -31,7 +31,7 @@ flume roster  (alias: flume org)   the org chart, and every disagreement between
 flume record                       which build each employee actually runs, against the configured pin
 flume review [--agent <id>]        performance review across all nine observation domains
 flume handbook validate            authorities, classes, service model, retired modes
-flume audit [repo] [--rules ids]   the eight employee invariants a repository is subject to
+flume audit [repo] [--rules ids]   the employee invariants a repository is subject to
 flume remediate <finding> [repo]   correct one finding
 ```
 
@@ -262,8 +262,8 @@ process control, service changes, board changes, or Bloodbank activation.
 - Never duplicate fleet `mcp_servers` into a delta; the base owns them. A delta
   that redeclares a base LIST replaces it rather than extending it, which is what
   `hermes.delta-list-override` exists to catch.
-- **`flume audit` enforces all of this.** The thirteen employee rules and what each
-  one actually reads:
+- **`flume audit` enforces all of this.** The employee rules (`flume audit --json`
+  lists every one) and what each one actually reads:
 
   | rule | scope | reads |
   |---|---|---|
@@ -277,6 +277,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.gateway-routing` | host | ALL inference routes through the AutomaticAI gateway, in the base and every member's generated config (members that only inherit a broken base are folded into one count): `model.provider` is `automaticai`/`custom:automaticai` with an `automaticai/<account>/<model>` `model.default` and no non-gateway `model.base_url`; every auxiliary task (vision, web_extract, compression, skills_hub, approval, mcp, title_generation, memory_query_rewrite, tts_audio_tags, triage_specifier, kanban_decomposer, profile_describer, goal_judge, curator, monitor, background_review, moa_reference, moa_aggregator, kanban_estimator) is either pinned to the gateway or follows the main model (absent, `auto` or `main`) -- the owner's design, compliant only when `model.provider` is on the gateway AND `auxiliary.free_only: true` AND `auxiliary.discovery: false` (fork key, default true; without it a failed call falls through OpenRouter/Nous/direct-key discovery, which is how helpers reached direct Gemini, z.ai and Kimi), and the finding names the missing key; `auxiliary.discovery: false` is required even when every task is pinned (a pinned task re-walks discovery when its fallback hits a stale credential); every `auxiliary.<task>.fallback_chain` entry is a gateway route; `auxiliary.free_only: true` (no hidden paid OpenRouter lane); every enabled MoA preset's references and aggregator are gateway routes, read after Hermes' `load_config` deep-merges config.yaml over its built-in `moa.presets.default` (an absent `moa` block, a presets map without `default`, or the legacy flat shape all leave that stock openrouter/openai-codex preset enabled; only `moa.presets.default.enabled: false` or gateway slots in it turn it off; a slot with no provider is filled from the stock slot); of the auxiliary tasks only `title_generation` honors `enabled: false`; `fallback_providers`/`fallback_model` stay on the gateway; `providers.automaticai` with `key_env` and an explicit `extra_body.reasoning_effort`, `delegation.provider: automaticai` with a canonical route, no `delegation.base_url`/`api_key`, the key variable mapped to an `op://` reference |
   | `hermes.dotenv-no-op-refs` | host | neither `~/.hermes/.env` nor any profile `.env` that is its own file holds a literal `op://` value (names only are reported). Hermes reloads `.env` with `override=True` on every import while the 1Password source applies once, so the literal reference is sent as the key (401). `flume remediate hermes.dotenv-no-op-refs` deletes the lines already mapped to the identical reference in that config's `secrets.onepassword.env`; unmapped or conflicting ones need the operator to map them first |
   | `hermes.wake-word-session` | host | an enabled `wake_word` in the base or any member config sets `start_new_session: false`; otherwise every wake (false triggers too) calls `new_session(silent=True)`, which resets the model to `model.default` and silently undoes a `/model` switch |
+  | `hermes.skillex-resync` | host | with at least one Skillex-only desk present, `skillex-hermes-resync.timer` and `.path` are each installed, enabled and active (a path unit that tripped its trigger limit is `failed` and has stopped watching the catalog), `~/.local/state/skillex/hermes-resync.last.json` (schema 1) records a run that finished within 2 h, and that run left no desk `refused` or `error`. The finding names `~/code/skillex/scripts/install-hermes-resync.sh install` for the units and the cutover for a refused desk. It passes quietly when no strict desk exists and is not auto-fixable (host install state: `flume remediate hermes.skillex-resync` is blocked with the same instructions) |
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
@@ -377,6 +378,9 @@ process control, service changes, board changes, or Bloodbank activation.
   which quarantines the content under `~/.hermes/.skill-quarantine/<profile>/<stamp>/`,
   then run the resync again (`mise run hermes:resync` in the Skillex repo). Contract:
   `~/code/skillex/docs/implementation/hermes-skillex-resync.md`.
+  `flume audit --rules hermes.skillex-resync` is the guard on all of this: it fails
+  when strict desks exist and the units are missing, disabled or failed, the last
+  run is older than 2 h, or that run left a desk `refused` or `error`.
 - `flume roster` / `record` / `review` / `audit` are aggregate claims. Verify their
   result against `.project.json`, the registry row, real profile files, and exact
   systemd enabled/active/restart state before declaring success.

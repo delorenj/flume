@@ -189,7 +189,7 @@ Use the canonical profile renderer and flume's remediation surface for repairs.
 Do not recreate the old symlink/native-inheritance layout manually.
 
 ```bash
-flume audit                                        # the ten employee rules, this repo
+flume audit                                        # the employee rules, this repo
 flume remediate hermes.runtime-singleton --dry-run # plan before applying
 flume remediate hermes.runtime-singleton
 ```

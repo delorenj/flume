@@ -18,11 +18,13 @@
     "hermes.untracked-runtimes",
     "systemd.sentinel",
     "hermes.runtime-singleton",
+    "hermes.role-declaration",
     "hermes.fleet-config",
     "hermes.bloodbank-toolsets",
     "hermes.gateway-routing",
     "hermes.dotenv-no-op-refs",
     "hermes.wake-word-session",
+    "hermes.skillex-resync",
     "hermes.delta-list-override",
     "hermes.profile-wiring",
     "hermes.registry-parity"

@@ -206,6 +206,9 @@ const RULE_DOMAIN: Readonly<Record<string, FleetStatusDomain>> = Object.freeze({
   "hermes.dotenv-no-op-refs": "profile",
   // A wake word that rotates the session silently resets the model.
   "hermes.wake-word-session": "profile",
+  // The Skillex-only desks' auto-resync (units, last run): without it every
+  // catalog commit leaves every strict desk "sync pending".
+  "hermes.skillex-resync": "profile",
   // Registry parity between the two canonical stores.
   "hermes.registry-parity": "registry",
   // The org-wide rules (`src/parity/reconcile.ts`), which answer for the

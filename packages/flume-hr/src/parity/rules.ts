@@ -404,10 +404,12 @@ function legacyConsumerUnitPath(homeDir: string, agentId: string): string {
 
 function systemctlUser(args: string[]): { ok: boolean; stdout: string; stderr: string } {
   const result = spawnSync("systemctl", ["--user", ...args], { encoding: "utf8" });
+  // A spawn that never started (no systemctl on PATH) leaves stdout and stderr
+  // unset, and `.trim()` on them would throw out of the audit.
   return {
     ok: result.status === 0,
-    stdout: result.stdout.trim(),
-    stderr: result.stderr.trim(),
+    stdout: (result.stdout ?? "").trim(),
+    stderr: (result.stderr ?? "").trim(),
   };
 }
 
@@ -2571,6 +2573,169 @@ function skillexCutoverHint(profile: string, project = "<repo>"): string {
   return `preview python3 ~/code/skillex/scripts/hermes-skillex-cutover.py --profile ${profile} --project ${project} --registry-root ~/code/skillex --renderer ~/code/33GOD/hermes-agent-template/scripts/hermes-profile-config.py, then rerun with --apply`;
 }
 
+
+/**
+ * The Skillex-only desk auto-resync (skillex `scripts/hermes-skillex-resync.py`).
+ *
+ * A strict desk's Skillex receipt records the all-skills commit it was synced
+ * against, so EVERY catalog commit leaves every strict desk "sync pending"
+ * (`skillex profile show` exits 6 with one write-receipt change) and turns
+ * hermes.runtime-singleton red until each desk is strict-synced. Since
+ * 2026-10-02 two systemd user units do that: a path unit (the catalog's HEAD
+ * moved) and a 15-minute timer, both running the resync script, which records
+ * every real run in `$XDG_STATE_HOME/skillex/hermes-resync.last.json` (schema 1;
+ * a `busy` run and a dry run never replace it).
+ *
+ * `hermes.skillex-resync` guards that automation, because its failures are
+ * silent: with the units gone the desks just stay pending until somebody
+ * notices, and a desk the script refuses (foreign content in a strict desk) is
+ * left alone ON PURPOSE and reported only in the script's own record.
+ */
+const RESYNC_UNITS = ["skillex-hermes-resync.timer", "skillex-hermes-resync.path"] as const;
+/** The timer fires every 15 minutes, so two hours is eight missed runs. */
+const RESYNC_STALE_MS = 2 * 60 * 60 * 1000;
+const RESYNC_INSTALL = "~/code/skillex/scripts/install-hermes-resync.sh install";
+const RESYNC_STATUS = "~/code/skillex/scripts/install-hermes-resync.sh status";
+const RESYNC_RUN = "python3 ~/code/skillex/scripts/hermes-skillex-resync.py";
+const RESYNC_JOURNAL = "journalctl --user -u skillex-hermes-resync.service -n 20 --no-pager";
+/** How many desks one finding spells out before it folds the rest into a count. */
+const RESYNC_DESKS_SHOWN = 5;
+
+/**
+ * The strict desks: real directories under `<fleet>/profiles` that carry a
+ * regular-file `.skillex-only`. The resync script selects exactly these (a
+ * symlinked desk or a non-regular marker is skipped there, and reported by
+ * hermes.delta-list-override / hermes.runtime-singleton here).
+ */
+function skillexOnlyDesks(profilesRoot: string): { desks: string[]; error?: string } {
+  try {
+    const desks = readdirSync(profilesRoot, { withFileTypes: true })
+      // lstat semantics: a symlinked profile is not a real directory.
+      .filter((entry) => entry.isDirectory() && skillexOnlyMarker(join(profilesRoot, entry.name)) === "regular")
+      .map((entry) => entry.name)
+      .sort();
+    return { desks };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { desks: [] };
+    return { desks: [], error: (err as Error).message };
+  }
+}
+
+/** `$XDG_STATE_HOME/skillex/hermes-resync.last.json`, falling back to `~/.local/state`, as the script resolves it. */
+function resyncRecordPath(ctx: Context): string {
+  const state = process.env.XDG_STATE_HOME?.trim() || join(ctx.homeDir, ".local", "state");
+  return join(state, "skillex", "hermes-resync.last.json");
+}
+
+/** `systemctl show` prints one `Key=value` block per unit, separated by a blank line. */
+function parseSystemctlShow(text: string): Record<string, string>[] {
+  return text.split(/\n\s*\n/u).map((block) => {
+    const properties: Record<string, string> = {};
+    for (const line of block.split("\n")) {
+      const at = line.indexOf("=");
+      if (at > 0) properties[line.slice(0, at)] = line.slice(at + 1);
+    }
+    return properties;
+  });
+}
+
+/**
+ * One resync unit, observed with a single read-only `show`: loaded, enabled and
+ * active, or the reason it is not. `unobservable` means the user manager could
+ * not answer at all, which is a statement about the observer and not the unit.
+ */
+function readResyncUnit(unit: string): { unit: string; problems: string[]; unobservable?: string } {
+  const shown = systemctlUser(["show", "--no-pager", "-p", "Id,LoadState,UnitFileState,ActiveState,SubState,Result", unit]);
+  if (!shown.ok) {
+    return { unit, problems: [], unobservable: `systemctl --user show ${unit} failed${shown.stderr ? `: ${shown.stderr}` : ""}` };
+  }
+  const properties = parseSystemctlShow(shown.stdout).find((block) => block.Id === unit);
+  if (!properties) {
+    return { unit, problems: [], unobservable: `systemctl --user show ${unit} reported no properties for it` };
+  }
+  const load = properties.LoadState ?? "";
+  const enablement = properties.UnitFileState ?? "";
+  const active = properties.ActiveState ?? "";
+  const problems: string[] = [];
+  if (load === "not-found") {
+    problems.push("is not installed (LoadState=not-found)");
+  } else if (load !== "loaded") {
+    problems.push(`cannot be loaded (LoadState=${load || "unset"})`);
+  } else {
+    if (enablement !== "enabled") problems.push(`is installed but not enabled (UnitFileState=${enablement || "unset"})`);
+    // A failed path unit is the one that matters most: a runaway tripped its
+    // trigger limit and it STOPPED WATCHING the catalog until restarted.
+    if (active === "failed") problems.push(`has failed (Result=${properties.Result || "unset"}) and no longer starts the resync`);
+    else if (active !== "active") problems.push(`is not active (ActiveState=${active || "unset"}, SubState=${properties.SubState || "unset"})`);
+  }
+  return { unit, problems };
+}
+
+/** `3 min`, `47 min`, `2 h`, `2 h 5 min`: coarse on purpose, the limit is hours. */
+function resyncAge(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  if (minutes < 90) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+}
+
+type ResyncRecord =
+  | { kind: "missing" }
+  | { kind: "unreadable"; reason: string }
+  | { kind: "read"; data: Record<string, any> };
+
+function readResyncRecord(path: string): ResyncRecord {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { kind: "missing" };
+    return { kind: "unreadable", reason: (err as Error).message };
+  }
+  try {
+    const data: unknown = JSON.parse(text);
+    return isPlainObject(data) ? { kind: "read", data } : { kind: "unreadable", reason: "not a JSON object" };
+  } catch (err) {
+    return { kind: "unreadable", reason: `invalid JSON (${(err as Error).message})` };
+  }
+}
+
+/**
+ * Every desk the last run could not converge: a `refused` or `error` desk
+ * record, plus any name `attention` lists that the records do not explain.
+ * `refused` is skillex exit 3 (foreign or unowned content in a strict desk);
+ * the script never touches such a desk, so only a human cutover clears it.
+ */
+function resyncDeskProblems(record: Record<string, any>, recordPath: string): { count: number; lines: string[] } {
+  const lines = new Map<string, string>();
+  for (const desk of Array.isArray(record.results) ? record.results : []) {
+    if (!isPlainObject(desk) || typeof desk.desk !== "string" || !desk.desk) continue;
+    const status = String(desk.status ?? "");
+    if (status !== "refused" && status !== "error") continue;
+    const finding = Array.isArray(desk.findings) ? desk.findings.find((item: unknown) => isPlainObject(item)) : undefined;
+    const why = [desk.reason, finding?.message].find((value) => typeof value === "string" && value.trim()) ?? "no reason recorded";
+    const where = typeof finding?.path === "string" && finding.path ? `; ${finding.path}` : "";
+    lines.set(
+      desk.desk,
+      status === "refused"
+        ? `${desk.desk}: refused by the resync (${why}${where}); it is left alone on purpose, so only a cutover clears it: ${skillexCutoverHint(desk.desk, typeof desk.project === "string" && desk.project ? desk.project : undefined)}; then run ${RESYNC_RUN}`
+        : `${desk.desk}: the resync errored (${why}); read ${RESYNC_JOURNAL}, then run ${RESYNC_RUN} --profile ${desk.desk}`,
+    );
+  }
+  for (const name of Array.isArray(record.attention) ? record.attention : []) {
+    if (typeof name === "string" && name && !lines.has(name)) {
+      lines.set(name, `${name}: the last run lists it as needing a human (see ${recordPath})`);
+    }
+  }
+  const all = [...lines.values()];
+  return {
+    count: all.length,
+    lines: all.length > RESYNC_DESKS_SHOWN
+      ? [...all.slice(0, RESYNC_DESKS_SHOWN), `+${all.length - RESYNC_DESKS_SHOWN} more desk(s) the last run could not converge (see ${recordPath})`]
+      : all,
+  };
+}
+
 export function createHermesChecks(): RecipeOwnedCheck[] {
 return [
   roleDeclarationCheck,
@@ -3710,6 +3875,129 @@ return [
         `Set wake_word.start_new_session: false in ${join(fleetHome(ctx), "config.yaml")} (or in the member's config.delta.yaml), then re-render each named desk with hermes-profile-config.py render --profile <name>.`,
       ],
     }),
+  },
+  {
+    // The Skillex desk auto-resync must stay installed, firing and clean.
+    //
+    // A Skillex receipt records the all-skills commit it was written against,
+    // so every catalog commit leaves each Skillex-only desk "sync pending" and
+    // turns hermes.runtime-singleton red. Two systemd user units (a path unit on
+    // the catalog's HEAD, a 15-minute timer) strict-sync the desks within
+    // seconds, and nothing else notices when that automation is uninstalled,
+    // stopped, tripped (a failed path unit stops watching the catalog), starved
+    // of completed runs, or refusing a desk: the desks just stay pending.
+    //
+    // Reads only. The units come from `systemctl --user show`, the last run from
+    // $XDG_STATE_HOME/skillex/hermes-resync.last.json (schema 1, replaced
+    // atomically by every real run; skillex docs/implementation/
+    // hermes-skillex-resync.md). Passes quietly when no Skillex-only desk exists.
+    id: "hermes.skillex-resync",
+    title: "Skillex-only desks resync themselves after a catalog commit",
+    // Host-scoped: the user systemd manager, $HOME/.hermes/profiles/*, $XDG_STATE_HOME/skillex.
+    scope: "host",
+    audit: (ctx) => {
+      const id = "hermes.skillex-resync";
+      const title = "Skillex-only desks resync themselves after a catalog commit";
+      const roles = discoverRoles(ctx.repoRoot);
+      if (!roles.length) {
+        return { id, title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
+      }
+      const profilesRoot = join(fleetHome(ctx), "profiles");
+      const strict = skillexOnlyDesks(profilesRoot);
+      if (strict.error) {
+        return { id, title, status: "warn", summary: `profiles directory unreadable: ${profilesRoot} (${strict.error})`, details: [], fixable: false };
+      }
+      if (strict.desks.length === 0) {
+        return { id, title, status: "pass", summary: "No Skillex-only desk exists, so there is nothing to resync", details: [], fixable: false };
+      }
+      const desks = `${strict.desks.length} Skillex-only desk(s)`;
+      const failures: string[] = [];
+      const unassessed: string[] = [];
+      const aspects: string[] = [];
+
+      // 1. The units: installed, enabled and active. A failed one is none of those.
+      const readings = RESYNC_UNITS.map(readResyncUnit);
+      for (const reading of readings) {
+        if (reading.problems.length) failures.push(`${reading.unit} ${reading.problems.join(" and ")}`);
+        if (reading.unobservable) unassessed.push(reading.unobservable);
+      }
+      const unhealthy = readings.filter((reading) => reading.problems.length).map((reading) => reading.unit);
+      if (unhealthy.length) {
+        aspects.push(`${unhealthy.join(" and ")} must be installed, enabled and active (run ${RESYNC_INSTALL})`);
+        failures.push(`${RESYNC_INSTALL} links both units, enables them and starts a run; it is idempotent and resets a failed unit, and ${RESYNC_STATUS} shows the units and the last run`);
+      }
+
+      // 2. The last run: recorded, recent and clean.
+      const recordPath = resyncRecordPath(ctx);
+      const record = readResyncRecord(recordPath);
+      let last = "";
+      if (record.kind === "missing") {
+        aspects.push("no resync run is recorded");
+        failures.push(`${recordPath}: no resync run is recorded, so no desk has ever been synced automatically; ${RESYNC_INSTALL} installs the units and starts a run, and ${RESYNC_RUN} runs one now`);
+      } else if (record.kind === "unreadable") {
+        aspects.push("the last-run record is unreadable");
+        failures.push(`${recordPath}: the last-run record is unreadable (${record.reason}); ${RESYNC_RUN} writes a fresh one`);
+      } else if (record.data.schema !== 1) {
+        // A record this rule cannot read proves nothing either way.
+        unassessed.push(`${recordPath}: schema ${JSON.stringify(record.data.schema ?? null)} is not the one this rule reads (1); the rule has to follow the resync contract`);
+      } else {
+        const data = record.data;
+        const status = typeof data.status === "string" ? data.status : "";
+        const finished = typeof data.finished_at === "string" ? Date.parse(data.finished_at) : Number.NaN;
+        if (Number.isNaN(finished)) {
+          aspects.push("the last-run record has no valid finish time");
+          failures.push(`${recordPath}: finished_at is missing or not a timestamp; ${RESYNC_RUN} writes a fresh record`);
+        } else {
+          const age = Math.max(0, Date.now() - finished);
+          last = `${status || "unknown"} ${resyncAge(age)} ago`;
+          if (age > RESYNC_STALE_MS) {
+            aspects.push(`the last run finished ${resyncAge(age)} ago (limit ${resyncAge(RESYNC_STALE_MS)})`);
+            failures.push(`${recordPath}: the last run finished ${String(data.finished_at)} (${resyncAge(age)} ago), over the ${resyncAge(RESYNC_STALE_MS)} limit; the 15-minute timer is not firing or no run completes (a run that finds a peer holding ~/.hermes/.skillex-resync.lock records nothing), so read ${RESYNC_JOURNAL}, and ${RESYNC_RUN} runs one now`);
+          }
+        }
+        // ok and partial (a desk was busy; the next run retries it) are clean.
+        const unconverged = resyncDeskProblems(data, recordPath);
+        if (unconverged.count) {
+          aspects.push(`the last run could not converge ${unconverged.count} desk(s)`);
+          failures.push(...unconverged.lines);
+        }
+        if (status !== "ok" && status !== "partial" && !(status === "attention" && unconverged.count)) {
+          aspects.push(`the last run ended ${status || "without a status"}`);
+          failures.push(`${recordPath}: the last run ended ${status || "without a status"} (exit ${String(data.exit ?? "unknown")})${typeof data.message === "string" && data.message ? `: ${data.message}` : ""}; read ${RESYNC_JOURNAL}`);
+        }
+      }
+
+      const verdict: RuleStatus = failures.length ? "fail" : unassessed.length ? "warn" : "pass";
+      return {
+        id,
+        title,
+        status: verdict,
+        summary: verdict === "fail"
+          ? `${desks} are not kept in sync automatically: ${aspects.join("; ")}`
+          : verdict === "warn"
+            ? `${desks}: the auto-resync could not be fully assessed (${unassessed.length} observation(s) unavailable)`
+            : `${desks} resync automatically (timer and path units active, last run ${last})`,
+        details: [...failures, ...unassessed],
+        // Host install state: the operator runs the installer or the cutover.
+        fixable: false,
+      };
+    },
+    migrate: (_ctx, finding) => {
+      if (finding.status === "pass" || finding.status === "skip") {
+        return { id: finding.id, title: finding.title, status: "noop", summary: finding.summary, changedFiles: [], details: [] };
+      }
+      return {
+        id: finding.id,
+        title: finding.title,
+        status: "blocked",
+        summary: "The Skillex desk auto-resync is host install state; flume will not install units, start services or touch a desk for it",
+        changedFiles: [],
+        details: [
+          ...finding.details,
+          `Nothing here is mechanical: install or repair the units with ${RESYNC_INSTALL}; a desk the resync refuses needs its cutover (preview, then --apply), never a hand edit.`,
+        ],
+      };
+    },
   },
   {
     // A delta that sets a LIST-valued key REPLACES the base list. YAML
