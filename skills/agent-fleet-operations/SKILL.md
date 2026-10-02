@@ -262,7 +262,7 @@ process control, service changes, board changes, or Bloodbank activation.
 - Never duplicate fleet `mcp_servers` into a delta; the base owns them. A delta
   that redeclares a base LIST replaces it rather than extending it, which is what
   `hermes.delta-list-override` exists to catch.
-- **`flume audit` enforces all of this.** The twelve employee rules and what each
+- **`flume audit` enforces all of this.** The thirteen employee rules and what each
   one actually reads:
 
   | rule | scope | reads |
@@ -270,7 +270,8 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.pm-scaffold` | project | `agents/hermes/<title>/` scripts and launcher match the pinned template |
   | `hermes.untracked-runtimes` | project | runtime is untracked + gitignored, no gitlink, no stale `.gitmodules` |
   | `systemd.sentinel` | host | gateway unit installed and matching each role's declared `service_state` |
-  | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection, generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
+  | `hermes.runtime-singleton` | project | real desk dir, shared links, Skillex projection (a role that declares `skills:` is read against its own selection project: manifest matches the declaration, strict marker, no pending `skillex profile show` change, no legacy `<desk>/.agents/skills`), generated `config.yaml` + present `config.delta.yaml` + pinned memory bank |
+  | `hermes.role-declaration` | project | `roles/<role>.md` deployment keys: `skills` resolves in the live Skillex catalog and is one expressible selection, `chain` routes exist in the gateway catalog, `department` and `reports_to` exist, no reporting cycle |
   | `hermes.fleet-config` | host | fleet base: `tts.provider: vox`, a `hooks:` block with all four events calling the canonical publisher `~/.agents/hooks/bb-hook --cli hermes --native <event>` (bloodbank `hooks.master.json`; `publish.py` is a legacy forwarder), `memory.provider` set, `memory` absent from `agent.disabled_toolsets` |
   | `hermes.bloodbank-toolsets` | host | base `platform_toolsets.bloodbank` carries delegation, terminal, file, skills and `timeouts.tools.{sequential_call,concurrent_batch}` is ≥ 900 s (or 0); every routable PM's generated config does too; no routable non-PM employee has delegation, terminal or file |
   | `hermes.gateway-routing` | host | ALL inference routes through the AutomaticAI gateway, in the base and every member's generated config (members that only inherit a broken base are folded into one count): `model.provider` is `automaticai`/`custom:automaticai` with an `automaticai/<account>/<model>` `model.default` and no non-gateway `model.base_url`; every auxiliary task (vision, web_extract, compression, skills_hub, approval, mcp, title_generation, memory_query_rewrite, tts_audio_tags, triage_specifier, kanban_decomposer, profile_describer, goal_judge, curator, monitor, background_review, moa_reference, moa_aggregator, kanban_estimator) is either pinned to the gateway or follows the main model (absent, `auto` or `main`) -- the owner's design, compliant only when `model.provider` is on the gateway AND `auxiliary.free_only: true` AND `auxiliary.discovery: false` (fork key, default true; without it a failed call falls through OpenRouter/Nous/direct-key discovery, which is how helpers reached direct Gemini, z.ai and Kimi), and the finding names the missing key; `auxiliary.discovery: false` is required even when every task is pinned (a pinned task re-walks discovery when its fallback hits a stale credential); every `auxiliary.<task>.fallback_chain` entry is a gateway route; `auxiliary.free_only: true` (no hidden paid OpenRouter lane); every enabled MoA preset's references and aggregator are gateway routes, read after Hermes' `load_config` deep-merges config.yaml over its built-in `moa.presets.default` (an absent `moa` block, a presets map without `default`, or the legacy flat shape all leave that stock openrouter/openai-codex preset enabled; only `moa.presets.default.enabled: false` or gateway slots in it turn it off; a slot with no provider is filled from the stock slot); of the auxiliary tasks only `title_generation` honors `enabled: false`; `fallback_providers`/`fallback_model` stay on the gateway; `providers.automaticai` with `key_env` and an explicit `extra_body.reasoning_effort`, `delegation.provider: automaticai` with a canonical route, no `delegation.base_url`/`api_key`, the key variable mapped to an `op://` reference |
@@ -346,6 +347,15 @@ process control, service changes, board changes, or Bloodbank activation.
   install directly into generated roots; import/edit `all-skills/`, select in
   manifests/sets, then sync through Skillex. Verify actual Hermes source paths
   and a no-op second preview, not the native list's misleading `local` label.
+  A role file's `skills:` loadout is part of this selection, never a second
+  one: flume writes it as `<desk>/.skillex-selection/.agents/skills.json`
+  (`sets`/`packs`, generated from the role) and runs `skillex profile sync
+  <name> --project <desk>/.skillex-selection --skillex-only`, so the desk is the
+  global selection plus exactly that loadout. flume never writes
+  `skills.external_dirs`, `<desk>/.agents/skills` or a copied payload into a desk.
+  A pack is exclusive (one per role, never with a set). Such a desk's project is the
+  selection, so do not `profile sync` it against its repo, and read its state with
+  `skillex profile show <name>` (the receipt records the project).
 - **Catalog commits resync the desks by themselves.** A strict desk's Skillex
   receipt records the `all-skills` HEAD it was synced against, so every catalog
   commit leaves all of them `sync pending` (`skillex profile show` exit 6, one

@@ -75,6 +75,80 @@ turns these files into a SOUL, and every path goes through it:
 had no caller and it has been deleted; `~/code/33GOD/momo/spec/momo-agent.spec.yaml`
 is the ancestor of the file format here.
 
+## Deployment declaration
+
+Besides the charter, the frontmatter can declare how an employee in this role is
+deployed. `flume hire` and `flume onboard` project each key; `flume audit`
+(`hermes.role-declaration`, `hermes.runtime-singleton`) re-reads the same file and
+fails by name when the desk, the registry or the org chart disagree with it. A role
+with none of these keys is charter-only and provisions exactly as it always has.
+
+| key | declares | projected into |
+| --- | --- | --- |
+| `skills` | one Skillex `set` or `pack` (see below) | the desk's Skillex selection, then `<desk>/skills/` |
+| `chain` | ordered `automaticai/<account>/<model>` routes; the first is the primary `model:`, the rest are `fallback_providers` | the desk's `config.delta.yaml`, rendered into `config.yaml`; omitted means the desk inherits the fleet base at run time |
+| `department` | a department id from `~/.hermes/org.yaml` | `agents.<id>.department` and the department's `members` |
+| `reports_to` | an employee id in the registry; omitted means the department's manager | `agents.<id>.reports_to` (subordinates are derived, never listed) |
+
+`identity`/`memory` share their definitions with the named-agent contract
+(`contracts/named-agent.schema.json`), so a role and a named agent cannot disagree
+about what a skills binding or a memory bank is.
+
+### `skills`: a loadout is a Skillex selection
+
+```yaml
+skills:
+  set: dev-tools           # a composable, reference-only set
+# or
+skills:
+  pack: dev                # an exclusive complete loadout; NAME or NAME@VERSION
+```
+
+Skillex alone decides what a strict (Skillex-only) desk contains. A desk's
+`skills/` is the union of the global selection and one explicit project selection,
+projected as symlinks into `all-skills/` by `skillex profile sync NAME --project
+PATH --skillex-only`. A role that declares `skills` owns that project selection:
+
+- flume writes the declaration, through Skillex's own manifest writer, to
+  `<desk>/.skillex-selection/.agents/skills.json` (`{"inherit_global": false,
+  "sets": ["dev-tools"]}` or `"packs": ["dev"]`). The file is generated; edit the role
+  file and run `flume onboard`, never the manifest.
+- Skillex then projects it, and flume refuses to report done until a second `skillex
+  profile show` plans nothing. The receipt records the selection as the desk's
+  project, so `skillex profile show <profile>` needs no `--project`.
+- The desk is therefore the global selection plus exactly the declared loadout. The
+  owning repo's `.agents/skills.json` no longer feeds a desk whose role declares
+  `skills`; do not `profile sync` such a desk against its repo (the audit reports it
+  and `flume onboard` repairs it).
+- A loadout that gains or loses a member in the catalog flows through the same
+  selection; `skillex profile sync <profile> --project <desk>/.skillex-selection
+  --skillex-only` applies it without re-onboarding.
+
+What flume will not do, because a Skillex-only desk refuses it: write
+`skills.external_dirs` (the projection pins it to `[]`, the same pin PM
+provisioning writes), create `<desk>/.agents/skills`, or copy a skill payload. A
+desk that is not Skillex-only and holds local skills is refused before anything is
+changed; convert it with `~/code/skillex/scripts/hermes-skillex-cutover.py`
+(preview, then `--apply`) first.
+
+A pack is an exclusive complete loadout in Skillex: a manifest holds at most one
+and it leaves every set dormant. So a role selects at most one pack and cannot
+combine it with a set. `packs: [a, b]` and `pack: a` with `set: b` fail
+`hermes.role-declaration` and `flume hire`/`onboard` by name; compose several
+skills with a set instead. A set or pack that names a skill the catalog does not
+own fails the same way instead of being dropped.
+
+### `chain`: which surfaces honour a desk override
+
+A desk's explicit override of the shared chain (a primary `model:` of its own, or its
+own `fallback_providers`) survives hire/onboard and is reported as an override. It is
+honoured only where it is read: a desk's own Telegram/Slack gateway reads the desk's
+fallback chain, while multiplexed Bloodbank turns refresh fallbacks from the shared
+`fleet-bloodbank-gateway` process's own config (the target desk's primary `model:` is
+read per target). Do not claim a desk-level fallback chain for Bloodbank turns. The
+fallback entries do not carry the provider's `extra_body` effort either, so record the
+ledger's actual effort rather than the configured one.
+
 ## Named agents
 
 A role directory is a **post** (`agent_id` / `profile`). A post held by a

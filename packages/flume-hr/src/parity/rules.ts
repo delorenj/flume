@@ -3019,7 +3019,9 @@ return [
         }
         const declaration=readRoleDeclaration(process.env.FLUME_ROLES_ROOT??resolveFlumeRoot(),role.role,role.agentId,profileNameOf(role));
         if(declaration.skills) {
-          details.push(...await auditRoleSkills(plan.profileDir,declaration,{home:ctx.homeDir}));
+          // The loadout is a Skillex selection: observe it the way Skillex does (strict desk, the
+          // role's own selection project), not through a second skill directory.
+          if(existsSync(plan.profileDir)) details.push(...await auditRoleSkills(profileNameOf(role),plan.profileDir,declaration,{home:ctx.homeDir,fleetRoot:plan.fleetRoot}));
         } else {
           const projection = await showProfile(profileNameOf(role), {
             ...skillCoreOptions(ctx), hermesRoot: plan.fleetRoot,
@@ -3109,7 +3111,16 @@ return [
         } else {
           const declaration=readRoleDeclaration(process.env.FLUME_ROLES_ROOT??resolveFlumeRoot(),role.role,role.agentId,profileNameOf(role));
           if(declaration.skills) {
-            await projectRoleDeclaration(declaration,role.agentId,profileNameOf(role),{home:ctx.homeDir,dryRun:ctx.dryRun});
+            try {
+              const projected=await projectRoleDeclaration(declaration,role.agentId,profileNameOf(role),{home:ctx.homeDir,fleetRoot:plan.fleetRoot,dryRun:ctx.dryRun});
+              const selection=projected.selection as {project?:string}|null;
+              if(selection?.project) {
+                details.push(`${ctx.dryRun?"would project":"projected"} role skills selection ${selection.project} into ${plan.profileDir}/skills`);
+                changedFiles.push(join(plan.profileDir,"skills"));
+              }
+            } catch(error) {
+              details.push(`blocked: role projection for ${profileNameOf(role)} failed: ${(error as Error).message}`);
+            }
           } else {
           const projection = await syncProfile(profileNameOf(role), {
             ...skillCoreOptions(ctx), hermesRoot: plan.fleetRoot, dryRun: Boolean(ctx.dryRun),

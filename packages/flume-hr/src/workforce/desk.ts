@@ -55,6 +55,10 @@ export function resolveDeskPath(
  * - Compiled .agents/skills are symlinks pointing directly to canonical skills in all-skills/.
  * - Never copies file payloads or SKILL.md into desk directories.
  * - Reconciles existing symlinks idempotently without deleting or altering user notes in the desk.
+ *
+ * This is the portable named-agent desk (Story 2.1). It is NOT how a Hermes profile desk
+ * receives skills: a strict (Skillex-only) Hermes desk refuses `<desk>/.agents/skills`, and its
+ * role loadout is delivered as a Skillex selection instead (see `./selection.ts`).
  */
 export async function provisionDesk(
   contractInput: NamedAgentContract | ResolvedNamedAgentContract | string,

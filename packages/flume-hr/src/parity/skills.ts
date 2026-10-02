@@ -28,7 +28,7 @@ export function skillCoreOptions(ctx: Context): SyncOptions & { scope: "project"
   };
 }
 
-function registryRootOption(home: string): { registryRoot?: string } {
+export function registryRootOption(home: string): { registryRoot?: string } {
   const explicit = process.env.PJ_SKILLS_REGISTRY_ROOT?.trim();
   if (explicit) return { registryRoot: resolve(explicit) };
   const canonical = join(home, "code", "skillex");

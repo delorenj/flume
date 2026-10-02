@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mkdirSync,mkdtempSync,writeFileSync,readFileSync,readdirSync,realpathSync,rmSync} from 'node:fs';
+import {existsSync,mkdirSync,mkdtempSync,writeFileSync,readFileSync,readdirSync,realpathSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import YAML from 'yaml';
@@ -25,11 +25,15 @@ try {
   const original='# precious top comment\ncompany: {name: Fixture}\ndepartments:\n  - id: engineering # department comment\n    manager: boss\n    members: []\n  - id: editorial\n    members: [unrelated] # precious other employee\n';
   writeFileSync(org,original);
   const role={role:'dev',skills:{pack:'dev'},chain,department:'engineering',reports_to:'boss'};
-  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,catalogModels:chain,catalogPath:'/home/delorenj/docker/stacks/ai/newapi/ops/routes.json',renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
+  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome:join(home,'.local','state'),catalogModels:chain,catalogPath:'/home/delorenj/docker/stacks/ai/newapi/ops/routes.json',renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
   await api.projectRoleDeclaration(role,'demo-dev','demo-dev',options);
-  assert.deepEqual(readdirSync(join(desk,'.agents','skills')).sort(),['build','review']);
-  for(const name of ['build','review']) assert.equal(realpathSync(join(desk,'.agents','skills',name)),join(skillex,'all-skills',name));
+  // The loadout is a Skillex selection projected into the strict desk's own skills/ -- never a
+  // second skill directory or a discovery root.
+  assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
+  for(const name of ['build','review']) assert.equal(realpathSync(join(desk,'skills',name)),join(skillex,'all-skills',name));
+  assert.equal(existsSync(join(desk,'.agents')),false,'a role loadout must not create <desk>/.agents/skills');
   const cfg=YAML.parse(readFileSync(join(desk,'config.yaml'),'utf8'));
+  assert.deepEqual(cfg.skills.external_dirs,[],'a role loadout must never add skills.external_dirs');
   assert.deepEqual([cfg.model.default,...cfg.fallback_providers.map(x=>x.model)],chain);
   const chart=api.buildOrgChart({home,registryPath:registry,orgPath:org});
   const find=n=>n.id==='demo-dev'?n:n.children.map(find).find(Boolean);
@@ -82,6 +86,6 @@ try {
   }
   assert.equal(readFileSync(org,'utf8'),beforeOrg);
   assert.equal(readFileSync(join(desk,'config.yaml'),'utf8'),beforeCfg);
-  assert.deepEqual(readdirSync(join(desk,'.agents','skills')).sort(),['build','review']);
+  assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
   console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
 } finally {rmSync(work,{recursive:true,force:true});}

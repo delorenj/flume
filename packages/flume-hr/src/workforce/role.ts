@@ -1,16 +1,23 @@
-import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync, readdirSync, realpathSync} from "node:fs";
+import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync} from "node:fs";
 import {join, dirname, resolve} from "node:path";
 import {homedir} from "node:os";
 import {spawn,spawnSync} from "node:child_process";
 import YAML from "yaml";
 import {resolveFlumeRoot} from "../kernel/paths";
-import {validateRoleDeclaration, resolveSkillLoadout, type RoleDeclaration} from "./validator";
-import {provisionDesk} from "./desk";
-import type {ValidationOptions} from "./types";
+import {validateRoleDeclaration, type RoleDeclaration} from "./validator";
+import {applyRoleSelection, auditRoleSelection, planRoleSelection, preflightRoleSelection, previewRoleSelection, resolveRoleLoadout, roleSelectionManifest, type RoleSelectionPreview, type RoleSelectionResult, type SelectionContext} from "./selection";
+import type {ResolvedSkill, ValidationOptions} from "./types";
 
 export interface RoleProjectionOptions extends ValidationOptions {
   fleetRoot?: string; registryPath?: string; orgPath?: string; deskPath?: string; renderer?: string;
   catalogPath?: string; catalogModels?: string[]; dryRun?: boolean;
+  /** XDG state home for Skillex's profile receipts and locks (defaults to the environment's). */
+  stateHome?: string;
+}
+export interface RoleProjectionResult {
+  department: string|undefined; reports_to: string|undefined; skills: ResolvedSkill[]; chain?: unknown; overrides: string[];
+  /** The Skillex selection that carries the loadout (null for a role without one). */
+  selection: RoleSelectionResult|RoleSelectionPreview|null; fallback_surface?: string;
 }
 function read(path:string): any {return existsSync(path) ? YAML.parse(readFileSync(path,"utf8")) ?? {} : {};}
 function paths(options:RoleProjectionOptions) {
@@ -18,14 +25,19 @@ function paths(options:RoleProjectionOptions) {
   return {home,fleet,registry:options.registryPath ?? process.env.HERMES_AGENTS_REGISTRY ?? process.env.HERMES_FLEET_REGISTRY_FILE ?? join(fleet,"agents-registry.yaml"),
     org:options.orgPath ?? process.env.HERMES_ORG_PATH ?? join(fleet,"org.yaml")};
 }
-export async function auditRoleSkills(profileDir:string, declaration:RoleDeclaration, options:RoleProjectionOptions={}) {
-  const skills=declaration.skills?await resolveSkillLoadout(declaration.skills,{...options,skillexRoot:options.skillexRoot??process.env.PJ_SKILLS_REGISTRY_ROOT}):[];
-  const root=join(profileDir,'.agents','skills');
-  const errors:string[]=[];
-  const names=existsSync(root)?readdirSync(root).sort():[];
-  if(JSON.stringify(names)!==JSON.stringify(skills.map(s=>s.name).sort())) errors.push(`role managed skills differ at ${root}`);
-  for(const skill of skills) {const path=join(root,skill.name);if(!existsSync(path)||!lstatSync(path).isSymbolicLink()||realpathSync(path)!==realpathSync(skill.path)) errors.push(`role skill ${skill.name} is not a canonical symlink at ${path}`);}
-  return errors;
+function selectionContext(options:RoleProjectionOptions, p:ReturnType<typeof paths>): SelectionContext {
+  return {hermesRoot:p.fleet,home:p.home,...(options.skillexRoot?{skillexRoot:options.skillexRoot}:{}),...(options.stateHome?{stateHome:options.stateHome}:{})};
+}
+/** Every problem between the role's skills loadout and what Skillex projects into its desk. */
+export async function auditRoleSkills(profile:string, profileDir:string, declaration:RoleDeclaration, options:RoleProjectionOptions={}) {
+  if(!declaration.skills) return [];
+  return auditRoleSelection(profile,profileDir,declaration.skills,selectionContext(options,paths(options)));
+}
+/** Does the declared loadout resolve against the live Skillex catalog? Async because Skillex is. */
+export async function skillsProblems(role:RoleDeclaration, employee:string, options:RoleProjectionOptions={}): Promise<string[]> {
+  if(!role.skills) return [];
+  try {await resolveRoleLoadout(role.skills,selectionContext(options,paths(options)));return [];}
+  catch(error){return [`${employee}: skills loadout does not resolve: ${(error as Error).message}`];}
 }
 export function readRoleDeclaration(root:string, role:string, post="", profile=post): RoleDeclaration {
   if (!/^[a-z0-9][a-z0-9_-]*$/u.test(role)) throw new Error("Unsafe role filename");
@@ -57,6 +69,7 @@ export function declarationProblems(role:RoleDeclaration, employee:string, optio
   const edges={...Object.fromEntries(Object.entries(agents).map(([id,row])=>[id,(row as any).reports_to])),[employee]:superior};
   const seen=new Set<string>(); let cursor:string|undefined=employee;
   while(cursor) {if(seen.has(cursor)){problems.push(`${employee}: reporting cycle ${[...seen,cursor].join(" -> ")}`);break;}seen.add(cursor);cursor=edges[cursor];}
+  if(role.skills) {try {roleSelectionManifest(role.skills);} catch(error){problems.push(`${employee}: ${(error as Error).message}`);}}
   if(role.chain) {
     try {const catalog=gatewayCatalog(options);for(const route of role.chain) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);}
     catch(error){problems.push(`${employee}: gateway catalog unavailable: ${(error as Error).message}`);}
@@ -83,18 +96,23 @@ async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T
   });
   try {return await action();} finally {child.stdin.end('\n');await new Promise<void>(resolve=>child.once('close',()=>resolve()));}
 }
-export async function projectRoleDeclaration(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {
+export async function projectRoleDeclaration(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}): Promise<RoleProjectionResult> {
   if(options.dryRun) return projectUnlocked(input,employee,profile,options);
   return withRegistryLock(paths(options).registry,()=>projectUnlocked(input,employee,profile,options));
 }
-async function projectUnlocked(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}) {
+async function projectUnlocked(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}): Promise<RoleProjectionResult> {
   const role=validateRoleDeclaration(input,employee,profile), p=paths(options);
   const errors=declarationProblems(role,employee,options);if(errors.length) throw new Error(errors.join("; "));
   const department=read(p.org).departments.find((d:any)=>d.id===role.department);
   const superior=role.reports_to ?? department.manager;
   const desk=options.deskPath ?? join(p.fleet,"profiles",profile);
   if(existsSync(desk)&&lstatSync(desk).isSymbolicLink()) throw new Error("desk must be a real directory");
-  const skills=role.skills ? await resolveSkillLoadout(role.skills,{...options,skillexRoot:options.skillexRoot??process.env.PJ_SKILLS_REGISTRY_ROOT}) : [];
+  const selected=selectionContext(options,p);
+  // Skillex projects into <hermes root>/profiles/<profile> and nowhere else: a loadout is
+  // never delivered through a second directory the desk would have to be told about.
+  if(role.skills&&resolve(desk)!==resolve(join(p.fleet,"profiles",profile))) throw new Error(`skills loadout: Skillex projects into ${join(p.fleet,"profiles",profile)}, not ${desk}`);
+  const plan=role.skills ? await planRoleSelection(desk,role.skills,selected) : undefined;
+  const skills=plan?.skills ?? [];
   const flume=resolveFlumeRoot();
   if(role.chain && !options.catalogModels) {
     const current=read(join(desk,"config.yaml"));
@@ -102,12 +120,16 @@ async function projectUnlocked(input:unknown, employee:string, profile:string, o
     const check=spawnSync("python3",[join(flume,"scripts/role-catalog-check.py")],{input:JSON.stringify({chain:role.chain,reference}),encoding:"utf8",timeout:40_000});
     if(check.status!==0) throw new Error(String(check.stderr).trim()||"Authenticated catalog check failed");
   }
-  if(options.dryRun) return {department:role.department,reports_to:superior,skills,chain:role.chain??null,overrides:[]};
+  // Read-only, so a dry run reports the refusal a real run would hit (and a real run hits it before any change).
+  if(plan) await preflightRoleSelection(profile,desk,selected);
+  if(options.dryRun) return {department:role.department,reports_to:superior,skills,chain:role.chain??null,overrides:[],selection:plan?await previewRoleSelection(profile,plan,selected):null};
   mkdirSync(desk,{recursive:true});
-  if(role.skills) await provisionDesk({schema_version:1,id:employee,display_name:employee,role:role.role,charter:{purpose:role.role},skills:role.skills,memory:{write_bank:`agent-${employee}`},desk:{path:desk}}, {resolvedSkills:skills,home:p.home});
+  // A loadout makes the desk strict: discovery is pinned to the Skillex projection before Skillex
+  // writes it (a strict sync refuses a generated config that still lists external roots).
   const configured=spawnSync("python3",[join(flume,"scripts/role-profile-config.py"),options.renderer??join(flume,"templates/hermes-agent/scripts/hermes-profile-config.py"),profile],
-    {input:JSON.stringify({chain:role.chain,skills_dir:role.skills?join(desk,".agents","skills"):undefined}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
+    {input:JSON.stringify({chain:role.chain,strict_skills:Boolean(role.skills)}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
   if(configured.status!==0) throw new Error(`Role config projection failed: ${configured.stderr}`);
+  const selection=plan ? await applyRoleSelection(profile,plan,selected) : null;
   updateDocument(p.registry,doc=>{doc.setIn(["agents",employee,"department"],role.department);doc.setIn(["agents",employee,"reports_to"],superior);});
   updateDocument(p.org,doc=>{
     const departments=doc.get("departments",true);
@@ -122,5 +144,5 @@ async function projectUnlocked(input:unknown, employee:string, profile:string, o
       }
     }
   });
-  return {department:role.department,reports_to:superior,skills,...JSON.parse(configured.stdout)};
+  return {department:role.department,reports_to:superior,skills,selection,...JSON.parse(configured.stdout)};
 }

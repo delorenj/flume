@@ -49,9 +49,30 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
     # Explicitly scoped, never mistaken for a shared-process Bloodbank chain.
     if "fallback_providers" in delta:
         delta["x-flume-fallback-override"] = "desk-gateway"
-    if request.get("skills_dir"):
-        patches = delta.setdefault(r.LIST_PATCH_KEY, {}).setdefault("list_patches", {})
-        patches["skills.external_dirs"] = {"add": [request["skills_dir"]]}
+    # A role loadout is delivered as a Skillex selection, never as a discovery root. Earlier
+    # flume versions appended the desk's own .agents/skills to skills.external_dirs through a
+    # list patch; a Skillex-only desk refuses that, so the one entry flume itself wrote (and
+    # nothing a person authored) is removed.
+    directive = delta.get(r.LIST_PATCH_KEY)
+    patches = directive.get("list_patches") if isinstance(directive, dict) else None
+    legacy = patches.get("skills.external_dirs") if isinstance(patches, dict) else None
+    if legacy == {"add": [str(pdir / ".agents" / "skills")]}:
+        del patches["skills.external_dirs"]
+        if not patches:
+            del directive["list_patches"]
+        if not directive:
+            del delta[r.LIST_PATCH_KEY]
+    # Strict discovery (skills.external_dirs: []) mirrors the template's step 10 pin, so a desk
+    # that this projection first makes Skillex-only is accepted by `skillex profile sync
+    # --skillex-only` and by hermes.delta-list-override. Idempotent: an already pinned delta is
+    # left byte for byte alone.
+    if request.get("strict_skills"):
+        skills = delta.get("skills")
+        if skills is None:
+            skills = {}
+        if not isinstance(skills, dict):
+            raise SystemExit("skills delta must be a mapping")
+        delta["skills"] = {**skills, "external_dirs": []}
     merged = r.deep_merge(r.load_yaml(r.BASE), delta)
     text = r.dump_yaml(delta)
     if not delta_path.exists() or delta_path.read_text() != text:
