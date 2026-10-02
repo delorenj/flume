@@ -968,5 +968,41 @@ const OP_SECRETS = (enabled = true) => ({
   assert.match(f.text, /profiles\/demo-pm\/\.env: SLACK_BOT_TOKEN not mapped in .*profiles\/demo-pm\/config\.yaml -- move each reference into secrets\.onepassword\.env of .*profiles\/demo-pm\/config\.delta\.yaml, re-render \(hermes-profile-config\.py render --profile demo-pm\)/);
 }
 
+// Skillex-only PM desks (skillex ADR-0001, Hermes PM amendment). A strict desk
+// pins skills.external_dirs: [] on purpose; the exemption needs BOTH the
+// regular-file .skillex-only marker and exactly [], so it cannot hide an
+// accidental override, and a half-done cutover is named as one.
+{
+  const strictDelta = { skills: { external_dirs: [] } };
+  const marked = makeFleet({ delta: strictDelta });
+  writeFileSync(join(marked, "profiles", "demo-pm", ".skillex-only"), "Skillex owns this PM skill projection.\n");
+  const pass = auditRule(repo, marked, "hermes.delta-list-override");
+  assert.equal(pass.status, "pass", `a marked strict desk's [] is the policy, not an override: ${pass.text}`);
+
+  const unmarked = auditRule(repo, makeFleet({ delta: strictDelta }), "hermes.delta-list-override");
+  assert.equal(unmarked.status, "fail");
+  assert.match(unmarked.text, /skills\.external_dirs: \[\] without a \.skillex-only marker -- a half-finished Skillex-only cutover/);
+  assert.doesNotMatch(unmarked.text, /removing "skills\.external_dirs" from the delta/, "never tell the operator to undo the isolation");
+
+  const unpinned = makeFleet({});
+  writeFileSync(join(unpinned, "profiles", "demo-pm", ".skillex-only"), "x\n");
+  const leak = auditRule(repo, unpinned, "hermes.delta-list-override");
+  assert.equal(leak.status, "fail");
+  assert.match(leak.text, /Skillex-only desk \(\.skillex-only\) but config\.delta\.yaml does not pin skills\.external_dirs: \[\]/);
+
+  const fake = makeFleet({ delta: strictDelta });
+  mkdirSync(join(fake, "profiles", "demo-pm", ".skillex-only"));
+  assert.match(auditRule(repo, fake, "hermes.delta-list-override").text, /\.skillex-only must be a regular file/);
+
+  const otherList = makeFleet({ delta: { ...strictDelta, plugins: { enabled: ["tts/vox"] } } });
+  writeFileSync(join(otherList, "profiles", "demo-pm", ".skillex-only"), "x\n");
+  assert.match(auditRule(repo, otherList, "hermes.delta-list-override").text, /plugins\.enabled drops 2 fleet entries/,
+    "the marker exempts only the skills pin, never another list");
+
+  const singleton = auditRule(repo, makeFleet({}), "hermes.runtime-singleton");
+  assert.match(singleton.text, /PM desk demo-pm is not Skillex-only \(no regular \.skillex-only marker\)/);
+  assert.doesNotMatch(auditRule(repo, marked, "hermes.runtime-singleton").text, /is not Skillex-only/);
+}
+
 for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });
 console.log("hermes profile inheritance regressions passed");

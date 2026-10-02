@@ -175,8 +175,20 @@ authorities:
         The generated profile tree, whole. config.yaml is produced by
         deep-merging the shared base with the per-profile config.delta.yaml and
         is never hand-edited; the rest of config.delta.yaml is the
-        operator-owned override SSOT, and only the three fleet-owned dotted
-        paths below are rewritten.
+        operator-owned override SSOT, and only the four fleet-owned dotted paths
+        below are rewritten.
+      - >-
+        PM desks are Skillex-only (skillex ADR-0001, Hermes PM amendment
+        2026-10-01). Step 10 writes config.delta.skills.external_dirs: []
+        through lib/skills-policy.py under the renderer lock; Skillex owns
+        skills/ and publishes the regular-file markers .no-bundled-skills and
+        .skillex-only in the profile root on its first strict sync, after which
+        every show and sync refuses any skills/ entry it does not own (Hermes
+        bookkeeping excepted) and any non-empty external_dirs.
+        hermes.delta-list-override exempts exactly that pin on a marked desk;
+        hermes.runtime-singleton fails a PM desk without the marker. Legacy
+        desks convert only through skillex scripts/hermes-skillex-cutover.py
+        (preview, then --apply).
       - >-
         Was two blocks -- generated_profile_inputs (the renderer) and
         provisioned_profile_state (the provisioning step). Both resolved to the
@@ -189,6 +201,7 @@ authorities:
       - profiles.{profile_name}.config.delta.memory.provider
       - profiles.{profile_name}.config.delta.memory.memory_enabled
       - profiles.{profile_name}.config.delta.memory.user_profile_enabled
+      - profiles.{profile_name}.config.delta.skills.external_dirs
       - profiles.{profile_name}.profile.yaml
       - profiles.{profile_name}.hindsight.config.json
       - profiles.{profile_name}.skills
@@ -631,7 +644,9 @@ profile_manifest:
       - hermes
   # Optional fleet byte-policy, separate from Skillex activation health. The
   # default imposes no global projection or fixed skill list: project/global
-  # manifests and profile-local precedence define the profile's selection.
+  # .agents/skills.json manifests define the selection. PM desks are
+  # Skillex-only (see agent_profile_state): no profile-local, bundled or
+  # external skills, so nothing local takes precedence over the selection.
   skill_core:
     canonical_dir: "{HOME}/.agents/skills"
     canonical_dir_env: CANONICAL_SKILLS_DIR

@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
   initScope,
   inspectStatus,
@@ -18,10 +19,20 @@ export function skillCoreOptions(ctx: Context): SyncOptions & { scope: "project"
     home: ctx.homeDir,
     env: process.env,
     // Preserve the documented PJangler override while using one core resolver.
-    ...(process.env.PJ_SKILLS_REGISTRY_ROOT?.trim()
-      ? { registryRoot: resolve(process.env.PJ_SKILLS_REGISTRY_ROOT.trim()) }
-      : {}),
+    // Without it, default to the canonical catalog checkout, exactly as PM
+    // provisioning (hermes-agent-template step 10) does: a project manifest's
+    // `registry` URL otherwise resolves to ~/.agents/.cache/registries/<url>, a
+    // clone nothing keeps current, and the audit would demand (and remediation
+    // would write) links onto its stale bytes.
+    ...registryRootOption(ctx.homeDir),
   };
+}
+
+function registryRootOption(home: string): { registryRoot?: string } {
+  const explicit = process.env.PJ_SKILLS_REGISTRY_ROOT?.trim();
+  if (explicit) return { registryRoot: resolve(explicit) };
+  const canonical = join(home, "code", "skillex");
+  return existsSync(join(canonical, "all-skills")) ? { registryRoot: canonical } : {};
 }
 
 export function skillDiagnostics(findings: readonly Diagnostic[]): string[] {

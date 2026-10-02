@@ -2546,6 +2546,31 @@ function listOverrides(base: unknown, delta: unknown, path: string[] = []): List
 
 
 
+/**
+ * Skillex-only PM policy (skillex ADR-0001, Hermes PM amendment 2026-10-01):
+ * the desk's profile root carries a regular-file `.skillex-only` marker that
+ * Skillex publishes on its first strict sync, and its config delta pins
+ * `skills.external_dirs: []` so nothing outside the Skillex projection is
+ * discoverable. Skillex (>= 0.1.3) then enforces strictness on every show/sync.
+ */
+type SkillexOnlyMarker = "regular" | "absent" | "invalid";
+
+function skillexOnlyMarker(profileDir: string): SkillexOnlyMarker {
+  const info = lstatIfPresent(join(profileDir, ".skillex-only"));
+  if (!info) return "absent";
+  return info.isFile() ? "regular" : "invalid";
+}
+
+function deltaPinsNoExternalSkillDirs(delta: unknown): boolean {
+  if (!isPlainObject(delta) || !isPlainObject(delta.skills)) return false;
+  const dirs = delta.skills.external_dirs;
+  return Array.isArray(dirs) && dirs.length === 0;
+}
+
+function skillexCutoverHint(profile: string, project = "<repo>"): string {
+  return `preview python3 ~/code/skillex/scripts/hermes-skillex-cutover.py --profile ${profile} --project ${project} --registry-root ~/code/skillex --renderer ~/code/33GOD/hermes-agent-template/scripts/hermes-profile-config.py, then rerun with --apply`;
+}
+
 export function createHermesChecks(): RecipeOwnedCheck[] {
 return [
   roleDeclarationCheck,
@@ -3001,6 +3026,12 @@ return [
           });
           details.push(...skillDiagnostics(projection.findings));
           details.push(...(projection.data?.changes ?? []).map((change) => `profile skills ${change.action}: ${change.path}`));
+          // PM desks are Skillex-only. Skillex enforces the policy once the
+          // marker exists; a PM desk without it still discovers bundled,
+          // local or external skills, so say so instead of passing.
+          if (role.role === "pm" && existsSync(plan.profileDir) && skillexOnlyMarker(plan.profileDir) !== "regular") {
+            details.push(`PM desk ${profileNameOf(role)} is not Skillex-only (no regular .skillex-only marker): ${skillexCutoverHint(profileNameOf(role), ctx.repoRoot)}`);
+          }
         }
         if (role.identity.state === "invalid") {
           details.push(`${relative(ctx.repoRoot, role.roleYamlPath)}: ${role.identity.reason}`);
@@ -3749,9 +3780,26 @@ return [
         // sentence that says what to do about it.
         const elide = (entries: string[], keep: number) =>
           entries.slice(0, keep).join(", ") + (entries.length > keep ? `, +${entries.length - keep} more` : "");
+        // A Skillex-only desk replaces the fleet discovery roots with [] on
+        // purpose: its whole skill set is the Skillex projection in skills/.
+        // The exemption needs BOTH the regular-file marker and exactly [], so
+        // an accidental override on any other desk is still reported, and a
+        // strict desk whose delta lost the pin is reported the other way round.
+        const marker = skillexOnlyMarker(join(profilesRoot, name));
+        const strictPinned = marker === "regular" && deltaPinsNoExternalSkillDirs(delta);
+        if (marker === "invalid") {
+          details.push(`${name}: .skillex-only must be a regular file (Skillex-only policy marker); ${skillexCutoverHint(name)}`);
+        } else if (marker === "regular" && !strictPinned) {
+          details.push(`${name}: Skillex-only desk (.skillex-only) but config.delta.yaml does not pin skills.external_dirs: [] -- external roots leak unselected skills into discovery; ${skillexCutoverHint(name)}`);
+        }
         for (const override of listOverrides(base, delta)) {
           // A declared desk-gateway chain is an explicit replacement, not a shared-process chain.
           if (override.path === "fallback_providers" && isPlainObject(delta) && delta["x-flume-fallback-override"] === "desk-gateway") continue;
+          if (override.path === "skills.external_dirs" && strictPinned) continue;
+          if (override.path === "skills.external_dirs" && deltaPinsNoExternalSkillDirs(delta)) {
+            details.push(`${name}: skills.external_dirs: [] without a .skillex-only marker -- a half-finished Skillex-only cutover; do not delete the key, finish it: ${skillexCutoverHint(name)}`);
+            continue;
+          }
           const shown = elide(override.lost, 4);
           // A delta that adds nothing is pure redundancy: deleting the key
           // restores inheritance outright. One that adds entries states a real
