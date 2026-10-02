@@ -1503,6 +1503,8 @@ try {
       "profiles.{profile_name}.config.delta.memory.provider",
       "profiles.{profile_name}.config.delta.memory.memory_enabled",
       "profiles.{profile_name}.config.delta.memory.user_profile_enabled",
+      // Skillex-only PM desks (2026-10-01): step 10 pins external_dirs: [].
+      "profiles.{profile_name}.config.delta.skills.external_dirs",
       "profiles.{profile_name}.profile.yaml",
       "profiles.{profile_name}.hindsight.config.json",
       "profiles.{profile_name}.skills",
