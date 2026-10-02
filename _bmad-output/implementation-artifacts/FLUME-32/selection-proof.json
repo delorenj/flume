@@ -1,0 +1,195 @@
+{
+  "generatedAt": "2026-10-02T17:21:00.562Z",
+  "loadoutSet": "product-manager",
+  "newBuild": "/tmp/flume-wt-dev/packages/flume-hr/dist/index.js",
+  "oldBuild": "/tmp/flume-wt-base/packages/flume-hr/dist/index.js",
+  "seedManagedSkills": 56,
+  "seedDeskMarkers": {
+    "skillexOnly": true,
+    "noBundled": true
+  },
+  "new": {
+    "onboard": {
+      "first": 0,
+      "second": 0,
+      "secondRunChangedNothing": true,
+      "message": "Role declaration projected: {\"department\":\"tooling\",\"reports_to\":\"pjangler-pm\",\"skills\":[{\"name\":\"product-manager-agent\",\"path\":\"…\"},{\"name\":\"product-manager-brainstorm-phase\",\"path\":\"…\"},{\"name\":\"product-manager-feature-doc-phase\",\"path\":\"…\"},{\"name\":\"product-manager-hub\",\"path\":\"…\"},{\"name\":\"produ"
+    },
+    "label": "new flume",
+    "selectionManifest": {
+      "inherit_global": false,
+      "sets": [
+        "product-manager"
+      ]
+    },
+    "profileShowExplicitProject": {
+      "exit": 0,
+      "findings": []
+    },
+    "profileShowRecordedProject": {
+      "exit": 0,
+      "project": "/tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/.skillex-selection",
+      "findings": [],
+      "pendingChanges": 0
+    },
+    "deskSkillCount": 62,
+    "loadoutPresent": true,
+    "externalDirs": [],
+    "deskHasDotAgents": false,
+    "strictMarkers": [
+      true,
+      true
+    ],
+    "audit": {
+      "hermes.role-declaration": {
+        "status": "pass",
+        "details": []
+      },
+      "hermes.delta-list-override": {
+        "status": "pass",
+        "details": []
+      },
+      "hermes.runtime-singleton": {
+        "status": "fail",
+        "details": [
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/.env -> /tmp/flume32-proof-new-EMqB9y/hermes/.env",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/memories -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/memories",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/sessions -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/sessions",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/workspace -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/workspace",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/logs -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/logs",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/cron -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/cron",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/plans -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/plans",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/hooks -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/hooks",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/pairing -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/pairing",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/audio_cache -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/audio_cache",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/image_cache -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/image_cache",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/SOUL.md -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/SOUL.md",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/state.db -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/state.db",
+          "missing: /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/kanban.db -> /tmp/flume32-proof-new-EMqB9y/flume/agents/hermes/pm/runtime/kanban.db",
+          "identity-memory bank not pinned (expected bank_id \"agent-flume-pm\"): /tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/hindsight/config.json"
+        ]
+      }
+    },
+    "remediate": {
+      "exit": 0
+    },
+    "afterRemediate": {
+      "label": "new flume after remediate",
+      "selectionManifest": {
+        "inherit_global": false,
+        "sets": [
+          "product-manager"
+        ]
+      },
+      "profileShowExplicitProject": {
+        "exit": 0,
+        "findings": []
+      },
+      "profileShowRecordedProject": {
+        "exit": 0,
+        "project": "/tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/.skillex-selection",
+        "findings": [],
+        "pendingChanges": 0
+      },
+      "deskSkillCount": 62,
+      "loadoutPresent": true,
+      "externalDirs": [],
+      "deskHasDotAgents": false,
+      "strictMarkers": [
+        true,
+        true
+      ],
+      "audit": {
+        "hermes.role-declaration": {
+          "status": "pass",
+          "details": []
+        },
+        "hermes.delta-list-override": {
+          "status": "pass",
+          "details": []
+        },
+        "hermes.runtime-singleton": {
+          "status": "pass",
+          "details": []
+        }
+      }
+    },
+    "autoResync": {
+      "onConvergedDesk": "ok",
+      "afterSelectionMoved": {
+        "dryRun": "would-sync",
+        "applied": "synced",
+        "project": "/tmp/flume32-proof-new-EMqB9y/hermes/profiles/flume-pm/.skillex-selection"
+      },
+      "followedRecordedProject": true,
+      "showExitAfter": 0,
+      "flumeRestoredDeclaration": true
+    },
+    "orgPlacement": {
+      "registryDepartment": "tooling",
+      "registryReportsTo": "pjangler-pm",
+      "departmentManager": "pjangler-pm",
+      "listedUnderDepartment": true
+    }
+  },
+  "old": {
+    "onboard": {
+      "first": 0
+    },
+    "label": "old flume",
+    "selectionManifest": null,
+    "profileShowExplicitProject": {
+      "exit": null,
+      "findings": []
+    },
+    "profileShowRecordedProject": {
+      "exit": 3,
+      "project": "/home/delorenj/code/33GOD/flume",
+      "findings": [
+        "E_PROFILE_SKILLEX_ONLY: Skillex-only profiles require skills.external_dirs: []."
+      ],
+      "pendingChanges": 0
+    },
+    "deskSkillCount": 0,
+    "loadoutPresent": false,
+    "externalDirs": [
+      "/tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/.agents/skills"
+    ],
+    "deskHasDotAgents": true,
+    "strictMarkers": [
+      true,
+      true
+    ],
+    "audit": {
+      "hermes.role-declaration": {
+        "status": "pass",
+        "details": []
+      },
+      "hermes.delta-list-override": {
+        "status": "pass",
+        "details": []
+      },
+      "hermes.runtime-singleton": {
+        "status": "fail",
+        "details": [
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/.env -> /tmp/flume32-proof-old-yiluP6/hermes/.env",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/memories -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/memories",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/sessions -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/sessions",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/workspace -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/workspace",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/logs -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/logs",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/cron -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/cron",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/plans -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/plans",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/hooks -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/hooks",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/pairing -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/pairing",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/audio_cache -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/audio_cache",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/image_cache -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/image_cache",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/SOUL.md -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/SOUL.md",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/state.db -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/state.db",
+          "missing: /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/kanban.db -> /tmp/flume32-proof-old-yiluP6/flume/agents/hermes/pm/runtime/kanban.db",
+          "identity-memory bank not pinned (expected bank_id \"agent-flume-pm\"): /tmp/flume32-proof-old-yiluP6/hermes/profiles/flume-pm/hindsight/config.json"
+        ]
+      }
+    }
+  },
+  "liveFleetUntouched": true
+}
