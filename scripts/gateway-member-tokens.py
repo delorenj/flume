@@ -117,7 +117,9 @@ def mint(consumer: str, models: list[str]) -> tuple[str, str]:
             print(f"  ... gateway login throttled ({'429' if '429' in out else '409'}); waiting 60s ({consumer})", flush=True)
             time.sleep(60)
             continue
-        if ("lock" in out.lower() or "contend" in out.lower()) and contention < 5:
+        # flock contention surfaces as "another operation owns tokens-vault" --
+        # "owns", not "lock". The holder is short-lived; retry rather than fail.
+        if ("lock" in out.lower() or "contend" in out.lower() or "owns" in out.lower()) and contention < 10:
             contention += 1
             time.sleep(3 * contention)
             continue

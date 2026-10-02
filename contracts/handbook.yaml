@@ -364,7 +364,35 @@ classifications:
       - lifecycle_state
       - rationale
       - policy_domains
-    entries: []
+    entries:
+      - id: intelliforia-shared-board
+        kind: shared-board
+        owner: operator
+        source: projects.{slug}.ticket_provider.board_id
+        lifecycle_state: intentionally-unmanaged
+        rationale: >
+          intelliforia and intelliforia-mobile were one monorepo and the team
+          never split the Trello board; both projects deliberately file against
+          board 687535e9873b89478afef689. Operator ruling 2026-10-02.
+        policy_domains:
+          - project-registry
+        participants:
+          - intelliforia
+          - intelliforia-mobile
+      - id: intelliforia-shared-identifier
+        kind: shared-board
+        owner: operator
+        source: projects.{slug}.ticket_provider.identifier
+        lifecycle_state: intentionally-unmanaged
+        rationale: >
+          The shared board's ticket prefix INT is claimed by both projects for
+          the same reason the board is: an ex-monorepo whose board was never
+          split. Operator ruling 2026-10-02.
+        policy_domains:
+          - project-registry
+        participants:
+          - intelliforia
+          - intelliforia-mobile
 
   retired:
     notes:
