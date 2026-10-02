@@ -42,8 +42,9 @@ agents/hermes/*/runtime/
 # OS
 .DS_Store
 
-# Canonical agent config lives in .agents; generated skill projections stay local.
-/.agents/skills
 
 # live-proof Hermes homes written by scripts/flume32-live-proof.py
 .hermes/
+
+# Canonical agent config lives in .agents; generated skill projections stay local.
+/.agents/skills
