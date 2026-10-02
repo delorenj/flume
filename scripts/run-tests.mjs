@@ -67,6 +67,7 @@ const SUITES = [
   "tests/fleet-profile-regressions.mjs",
   "tests/fleet-systemd-regressions.mjs",
   "tests/pjan-86-hermes-deploy-regressions.mjs",
+  "tests/skillex-only-config-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);

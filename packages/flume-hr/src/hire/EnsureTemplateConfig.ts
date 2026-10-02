@@ -87,24 +87,12 @@ function hostSchema(): ConfigSchema {
         ["registry_file", quote("~/.hermes/agents-registry.yaml")],
         ["oauth_file", quote("~/.hermes/auth.json")],
         ["codex_home", quote("~/.codex")],
-        ["canonical_skills_dir", quote(join(home, ".agents", "skills"))],
         ["vox_plugin_name", quote("vox")],
         ["vox_plugin_dir", quote(join(home, "code", "voxxy", "plugins", "tts", "vox"))],
         ["vox_voice", quote("carlin")],
         ["vox_url", quote("https://vox.delo.sh")],
         ["onepassword_vault", quote("DeLoSecrets")],
         ["onepassword_item_prefix", quote("hermes-agent")],
-        [
-          "symlinked_runtime_skills",
-          `[${[
-            "delonet-conventions",
-            "delonet-dotenv",
-            "hermes-pm-template-maintenance",
-            "hindsight",
-            "33god-projects",
-            "subagent-driven-development",
-          ].map(quote).join(", ")}]`,
-        ],
       ],
     },
     { section: "github", values: [["runtime_repo_owner", quote("")]] },
@@ -331,8 +319,44 @@ function ownedBareKeys(source: string, table: TomlTableHeader): Set<string> {
   return keys;
 }
 
+const RETIRED_SKILL_KEYS = new Set(["canonical_skills_dir", "symlinked_runtime_skills", "pm_external_skill_dirs"]);
+
+/** Remove only retired fleet assignments; leave every unrelated byte intact. */
+function retireSkillConfig(source: string): string {
+  if (!validateTomlBytes(Buffer.from(source), "Existing Hermes template config").length) return source;
+  const table = parseTomlTableHeaders(source).find((item) => item.kind === "table" && item.path.length === 1 && item.path[0] === "fleet");
+  if (!table) throw new Error("Retired fleet skill keys require an explicit [fleet] table before retirement");
+  const lines = source.slice(table.bodyStart, table.bodyEnd).match(/[^\r\n]*(?:\r\n|\n|\r|$)/g)!.filter(Boolean);
+  let body = "";
+  let multiline: MultilineString;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    const assignment = !multiline && line.match(/^\s*((?:"(?:\\.|[^"\\])*"|'[^']*'|[A-Za-z0-9_-]+))\s*=/);
+    const key = assignment ? parseDottedKey(assignment[1]!)?.[0] : undefined;
+    if (key && RETIRED_SKILL_KEYS.has(key)) {
+      let statement = line;
+      while (true) {
+        try { validateTomlBytes(Buffer.from(statement), "Retired assignment"); break; } catch (error) {
+          if (!(error instanceof Error) || !error.message.includes("is not valid TOML")) throw error;
+          index += 1;
+          if (index >= lines.length) throw new Error(`Cannot safely retire fleet.${key}`);
+          statement += lines[index]!;
+        }
+      }
+      continue;
+    }
+    body += line;
+    multiline = scanMultilineState(line, multiline);
+  }
+  const retired = source.slice(0, table.bodyStart) + body + source.slice(table.bodyEnd);
+  if (validateTomlBytes(Buffer.from(retired), "Retired Hermes template config").length) {
+    throw new Error("Retired fleet skill keys use an unsupported ownership form; preserve the file and convert them to [fleet] assignments first");
+  }
+  return retired;
+}
+
 const TOMLLIB_VALIDATE = String.raw`
-import sys
+import json, sys
 
 try:
     import tomllib
@@ -342,10 +366,12 @@ except Exception as exc:
 
 try:
     source = sys.stdin.buffer.read().decode("utf-8", errors="strict")
-    tomllib.loads(source)
+    document = tomllib.loads(source)
 except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
     sys.stderr.write("TOML_INVALID:" + exc.__class__.__name__ + ": " + str(exc))
     raise SystemExit(1)
+fleet = document.get("fleet", {})
+print(json.dumps([key for key in ("canonical_skills_dir", "symlinked_runtime_skills", "pm_external_skill_dirs") if isinstance(fleet, dict) and key in fleet]))
 `;
 
 const TOMLLIB_VALIDATION_TIMEOUT_MS = 5_000;
@@ -377,7 +403,7 @@ function isolatedPythonEnvironment(): NodeJS.ProcessEnv {
  * the template drives python3 heredocs, and the config is unreadable without
  * tomllib, so a host that cannot run the validator cannot run Hermes at all.
  */
-function validateTomlBytes(source: Buffer, label: string): void {
+function validateTomlBytes(source: Buffer, label: string): string[] {
   const validation = spawnSync("python3", ["-I", "-S", "-c", TOMLLIB_VALIDATE], {
     input: source,
     encoding: "utf8",
@@ -406,6 +432,7 @@ function validateTomlBytes(source: Buffer, label: string): void {
     const detail = validation.stderr.replace(/^TOML_INVALID:/, "").trim() || `python3 exited ${validation.status ?? "without a status"}`;
     throw new Error(`${label} is not valid TOML 1.0 for Python tomllib: ${detail}`);
   }
+  return JSON.parse(validation.stdout) as string[];
 }
 
 function assertValidToml(source: string, label: string): void {
@@ -435,7 +462,7 @@ export function mergeHostConfig(existingBytes: Buffer): string {
     // on it, instead of an assumption about another function's Python.
     throw new Error("Existing Hermes template config is not valid UTF-8");
   }
-  let merged = existing;
+  let merged = retireSkillConfig(existing);
   for (const { section, values } of hostSchema()) {
     const tables = parseTomlTableHeaders(merged);
     const matching = tables.filter((table) => table.kind === "table" && table.path.length === 1 && table.path[0] === section);
