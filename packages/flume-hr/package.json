@@ -15,7 +15,7 @@
   "dependencies": {
     "@clack/prompts": "^1.4.0",
     "@delorenj/flume-core": "1.0.0",
-    "@delorenj/skillex": "0.1.3",
+    "@delorenj/skillex": "github:delorenj/skillex#d0e03253029328c4004bd832472ee7bff947e182",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "ajv": "^8.20.0",
     "commander": "^14.0.2",

@@ -1,0 +1,289 @@
+{
+  "infra-specialist": {
+    "convergence": {
+      "employee": "infra-specialist",
+      "first_refresh_changed": true,
+      "first_profile_changes": [
+        "config.delta.yaml",
+        "config.yaml",
+        "specialist-projection.json"
+      ],
+      "second_refresh_changed": false,
+      "managed_files_links_registry_receipt_unchanged": true,
+      "normal_home_standalone_skillex_exit": 0,
+      "normal_home_standalone_changes": [],
+      "managed_entry_count": 230,
+      "automaticai_enabled": true,
+      "provider_key_env": "AUTOMATICAI_GATEWAY_KEY",
+      "provider_key_ref": "op://DeLoSecrets/hermes-infra-specialist/credential",
+      "config_contains_resolved_token": false
+    },
+    "native-profile": {
+      "profile": "infra-specialist",
+      "runtime": "/home/delorenj/.local/share/hermes-agent/releases/0408fec7a153e6c32c064acd2b8053917f1525f1",
+      "cwd": "/tmp/flume29-travel-proof",
+      "soul_sha256": "f01bb9cd2c47a5fdbf78447617239631294f9836406f32ad8e38eaf427f70f20",
+      "charter_loaded": true,
+      "skills": [
+        "delonet-conventions",
+        "delonet-dotenv",
+        "stacks-deploy",
+        "systemd-agent-service-diagnostics"
+      ],
+      "skill_count": 4,
+      "project_discovery": false,
+      "external_dirs": [],
+      "profile_agents_root": false,
+      "own_bank": "agent-infra-specialist",
+      "native_tool_recall_bank": "agent-infra-specialist",
+      "declared_recall_banks": [
+        "agent-infra-specialist",
+        "infra",
+        "docker"
+      ],
+      "declared_write_bank": "agent-infra-specialist",
+      "inference_attempted": false
+    },
+    "native-memory-final": {
+      "employee": "infra-specialist",
+      "runtime": "/home/delorenj/.local/share/hermes-agent/releases/0408fec7a153e6c32c064acd2b8053917f1525f1",
+      "cwd": "/tmp/flume29-travel-proof",
+      "own_bank": "agent-infra-specialist",
+      "marker": "FLUME29-infra-specialist-95dea7ce8fcc",
+      "proof_kind": "native-memory-integration-without-chat-inference",
+      "native_retain_success": true,
+      "native_tool_recalled_marker": true,
+      "configured_recall_types": [
+        "world",
+        "experience",
+        "observation"
+      ],
+      "explicit_own_bank_recalled_marker": true,
+      "explicit_own_bank_result_count": 3,
+      "recall_after_processing": true,
+      "recall_attempts": 1
+    },
+    "launch-dependency": {
+      "employee": "infra-specialist",
+      "launcher": "installed-public-flume",
+      "cwd": "/tmp/flume29-travel-proof",
+      "exit": 1,
+      "dependency": "Deployment dependency: employee member token unavailable at op://DeLoSecrets/hermes-infra-specialist/credential (FLUME-39)",
+      "chat_inference_attempted": false,
+      "borrowed_access": false
+    },
+    "final-audit": {
+      "ok": true,
+      "id": "infra-specialist",
+      "standing": "in good standing",
+      "problems": [],
+      "desk": "/home/delorenj/.agents/workforce/infra-specialist",
+      "profile": "/home/delorenj/.hermes/profiles/infra-specialist",
+      "write_bank": "agent-infra-specialist",
+      "recall_banks": [
+        "agent-infra-specialist",
+        "infra",
+        "docker"
+      ],
+      "skills": [
+        "delonet-conventions",
+        "delonet-dotenv",
+        "stacks-deploy",
+        "systemd-agent-service-diagnostics"
+      ]
+    },
+    "final-onboard": {
+      "ok": true,
+      "id": "infra-specialist",
+      "desk": "/home/delorenj/.agents/workforce/infra-specialist",
+      "profile": "/home/delorenj/.hermes/profiles/infra-specialist",
+      "write_bank": "agent-infra-specialist",
+      "recall_banks": [
+        "agent-infra-specialist",
+        "infra",
+        "docker"
+      ],
+      "skills": [
+        "delonet-conventions",
+        "delonet-dotenv",
+        "stacks-deploy",
+        "systemd-agent-service-diagnostics"
+      ],
+      "changed": false,
+      "projection": {
+        "profile": "/home/delorenj/.hermes/profiles/infra-specialist",
+        "changed": [],
+        "write_bank": "agent-infra-specialist",
+        "recall_banks": [
+          "agent-infra-specialist",
+          "infra",
+          "docker"
+        ]
+      },
+      "selection": {
+        "project": "/home/delorenj/.hermes/profiles/infra-specialist/.skillex-selection",
+        "manifestChanged": false,
+        "applied": []
+      }
+    }
+  },
+  "n8n-specialist": {
+    "convergence": {
+      "employee": "n8n-specialist",
+      "first_refresh_changed": true,
+      "first_profile_changes": [
+        "config.delta.yaml",
+        "config.yaml",
+        "specialist-projection.json"
+      ],
+      "second_refresh_changed": false,
+      "managed_files_links_registry_receipt_unchanged": true,
+      "normal_home_standalone_skillex_exit": 0,
+      "normal_home_standalone_changes": [],
+      "managed_entry_count": 250,
+      "automaticai_enabled": true,
+      "provider_key_env": "AUTOMATICAI_GATEWAY_KEY",
+      "provider_key_ref": "op://DeLoSecrets/hermes-n8n-specialist/credential",
+      "config_contains_resolved_token": false
+    },
+    "native-profile": {
+      "profile": "n8n-specialist",
+      "runtime": "/home/delorenj/.local/share/hermes-agent/releases/0408fec7a153e6c32c064acd2b8053917f1525f1",
+      "cwd": "/tmp/flume29-travel-proof",
+      "soul_sha256": "29da7f57c17e533ff951f771179f71b62cba48a49806c1ce46716585221791f9",
+      "charter_loaded": true,
+      "skills": [
+        "n8n-agents",
+        "n8n-binary-and-data",
+        "n8n-code-javascript",
+        "n8n-code-python",
+        "n8n-code-tool",
+        "n8n-error-handling",
+        "n8n-expression-syntax",
+        "n8n-mcp-tools-expert",
+        "n8n-multi-instance",
+        "n8n-node-configuration",
+        "n8n-self-hosting",
+        "n8n-subworkflows",
+        "n8n-validation-expert",
+        "n8n-workflow-patterns"
+      ],
+      "skill_count": 14,
+      "project_discovery": false,
+      "external_dirs": [],
+      "profile_agents_root": false,
+      "own_bank": "agent-n8n-specialist",
+      "native_tool_recall_bank": "agent-n8n-specialist",
+      "declared_recall_banks": [
+        "agent-n8n-specialist",
+        "n8n"
+      ],
+      "declared_write_bank": "agent-n8n-specialist",
+      "inference_attempted": false
+    },
+    "native-memory-final": {
+      "employee": "n8n-specialist",
+      "runtime": "/home/delorenj/.local/share/hermes-agent/releases/0408fec7a153e6c32c064acd2b8053917f1525f1",
+      "cwd": "/tmp/flume29-travel-proof",
+      "own_bank": "agent-n8n-specialist",
+      "marker": "FLUME29-n8n-specialist-7e0e94fe22e8",
+      "proof_kind": "native-memory-integration-without-chat-inference",
+      "retained_content_kind": "true deployed workforce and charter facts",
+      "configured_recall_types": [
+        "world",
+        "experience",
+        "observation"
+      ],
+      "native_retain_success": true,
+      "native_tool_recalled_marker": true,
+      "native_recalled_identity_and_own_bank": true,
+      "explicit_own_bank_result_count": 16,
+      "recalled_document_ids": [
+        "66cdd542-0dbc-41e4-894a-132eaaa4e731"
+      ],
+      "recall_after_processing": true,
+      "recall_attempts": 1,
+      "explicit_own_bank_recalled_marker": true
+    },
+    "launch-dependency": {
+      "employee": "n8n-specialist",
+      "launcher": "installed-public-flume",
+      "cwd": "/tmp/flume29-travel-proof",
+      "exit": 1,
+      "dependency": "Deployment dependency: employee member token unavailable at op://DeLoSecrets/hermes-n8n-specialist/credential (FLUME-39)",
+      "chat_inference_attempted": false,
+      "borrowed_access": false
+    },
+    "final-audit": {
+      "ok": true,
+      "id": "n8n-specialist",
+      "standing": "in good standing",
+      "problems": [],
+      "desk": "/home/delorenj/.agents/workforce/n8n-specialist",
+      "profile": "/home/delorenj/.hermes/profiles/n8n-specialist",
+      "write_bank": "agent-n8n-specialist",
+      "recall_banks": [
+        "agent-n8n-specialist",
+        "n8n"
+      ],
+      "skills": [
+        "n8n-agents",
+        "n8n-binary-and-data",
+        "n8n-code-javascript",
+        "n8n-code-python",
+        "n8n-code-tool",
+        "n8n-error-handling",
+        "n8n-expression-syntax",
+        "n8n-mcp-tools-expert",
+        "n8n-multi-instance",
+        "n8n-node-configuration",
+        "n8n-self-hosting",
+        "n8n-subworkflows",
+        "n8n-validation-expert",
+        "n8n-workflow-patterns"
+      ]
+    },
+    "final-onboard": {
+      "ok": true,
+      "id": "n8n-specialist",
+      "desk": "/home/delorenj/.agents/workforce/n8n-specialist",
+      "profile": "/home/delorenj/.hermes/profiles/n8n-specialist",
+      "write_bank": "agent-n8n-specialist",
+      "recall_banks": [
+        "agent-n8n-specialist",
+        "n8n"
+      ],
+      "skills": [
+        "n8n-agents",
+        "n8n-binary-and-data",
+        "n8n-code-javascript",
+        "n8n-code-python",
+        "n8n-code-tool",
+        "n8n-error-handling",
+        "n8n-expression-syntax",
+        "n8n-mcp-tools-expert",
+        "n8n-multi-instance",
+        "n8n-node-configuration",
+        "n8n-self-hosting",
+        "n8n-subworkflows",
+        "n8n-validation-expert",
+        "n8n-workflow-patterns"
+      ],
+      "changed": false,
+      "projection": {
+        "profile": "/home/delorenj/.hermes/profiles/n8n-specialist",
+        "changed": [],
+        "write_bank": "agent-n8n-specialist",
+        "recall_banks": [
+          "agent-n8n-specialist",
+          "n8n"
+        ]
+      },
+      "selection": {
+        "project": "/home/delorenj/.hermes/profiles/n8n-specialist/.skillex-selection",
+        "manifestChanged": false,
+        "applied": []
+      }
+    }
+  }
+}
