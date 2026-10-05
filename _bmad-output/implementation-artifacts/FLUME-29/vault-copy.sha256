@@ -1,3 +1,7 @@
+# Markdown entries hash the document body after frontmatter; JSON entries hash the complete file.
 333b6350a600d40a52d6bb329dd66c39eb3b509ee3be1720d4ba0860f4123e62  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/named-specialists.md
-d0244855ffb0ff65a0517a4f34400bd93df98df44f1efddcd84f91f204d211f9  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/source-verification.md
-1a9a607331955042171394fcacebd5d6cb4342c7c6bfbf6e1e806348bcedfa71  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/spec-flume-29-portable-specialist-hire.md
+5f501d77cf8c94a69012efce84521c1ca6dafe8e6f9594bc9acf6fb2cc1ba4c0  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/spec-flume-29-portable-specialist-hire.md
+8b570d0b43f3edf02242c04898d9c8406a3d2753a9a65b9e72c6e8211f1284e7  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/source-verification.md
+c31a05c008f0766acf52fc52e8e75680b8f9bee15acc95a490486cc4488e5183  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/operator-acceptance.md
+4cf88194d1a0a06f5225450bf2467bccef5ad590dbb40f625613ad973e51e6fe  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/operator-evidence.json
+e3fd84597b307d835c4c1b90b10303b77372b993723557406c8de302f1c3bfa7  /home/delorenj/code/DeLoDocs/Projects/AutomaticAI/Flume/FLUME-29/closeout.md
