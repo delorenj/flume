@@ -51,12 +51,8 @@ The operator needs specialists that can work across repositories without pretend
 
 Both inaugural specialists can be hired without a project, run from unrelated working directories with verified charter/loadout/own-bank behavior, and refresh twice with a zero-change second pass. Evidence separates source tests, actual profile state, live invocation, and any unresolved token or runtime dependency.
 
-## Assumptions
+## Confirmed projection choices
 
-- Hermes CLI is the first harness. The optional harness preference remains pending.
-- The owning root is ~/.agents/workforce/<id>; ~/.hermes/profiles/<id> is its generated runtime projection.
-- Big Chungus uses identity infra-specialist and bank agent-infra-specialist, following the parent epic. The historical big-chungus-infra name is not silently treated as the same identity.
-
-## Open Questions
-
-- Confirm or supersede the pending desk/location and infrastructure identity choices before implementing CAP-2 and CAP-6. These are explicit assumptions, not accepted user decisions.
+- Hermes CLI is the first harness.
+- The owning definition root is ~/.agents/workforce/<id>; ~/.hermes/profiles/<id> is its generated runtime projection.
+- Big Chungus uses identity infra-specialist and bank agent-infra-specialist.
