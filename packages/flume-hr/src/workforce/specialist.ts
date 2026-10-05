@@ -5,10 +5,10 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import YAML from "yaml";
 import { isDeepStrictEqual } from "node:util";
-import { showProfile } from "@delorenj/skillex";
+import { ExitCode, showProfile } from "@delorenj/skillex";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths, updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
-import { provisionDesk, resolveDeskPath } from "./desk";
+import { provisionDesk, renderDeskContract, resolveDeskPath } from "./desk";
 import { readRoleIdentity } from "./identity";
 import { withRegistryLock } from "./role";
 import { applyRoleSelection, auditRoleSelection, planRoleSelection, previewRoleSelection, type SelectionContext } from "./selection";
@@ -16,7 +16,7 @@ import { validateNamedAgent } from "./validator";
 
 const EMPLOYMENT = "portable-specialist";
 const MARKER = ".flume-specialist.json";
-export interface SpecialistOptions { dryRun?: boolean }
+export interface SpecialistOptions { dryRun?: boolean; expectedEmployee?: string }
 
 function stat(path: string) {
   try { return lstatSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
@@ -57,12 +57,14 @@ function environment() {
   const selection: SelectionContext = { home, hermesRoot, skillexRoot: process.env.PJ_SKILLS_REGISTRY_ROOT || join(home, "code/skillex"), stateHome: process.env.XDG_STATE_HOME || join(home, ".local/state") };
   return { home, hermesRoot, registryPath, fleetBin, selection };
 }
-async function prepare(definitionPath: string) {
+async function prepare(definitionPath: string, expectedEmployee?: string) {
   const p = environment();
   const source = resolve(definitionPath);
   safe(source);
   const bytes = readFileSync(source, "utf8");
   const definition = await validateNamedAgent(bytes, { home: p.home, skillexRoot: p.selection.skillexRoot });
+  if (definition.id === "default") throw new Error("Reserved Hermes profile identity: default");
+  if (expectedEmployee && definition.id !== expectedEmployee) throw new Error(`Employee definition identity mismatch: requested ${expectedEmployee}, found ${definition.id}`);
   const desk = resolveDeskPath(definition, { home: p.home });
   const expected = join(p.home, ".agents/workforce", definition.id);
   if (resolve(desk) !== resolve(expected)) throw new Error(`Portable specialist desk must be ${expected}`);
@@ -108,26 +110,34 @@ function ownership(p: Prepared, hire: boolean) {
     return;
   }
   if (!marker || marker.id !== p.definition.id || marker.definition !== join(p.desk, "agent.yaml")) throw new Error("Desk ownership conflict: hire the definition first");
-  if (existing && (existing.employment !== EMPLOYMENT || existing.definition_path !== marker.definition || existing.profile_name !== p.definition.id || existing.identity !== p.definition.id || existing.repo || existing.project_path)) throw new Error("Registry ownership conflict");
+  if (existing && (existing.employment !== EMPLOYMENT || existing.definition_path !== marker.definition || existing.desk_path !== p.desk || existing.profile_name !== p.definition.id || existing.identity !== p.definition.id || existing.repo || existing.project_path || existing.role_dir
+    || existing.plane?.workspace || existing.plane?.project_id || existing.plane?.identifier || existing.systemd?.gateway_unit)) throw new Error("Registry ownership conflict: portable employee has contradictory identity or project bindings");
   if (!existing && marker.status !== "pending") throw new Error("Owned employee record is missing");
   for (const name of existsSync(join(p.desk, ".agents/skills")) ? readdirSync(join(p.desk, ".agents/skills")) : []) {
     if (name.startsWith(".")) continue;
     const path = join(p.desk, ".agents/skills", name);
     if (!stat(path)?.isSymbolicLink() || readlinkSync(path) !== marker.skills?.[name]) throw new Error(`Desk skill ownership conflict: ${name}`);
   }
+  return marker;
+}
+
+function deskContractDiffers(p: Prepared): boolean {
+  const path = join(p.desk, "contract.yaml");
+  return !existsSync(path) || readFileSync(path, "utf8") !== renderDeskContract(p.definition);
 }
 
 async function profileOwnership(p: Prepared): Promise<void> {
   if (!existsSync(p.profile) || !existsSync(join(p.profile, "skills"))) return;
-  const shown = await showProfile(p.definition.id, { ...p.selection, project: p.plan.project, skillexOnly: true });
-  if (!shown.ok) throw new Error(`Profile skill ownership refused: ${shown.findings.map(f => `${f.code}: ${f.message}`).join("; ")}`);
+  const shown = await showProfile(p.definition.id, { ...p.selection, registryRoot: p.selection.skillexRoot, project: p.plan.project, skillexOnly: true });
+  // Managed drift is repair work for onboarding; ownership refusals remain fatal.
+  if (!shown.ok && shown.exit !== ExitCode.DRIFT) throw new Error(`Profile skill ownership refused: ${shown.findings.map(f => `${f.code}: ${f.message}`).join("; ")}`);
 }
 
 /** Hire is exclusive; onboard reconciles the same owned definition. */
 export async function hireSpecialist(definitionPath: string, onboard = false, options: SpecialistOptions = {}) {
-  const initial = await prepare(definitionPath); // Invalid catalog/paths refuse before lock creation or publication.
+  const initial = await prepare(definitionPath, options.expectedEmployee); // Invalid catalog/paths refuse before lock creation or publication.
   const apply = async () => {
-    const p = await prepare(definitionPath);
+    const p = await prepare(definitionPath, options.expectedEmployee || initial.definition.id);
     ownership(p, !onboard);
     const preview = projection(p, true);
     await profileOwnership(p);
@@ -143,7 +153,8 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
       // A reservation makes interrupted projection explicitly recoverable through onboard.
       const deskPreview = await provisionDesk(p.definition, { home: p.home, resolvedSkills: p.plan.skills, dryRun: true, quiet: true });
       const changedDefinition = !existsSync(join(p.desk, "agent.yaml")) || readFileSync(join(p.desk, "agent.yaml"), "utf8") !== p.bytes;
-      if (!existsSync(markerPath) || changedDefinition || preview.changed.length || deskPreview.created + deskPreview.updated + deskPreview.removed) {
+      const contractChanged = deskContractDiffers(p);
+      if (!existsSync(markerPath) || changedDefinition || contractChanged || preview.changed.length || deskPreview.created + deskPreview.updated + deskPreview.removed) {
         write(markerPath, JSON.stringify({ ...marker, skills: { ...oldMarker.skills, ...desiredSkills } }, null, 2) + "\n");
       }
       const definitionChanged = write(join(p.desk, "agent.yaml"), p.bytes);
@@ -162,9 +173,9 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
         }
         if (current.bloodbank?.enabled !== false) doc.setIn(["agents", p.definition.id, "bloodbank", "enabled"], false);
       });
-      write(markerPath, JSON.stringify({ ...marker, status: "complete" }, null, 2) + "\n");
+      const completionChanged = write(markerPath, JSON.stringify({ ...marker, status: "complete" }, null, 2) + "\n");
       return { ok: true, id: p.definition.id, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks,
-        skills: p.plan.skills.map(s => s.name), changed: definitionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
+        skills: p.plan.skills.map(s => s.name), changed: definitionChanged || contractChanged || completionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
     } catch (error) {
       throw new Error(`${started ? "Partial specialist projection; inspect owned state and retry onboard" : "Specialist refused before projection"}: ${(error as Error).message}`);
     }
@@ -175,10 +186,12 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
 export async function auditSpecialist(employee: string) {
   if (!/^[a-z0-9][a-z0-9_-]{0,57}$/u.test(employee)) throw new Error("Unsafe employee identity");
   const { home } = environment();
-  const p = await prepare(join(home, ".agents/workforce", employee, "agent.yaml"));
-  ownership(p, false);
+  const p = await prepare(join(home, ".agents/workforce", employee, "agent.yaml"), employee);
+  const marker = ownership(p, false);
+  if (marker.status !== "complete") throw new Error("Incomplete specialist publication: desk marker is pending");
   const config = projection(p, true);
   const problems = [...config.changed.map(file => `Profile projection differs: ${file}`), ...await auditRoleSelection(employee, p.profile, p.definition.skills, p.selection)];
+  if (deskContractDiffers(p)) problems.push("Desk contract differs: contract.yaml");
   for (const skill of p.plan.skills) {
     const link = join(p.desk, ".agents/skills", skill.name);
     if (!stat(link)?.isSymbolicLink() || readlinkSync(link) !== skill.path) problems.push(`Desk skill differs: ${skill.name}`);
@@ -197,7 +210,11 @@ export async function auditSpecialist(employee: string) {
 export async function launchSpecialist(employee: string, args: string[], cwd = process.cwd()): Promise<number> {
   const audited = await auditSpecialist(employee);
   if (!audited.ok) throw new Error(`Specialist launch refused: ${audited.problems.join("; ")}`);
-  if (args.some(arg => /^(?:--(?:profile|api-key|base-url|provider)(?:=|$)|-p)/u.test(arg))) throw new Error("Specialist launcher refuses profile or inference overrides");
+  if (args.some(arg => {
+    if (/^-p/u.test(arg)) return true;
+    const option = /^--([^=]+)/u.exec(arg)?.[1];
+    return Boolean(option && ["profile", "api-key", "base-url", "provider"].some(forbidden => forbidden.startsWith(option)));
+  })) throw new Error("Specialist launcher refuses profile or inference overrides");
   const runtime = environment().fleetBin || "hermes";
   if (runtime !== "hermes") {
     try {

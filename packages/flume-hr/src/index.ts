@@ -106,7 +106,7 @@ program
         await specialistResult(async () => { throw new Error("Choose --employee or --definition"); }, options.json); return;
       }
       const path = options.definition || join(process.env.HOME || homedir(), ".agents/workforce", options.employee, "agent.yaml");
-      await specialistResult(() => hireSpecialist(path, true, options), options.json); return;
+      await specialistResult(() => hireSpecialist(path, true, { ...options, expectedEmployee: options.employee }), options.json); return;
     }
     // Onboarding IS hiring, run again. Every step is marker-guarded and the
     // registry write is an upsert, so a second pass is a no-op that proves the

@@ -336,6 +336,7 @@ export function classifyPath(raw: unknown, options: ClassifyPathOptions = {}): F
     return { declared, classification: "symlink", link_target: target };
   }
   if (options.directory && !stat.isDirectory()) return { declared, classification: "not-a-directory", link_target: null };
+  if (options.directory === false && !stat.isFile()) return { declared, classification: "unreadable", link_target: null };
   return { declared, classification: "ok", link_target: null };
 }
 
@@ -1125,7 +1126,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     identity,
     type,
     employment,
-    definition_path: definitionPath,
+    definition_path: portable && paths.definition_path?.classification !== "ok" ? { ...definitionPath, state: "unresolved" } : definitionPath,
     desk_path: portable && paths.desk_path?.classification !== "ok" ? { ...deskPath, state: "unresolved" } : deskPath,
     role_dir: roleDir.value
       ? field(shownPath(roleDir.value), roleDir.source, paths.role_dir.classification === "ok" ? "resolved" : "unresolved")
@@ -1822,7 +1823,7 @@ export function collectFleetInventory(options: FleetInventoryOptions = {}): Flee
     return true;
   }).length;
   const unresolvedRows = allRows.filter((row) => (
-    row.project_id.state !== "resolved" || row.profile_path.state !== "resolved" || (row.employment.value === "portable-specialist" ? row.desk_path.state !== "resolved" : row.role_dir.state !== "resolved")
+    row.project_id.state !== "resolved" || row.profile_path.state !== "resolved" || (row.employment.value === "portable-specialist" ? row.desk_path.state !== "resolved" || row.definition_path.state !== "resolved" : row.role_dir.state !== "resolved")
   )).length;
 
   const totals: FleetInventoryTotals = {

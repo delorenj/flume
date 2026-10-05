@@ -48,6 +48,12 @@ export function resolveDeskPath(
   return join(home, ".agents", "workforce", contract.id);
 }
 
+/** The authored desk projection, excluding resolved runtime skill paths. */
+export function renderDeskContract(contract: NamedAgentContract | ResolvedNamedAgentContract): string {
+  const { resolvedSkills: _, ...cleanContract } = contract as ResolvedNamedAgentContract;
+  return YAML.stringify(cleanContract);
+}
+
 /**
  * Materialize an agent's desk directory and reconcile its .agents/skills symlinks.
  *
@@ -290,8 +296,7 @@ export async function provisionDesk(
   // 5. Save contract.yaml in desk directory without runtime-only fields
   try {
     const contractPath = join(deskPath, "contract.yaml");
-    const { resolvedSkills: _, ...cleanContract } = resolvedContract as unknown as { resolvedSkills?: unknown };
-    const rendered = YAML.stringify(cleanContract);
+    const rendered = renderDeskContract(resolvedContract);
     if (!existsSync(contractPath) || readFileSync(contractPath, "utf8") !== rendered) writeFileSync(contractPath, rendered, "utf8");
   } catch (err) {
     throw new Error(
