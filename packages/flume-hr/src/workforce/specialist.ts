@@ -66,12 +66,10 @@ async function prepare(definitionPath: string) {
   const desk = resolveDeskPath(definition, { home: p.home });
   const expected = join(p.home, ".agents/workforce", definition.id);
   if (resolve(desk) !== resolve(expected)) throw new Error(`Portable specialist desk must be ${expected}`);
-  // Skillex profile sync unions its supplied global home and project. The owning
-  // desk has no global activation manifest: this isolates a specialist's exact
-  // loadout without changing the operator's global selection or PM defaults.
+  // The owning desk exposes canonical links; profile configuration owns the
+  // persistent global inheritance policy used by normal-home Skillex callers.
   safe(join(desk, ".agents/skills.json"));
   if (existsSync(join(desk, ".agents/skills.json"))) throw new Error("Specialist desk cannot carry a global activation manifest");
-  p.selection.home = desk;
   const profile = join(p.hermesRoot, "profiles", definition.id);
   for (const path of [desk, profile, join(desk, ".agents"), join(desk, ".agents/skills"), join(profile, ".skillex-selection"), join(profile, ".skillex-selection/.agents")]) safe(path, true);
   for (const path of [p.registryPath, join(desk, MARKER), join(desk, "agent.yaml"), join(desk, "contract.yaml"), join(profile, ".skillex-selection/.agents/skills.json")]) safe(path);

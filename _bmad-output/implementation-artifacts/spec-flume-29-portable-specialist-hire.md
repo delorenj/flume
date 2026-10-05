@@ -69,6 +69,8 @@ Source implementation is assigned through BMAD; the parent owns operator deploym
 
 Source is ready for parent integration and independent review. The dashboard deployment blocker is covered by an owned disabled/empty profile projection; the shared base is unchanged. Launch honors the trusted declared Hermes runtime and refuses unavailable pins. Parent owns the reference-only Skillex catalog commit `db98edb`, installation, runtime inspection and live acceptance. Both employees currently lack their own AutomaticAI member token, so FLUME-39 remains an explicit deployment dependency. Source verification is recorded in `FLUME-29/source-verification.md`; the combined operational evidence task remains open.
 
+Integration follow-up owns profile `skills.inherit_global: false` and uses normal Skillex home/state context, replacing the temporary desk-home override. A standalone normal-home CLI regression verifies unchanged exact loadouts after both hire and refresh. Parent owns the additive Skillex policy implementation, installation and reviewed dependency pin in `packages/flume-hr/package.json` plus `package-lock.json`. Specialist Hindsight recall defaults to world/experience/observation through `setdefault`, preserving explicit operator recall-type overrides. Parent owns the resulting operational proof reruns.
+
 ## Spec Change Log
 
 ## Review Triage Log
