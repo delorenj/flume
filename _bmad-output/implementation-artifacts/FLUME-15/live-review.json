@@ -1,0 +1,475 @@
+{
+  "status": "read-only evidence",
+  "recorded_on": "2026-10-05",
+  "baseline_commit": "2034f78322b89af2b74db69bb182085a6966c20f",
+  "worker_template_pin": "97f9ff82e087dad3273c5cc596feac6b39f2c370",
+  "canonical_template_followup": "4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74",
+  "command": "env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus node packages/flume-hr/dist/index.js review --domain systemd --json",
+  "before_cwd": "/home/delorenj/code/33GOD/flume",
+  "after_cwd": "/home/delorenj/code/33GOD/flume/.worktrees/flume-15",
+  "limitations": [
+    "Sequential live snapshots are not a frozen host; unrelated processes can change between reads.",
+    "Initial captures without the user-bus environment reported manager-unavailable and are retained separately.",
+    "No --live, remediation, service mutation, profile mutation, Plane or vault write was requested by these commands.",
+    "The worker uses the original template pin; parent owns integration with the canonical new pin."
+  ],
+  "before": {
+    "artifact": "/tmp/flume-orch/flume15-live-before-bus.json",
+    "sha256": "3f92918fa6074338ec19ea6d0d1979c33de824ddae4e267d115df6e395e8479c",
+    "contract_version": "1.4.0",
+    "manager": {
+      "state": "degraded",
+      "code": "available"
+    },
+    "registered_employees": 28,
+    "selected_employees": 28,
+    "heartbeat_field_observations": 84,
+    "failed_heartbeat_field_observations": 70,
+    "employees_failing_heartbeat_fields": 28,
+    "required_heartbeat_observations": 112,
+    "failed_required_heartbeat_observations": 98,
+    "employees_failing_any_heartbeat_requirement": 28,
+    "employee_observation_states": {
+      "pass": 19,
+      "warn": 2,
+      "fail": 119,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "nonheartbeat_observation_states": {
+      "pass": 5,
+      "warn": 2,
+      "fail": 21,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "systemd_agents": {
+      "total_registered": 28,
+      "selected": 28,
+      "complete": 28,
+      "topology_ok": 0,
+      "gateway_healthy": 3,
+      "gateway_deferred": 2,
+      "heartbeat_healthy": 0,
+      "unstable": 3,
+      "crash_looping": 0,
+      "drifted": 28,
+      "incomplete": 0,
+      "exception_authorized": 0,
+      "unobserved": 0
+    },
+    "shared_gateway": {
+      "coverage": "observed",
+      "unit": "hermes-fleet-bloodbank-gateway.service",
+      "profile": "fleet-bloodbank-gateway",
+      "state": "healthy",
+      "code": null
+    },
+    "unregistered": {
+      "coverage": "swept",
+      "reason": null,
+      "total": 4,
+      "by_class": {
+        "retired": 0,
+        "transient": 1,
+        "profile-correlated": 1,
+        "managed-exception": 0,
+        "unclassified": 2
+      },
+      "listed": 4,
+      "truncated": false
+    },
+    "host_findings": [
+      {
+        "rule_id": "systemd.manager",
+        "state": "pass",
+        "summary": "the user manager reports degraded, which the contract lists as available"
+      },
+      {
+        "rule_id": "systemd.shared-gateway",
+        "state": "pass",
+        "summary": "hermes-fleet-bloodbank-gateway.service is enabled, active, stable over the window and rooted at the declared shared profile"
+      },
+      {
+        "rule_id": "systemd.unregistered",
+        "state": "warn",
+        "summary": "4 of 4 unregistered hermes-* unit(s) carry no contract classification (1 transient, 1 profile-correlated, 2 unclassified); each is a finding for an operator, never a licence to stop, disable or delete"
+      }
+    ],
+    "samples": {
+      "heartbeat": [
+        {
+          "agent_id": "33god-pm",
+          "field": "agents.{agent_id}.systemd.gateway_unit",
+          "state": "fail",
+          "summary": "2 topology defect(s): the canonical unit set, the row's own unit names, or a retired shape disagrees with the contract",
+          "codes": [
+            "heartbeat-timer-missing",
+            "heartbeat-service-missing"
+          ]
+        },
+        {
+          "agent_id": "33god-pm",
+          "field": "agents.{agent_id}.systemd.heartbeat_timer",
+          "state": "fail",
+          "summary": "the row's heartbeat_timer field and the units on this manager disagree",
+          "codes": [
+            "unit-missing"
+          ]
+        },
+        {
+          "agent_id": "33god-pm",
+          "field": "units.hermes-{agent_id}-heartbeat.service",
+          "state": "fail",
+          "summary": "1 heartbeat-service defect(s): an active timer proves nothing without a successful tick",
+          "codes": [
+            "absent"
+          ]
+        },
+        {
+          "agent_id": "33god-pm",
+          "field": "units.hermes-{agent_id}-heartbeat.timer",
+          "state": "fail",
+          "summary": "1 heartbeat-timer defect(s): an active timer proves nothing on its own",
+          "codes": [
+            "absent"
+          ]
+        }
+      ],
+      "remaining": [
+        {
+          "agent_id": "bloodbank-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "candystore-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "client-portal-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "condaleeza",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "1 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared"
+          ]
+        },
+        {
+          "agent_id": "deckard-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a deferred messaging declaration",
+          "codes": [
+            "deferred-but-enabled",
+            "deferred-but-active"
+          ]
+        }
+      ]
+    }
+  },
+  "initial_after": {
+    "artifact": "/tmp/flume-orch/flume15-live-after-bus.json",
+    "sha256": "f8cf0f7501dd043a46f4bb9e9fbfc6063cb06d96ef2acebc1ffdba3703c78ab8",
+    "contract_version": "1.5.0",
+    "manager": {
+      "state": "degraded",
+      "code": "available"
+    },
+    "registered_employees": 28,
+    "selected_employees": 28,
+    "heartbeat_field_observations": 0,
+    "failed_heartbeat_field_observations": 0,
+    "employees_failing_heartbeat_fields": 0,
+    "required_heartbeat_observations": 0,
+    "failed_required_heartbeat_observations": 0,
+    "employees_failing_any_heartbeat_requirement": 0,
+    "employee_observation_states": {
+      "pass": 28,
+      "warn": 2,
+      "fail": 26,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "nonheartbeat_observation_states": {
+      "pass": 28,
+      "warn": 2,
+      "fail": 26,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "systemd_agents": {
+      "total_registered": 28,
+      "selected": 28,
+      "complete": 28,
+      "topology_ok": 23,
+      "gateway_healthy": 3,
+      "gateway_deferred": 2,
+      "unstable": 3,
+      "crash_looping": 0,
+      "drifted": 22,
+      "incomplete": 0,
+      "exception_authorized": 0,
+      "unobserved": 0
+    },
+    "shared_gateway": {
+      "coverage": "observed",
+      "unit": "hermes-fleet-bloodbank-gateway.service",
+      "profile": "fleet-bloodbank-gateway",
+      "state": "healthy",
+      "code": null
+    },
+    "unregistered": {
+      "coverage": "swept",
+      "reason": null,
+      "total": 4,
+      "by_class": {
+        "retired": 0,
+        "transient": 1,
+        "profile-correlated": 1,
+        "managed-exception": 0,
+        "unclassified": 2
+      },
+      "listed": 4,
+      "truncated": false
+    },
+    "host_findings": [
+      {
+        "rule_id": "systemd.manager",
+        "state": "pass",
+        "summary": "the user manager reports degraded, which the contract lists as available"
+      },
+      {
+        "rule_id": "systemd.shared-gateway",
+        "state": "pass",
+        "summary": "hermes-fleet-bloodbank-gateway.service is enabled, active, stable over the window and rooted at the declared shared profile"
+      },
+      {
+        "rule_id": "systemd.unregistered",
+        "state": "warn",
+        "summary": "4 of 4 unregistered hermes-* unit(s) carry no contract classification (1 transient, 1 profile-correlated, 2 unclassified); each is a finding for an operator, never a licence to stop, disable or delete"
+      }
+    ],
+    "samples": {
+      "heartbeat": [],
+      "remaining": [
+        {
+          "agent_id": "bloodbank-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "candystore-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "client-portal-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "condaleeza",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "1 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared"
+          ]
+        },
+        {
+          "agent_id": "deckard-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a deferred messaging declaration",
+          "codes": [
+            "deferred-but-enabled",
+            "deferred-but-active"
+          ]
+        }
+      ]
+    }
+  },
+  "after": {
+    "artifact": "/tmp/flume-orch/flume15-live-after-final-bus.json",
+    "sha256": "f8cf0f7501dd043a46f4bb9e9fbfc6063cb06d96ef2acebc1ffdba3703c78ab8",
+    "contract_version": "1.5.0",
+    "manager": {
+      "state": "degraded",
+      "code": "available"
+    },
+    "registered_employees": 28,
+    "selected_employees": 28,
+    "heartbeat_field_observations": 0,
+    "failed_heartbeat_field_observations": 0,
+    "employees_failing_heartbeat_fields": 0,
+    "required_heartbeat_observations": 0,
+    "failed_required_heartbeat_observations": 0,
+    "employees_failing_any_heartbeat_requirement": 0,
+    "employee_observation_states": {
+      "pass": 28,
+      "warn": 2,
+      "fail": 26,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "nonheartbeat_observation_states": {
+      "pass": 28,
+      "warn": 2,
+      "fail": 26,
+      "error": 0,
+      "unsupported": 0,
+      "unobserved": 0
+    },
+    "systemd_agents": {
+      "total_registered": 28,
+      "selected": 28,
+      "complete": 28,
+      "topology_ok": 23,
+      "gateway_healthy": 3,
+      "gateway_deferred": 2,
+      "unstable": 3,
+      "crash_looping": 0,
+      "drifted": 22,
+      "incomplete": 0,
+      "exception_authorized": 0,
+      "unobserved": 0
+    },
+    "shared_gateway": {
+      "coverage": "observed",
+      "unit": "hermes-fleet-bloodbank-gateway.service",
+      "profile": "fleet-bloodbank-gateway",
+      "state": "healthy",
+      "code": null
+    },
+    "unregistered": {
+      "coverage": "swept",
+      "reason": null,
+      "total": 4,
+      "by_class": {
+        "retired": 0,
+        "transient": 1,
+        "profile-correlated": 1,
+        "managed-exception": 0,
+        "unclassified": 2
+      },
+      "listed": 4,
+      "truncated": false
+    },
+    "host_findings": [
+      {
+        "rule_id": "systemd.manager",
+        "state": "pass",
+        "summary": "the user manager reports degraded, which the contract lists as available"
+      },
+      {
+        "rule_id": "systemd.shared-gateway",
+        "state": "pass",
+        "summary": "hermes-fleet-bloodbank-gateway.service is enabled, active, stable over the window and rooted at the declared shared profile"
+      },
+      {
+        "rule_id": "systemd.unregistered",
+        "state": "warn",
+        "summary": "4 of 4 unregistered hermes-* unit(s) carry no contract classification (1 transient, 1 profile-correlated, 2 unclassified); each is a finding for an operator, never a licence to stop, disable or delete"
+      }
+    ],
+    "samples": {
+      "heartbeat": [],
+      "remaining": [
+        {
+          "agent_id": "bloodbank-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "candystore-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "client-portal-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared",
+            "entrypoint-unpinned"
+          ]
+        },
+        {
+          "agent_id": "condaleeza",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "1 gateway defect(s) against a undeclared messaging declaration",
+          "codes": [
+            "channel-undeclared"
+          ]
+        },
+        {
+          "agent_id": "deckard-pm",
+          "field": "units.hermes-{agent_id}-gateway.service",
+          "state": "fail",
+          "summary": "2 gateway defect(s) against a deferred messaging declaration",
+          "codes": [
+            "deferred-but-enabled",
+            "deferred-but-active"
+          ]
+        }
+      ]
+    },
+    "worker_commit": "827ac7b842f3eea342eb288f986de9033102c1df",
+    "captured_after_full_verification": true
+  },
+  "worker_commit": "827ac7b842f3eea342eb288f986de9033102c1df"
+}
