@@ -96,6 +96,8 @@ All three review layers returned before triage. Each row below is an individual 
 | G3 | Verification gap | medium | patch | Filed mutation evidence: disabling candidate-only fallback leaves existing retirement cases passing; a custom old-poll timer loses its retired class. Add the exact manifest-only candidate fixture. |
 | G4 | Verification gap, other | medium | patch | The compatibility claim is confirmed by the completeness loop and original historical documents, matching B1. |
 
+Historical compatibility preserves established semantic rejections: the original 1.3/schema-4 default-deny document already violates quarantine-by-omission policy. Compatibility proof must use the original supported v1.4 handbook and its supported schema-4 form, rather than weakening that independent authority rule.
+
 Patch groups: historical contract compatibility; stale registry retirement ownership; current profile-wiring retirement; effective current retirement detection; alias observation; consistent repeated placeholders; three targeted verification gaps. Baseline defects are recorded separately in `deferred-work.md`.
 
 ## Verification
