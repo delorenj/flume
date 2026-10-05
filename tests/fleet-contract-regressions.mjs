@@ -245,6 +245,50 @@ console.log("fleet contract authority + managed-state contract");
 try {
   seedHome();
 
+  // Original v1.4 bytes, plus the supported schema-4 projection from the review reproduction.
+  for (const schema of [5, 4]) {
+    check(`original v1.4 handbook loads as schema-${schema} with its historical manifests`, () => {
+      const text = readFileSync(join(ROOT, "tests", "fixtures", "handbooks", "1.4.0-schema5.yaml"), "utf8");
+      const document = YAML.parseDocument(text);
+      if (schema === 4) {
+        document.set("schema_version", 4);
+        document.delete("service_manifest");
+      }
+      const source = document.toJS();
+      assert.equal(source.contract_version, "1.4.0");
+      assert.equal(source.schema_version, schema);
+      assert.equal(source.retired.some((entry) => entry.id === "per-agent-heartbeat"), false);
+      assert.equal(source.service_model.per_agent.heartbeat_timer, "hermes-{agent_id}-heartbeat.timer");
+      assert.ok(source.profile_manifest, "retain the original profile manifest");
+      assert.equal(source.activation.execution_authority.default, "allow");
+      if (schema === 5) {
+        assert.deepEqual(Object.keys(source.service_manifest.heartbeat).sort(), [
+          "max_tick_seconds", "on_boot_sec", "on_unit_inactive_sec", "overdue_multiplier", "reconcile_policy_file", "reconcile_state_file",
+        ]);
+      } else assert.equal(source.service_manifest, undefined);
+      const path = rawCopy(`historical-1.4-schema${schema}`, schema === 5 ? text : String(document));
+      const result = cli(["handbook", "validate", "--contract", path, "--json"]);
+      const parsed = envelope(result);
+      assert.equal(result.status, 0, JSON.stringify(parsed.error));
+      assert.equal(parsed.ok, true, JSON.stringify(parsed.error));
+    });
+  }
+
+  check("original v1.3 schema-4 default-deny handbook retains its established semantic rejection", () => {
+    const text = readFileSync(join(ROOT, "tests", "fixtures", "handbooks", "1.3.0-schema4.yaml"), "utf8");
+    const source = YAML.parse(text);
+    assert.equal(source.schema_version, 4);
+    assert.equal(source.contract_version, "1.3.0");
+    assert.equal(source.activation.execution_authority.default, "deny");
+    const result = cli(["handbook", "validate", "--contract", rawCopy("historical-default-deny", text), "--json"]);
+    const parsed = envelope(result);
+    assert.equal(result.status, 4);
+    assert.equal(errorCode(parsed), "RETIRED_MODE");
+    assert.equal(parsed.error.details.diagnostic_count, 1);
+    assert.match(JSON.stringify(parsed.error), /activation.execution_authority.default.*quarantine-by-omission/);
+    assert.doesNotMatch(JSON.stringify(parsed.error), /per-agent-heartbeat/);
+  });
+
   // -- the tracked contract, through the real built CLI ---------------------
 
   check("canonical validate exits 0 and names every declared surface", () => {
@@ -954,6 +998,49 @@ try {
     const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
     assert.equal(errorCode(parsed), "INVALID_INPUT");
     assert.match(JSON.stringify(parsed.error), /per-agent-heartbeat/);
+  });
+
+  check("current retirement needs effective detection of both canonical heartbeat unit types", () => {
+    for (const suffix of ["both", "service", "timer"]) {
+      const path = mutated(`heartbeat-undetected-${suffix}`, (doc) => {
+        const mode = doc.get("retired").items.find((item) => item.get("id") === "per-agent-heartbeat");
+        mode.set("detect", suffix === "both" ? ["never-a-heartbeat"] : [`-heartbeat\\.${suffix === "service" ? "timer" : "service"}$`]);
+        doc.setIn(["service_manifest", "unregistered", "retired_candidates"], [
+          "hermes-{agent_id}-consumer.service", "hermes-{agent_id}-checkpoint.timer", "hermes-{agent_id}-checkpoint.service",
+        ]);
+      });
+      const result = cli(["handbook", "validate", "--contract", path, "--json"]);
+      const parsed = envelope(result);
+      assert.equal(errorCode(parsed), "INVALID_INPUT");
+      assert.equal(result.status, 2);
+      assert.match(JSON.stringify(parsed.error), /heartbeat retirement must detect/);
+      if (suffix !== "both") assert.ok(JSON.stringify(parsed.error).includes(`heartbeat.${suffix}`));
+    }
+  });
+
+  check("custom detectors or candidate-only heartbeat retirement remain valid", () => {
+    for (const detection of ["detectors", "candidates", "mixed"]) {
+      const path = mutated(`heartbeat-detection-${detection}`, (doc) => {
+        const mode = doc.get("retired").items.find((item) => item.get("id") === "per-agent-heartbeat");
+        mode.set("detect", detection === "candidates" ? ["operator-legacy-heartbeat"] : detection === "mixed"
+          ? ["^hermes-[a-z0-9_-]+-heartbeat\\.service$"]
+          : ["^hermes-[a-z0-9_-]+-heartbeat\\.(?:service|timer)$"]);
+        const candidates = doc.getIn(["service_manifest", "unregistered", "retired_candidates"]);
+        candidates.items = candidates.items.filter((item) => !String(item.value).includes("heartbeat") || detection === "candidates"
+          || (detection === "mixed" && String(item.value).endsWith(".timer")));
+      });
+      const result = cli(["handbook", "validate", "--contract", path, "--json"]);
+      assert.equal(result.status, 0, JSON.stringify(envelope(result).error));
+    }
+  });
+
+  check("historical heartbeat manifest values still receive validation", () => {
+    const source = YAML.parseDocument(readFileSync(join(ROOT, "tests", "fixtures", "handbooks", "1.4.0-schema5.yaml"), "utf8"));
+    source.setIn(["service_manifest", "heartbeat", "max_tick_seconds"], 0);
+    const path = rawCopy("historical-invalid-schedule", String(source));
+    const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
+    assert.equal(errorCode(parsed), "INVALID_INPUT");
+    assert.match(JSON.stringify(parsed.error), /service_manifest\.heartbeat\.max_tick_seconds/);
   });
 
   check("a duplicate retired id cannot stand in for the mode it shadows", () => {

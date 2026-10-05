@@ -963,6 +963,79 @@ async function main() {
     }
   });
 
+  check("a heartbeat stored as gateway stays misnamed and remains visible for retirement", () => {
+    for (const key of ["timer", "service"]) {
+      const unit = unitsOf("alpha-pm")[key];
+      const registry = join(temp, `heartbeat-as-gateway-${key}.yaml`);
+      writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm"
+        ? { ...a, rowOverrides: { systemd: { gateway_unit: unit } } } : a));
+      setState(canonicalState({ "alpha-pm": { present: { gateway: true, timer: true, service: true } } }));
+      const data = systemdRun(["--agent-registry", registry]);
+      const alpha = agentNamed(data, "alpha-pm");
+      assert.ok(kindsOf(leafOf(alpha, FIELDS.topology)).includes("misnamed-gateway"));
+      assert.equal(kindsOf(leafOf(alpha, FIELDS.topology)).includes("duplicate-gateway"), false);
+      assert.equal(alpha.systemd.topology.extra.some((entry) => entry.unit === unit), false);
+      const retired = hostNamed(data, "systemd.unregistered").items.find((entry) => entry.unit === unit);
+      assert.equal(retired.class, "retired");
+      assert.equal(retired.guidance, "retirement");
+      assert.equal(retired.detail, "retired:per-agent-heartbeat");
+    }
+  });
+
+  check("candidate-only retirement uses one consistent employee ID in repeated placeholders", () => {
+    const contract = writeContract("candidate-only", (doc) => {
+      doc.service_manifest.unregistered.retired_candidates.push("hermes-{agent_id}-old-poll.timer", "hermes-{agent_id}-echo-{agent_id}-old-echo.timer");
+    });
+    const single = "hermes-stray-pm-old-poll.timer";
+    const repeated = "hermes-stray-pm-echo-stray-pm-old-echo.timer";
+    const different = "hermes-stray-pm-echo-other-pm-old-echo.timer";
+    const state = canonicalState();
+    for (const unit of [single, repeated, different]) {
+      state.units[unit] = { Id: unit, LoadState: "loaded", UnitFileState: "disabled", ActiveState: "inactive", SubState: "dead" };
+      state.unit_files.push({ unit_file: unit, state: "disabled", preset: null });
+    }
+    assert.ok(contractDocument().retired.every((mode) => mode.detect.every((pattern) => !new RegExp(pattern, "u").test(single))));
+    setState(state);
+    const finding = hostNamed(systemdRun(["--contract", contract]), "systemd.unregistered");
+    assert.equal(finding.state, "warn");
+    for (const unit of [single, repeated]) {
+      const item = finding.items.find((entry) => entry.unit === unit);
+      assert.equal(item.class, "retired");
+      assert.equal(item.guidance, "retirement");
+      assert.equal(item.detail, "retired:candidate");
+    }
+    const nonmatch = finding.items.find((entry) => entry.unit === different);
+    assert.equal(nonmatch.class, "unclassified");
+    assert.equal(nonmatch.guidance, "manual-review");
+    assert.equal(nonmatch.detail, null);
+  });
+
+  check("an unregistered alias correlates Names to canonical Id without hiding ambiguous identity", () => {
+    const alias = "hermes-stray-pm-heartbeat.timer";
+    const canonical = "hermes-canonical-pm-heartbeat.timer";
+    const block = (id, names) => `Id=${id}\nNames=${names}\nLoadState=loaded\nUnitFileState=disabled\nActiveState=inactive\nSubState=dead\n`;
+    const cases = [
+      [block(canonical, `${canonical} ${alias}`), "warn", null],
+      [block(canonical, canonical), "error", "show-malformed"],
+      [block(canonical, `${canonical} ${alias}`) + "\n" + block("hermes-other-pm-heartbeat.timer", `hermes-other-pm-heartbeat.timer ${alias}`), "error", "show-malformed"],
+    ];
+    for (const [stdout, expectedState, reason] of cases) {
+      const state = canonicalState();
+      state.unit_files.push({ unit_file: alias, state: "disabled", preset: null });
+      setState({ ...state, classification: { stdout } });
+      const data = systemdRun();
+      const finding = hostNamed(data, "systemd.unregistered");
+      assert.equal(finding.state, expectedState, finding.summary);
+      assert.equal(data.systemd.unregistered.reason, reason);
+      const item = finding.items.find((entry) => entry.unit === alias);
+      assert.equal(item.class, "retired");
+      assert.equal(item.guidance, "retirement");
+      assert.equal(item.active, expectedState === "warn" ? "inactive" : null);
+      const argv = fakeSystemctlInvocations(systemctlShim).find((args) => args.includes(alias) && args.includes("show") && args.some((arg) => arg.includes("Names")));
+      assert.ok(argv, "classification must request Names for alias correlation");
+    }
+  });
+
   check("retired timers retain observed enabled, active and substate words", () => {
     setState(canonicalState({
       "alpha-pm": { present: { gateway: true, timer: true }, timerEnabled: false },

@@ -18,6 +18,7 @@
 // observations through its single construction point.
 
 import YAML from "yaml";
+import { matchesRetiredCandidate } from "./contract";
 import { isAbsolute, join, resolve, sep } from "node:path";
 import { isSafePathSegment } from "./inventory";
 import { entryStat, readBounded, RENDERER_BASE_FILE, type BoundedRead } from "./profile";
@@ -91,7 +92,7 @@ export const SYSTEMD_SHOW_PROPERTIES = [
 
 /** The properties the ONE classification `show` over unregistered units asks for. Narrower still. */
 export const SYSTEMD_CLASSIFY_PROPERTIES = [
-  "Id", "LoadState", "UnitFileState", "ActiveState", "SubState", "Description", "Environment", "FragmentPath",
+  "Id", "Names", "LoadState", "UnitFileState", "ActiveState", "SubState", "Description", "Environment", "FragmentPath",
 ] as const;
 
 /**
@@ -1035,7 +1036,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   // provisioner at a unit the contract does not name.
   if (input.storedGatewayUnit !== null && input.storedGatewayUnit !== "" && input.storedGatewayUnit !== gatewayUnit) {
     topologyItems.push({ path: unitWord(input.storedGatewayUnit), kind: "misnamed-gateway", desired: gatewayUnit, observed: unitWord(input.storedGatewayUnit), detail: `misnamed-gateway:${unitWord(input.storedGatewayUnit)}` });
-    if (loaded(input.storedGatewayUnit)) extra.push({ unit: input.storedGatewayUnit, class: "duplicate-gateway" });
+    if (!isRetiredHeartbeat(input.storedGatewayUnit) && loaded(input.storedGatewayUnit)) extra.push({ unit: input.storedGatewayUnit, class: "duplicate-gateway" });
   }
   // A second gateway-named unit for this agent: two gateways racing one channel.
   // SORTED, because the listing arrives in whatever order the manager chose and
@@ -1373,8 +1374,20 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
     reason: result.outcome === "ok" ? null : result.outcome === "timeout" ? "show-timeout" : "show-failed",
   };
   const shown = result.outcome === "ok" ? parseShowBlocks(result.value ?? "") : new Map<string, Map<string, string[]>>();
+  // Id is canonical even when show was requested by an alias. Names must
+  // correlate that alias to exactly one block; overlapping claims are uncertain.
+  const correlated = new Map<string, Sample>();
+  for (const unit of kept) {
+    const matches = [...shown.entries()].filter(([id, sample]) => id === unit || all(sample, "Names").some((names) => names.split(/\s+/u).includes(unit)));
+    const sample = matches.length === 1 ? matches[0]![1] : null;
+    const ids = all(sample, "Id");
+    const names = all(sample, "Names");
+    const validIdentity = ids.length === 1 && UNIT_NAME.test(ids[0]!)
+      && (ids[0] === unit || (names.length === 1 && names[0]!.split(/\s+/u).includes(ids[0]!)));
+    correlated.set(unit, validIdentity ? sample : null);
+  }
   if (result.outcome === "ok" && kept.some((unit) => {
-    const sample = shown.get(unit) ?? null;
+    const sample = correlated.get(unit) ?? null;
     return sample === null || SYSTEMD_REQUIRED_PROPERTIES.some((key) => {
       const values = all(sample, key);
       return values.length !== 1 || (values[0] !== "" && !WORD.test(values[0]!)) || (key !== "UnitFileState" && values[0] === "");
@@ -1387,7 +1400,7 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
   const retiredPatterns = ctx.retired.flatMap((mode) => mode.detect.map((pattern) => ({ id: mode.id, pattern })));
 
   const items: FleetStatusSystemdUnregisteredItem[] = kept.map((unit) => {
-    const sample = shown.get(unit) ?? null;
+    const sample = correlated.get(unit) ?? null;
     const listed = shared.listing.units.get(unit);
     const observed = unitView(unit, sample);
     const fileState = shared.listing.files.get(unit) ?? observed.unit_file;
@@ -1419,10 +1432,7 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
     if (retiredHit !== undefined) {
       return { ...view, class: "retired", correlated_profile: null, process_reference: "unobserved", guidance: "retirement", detail: `retired:${word(retiredHit.id)}` };
     }
-    const retiredCandidate = ctx.manifest.unregistered.retired_candidates.find((pattern) => {
-      const escaped = pattern.split("{agent_id}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("[a-z0-9][a-z0-9_-]{0,63}");
-      return new RegExp(`^${escaped}$`, "u").test(unit);
-    });
+    const retiredCandidate = ctx.manifest.unregistered.retired_candidates.find((pattern) => matchesRetiredCandidate(pattern, unit));
     if (retiredCandidate !== undefined) {
       return { ...view, class: "retired", correlated_profile: null, process_reference: "unobserved", guidance: "retirement", detail: "retired:candidate" };
     }
@@ -1487,7 +1497,10 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
       if (unit !== null && !isRetiredHeartbeat(pattern)) { interest.add(unit); owned.add(unit); }
     }
     for (const stored of [agent.storedGatewayUnit]) {
-      if (stored !== null && stored !== "" && UNIT_NAME.test(stored)) { interest.add(stored); owned.add(stored); }
+      if (stored !== null && stored !== "" && UNIT_NAME.test(stored)) {
+        interest.add(stored);
+        if (!isRetiredHeartbeat(stored)) owned.add(stored);
+      }
     }
   }
   // Every REGISTERED agent's canonical names are owned even when this run did

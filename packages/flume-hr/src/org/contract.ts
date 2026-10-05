@@ -42,6 +42,7 @@ import {
   FLEET_SCAFFOLD_MANIFEST_KEYS,
   FLEET_SCAFFOLD_PRESENCE_ONLY_KEYS,
   FLEET_SERVICE_MANIFEST_ENTRYPOINT_KEYS,
+  FLEET_SERVICE_MANIFEST_HEARTBEAT_KEYS,
   FLEET_SERVICE_MANIFEST_KEYS,
   FLEET_SERVICE_MANIFEST_LIMITS_KEYS,
   FLEET_SERVICE_MANIFEST_MESSAGING_KEYS,
@@ -78,6 +79,21 @@ const FLEET_CONTRACT_MAX_BYTES = 1_048_576;
 const DOCUMENT_PATH = "contract";
 
 const SEMVER = /^\d+\.\d+\.\d+$/u;
+
+/** Retirement became required in 1.5; supported older handbooks keep their grammar. */
+function heartbeatRetirementRequired(version: unknown): boolean {
+  if (typeof version !== "string" || !SEMVER.test(version)) return false;
+  const [major, minor] = version.split(".").map(Number);
+  return major! > 1 || (major === 1 && minor! >= 5);
+}
+
+/** Match the same safe employee ID at every placeholder, as derive() substitutes it. */
+export function matchesRetiredCandidate(pattern: string, unit: string): boolean {
+  const parts = pattern.split("{agent_id}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  if (parts.length < 2) return false;
+  const expression = parts[0] + "(?<agent_id>[a-z0-9][a-z0-9_-]{0,63})" + parts.slice(1).join("\\k<agent_id>");
+  return new RegExp(`^${expression}$`, "u").test(unit);
+}
 const OWNER_NAME = /^[a-z][a-z0-9-]*$/u;
 const ENV_KEY = /^[A-Z][A-Z0-9_]*$/u;
 const DIRECTION = /^[a-z0-9_]+_to_[a-z0-9_]+$/u;
@@ -668,6 +684,7 @@ function validateStructure(policy: Record<string, unknown>, extensions: readonly
       });
     });
     for (const id of FLEET_RETIRED_IDS) {
+      if (id === "per-agent-heartbeat" && !heartbeatRetirementRequired(policy.contract_version)) continue;
       if (!ids.has(id)) fail("retired", `retired must declare the superseded mode ${id}`);
     }
   }
@@ -750,6 +767,21 @@ function validateClassifications(contract: FleetContract): FleetDiagnostic[] {
 
 function validateRetiredModes(contract: FleetContract): FleetDiagnostic[] {
   const findings: FleetDiagnostic[] = [];
+
+  if (heartbeatRetirementRequired(contract.contract_version)) {
+    const detectors = contract.retired.flatMap((mode) => mode.detect.map((pattern) => new RegExp(pattern, "u")));
+    const unregistered = contract.service_manifest?.unregistered;
+    for (const suffix of ["service", "timer"]) {
+      const unit = `hermes-x-heartbeat.${suffix}`;
+      const detected = detectors.some((pattern) => pattern.test(unit));
+      const candidate = Array.isArray(unregistered?.retired_candidates) && unregistered.retired_candidates.some((pattern) => typeof pattern === "string" && matchesRetiredCandidate(pattern, unit));
+      const swept = typeof unregistered?.unit_glob === "string" && rootEntryGlob(unregistered.unit_glob).test(unit);
+      if (!detected && !(candidate && swept)) findings.push({
+        code: "INVALID_INPUT", path: "retired",
+        message: `heartbeat retirement must detect ${unit} through declared detectors or swept retired candidates`,
+      });
+    }
+  }
 
   // No key means enabled. Default-deny is RETIRED: an absent flag that read as
   // "disabled" is exactly how an accidental re-provision that dropped the key
@@ -1427,7 +1459,8 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
     return out;
   };
 
-  closed(block, "service_manifest", FLEET_SERVICE_MANIFEST_KEYS);
+  const historical = !heartbeatRetirementRequired(policy.contract_version);
+  closed(block, "service_manifest", historical ? [...FLEET_SERVICE_MANIFEST_KEYS, "heartbeat"] : FLEET_SERVICE_MANIFEST_KEYS);
   const declared = declaredWritableFields(policy);
   const requireDeclared = (leaf: string, at: string): void => {
     if (!declared.has(leaf)) fail(at, `${leaf} is not declared writable by any authority`);
@@ -1526,6 +1559,19 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
     perPlatform(messaging.identity_fields, "service_manifest.messaging.identity_fields", (item, where) => {
       if (!IDENTIFIER.test(item)) fail(where, "an identity field must be a lower-case identifier");
     });
+  }
+
+  // -- heartbeat ----------------------------------------------------------------
+  const heartbeat = block.heartbeat;
+  if (historical && closed(heartbeat, "service_manifest.heartbeat", FLEET_SERVICE_MANIFEST_HEARTBEAT_KEYS)) {
+    wholeNumber(heartbeat.on_boot_sec, "service_manifest.heartbeat.on_boot_sec", 1, 86_400, "on_boot_sec");
+    wholeNumber(heartbeat.on_unit_inactive_sec, "service_manifest.heartbeat.on_unit_inactive_sec", 1, 86_400, "on_unit_inactive_sec");
+    wholeNumber(heartbeat.overdue_multiplier, "service_manifest.heartbeat.overdue_multiplier", 1, 1_000, "overdue_multiplier");
+    wholeNumber(heartbeat.max_tick_seconds, "service_manifest.heartbeat.max_tick_seconds", 1, 86_400, "max_tick_seconds");
+    for (const key of ["reconcile_policy_file", "reconcile_state_file"] as const) {
+      const value = heartbeat[key];
+      if (!relativeInside(value) || value.endsWith("/")) fail(`service_manifest.heartbeat.${key}`, `${key} must be a role-relative file path`);
+    }
   }
 
   // -- unregistered -------------------------------------------------------------

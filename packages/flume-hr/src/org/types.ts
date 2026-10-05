@@ -120,6 +120,10 @@ export const FLEET_PROFILE_MANIFEST_LIMITS_KEYS = ["max_file_bytes", "max_root_e
  * shapes, and the caps every read is bounded by.
  */
 export const FLEET_SERVICE_MANIFEST_KEYS = ["stabilization", "probe", "entrypoint", "messaging", "unregistered", "limits"] as const;
+/** Schedule grammar retained only for handbooks predating heartbeat retirement. */
+export const FLEET_SERVICE_MANIFEST_HEARTBEAT_KEYS = [
+  "on_boot_sec", "on_unit_inactive_sec", "overdue_multiplier", "max_tick_seconds", "reconcile_policy_file", "reconcile_state_file",
+] as const;
 export const FLEET_SERVICE_MANIFEST_STABILIZATION_KEYS = ["samples", "interval_ms"] as const;
 export const FLEET_SERVICE_MANIFEST_PROBE_KEYS = ["timeout_ms", "env_allowlist", "manager_available_states"] as const;
 export const FLEET_SERVICE_MANIFEST_ENTRYPOINT_KEYS = ["launcher", "pinned_bin_field", "home_env"] as const;
@@ -446,6 +450,15 @@ export interface FleetServiceManifest {
     enabled_path: string;
     secret_env: Record<string, string[]>;
     identity_fields: Record<string, string[]>;
+  };
+  /** Historical pre-1.5 policy, validated on load but never required by the observer. */
+  heartbeat?: {
+    on_boot_sec: number;
+    on_unit_inactive_sec: number;
+    overdue_multiplier: number;
+    max_tick_seconds: number;
+    reconcile_policy_file: string;
+    reconcile_state_file: string;
   };
   unregistered: {
     unit_glob: string;
