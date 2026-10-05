@@ -1,0 +1,47 @@
+{
+  "verdict": "PASS_SEAM_ONLY",
+  "ingress": "isolated Hermes AIAgent fallback seam (not multiplexed Bloodbank)",
+  "consumer": "hermes-flume-pm",
+  "marker": "AAI_ROUTE_PROOF_5dfa0cf0a9e5b690369021babc832429",
+  "effective_chain": [
+    "automaticai/personal/sol-6.1",
+    "automaticai/personal/glm-5.3",
+    "automaticai/personal/kimi-2.8"
+  ],
+  "failure_injection": "primary client HTTP 503 simulated at isolated desk transport; no server mutation",
+  "authenticated_models_verified": true,
+  "activated_model": "automaticai/personal/glm-5.3",
+  "outgoing_effort": {
+    "reasoning_effort": null,
+    "extra_body": null
+  },
+  "response_completed": true,
+  "receipts": [
+    {
+      "log_id": 69879,
+      "request_id": "202610050350196487012018268d9d6Yv0xCfMk",
+      "created_at": 1791172223,
+      "token_name": "aai:hermes-flume-pm:1790777406434714921",
+      "session_id": "",
+      "route": "automaticai/personal/glm-5.3",
+      "account": "zai-personal",
+      "native_model": "glm-5.3",
+      "channel": 9,
+      "requested_effort": "max",
+      "effective_effort": "max",
+      "prompt_tokens": 44,
+      "completion_tokens": 145,
+      "quota": 0,
+      "group_ratio": 1,
+      "model_ratio": 0,
+      "effort_defaulted": true,
+      "outgoing_reasoning_effort": "max"
+    }
+  ],
+  "provenance": {
+    "recorded_at": "2026-10-05T03:50:24.398Z",
+    "rollout_id": "01a0fd4b-f4df-7851-91ec-9b467ef27325",
+    "recovered_at": "2026-10-05",
+    "scope": "Historical completed live request; no rerun or gateway mutation during recovery"
+  }
+}
