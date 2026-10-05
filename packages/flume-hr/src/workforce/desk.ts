@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync, type Dirent } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import YAML from "yaml";
@@ -291,7 +291,8 @@ export async function provisionDesk(
   try {
     const contractPath = join(deskPath, "contract.yaml");
     const { resolvedSkills: _, ...cleanContract } = resolvedContract as unknown as { resolvedSkills?: unknown };
-    writeFileSync(contractPath, YAML.stringify(cleanContract), "utf8");
+    const rendered = YAML.stringify(cleanContract);
+    if (!existsSync(contractPath) || readFileSync(contractPath, "utf8") !== rendered) writeFileSync(contractPath, rendered, "utf8");
   } catch (err) {
     throw new Error(
       `Filesystem error writing contract.yaml at "${deskPath}": ${err instanceof Error ? err.message : String(err)}`,
@@ -299,7 +300,7 @@ export async function provisionDesk(
   }
 
   // 6. Log reconciliation counts
-  console.log(
+  if (!options.quiet) console.log(
     `[workforce] Desk provisioned at ${deskPath}: ${created} created, ${updated} updated, ${preserved} preserved, ${removed} removed`,
   );
 

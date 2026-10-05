@@ -46,6 +46,8 @@ export interface ResolvedNamedAgentContract extends NamedAgentContract {
 }
 
 export interface DeskProvisionOptions {
+  /** Suppress human progress for callers returning structured results. */
+  quiet?: boolean;
   /** Override the desk root directory (e.g. for testing) */
   deskRoot?: string;
   /** Override the skillex registry root (e.g. for testing) */

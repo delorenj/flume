@@ -15,11 +15,11 @@ import { resolveTemplateConfigPath } from "./EnsureTemplateConfig";
 const FLEET_REGISTRY_ENV = String.raw`
 builtin source "$1"
 load_fleet_environment "$2" "$3" || exit 1
-python3 -I -c 'import json, os; print(json.dumps({k: os.environ.get(k) for k in ("REGISTRY_FILE", "HERMES_FLEET_REGISTRY_FILE")}))'
+python3 -I -c 'import json, os; print(json.dumps({k: os.environ.get(k) for k in ("REGISTRY_FILE", "HERMES_FLEET_REGISTRY_FILE", "HERMES_FLEET_BIN")}))'
 `;
 
 /** Resolve the registry used by template tasks, then pin it in their environment. */
-export function copierRegistryPath(env: NodeJS.ProcessEnv): string {
+export function copierFleetPaths(env: NodeJS.ProcessEnv): { registryPath: string; fleetBin?: string } {
   const home = env.HOME || homedir();
   const expand = (path: string) => path.startsWith("~/") ? join(home, path.slice(2)) : path;
   const config = env.HERMES_TEMPLATE_CONFIG || resolveTemplateConfigPath();
@@ -36,8 +36,13 @@ export function copierRegistryPath(env: NodeJS.ProcessEnv): string {
     { encoding: "utf8", env, timeout: 5_000, maxBuffer: 1024 * 1024 });
   if (parsed.error || parsed.status !== 0) throw new Error(`Fleet environment: ${parsed.error?.message || parsed.stderr.trim() || `loader exited ${parsed.status}`}`);
   const effective = JSON.parse(parsed.stdout) as Record<string, string | undefined>;
-  return expand(effective.REGISTRY_FILE || env.HERMES_AGENTS_REGISTRY || effective.HERMES_FLEET_REGISTRY_FILE
-    || configPath("registry_file") || join(home, ".hermes", "agents-registry.yaml"));
+  const bin = effective.HERMES_FLEET_BIN || configPath("hermes_bin");
+  return { registryPath: expand(effective.REGISTRY_FILE || env.HERMES_AGENTS_REGISTRY || effective.HERMES_FLEET_REGISTRY_FILE
+    || configPath("registry_file") || join(home, ".hermes", "agents-registry.yaml")), ...(bin ? { fleetBin: expand(bin) } : {}) };
+}
+
+export function copierRegistryPath(env: NodeJS.ProcessEnv): string {
+  return copierFleetPaths(env).registryPath;
 }
 
 function document(path: string) {
@@ -100,6 +105,17 @@ function publish(path: string, rendered: string, mode: number): void {
     if (fd !== undefined) closeSync(fd);
     rmSync(temporary, { force: true });
   }
+}
+
+/** Caller holds withRegistryLock: preserve nodes/comments and publish atomically. */
+export function updateRegistryDocumentUnlocked(path: string, edit: (doc: ReturnType<typeof YAML.parseDocument>) => void): boolean {
+  const current = existsSync(path) ? document(path) : { doc: YAML.parseDocument("schema_version: 1\nagents: {}\n"), source: "", mode: 0o600 };
+  if (!YAML.isMap(current.doc.get("agents", true))) throw new Error(`Registry agents must be a mapping: ${path}`);
+  edit(current.doc);
+  const rendered = String(current.doc);
+  if (rendered === current.source) return false;
+  publish(path, rendered, current.mode);
+  return true;
 }
 
 /** Copier releases its lock before restoration acquires the same lock. */

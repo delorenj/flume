@@ -2,7 +2,7 @@
 title: 'FLUME-29: hire and carry a named specialist between working directories'
 type: feature
 created: '2026-10-05'
-status: in-progress
+status: in-review
 route: dispatch
 baseline_commit: 259c3db7edb7cc03f5b3090f91fabc26d2ad9bc5
 review_loop_iteration: 0
@@ -50,11 +50,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `packages/flume-hr/src/workforce/specialist.ts` and `index.ts` — validate, hire, refresh, audit and launch a portable definition using existing domain APIs.
-- [ ] `templates/hermes-agent/scripts/hermes-specialist-profile.py` and template tests — render owned charter/config/memory/profile metadata safely and deterministically; keep unrelated template WIP untouched.
-- [ ] `contracts/handbook.yaml` and `org/inventory.ts` — project explicit specialist records with no fake repository or board.
-- [ ] `examples/employees/` and `docs/named-specialists.md` — supply both inaugural definitions and documented commands; select existing canonical infrastructure/n8n skills through reference-only Skillex composition.
-- [ ] `tests/specialist-hire-regressions.mjs` and `scripts/run-tests.mjs` — exercise actual built CLI, refusal, refresh, comments, concurrency/ownership, strict skills and arbitrary-CWD launch.
+- [x] `packages/flume-hr/src/workforce/specialist.ts` and `index.ts` — validate, hire, refresh, audit and launch a portable definition using existing domain APIs.
+- [x] `templates/hermes-agent/scripts/hermes-specialist-profile.py` and template tests — render owned charter/config/memory/profile metadata safely and deterministically; keep unrelated template WIP untouched.
+- [x] `contracts/handbook.yaml` and `org/inventory.ts` — project explicit specialist records with no fake repository or board.
+- [x] `examples/employees/` and `docs/named-specialists.md` — supply both inaugural definitions and documented commands; select existing canonical infrastructure/n8n skills through reference-only Skillex composition.
+- [x] `tests/specialist-hire-regressions.mjs` and `scripts/run-tests.mjs` — exercise actual built CLI, refusal, refresh, comments, concurrency/ownership, strict skills and arbitrary-CWD launch.
 - [ ] `_bmad-output/implementation-artifacts/FLUME-29/` — capture separate source, installed-profile, launch and memory evidence; review, integrate, push and verify vault copies.
 
 **Acceptance Criteria:**
@@ -66,6 +66,8 @@ context:
 ## Implementation Notes
 
 Source implementation is assigned through BMAD; the parent owns operator deployment and live acceptance. Use the clean nested template checkout or an isolated checkout for additive template code, preserving the unrelated project-skills WIP in the canonical working directory. Operator approval already covers the confirmed specialist design and this implementation run.
+
+Source is ready for parent integration and independent review. The dashboard deployment blocker is covered by an owned disabled/empty profile projection; the shared base is unchanged. Launch honors the trusted declared Hermes runtime and refuses unavailable pins. Parent owns the reference-only Skillex catalog commit `db98edb`, installation, runtime inspection and live acceptance. Both employees currently lack their own AutomaticAI member token, so FLUME-39 remains an explicit deployment dependency. Source verification is recorded in `FLUME-29/source-verification.md`; the combined operational evidence task remains open.
 
 ## Spec Change Log
 

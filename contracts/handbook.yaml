@@ -113,6 +113,10 @@ authorities:
       - agents.{agent_id}.department
       - agents.{agent_id}.reports_to
       - agents.{agent_id}.type
+      # Portable employment is explicit; an owning desk is never a project.
+      - agents.{agent_id}.employment
+      - agents.{agent_id}.definition_path
+      - agents.{agent_id}.desk_path
       # A travelling named agent keeps this identity when the profile/post
       # changes. The SOURCE is the role's role.yaml `identity:` block
       # (name, write_bank: agent-<name>, recall_banks); 80-registry.sh and

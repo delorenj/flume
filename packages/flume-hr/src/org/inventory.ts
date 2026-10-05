@@ -870,6 +870,10 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   // layer hard-coding hermes, so a row that does not state one is `unresolved`
   // and never silently reported as a Hermes agent.
   const type = scalar("type", "agents.{agent_id}.type");
+  const employment = scalar("employment", "agents.{agent_id}.employment");
+  const definitionPath = scalar("definition_path", "agents.{agent_id}.definition_path");
+  const deskPath = scalar("desk_path", "agents.{agent_id}.desk_path");
+  const portable = employment.value === "portable-specialist";
   const projectPath = scalar("project_path", "agents.{agent_id}.project_path");
   const roleDir = scalar("role_dir", "agents.{agent_id}.role_dir");
   const profileName = scalar("profile_name", "agents.{agent_id}.profile_name");
@@ -886,30 +890,31 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   // `resolve()` would silently anchor it to whatever directory the operator
   // happened to be standing in, making correlation depend on the caller's cwd.
   // `classifyPath` has already reported it as `relative`.
-  if (projectPath.value) {
+  if (portable && (projectPath.value || repo.value)) note("specialist-project-binding", "agents.{agent_id}.employment", employment.source, "error", "Portable specialist must not declare repository/project binding");
+  if (!portable && projectPath.value) {
     const expanded = expandHome(projectPath.value, ctx.home);
     if (isAbsolute(expanded)) {
       correlated = ctx.projectsByRepoPath.get(resolve(expanded));
       if (correlated) basis = "project_path";
     }
   }
-  if (!correlated && repo.value) {
+  if (!portable && !correlated && repo.value) {
     correlated = ctx.projectsBySlug.get(repo.value.toLowerCase());
     if (correlated) basis = "repo";
   }
 
   const projectId = correlated
     ? field(bounded(correlated.slug), projectSlugOwner, "resolved")
-    : unresolved<string>(projectSlugOwner);
+    : portable ? field<string>(null, employment.source, "resolved") : unresolved<string>(projectSlugOwner);
   const repoPathValue = correlated?.repoPath ?? null;
   const repoPath = repoPathValue
     ? field(shownPath(repoPathValue), repoPathOwner, "resolved")
     : unresolved<string>(repoPathOwner);
   const correlation = basis
     ? field(basis, projectSlugOwner, "resolved")
-    : unresolved<string>(projectSlugOwner);
+    : portable ? field("portable-specialist", employment.source, "resolved") : unresolved<string>(projectSlugOwner);
 
-  if (!correlated) {
+  if (!correlated && !portable) {
     note("project-record-missing", "projects.{slug}.repo_path", repoPathOwner, "warn",
       `no project record matches ${projectPath.value ? shownPath(projectPath.value) : "an undeclared project_path"}`);
   }
@@ -921,6 +926,14 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
       `project_path is ${paths.project_path.classification}`);
   }
   paths.role_dir = classifyPath(roleDir.value, { directory: true });
+  if (portable) {
+    paths.desk_path = classifyPath(deskPath.value, { directory: true });
+    paths.definition_path = classifyPath(definitionPath.value, { root: deskPath.value, directory: false });
+    if (identity.value !== agentId || profileName.value !== agentId || deskPath.value !== join(ctx.home, ".agents/workforce", agentId) || definitionPath.value !== (deskPath.value ? join(deskPath.value, "agent.yaml") : null)) {
+      note("specialist-employment-invalid", "agents.{agent_id}.employment", employment.source, "error", "Portable specialist identity, owning desk, definition and profile must agree");
+    }
+    if (paths.desk_path.classification !== "ok" || paths.definition_path.classification !== "ok") note("specialist-desk-unusable", "agents.{agent_id}.desk_path", deskPath.source, "warn", "Portable specialist desk or definition is unavailable");
+  }
   if (roleDir.value && paths.role_dir.classification !== "ok") {
     note("role-dir-unusable", "agents.{agent_id}.role_dir", roleDir.source, "warn",
       `role_dir is ${paths.role_dir.classification}`);
@@ -967,7 +980,8 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   // -- expected owned unit names (EXPECTED, never probed) --------------------
   const unitOwner = own.ownerOf("agents.{agent_id}.systemd.gateway_unit");
   let expectedUnits: FleetFieldValue<string[]>;
-  if (idSafe && ctx.unitPatterns.length) {
+  if (portable) expectedUnits = field([], employment.source, "resolved");
+  else if (idSafe && ctx.unitPatterns.length) {
     // `replaceAll`: a pattern is operator-authored, and a second `{agent_id}`
     // would otherwise survive literally into a name reported as expected.
     const names = ctx.unitPatterns.map((pattern) => bounded(pattern.replaceAll("{agent_id}", agentId)));
@@ -1001,7 +1015,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   const board = binding.identifier || binding.project_id || binding.workspace
     ? field(binding, boardOwner, "resolved")
     : unresolved<FleetBoardBinding>(boardOwner);
-  if (!board.value) {
+  if (!board.value && !portable) {
     note("board-binding-missing", "agents.{agent_id}.plane.identifier", boardOwner, "info",
       "the agent row stores no board binding");
   }
@@ -1110,6 +1124,9 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     role,
     identity,
     type,
+    employment,
+    definition_path: definitionPath,
+    desk_path: portable && paths.desk_path?.classification !== "ok" ? { ...deskPath, state: "unresolved" } : deskPath,
     role_dir: roleDir.value
       ? field(shownPath(roleDir.value), roleDir.source, paths.role_dir.classification === "ok" ? "resolved" : "unresolved")
       : roleDir,
@@ -1805,7 +1822,7 @@ export function collectFleetInventory(options: FleetInventoryOptions = {}): Flee
     return true;
   }).length;
   const unresolvedRows = allRows.filter((row) => (
-    row.project_id.state !== "resolved" || row.profile_path.state !== "resolved" || row.role_dir.state !== "resolved"
+    row.project_id.state !== "resolved" || row.profile_path.state !== "resolved" || (row.employment.value === "portable-specialist" ? row.desk_path.state !== "resolved" : row.role_dir.state !== "resolved")
   )).length;
 
   const totals: FleetInventoryTotals = {

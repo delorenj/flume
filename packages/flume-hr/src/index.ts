@@ -26,6 +26,9 @@ import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
+import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 const program = new Command();
 const commandArgs = process.argv.slice(2);
@@ -56,6 +59,8 @@ program
   .command("hire")
   .argument("[title]", "Job title to hire for", "pm")
   .description("Bring on a new employee for this repository, and prove they are seated")
+  .option("--definition <file>", "Hire a portable specialist from its named definition")
+  .option("--json", "Output machine-parseable JSON")
   .option("-y, --yes", "Non-interactive defaults; never overwrites an existing role without --force")
   .option("--target-repo <name>", "Target repo name (default: basename of cwd)")
   .option("--purpose <text>", "One-line purpose (default: \"pm agent for <repo>\")")
@@ -74,6 +79,7 @@ program
   .option("--dry-run", "Preview what would run; don't execute copier")
   .option("-f, --force", "Re-render even if agents/hermes/<title>/role.yaml already exists")
   .action(async (title: string, options) => {
+    if (options.definition) { await specialistResult(() => hireSpecialist(options.definition, false, options), options.json); return; }
     await runHire(title, options);
   });
 
@@ -81,6 +87,9 @@ program
   .command("onboard")
   .argument("[title]", "Job title to onboard", "pm")
   .description("Re-run the onboarding checklist for an existing employee; convergent by contract")
+  .option("--definition <file>", "Refresh a portable specialist from a changed definition")
+  .option("--employee <id>", "Refresh the owning workforce agent.yaml")
+  .option("--json", "Output machine-parseable JSON")
   .option("-y, --yes", "Non-interactive defaults", true)
   .option("--target-repo <name>", "Target repo name (default: basename of cwd)")
   .option("--skip-telegram", "Skip the Telegram wire-up")
@@ -89,11 +98,44 @@ program
   .option("--local", "Local-only: defer ticket-board creation and systemd")
   .option("--dry-run", "Preview what would run; don't execute copier")
   .action(async (title: string, options) => {
+    if (options.definition || options.employee) {
+      if (options.employee && !/^[a-z0-9][a-z0-9_-]{0,57}$/u.test(options.employee)) {
+        await specialistResult(async () => { throw new Error("Unsafe employee identity"); }, options.json); return;
+      }
+      if (options.employee && options.definition) {
+        await specialistResult(async () => { throw new Error("Choose --employee or --definition"); }, options.json); return;
+      }
+      const path = options.definition || join(process.env.HOME || homedir(), ".agents/workforce", options.employee, "agent.yaml");
+      await specialistResult(() => hireSpecialist(path, true, options), options.json); return;
+    }
     // Onboarding IS hiring, run again. Every step is marker-guarded and the
     // registry write is an upsert, so a second pass is a no-op that proves the
     // first one held. `--force` is deliberately not offered: onboarding an
     // employee must never be a way to overwrite one.
     await runHire(title, { ...options, yes: true, force: false, onboard: true });
+  });
+
+async function specialistResult(action: () => Promise<unknown>, json: boolean): Promise<void> {
+  guardBrokenPipe();
+  try {
+    const result = await action() as { ok: boolean };
+    await writeStdout(`${JSON.stringify(result, null, json ? 2 : undefined)}\n`);
+    process.exitCode = result.ok ? 0 : 1;
+  } catch (error) {
+    const result = { ok: false, standing: "unable to assess", error: (error as Error).message };
+    await writeStdout(`${JSON.stringify(result, null, json ? 2 : undefined)}\n`);
+    process.exitCode = 1;
+  }
+}
+
+program.command("launch")
+  .argument("<employee>", "Portable specialist identity")
+  .argument("[hermesArgs...]", "Hermes CLI arguments following --")
+  .option("--cwd <directory>", "Working directory (default: caller's current directory)")
+  .description("Launch Hermes with a portable employee's charter, loadout and personal memory")
+  .action(async (employee: string, args: string[], options) => {
+    try { process.exitCode = await launchSpecialist(employee, args, options.cwd); }
+    catch (error) { console.error((error as Error).message); process.exitCode = 1; }
   });
 
 async function runHire(title: string, options: Record<string, unknown>): Promise<void> {
@@ -184,6 +226,7 @@ program
   .command("audit")
   .argument("[repo]", "Repository to audit (default: cwd)")
   .description("Compliance audit: every employee invariant this repository is subject to")
+  .option("--employee <id>", "Audit an owned portable specialist without a repository")
   .option("--rules <ids>", "Comma-separated rule ids; report only these")
   .option("--json", "Output machine-parseable JSON")
   // `guardBrokenPipe` BEFORE the first write, and `writeStdout` + a flushing
@@ -198,6 +241,7 @@ program
   // stop reproducing, and it was reintroduced here by a plain
   // `process.stdout.write`.
   .action(async (repo: string | undefined, options) => {
+    if (options.employee) { await specialistResult(() => auditSpecialist(options.employee), options.json); return; }
     guardBrokenPipe();
     const ruleIds = String(options.rules ?? "").split(",").map((id: string) => id.trim()).filter(Boolean);
     const report = await runAudit(repo, undefined, ruleIds);

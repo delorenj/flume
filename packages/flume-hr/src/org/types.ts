@@ -679,6 +679,10 @@ export interface FleetInventoryRow {
    * agents by runtime type — hermes | claude | codex. This is that key.
    */
   type: FleetFieldValue<string>;
+  /** Explicit employment provenance, independent of project binding. */
+  employment: FleetFieldValue<string>;
+  definition_path: FleetFieldValue<string>;
+  desk_path: FleetFieldValue<string>;
   role_dir: FleetFieldValue<string>;
   profile_name: FleetFieldValue<string>;
   /** Explicit personal-bank declaration for a named agent, when present. */
