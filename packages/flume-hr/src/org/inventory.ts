@@ -755,15 +755,7 @@ function unitPatternsFrom(contract: FleetContract): string[] {
     .filter((value): value is string => typeof value === "string" && value.length > 0);
 }
 
-/**
- * The `gateway_unit` pattern specifically -- not "any of the three".
- *
- * Drift used to be judged against the whole `expected_units` array, which the
- * contract fills with the gateway service, the heartbeat service AND the
- * heartbeat timer. A registry that stored `hermes-x-heartbeat.timer` in
- * `systemd.gateway_unit` therefore reported no drift at all: the wrong unit, in
- * the right set. The contract names the roles; this reads the one it means.
- */
+/** The gateway pattern that the registry's systemd.gateway_unit must name. */
 function gatewayPatternFrom(contract: FleetContract): string | null {
   const perAgent = contract.service_model?.per_agent;
   if (!isRecord(perAgent)) return null;

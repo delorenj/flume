@@ -41,12 +41,10 @@ function deploymentDeferrals(ctx: HermesAgentContext): string[] {
   if (rolePath && existsSync(rolePath)) {
     try {
       const role = YAML.parse(readFileSync(rolePath, "utf8")) as {
-        service_state?: { gateway?: unknown; heartbeat?: unknown };
+        service_state?: { gateway?: unknown };
       } | null;
       const gateway = role?.service_state?.gateway;
-      const heartbeat = role?.service_state?.heartbeat;
       if (typeof gateway === "string" && gateway !== "active") deferred.push(`gateway (${gateway})`);
-      if (typeof heartbeat === "string" && heartbeat !== "active") deferred.push(`heartbeat (${heartbeat})`);
     } catch {
       deferred.push("service state unreadable");
     }

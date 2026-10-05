@@ -22,12 +22,7 @@
 #                 `scaffold.gitignore` means `.gitignore` and
 #                 `scaffold.sentinel.prompt.md` means `.scripts/sentinel.prompt.md`
 #                 -- the leaves name owned asset GROUPS, not store keys.
-#   units.*       systemd user units. Each leaf names ONE unit of the user
-#                 manager, with `{agent_id}` substituted: `units.hermes-{agent_id}-gateway.service`
-#                 is that agent's messaging gateway. The systemd observer samples
-#                 the manager itself (`systemctl --user show`) and reports every
-#                 leaf as an observation; `service_manifest` says how each is
-#                 proven and what the desired state is derived from.
+#   units.*       systemd user units
 #   processes.*   observed Hermes processes (read-only)
 #
 # Namespaced `x-` keys at any depth round-trip verbatim and are never
@@ -38,12 +33,12 @@
 # rather than be rejected as an unknown key, because rejecting it would hide the
 # very drift this contract exists to name.
 
-schema_version: 5
-contract_version: 1.5.0
+schema_version: 4
+contract_version: 1.3.0
 
 compatibility:
   min_schema_version: 1
-  max_schema_version: 5
+  max_schema_version: 4
 
 x-delonet/provenance:
   assessment: fleet-convergence-live-assessment-2026-08-31
@@ -54,22 +49,13 @@ authorities:
     owner: project-registry
     store: pjangler-project-registry
     store_env:
-      - PJ_REGISTRY_URL
       - PJ_PROJECT_REGISTRY
     notes:
-      - Each repository .project.json owns its case-insensitive project_id and
-        project-to-board binding.
-      - The singleton PostgreSQL registry indexes manifests for system-wide
-        queries.
-      - PJ_PROJECT_REGISTRY is an explicit file adapter for import and isolated
-        tests.
-      - The legacy slug field mirrors project_id; it is not a separate identity.
-      - Board provenance is indexed from the manifest, never owned by the agent
-        registry.
+      - Project identity and project-to-board binding.
+      - Board provenance fields exist only here, never in the agent registry.
     writable_fields:
       - projects.{slug}.name
       - projects.{slug}.slug
-      - projects.{slug}.project_id
       - projects.{slug}.repo_path
       - projects.{slug}.description
       - projects.{slug}.status
@@ -93,8 +79,8 @@ authorities:
       - projects.{slug}.updated_at
 
   agent_operational_records:
-    owner: agent-registry
-    store: agent-registry
+    owner: hermes-agent-registry
+    store: hermes-agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
@@ -109,26 +95,10 @@ authorities:
     writable_fields:
       - agents.{agent_id}.repo
       - agents.{agent_id}.role
-      # Role declaration projects these edges; subordinates are derived.
-      - agents.{agent_id}.department
-      - agents.{agent_id}.reports_to
-      - agents.{agent_id}.type
-      # A travelling named agent keeps this identity when the profile/post
-      # changes. The SOURCE is the role's role.yaml `identity:` block
-      # (name, write_bank: agent-<name>, recall_banks); 80-registry.sh and
-      # `flume remediate hermes.registry-parity` project it here. An unnamed
-      # post leaves it absent and keeps the profile-derived compatibility bank
-      # below. A PM post may be held by a named agent: the first is `grolf`,
-      # holding `33god-pm` (agent_id/profile stay the post's routing key).
-      - agents.{agent_id}.identity
       - agents.{agent_id}.display_name
       - agents.{agent_id}.project_path
       - agents.{agent_id}.role_dir
       - agents.{agent_id}.profile_name
-      - agents.{agent_id}.hindsight.write_bank
-      # Read-only history banks a named agent recalls explicitly (write bank
-      # first). The SOUL composer lists them; the memory provider does not.
-      - agents.{agent_id}.hindsight.recall_banks
       - agents.{agent_id}.provisioned_at
       - agents.{agent_id}.runtime_repo
       - agents.{agent_id}.telegram.provisioning_status
@@ -149,7 +119,7 @@ authorities:
 
   board_identity_projection:
     owner: project-registry
-    store: agent-registry
+    store: hermes-agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
@@ -165,49 +135,46 @@ authorities:
       - agents.{agent_id}.plane.project_id
       - agents.{agent_id}.plane.identifier
 
-  agent_profile_state:
-    owner: runtime-template
+  generated_profile_inputs:
+    owner: hermes-profile-renderer
     store: hermes-profile-tree
     store_env:
       - HERMES_FLEET_HOME
     notes:
-      - >-
-        The generated profile tree, whole. config.yaml is produced by
-        deep-merging the shared base with the per-profile config.delta.yaml and
-        is never hand-edited; the rest of config.delta.yaml is the
-        operator-owned override SSOT, and only the four fleet-owned dotted paths
-        below are rewritten.
-      - >-
-        PM desks are Skillex-only (skillex ADR-0001, Hermes PM amendment
-        2026-10-01). Step 10 writes config.delta.skills.external_dirs: []
-        through lib/skills-policy.py under the renderer lock; Skillex owns
-        skills/ and publishes the regular-file markers .no-bundled-skills and
-        .skillex-only in the profile root on its first strict sync, after which
-        every show and sync refuses any skills/ entry it does not own (Hermes
-        bookkeeping excepted) and any non-empty external_dirs.
-        hermes.delta-list-override exempts exactly that pin on a marked desk;
-        hermes.runtime-singleton fails a PM desk without the marker. Legacy
-        desks convert only through skillex scripts/hermes-skillex-cutover.py
-        (preview, then --apply).
-      - >-
-        Was two blocks -- generated_profile_inputs (the renderer) and
-        provisioned_profile_state (the provisioning step). Both resolved to the
-        same submodule under two invented owner names, and the split existed
-        only so `profiles.{profile_name}` would resolve to the renderer by
-        namespace majority, four leaves against three. One block needs no
-        tiebreak.
+      - config.yaml is generated by deep-merging the shared base with the
+        per-profile config.delta.yaml. It is never hand-edited.
+      - The rest of config.delta.yaml is the operator-owned override SSOT. Only
+        the three fleet-owned dotted paths listed here are rewritten by the
+        renderer.
     writable_fields:
       - profiles.{profile_name}.config.yaml
       - profiles.{profile_name}.config.delta.memory.provider
       - profiles.{profile_name}.config.delta.memory.memory_enabled
       - profiles.{profile_name}.config.delta.memory.user_profile_enabled
-      - profiles.{profile_name}.config.delta.skills.external_dirs
+
+  provisioned_profile_state:
+    owner: hermes-agent-template
+    store: hermes-profile-tree
+    store_env:
+      - HERMES_FLEET_HOME
+    notes:
+      - >-
+        The parts of a generated profile the template's provisioning scripts
+        write once and the renderer never touches: the identity file, the
+        explicit Hindsight bank pin, and the skill entries (six core skills
+        symlinked from the canonical projection, one copied by bytes).
+      - >-
+        Held apart from generated_profile_inputs so the renderer's three
+        rewritten leaves and the provisioner's three written leaves cannot be
+        claimed by one writer, and so `profiles.{profile_name}` still resolves
+        to the renderer by namespace majority (four leaves against three).
+    writable_fields:
       - profiles.{profile_name}.profile.yaml
       - profiles.{profile_name}.hindsight.config.json
       - profiles.{profile_name}.skills
 
   tracked_role_scaffold:
-    owner: runtime-template
+    owner: hermes-agent-template
     store: hermes-agent-role-scaffold
     store_env:
       - HERMES_TEMPLATE_RUNTIME_SCAFFOLD
@@ -227,42 +194,41 @@ authorities:
       - scaffold.runtime-scaffold
 
   systemd_lifecycle:
-    owner: runtime-template
+    owner: hermes-fleet-provisioner
     store: systemd-user-manager
     store_env:
       - XDG_CONFIG_HOME
     notes:
       - Unit files and the registry rows that name them are written by the
         provisioner, not by registry editing paths.
-      - >-
-        Every leaf below is OBSERVED by the systemd observer (story 1.8): the
-        per-agent gateway is sampled from the user manager over the window
-        `service_manifest.stabilization` declares, the gateway registry field is
-        compared against the name the contract derives, and the fleet-shared
-        gateway is correlated once per fleet-scope run. The DESIRED gateway
-        state is derived from the row's messaging declaration
-        (`telegram.provisioning_status` / `slack.provisioning_status`), never
-        read back from the unit.
     writable_fields:
       - units.hermes-{agent_id}-gateway.service
+      - units.hermes-{agent_id}-heartbeat.service
+      - units.hermes-{agent_id}-heartbeat.timer
       - units.hermes-fleet-bloodbank-gateway.service
       - agents.{agent_id}.systemd.gateway_unit
+      - agents.{agent_id}.systemd.heartbeat_timer
+
+  live_process_observations:
+    owner: fleet-observer
+    store: process-table
+    store_env: []
+    read_only: true
+    notes:
+      - Observation only. A process is attributed and classified; it is never
+        written to, and a drain is a separately authorized effect owned by a
+        later story.
+    writable_fields: []
 
   bloodbank_activation:
-    owner: agent-registry
-    store: agent-registry
+    owner: hermes-agent-registry
+    store: hermes-agent-registry
     store_env:
       - HERMES_AGENTS_REGISTRY
       - HERMES_FLEET_REGISTRY_FILE
     notes:
-      - The single field that can quarantine or grant execution authority. Held
-        apart from the operational records so routing metadata can never be
-        mistaken for the gate.
-      - No key means enabled (2026-09-22). An ABSENT bloodbank.enabled, in the
-        registry row or in role.yaml, means true; only an explicit YAML false
-        quarantines. A present non-boolean is invalid, treated as disabled, and
-        reported loudly. Absent-means-false silently disabled 33god-pm after an
-        accidental re-provision, which is why the default flipped.
+      - The single field that can grant execution authority. Held apart from the
+        operational records so discovery can never widen into dispatch.
     writable_fields:
       - agents.{agent_id}.bloodbank.enabled
 
@@ -270,37 +236,37 @@ projections:
   - field: project_repository_path
     source: projects.{slug}.repo_path
     target: agents.{agent_id}.project_path
-    direction: pjangler_project_registry_to_agent_registry
-    writable_by: agent-registry
+    direction: pjangler_project_registry_to_hermes_agent_registry
+    writable_by: hermes-agent-registry
 
   - field: project_slug
     source: projects.{slug}.slug
     target: agents.{agent_id}.repo
-    direction: pjangler_project_registry_to_agent_registry
-    writable_by: agent-registry
+    direction: pjangler_project_registry_to_hermes_agent_registry
+    writable_by: hermes-agent-registry
 
   - field: board_identifier
     source: projects.{slug}.ticket_provider.identifier
     target: agents.{agent_id}.plane.identifier
-    direction: pjangler_project_registry_to_agent_registry
+    direction: pjangler_project_registry_to_hermes_agent_registry
     writable_by: project-registry
 
   - field: board_id
     source: projects.{slug}.ticket_provider.board_id
     target: agents.{agent_id}.plane.project_id
-    direction: pjangler_project_registry_to_agent_registry
+    direction: pjangler_project_registry_to_hermes_agent_registry
     writable_by: project-registry
 
   - field: board_workspace
     source: projects.{slug}.ticket_provider.workspace
     target: agents.{agent_id}.plane.workspace
-    direction: pjangler_project_registry_to_agent_registry
+    direction: pjangler_project_registry_to_hermes_agent_registry
     writable_by: project-registry
 
   - field: agent_role_directory
     source: agents.{agent_id}.role_dir
     target: projects.{slug}.agents.{role}.role_dir
-    direction: agent_registry_to_pjangler_project_registry
+    direction: hermes_agent_registry_to_pjangler_project_registry
     writable_by: project-registry
 
 classifications:
@@ -331,7 +297,7 @@ classifications:
     entries:
       - id: fleet-bloodbank-gateway
         kind: shared-service
-        owner: runtime-template
+        owner: hermes-fleet-provisioner
         source: gateways.bloodbank
         lifecycle_state: managed
         rationale: One shared gateway owns Bloodbank command ingress fleet-wide.
@@ -341,7 +307,7 @@ classifications:
           - profile
       - id: fleet-shared-profile-base
         kind: shared-config
-        owner: runtime-template
+        owner: hermes-profile-renderer
         source: profiles.base.config.yaml
         lifecycle_state: managed
         rationale: Every generated profile config is a merge of this base.
@@ -361,35 +327,7 @@ classifications:
       - lifecycle_state
       - rationale
       - policy_domains
-    entries:
-      - id: intelliforia-shared-board
-        kind: shared-board
-        owner: operator
-        source: projects.{slug}.ticket_provider.board_id
-        lifecycle_state: intentionally-unmanaged
-        rationale: >
-          intelliforia and intelliforia-mobile were one monorepo and the team
-          never split the Trello board; both projects deliberately file against
-          board 687535e9873b89478afef689. Operator ruling 2026-10-02.
-        policy_domains:
-          - project-registry
-        participants:
-          - intelliforia
-          - intelliforia-mobile
-      - id: intelliforia-shared-identifier
-        kind: shared-board
-        owner: operator
-        source: projects.{slug}.ticket_provider.identifier
-        lifecycle_state: intentionally-unmanaged
-        rationale: >
-          The shared board's ticket prefix INT is claimed by both projects for
-          the same reason the board is: an ex-monorepo whose board was never
-          split. Operator ruling 2026-10-02.
-        policy_domains:
-          - project-registry
-        participants:
-          - intelliforia
-          - intelliforia-mobile
+    entries: []
 
   retired:
     notes:
@@ -422,6 +360,8 @@ classifications:
 service_model:
   per_agent:
     gateway_unit: hermes-{agent_id}-gateway.service
+    heartbeat_service: hermes-{agent_id}-heartbeat.service
+    heartbeat_timer: hermes-{agent_id}-heartbeat.timer
   fleet_shared:
     bloodbank_gateway_unit: hermes-fleet-bloodbank-gateway.service
     bloodbank_gateway_profile: fleet-bloodbank-gateway
@@ -449,12 +389,7 @@ health_policy:
   # no adapter exists for in this release. Generated-profile health is no longer
   # one of them: the profile observer (story 1.7) proves it through the
   # canonical renderer's own check, so `profile.render_generation` is answered
-  # rather than deferred. Neither is systemd topology: the systemd observer
-  # (story 1.8) samples the user manager itself, so `unit_topology` is answered
-  # too. THREE deferrals remain, not two: live-process attribution (owner 1.9)
-  # and Bloodbank routing liveness (owner 1.10), both whole-domain, plus the
-  # capability-level `release_provenance`/`fleet.registry_file` (owner 1.1) --
-  # that last one is easy to forget because its domain still reports verdicts.
+  # rather than deferred.
   required_domains:
     - registry
     - project_binding
@@ -470,6 +405,13 @@ health_policy:
   # it. Each entry authorizes ONE unsupported answer; it never authorizes
   # inferring the answer from something else.
   deferred_capabilities:
+    - domain: systemd
+      capability: unit_topology
+      reason: >-
+        No systemd observer exists in this release. The unit names reported for
+        an agent are the patterns service_model.per_agent derives, carried as
+        expectations and never as observations of the user manager.
+      owner_story: "1.8"
     - domain: live_process
       capability: process_attribution
       reason: >-
@@ -652,12 +594,8 @@ profile_manifest:
       - ui_meta
     inert_keys:
       - config
-  # The explicit bank pin. A generic `bank_id_template` never satisfies it for
-  # a real profile. It remains the compatibility default for unnamed posts;
-  # travelling named agents declare their personal bank (always agent-<name>,
-  # never agent-<post>) in role.yaml `identity:`, projected to
-  # agents.{agent_id}.hindsight.write_bank, so a post change does not move it.
-  # The two reserved ids are what the resolver falls back to when identity is
+  # The explicit bank pin. A generic `bank_id_template` never satisfies it, and
+  # the two reserved ids are what the resolver falls back to when identity is
   # lost -- a profile pinned to either shares its private memory.
   memory:
     pin_file: hindsight/config.json
@@ -665,16 +603,21 @@ profile_manifest:
     reserved_bank_ids:
       - custom
       - hermes
-  # Optional fleet byte-policy, separate from Skillex activation health. The
-  # default imposes no global projection or fixed skill list: project/global
-  # .agents/skills.json manifests define the selection. PM desks are
-  # Skillex-only (see agent_profile_state): no profile-local, bundled or
-  # external skills, so nothing local takes precedence over the selection.
+  # The six skills every deployed PM runs, by BYTES: a skill is present when a
+  # `SKILL.md` reachable through the profile's `skills` entry or the generated
+  # config's `skills.external_dirs` resolves inside an allowed root and equals
+  # the canonical copy. `source` names where the template declares the set.
   skill_core:
     canonical_dir: "{HOME}/.agents/skills"
     canonical_dir_env: CANONICAL_SKILLS_DIR
-    required: []
-    source: explicit fleet byte-policy; activation uses skillex profile sync
+    required:
+      - 33god-projects
+      - delonet-conventions
+      - delonet-dotenv
+      - hermes-pm-template-maintenance
+      - hindsight
+      - subagent-driven-development
+    source: template/.scripts/10-hermes-profile.sh CORE_RUNTIME_SKILLS
   # Root entries the sweep skips (the renderer's lock files: the observer's own
   # footprint, never counted) and the shapes that make an entry a retired
   # candidate.
@@ -693,102 +636,6 @@ profile_manifest:
     max_unit_files: 500
     max_extra_skills: 20
 
-# What a deployed agent's SERVICE STATE should be, as POLICY about the user
-# manager rather than a copy of any unit file.
-#
-# The systemd observer proves the gateway topology and messaging health per
-# registered employee -- plus, once per
-# fleet-scope run, the fleet-shared Bloodbank gateway and every unregistered
-# `hermes-*` unit. This block says how: how many samples make an observation
-# window and how far apart (`stabilization`), how a `systemctl --user` child is
-# bounded and what it may inherit (`probe`), which ExecStart counts as pinned
-# and which environment key names the profile home (`entrypoint`), how a
-# registry row DECLARES its messaging capability so the desired gateway state
-# is derived from the declaration and never read back from the unit
-# (`messaging`), which unit names are retired shapes (`unregistered`), and how
-# much may be read (`limits`). Historical heartbeat registry fields are accepted
-# but never required; leftover heartbeat units are unregistered retired candidates.
-service_manifest:
-  # The template's own stability rule: several samples over a window, and a
-  # unit that looked healthy and then changed is not proven.
-  stabilization:
-    samples: 3
-    interval_ms: 1000
-  # One `is-system-running`, one `list-units`, one `list-unit-files`, `samples`
-  # multi-unit `show` calls and one classification `show`: never a child per
-  # agent per sample. `degraded` is an available manager -- a failed unit
-  # elsewhere does not make the fleet unobservable.
-  probe:
-    timeout_ms: 4000
-    env_allowlist:
-      - PATH
-      - HOME
-      - XDG_RUNTIME_DIR
-      - DBUS_SESSION_BUS_ADDRESS
-    manager_available_states:
-      - running
-      - degraded
-      - starting
-      - maintenance
-  # An ExecStart is pinned when it is the role's own launcher (which resolves
-  # the release from the registry at start) or the exact executable the row's
-  # own `hermes.bin` records. Any other `hermes` on disk is a release the
-  # registry does not pin.
-  entrypoint:
-    launcher: .scripts/credential-launch.sh
-    pinned_bin_field: agents.{agent_id}.hermes.bin
-    home_env: HERMES_HOME
-  # The declaration the provisioner enables a gateway on: a platform whose
-  # `provisioning_status` is `verified` makes the gateway `active`; only the
-  # `deferred_statuses` make it `deferred`; a row that declares neither is
-  # `undeclared`, and an active gateway there is liveness theatre, not health.
-  # A deferred platform must also be pinned `enabled: false` in the profile's
-  # delta, or it inherits the fleet base's enablement and starts without a
-  # credential. `secret_env` names the environment keys whose `op://` reference
-  # a verified platform must carry in the delta; `identity_fields` the row
-  # fields a verified platform must fill. Names only, never values.
-  messaging:
-    platforms:
-      - telegram
-      - slack
-    status_field: provisioning_status
-    verified_status: verified
-    deferred_statuses:
-      - disabled
-      - deferred
-    enabled_path: "platforms.{platform}.enabled"
-    secret_env:
-      telegram:
-        - TELEGRAM_BOT_TOKEN
-      slack:
-        - SLACK_BOT_TOKEN
-        - SLACK_APP_TOKEN
-    identity_fields:
-      telegram:
-        - bot_username
-        - bot_id
-      slack:
-        - bot_user_id
-        - team_id
-  # The glob the fleet-scope sweep lists, and the per-agent unit names that
-  # are retired shapes (see `retired` below): present on the manager they are
-  # topology drift on the agent they name, and unregistered ones are `retired`.
-  # Heartbeat units are always unregistered retired candidates, even when their
-  # name includes a registered employee id. They are never required units.
-  unregistered:
-    unit_glob: "hermes-*"
-    retired_candidates:
-      - "hermes-{agent_id}-heartbeat.service"
-      - "hermes-{agent_id}-heartbeat.timer"
-      - "hermes-{agent_id}-consumer.service"
-      - "hermes-{agent_id}-checkpoint.timer"
-      - "hermes-{agent_id}-checkpoint.service"
-  limits:
-    max_units: 1000
-    max_unregistered_units: 200
-    max_file_bytes: 65536
-    max_show_bytes: 4194304
-
 activation:
   states:
     - discovered
@@ -798,10 +645,9 @@ activation:
     - activated
   execution_authority:
     field: agents.{agent_id}.bloodbank.enabled
-    owner: agent-registry
+    owner: hermes-agent-registry
     strict: true
-    # No key means enabled: absent -> true. Explicit false quarantines.
-    default: allow
+    default: deny
   routing_prerequisites:
     - field: agents.{agent_id}.bloodbank.gateway_scope
       constraint: equals-fleet
@@ -811,15 +657,6 @@ activation:
       constraint: nonblank
 
 retired:
-  - id: per-agent-heartbeat
-    reason: Gateway restart owns runtime liveness; Bloodbank scheduling and Krebs
-      leases own scheduling and persistence. Per-employee heartbeat ticks are
-      retired.
-    superseded_by: service_model.per_agent.gateway_unit
-    detect:
-      - '-heartbeat\.(?:service|timer)$'
-      - 'heartbeat_service'
-      - 'heartbeat_timer'
   - id: per-agent-bloodbank-consumer
     reason: A per-agent consumer races the shared gateway and duplicates work.
     superseded_by: service_model.fleet_shared.bloodbank_gateway_unit
@@ -828,7 +665,7 @@ retired:
       - 'consumer_unit'
   - id: per-agent-checkpoint-timer
     reason: Checkpoint-only ticks proved liveness without proving health.
-    superseded_by: service_model.per_agent.gateway_unit
+    superseded_by: service_model.per_agent.heartbeat_timer
     detect:
       - '-checkpoint\.timer'
       - 'checkpoint_timer'
@@ -838,9 +675,7 @@ retired:
     detect:
       - 'n8n'
   - id: activation-by-discovery
-    reason: A resolvable target is not the gate; the activation flag is (absent
-      means enabled, an explicit false quarantines), and nothing may rewrite it
-      from discovery.
+    reason: A resolvable target is not permission to dispatch to it.
     superseded_by: activation.execution_authority
     detect:
       - 'activation_by_discovery'

@@ -71,12 +71,9 @@ const TRACKED_CONTRACT = join(ROOT, "contracts", "handbook.yaml");
 /** The five declared leaves, in the byte order the observations sort in. */
 const FIELDS = {
   topology: "agents.{agent_id}.systemd.gateway_unit",
-  heartbeatTimerRow: "agents.{agent_id}.systemd.heartbeat_timer",
   gateway: "units.hermes-{agent_id}-gateway.service",
-  timer: "units.hermes-{agent_id}-heartbeat.timer",
-  service: "units.hermes-{agent_id}-heartbeat.service",
 };
-const FIELD_ORDER = [FIELDS.topology, FIELDS.heartbeatTimerRow, FIELDS.gateway, FIELDS.service, FIELDS.timer];
+const FIELD_ORDER = [FIELDS.topology, FIELDS.gateway];
 const UNREGISTERED_CLASSES = ["retired", "transient", "profile-correlated", "managed-exception", "unclassified"];
 /** Mirrors FLEET_SYSTEMD_EXTRA_CLASSES: how an extra unit on an agent's topology leaf is classed. */
 const EXTRA_CLASSES = ["retired", "duplicate-gateway"];
@@ -443,7 +440,7 @@ function agentUnits(name, options = {}) {
     serviceActive = "inactive", serviceSub = "dead", serviceResult = "success", serviceExecStatus = "0",
     serviceStartAgoUs = 31_000_000n, serviceExitAgoUs = 30_000_000n, serviceNeverRan = false,
     serviceTimeoutStart = "45min", serviceExec = null, serviceType = "oneshot",
-    present = { gateway: true, timer: true, service: true },
+    present = { gateway: true, timer: false, service: false },
     nowUs = monotonicNowUs(),
   } = options;
   const unit = unitsOf(name);
@@ -472,7 +469,7 @@ function agentUnits(name, options = {}) {
     unitFiles.push({ unit_file: unit.gateway, state: gatewayState.UnitFileState, preset: null });
   }
 
-  if (present.timer !== false) {
+  if (present.timer === true) {
     units[unit.timer] = {
       Id: unit.timer, Names: unit.timer, LoadState: "loaded", LoadError: "",
       UnitFileState: timerEnabled ? "enabled" : "disabled",
@@ -491,7 +488,7 @@ function agentUnits(name, options = {}) {
     unitFiles.push({ unit_file: unit.timer, state: timerEnabled ? "enabled" : "disabled", preset: null });
   }
 
-  if (present.service !== false) {
+  if (present.service === true) {
     units[unit.service] = {
       Id: unit.service, Names: unit.service, LoadState: "loaded", LoadError: "",
       UnitFileState: "static", ActiveState: serviceActive, SubState: serviceSub,
@@ -693,30 +690,18 @@ function detailsOf(observation) {
  * return. Those four codes have no case of their own; this helper proves the
  * shape, not those gates.
  *
- * The two heartbeat leaves are the pair that can silently swap units, and the
- * two summary CODES are the pair that can silently blank: `heartbeat.code` is
- * the field a JSON consumer reads to learn why the domain is not proven, and
- * nothing asserted it on an error path until it had already been null for a
- * commit.
+ * Both gateway observations retain the failure code and canonical unit name.
  */
 function assertErrorLeavesNameTheirUnits(agent, code) {
-  const units = unitsOf(agent.agent_id);
-  const named = (field) => (leafOf(agent, field).items ?? []).map((item) => item.path);
-  assert.deepEqual(named(FIELDS.gateway), [units.gateway], `${agent.agent_id} gateway item path`);
-  assert.deepEqual(named(FIELDS.timer), [units.timer], `${agent.agent_id} timer item path`);
-  assert.deepEqual(named(FIELDS.service), [units.service], `${agent.agent_id} service item path`);
-  assert.deepEqual(named(FIELDS.topology), [units.gateway], `${agent.agent_id} topology item path`);
-  assert.deepEqual(named(FIELDS.heartbeatTimerRow), [units.timer], `${agent.agent_id} heartbeat_timer row item path`);
-  assert.equal(agent.systemd.gateway.unit, units.gateway, `${agent.agent_id} gateway view`);
-  assert.equal(agent.systemd.heartbeat.timer.unit, units.timer, `${agent.agent_id} timer view`);
-  assert.equal(agent.systemd.heartbeat.service.unit, units.service, `${agent.agent_id} service view`);
-  assert.deepEqual(agent.systemd.topology.expected, [units.gateway, units.service, units.timer].sort(), `${agent.agent_id} expected stays sorted`);
-  // The two summary codes NAME the failure. A leaf that carries an item and
-  // reports no code tells a consumer the domain is `error` and nothing about
-  // why -- on exactly the path where there is no other reading to fall back on.
-  assert.equal(agent.systemd.gateway.code, code, `${agent.agent_id} gateway code`);
-  assert.equal(agent.systemd.heartbeat.code, code, `${agent.agent_id} heartbeat code`);
-  assert.equal(agent.systemd.heartbeat.state, "error", `${agent.agent_id} heartbeat state`);
+  const unit = unitsOf(agent.agent_id).gateway;
+  for (const field of FIELD_ORDER) {
+    assert.deepEqual((leafOf(agent, field).items ?? []).map((item) => item.path), [unit]);
+    assert.equal(leafOf(agent, field).state, "error");
+  }
+  assert.equal(agent.systemd.gateway.unit, unit);
+  assert.equal(agent.systemd.gateway.code, code);
+  assert.deepEqual(agent.systemd.topology.expected, [unit]);
+  assert.equal("heartbeat" in agent.systemd, false);
 }
 
 function hostNamed(data, ruleId) {
@@ -813,7 +798,7 @@ async function main() {
     }
   });
 
-  check("every agent carries all five declared leaves, in one field each", () => {
+  check("every employee carries only gateway topology and health observations", () => {
     setState(canonicalState());
     const data = systemdRun();
     for (const id of AGENT_IDS) {
@@ -822,7 +807,7 @@ async function main() {
       assert.deepEqual(fields, [...FIELD_ORDER].sort(), `${id}: ${JSON.stringify(fields)}`);
       assert.ok(agent.systemd, `${id} must carry its systemd summary`);
       assert.deepEqual(agent.systemd.topology.expected, [
-        unitsOf(id).gateway, unitsOf(id).service, unitsOf(id).timer,
+        unitsOf(id).gateway,
       ].sort());
       // Every leaf resolves an owner: all five are declared writable under the
       // contract's `systemd_lifecycle` authority.
@@ -833,12 +818,11 @@ async function main() {
     }
   });
 
-  check("a canonical active agent reads five passes, a stable window, a successful tick and a current one", () => {
+  check("a gateway-only active employee passes with a stable pinned gateway", () => {
     // The matrix's first row, end to end. Every earlier case asserts what goes
     // WRONG on some leaf; nothing asserted the shape the whole fixture is
     // supposed to have -- so `stability.stable: true`, and `pass` on the
-    // topology, heartbeat_timer row and both heartbeat leaves of an ACTIVE
-    // agent, were unproven in either direction.
+    // topology and gateway health of an active employee were unproven.
     setState(canonicalState());
     const data = systemdRun();
     const alpha = agentNamed(data, "alpha-pm");
@@ -851,11 +835,9 @@ async function main() {
     assert.deepEqual(alpha.systemd.gateway.stability.transitions, []);
     assert.deepEqual(alpha.systemd.gateway.entrypoint, { family: "launcher", pinned: true });
     assert.equal(alpha.systemd.gateway.home, "matches");
-    assert.equal(alpha.systemd.heartbeat.latest_result, "success");
-    assert.equal(alpha.systemd.heartbeat.tick, "current");
-    assert.equal(alpha.systemd.heartbeat.schedule, "within-policy");
-    assert.equal(alpha.systemd.heartbeat.timer.paired, true);
-    assert.equal(data.systemd.agents.heartbeat_healthy >= 1, true, JSON.stringify(data.systemd.agents));
+    assert.equal("heartbeat" in alpha.systemd, false);
+    assert.equal("heartbeat_healthy" in data.systemd.agents, false);
+    assert.equal(data.systemd.agents.gateway_healthy >= 1, true);
     // The row's stated input, asserted against the fixture rather than assumed:
     // this agent's GENERATED config really does carry telegram enabled.
     const generated = YAML.parse(readFileSync(join(profileRoot, "alpha-pm", "config.yaml"), "utf8"));
@@ -914,259 +896,254 @@ async function main() {
     assert.ok(kindsOf(gateway).includes("verified-channel-gateway-inactive"), JSON.stringify(kindsOf(gateway)));
   });
 
-  // -- AC3: heartbeat buckets ------------------------------------------------
+  // -- AC3: heartbeat retirement ------------------------------------------------
 
-  check("a heartbeat is a bucket: in-progress, stuck, failed, overdue and off-policy", () => {
-    const nowUs = monotonicNowUs();
-    setState(canonicalState({
-      // Activating and YOUNGER than its own start timeout.
-      "alpha-pm": { nowUs, serviceActive: "activating", serviceSub: "start", serviceStartAgoUs: 60_000_000n, serviceTimeoutStart: "45min" },
-      // Activating and OLDER than it.
-      "bravo-pm": { nowUs, serviceActive: "activating", serviceSub: "start", serviceStartAgoUs: 3_600_000_000n, serviceTimeoutStart: "45min" },
-      // Completed, and the completion failed.
-      "charlie-pm": { nowUs, serviceResult: "exit-code", serviceExecStatus: "209" },
-      // Inactive, and the last trigger is older than 5 x 60 s.
-      "delta-pm": { nowUs, gatewayEnabled: false, gatewayActive: false, lastTriggerAgoUs: 600_000_000n, serviceStartAgoUs: 601_000_000n, serviceExitAgoUs: 600_000_000n },
-      // A schedule the policy does not declare.
-      "echo-pm": { nowUs, onUnitInactiveSec: 300 },
-    }));
-    const data = systemdRun();
-    const summary = (id) => agentNamed(data, id).systemd.heartbeat;
-
-    // Whether the tick is HAPPENING is the TIMER's question -- the leaf that
-    // already owns `tick-overdue`, `tick-never` and `schedule-off-policy` --
-    // while whether the last COMPLETED run succeeded is the oneshot's. Both
-    // halves are asserted as the item CODE plus the leaf state, never as the
-    // summary bucket alone: a build that renamed the item or emitted a
-    // different failing kind while still bucketing the same word stayed green
-    // before.
-    assert.equal(summary("alpha-pm").latest_result, "in-progress");
-    const alphaTimer = leafOf(agentNamed(data, "alpha-pm"), FIELDS.timer);
-    assert.deepEqual(kindsOf(alphaTimer), ["in-progress"], JSON.stringify(detailsOf(alphaTimer)));
-    assert.equal(alphaTimer.state, "warn");
-    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.service).state, "pass", "a tick still running has no completed result for its own leaf to fault");
-
-    assert.equal(summary("bravo-pm").latest_result, "stuck");
-    const bravoTimer = leafOf(agentNamed(data, "bravo-pm"), FIELDS.timer);
-    assert.deepEqual(kindsOf(bravoTimer), ["stuck"], JSON.stringify(detailsOf(bravoTimer)));
-    assert.equal(bravoTimer.state, "fail");
-
-    assert.equal(summary("charlie-pm").latest_result, "failed");
-    const charlieService = leafOf(agentNamed(data, "charlie-pm"), FIELDS.service);
-    assert.equal(charlieService.state, "fail");
-    assert.ok(detailsOf(charlieService).includes("latest-result-failed:exit-code"), JSON.stringify(detailsOf(charlieService)));
-    // `Result` is read before `ExecMainStatus`, and the status is carried on the
-    // summary rather than in the code -- 209 is the live `automatic-ai-pm`
-    // reading this row was written from.
-    assert.equal(summary("charlie-pm").service.exec_status, 209);
-    assert.equal(summary("charlie-pm").service.result, "exit-code");
-
-    assert.equal(summary("delta-pm").tick, "overdue");
-    const deltaTimer = leafOf(agentNamed(data, "delta-pm"), FIELDS.timer);
-    assert.ok(kindsOf(deltaTimer).includes("tick-overdue"), JSON.stringify(detailsOf(deltaTimer)));
-    assert.equal(deltaTimer.state, "fail");
-
-    assert.equal(summary("echo-pm").schedule, "off-policy");
-    const echoTimer = leafOf(agentNamed(data, "echo-pm"), FIELDS.timer);
-    assert.ok(kindsOf(echoTimer).includes("schedule-off-policy"), JSON.stringify(detailsOf(echoTimer)));
-    assert.equal(echoTimer.state, "fail");
-    assert.match(
-      echoTimer.items.find((item) => item.kind === "schedule-off-policy").observed, /on_unit_inactive_sec 300s/u,
-      "the item must name the schedule it OBSERVED, in the manifest's vocabulary",
-    );
-
-    assert.equal(summary("alpha-pm").tick, "current");
-    assert.equal(summary("alpha-pm").schedule, "within-policy");
-
-    // NO age, NO duration, NO monotonic reading, NO epoch.
-    const serialized = JSON.stringify(data);
-    assert.equal(serialized.includes("USec"), false, "a USec property reached data");
-    assert.equal(serialized.includes("Monotonic"), false, "a monotonic property reached data");
-    assert.doesNotMatch(serialized, /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u, "an ISO instant reached data");
-    assert.doesNotMatch(serialized.replaceAll('"interval_ms":', '"<declared-window>":'), /"([a-z_]+_(ms|at|age|seconds)|age|duration|elapsed|timestamp)":/u, "an age-shaped key reached data");
-  });
-
-  check("a timer that has never fired is `never` only once the boot delay has passed twice over", () => {
-    // `never` is claimed only once the host's uptime exceeds `on_boot_sec x 2`,
-    // which made this case depend on THIS HOST: a box booted under 120 s ago
-    // read `unknown` and turned it red for a reading the observer got right.
-    // The contract declares the delay, so the contract is what moves -- 1 s,
-    // which any host running this suite has already exceeded -- and the
-    // fixture's own timer declares the same 1 s so the schedule stays on policy
-    // and `tick-never` is the only finding.
-    const contract = writeContract("boot-delay-1s", (document) => {
-      document.service_manifest.heartbeat.on_boot_sec = 1;
-    });
-    const onBoot = Object.fromEntries(AGENT_IDS.map((id) => [id, { onBootSec: 1 }]));
-    setState(canonicalState({ ...onBoot, "alpha-pm": { onBootSec: 1, lastTriggerNever: true, serviceNeverRan: true } }));
-    resetFakeSystemctl(systemctlShim);
-    const data = status(cli(["review", "--domain", "systemd", "--json", "--contract", contract]));
-    const alpha = agentNamed(data, "alpha-pm");
-    assert.equal(alpha.systemd.heartbeat.schedule, "within-policy", "the fixture's boot delay matches the contract's");
-    assert.equal(alpha.systemd.heartbeat.tick, "never", "the declared boot delay has elapsed twice over");
-    assert.equal(alpha.systemd.heartbeat.latest_result, "never");
-    assert.deepEqual(kindsOf(leafOf(alpha, FIELDS.timer)), ["tick-never"], JSON.stringify(detailsOf(leafOf(alpha, FIELDS.timer))));
-    assert.equal(leafOf(alpha, FIELDS.timer).state, "fail");
-    assert.ok(kindsOf(leafOf(alpha, FIELDS.service)).includes("never-completed"));
-    // Every OTHER agent's timer is on policy and current under the same
-    // contract: the boot delay moved, not the reading.
-    for (const id of AGENT_IDS.filter((name) => name !== "alpha-pm")) {
-      assert.equal(leafOf(agentNamed(data, id), FIELDS.timer).state, "pass", `${id}: ${JSON.stringify(kindsOf(leafOf(agentNamed(data, id), FIELDS.timer)))}`);
-    }
-  });
-
-  check("the overdue threshold is the declared multiple, read off the LATER of the two clocks", () => {
-    const nowUs = monotonicNowUs();
-    setState(canonicalState({
-      // 290 s is inside `on_unit_inactive_sec x overdue_multiplier` (60 x 5)
-      // and 310 s is outside it. The PAIR is what pins the multiplier: with a
-      // multiplier of 1 the first reads overdue, with 10 the second reads
-      // current, and either mutation goes red here.
-      "alpha-pm": { nowUs, lastTriggerAgoUs: 290_000_000n, serviceStartAgoUs: 291_000_000n, serviceExitAgoUs: 290_000_000n },
-      "bravo-pm": { nowUs, lastTriggerAgoUs: 310_000_000n, serviceStartAgoUs: 311_000_000n, serviceExitAgoUs: 310_000_000n },
-      // Only the TIMER's last trigger is stale; the oneshot exited a moment ago.
-      "charlie-pm": { nowUs, lastTriggerAgoUs: 600_000_000n, serviceStartAgoUs: 31_000_000n, serviceExitAgoUs: 30_000_000n },
-      // The mirror: only the ONESHOT's exit is stale. Reading either clock
-      // alone -- or the earlier of the two -- calls one of these two overdue.
-      "delta-pm": { nowUs, lastTriggerAgoUs: 30_000_000n, serviceStartAgoUs: 601_000_000n, serviceExitAgoUs: 600_000_000n },
-      // The schedule rule's OTHER limb: the boot delay, not the interval.
-      "echo-pm": { nowUs, onBootSec: 120 },
-    }));
-    const data = systemdRun();
-    const tickOf = (id) => agentNamed(data, id).systemd.heartbeat.tick;
-    assert.equal(tickOf("alpha-pm"), "current", "290 s is inside 60 s x 5");
-    assert.equal(kindsOf(leafOf(agentNamed(data, "alpha-pm"), FIELDS.timer)).includes("tick-overdue"), false);
-    assert.equal(tickOf("bravo-pm"), "overdue", "310 s is outside 60 s x 5");
-    assert.ok(kindsOf(leafOf(agentNamed(data, "bravo-pm"), FIELDS.timer)).includes("tick-overdue"));
-    assert.equal(tickOf("charlie-pm"), "current", "the oneshot's exit is the later reading");
-    assert.equal(tickOf("delta-pm"), "current", "the timer's last trigger is the later reading");
-    const echoTimer = leafOf(agentNamed(data, "echo-pm"), FIELDS.timer);
-    assert.equal(agentNamed(data, "echo-pm").systemd.heartbeat.schedule, "off-policy");
-    assert.ok(kindsOf(echoTimer).includes("schedule-off-policy"), JSON.stringify(detailsOf(echoTimer)));
-    assert.match(
-      echoTimer.items.find((item) => item.kind === "schedule-off-policy").observed, /on_boot_sec 120s/u,
-      "an off-policy BOOT delay is the same rule's other half",
-    );
-  });
-
-  check("a timer that is disabled, inactive, wrongly paired or in a bad substate says which", () => {
-    setState(canonicalState({
-      "alpha-pm": { timerEnabled: false },
-      "bravo-pm": { timerActive: "inactive", timerSub: "dead" },
-      "charlie-pm": { timerPaired: false },
-    }));
-    const data = systemdRun();
-    assert.deepEqual(kindsOf(leafOf(agentNamed(data, "alpha-pm"), FIELDS.timer)), ["timer-disabled"]);
-    assert.deepEqual(kindsOf(leafOf(agentNamed(data, "bravo-pm"), FIELDS.timer)).slice(0, 2), ["timer-inactive", "timer-substate"]);
-    assert.ok(kindsOf(leafOf(agentNamed(data, "charlie-pm"), FIELDS.timer)).includes("timer-unpaired"));
-    assert.equal(agentNamed(data, "charlie-pm").systemd.heartbeat.timer.paired, false);
-  });
-
-  // -- AC4: reconcile policy and evidence -----------------------------------
-
-  check("the reconcile policy is read for its declaration and its state file for the presence of keys", () => {
-    const roles = {
-      // reconcile ON with no state file at all.
-      "alpha-pm": { reconcile: { enabled: true } },
-      // OFF without an explicit opt-out.
-      "bravo-pm": { reconcile: { enabled: false } },
-      // OFF with one.
-      "charlie-pm": { reconcile: { enabled: false, explicit_opt_out: true } },
-      // No block at all.
-      "delta-pm": null,
-      // ON with a state file that evidences a FULL run.
-      "echo-pm": { reconcile: { enabled: true } },
+  check("retired heartbeat states and schedules cannot fail employee reviews", () => {
+    const patches = {
+      "alpha-pm": { serviceActive: "activating", serviceSub: "start", serviceStartAgoUs: 60_000_000n },
+      "bravo-pm": { serviceActive: "activating", serviceSub: "start", serviceStartAgoUs: 3_600_000_000n },
+      "charlie-pm": { serviceResult: "exit-code", serviceExecStatus: "209" },
+      "delta-pm": { lastTriggerAgoUs: 600_000_000n, serviceExitAgoUs: 600_000_000n },
+      "echo-pm": { onUnitInactiveSec: 300 },
     };
-    for (const [name, body] of Object.entries(roles)) {
-      writeFileSync(join(roleDirOf(name), "role.yaml"), YAML.stringify(body === null ? { role: "pm" } : { role: "pm", ...body }), "utf8");
-    }
-    const statePath = join(roleDirOf("echo-pm"), "runtime", "continuous-ticket-sentinel-state.json");
-    const alphaState = join(roleDirOf("alpha-pm"), "runtime", "continuous-ticket-sentinel-state.json");
-    writeFileSync(statePath, `${JSON.stringify({
-      last_decision: SECRET_SENTINEL,
-      last_full_run_epoch: 1,
-      last_runner_completed_at: "2026-01-01T00:00:00Z",
-    })}\n`, "utf8");
-    // The role trees, byte-for-byte, before and after: the sentinels planted in
-    // `runtime/.env`, `auth.json` and `runtime/logs/heartbeat.log` are files the
-    // observer must never open, and the state file it DOES open is opened for
-    // reading only.
-    const before = snapshotTree("roles", reposRoot);
-    try {
-      setState(canonicalState());
-      resetFakeSystemctl(systemctlShim);
-      const result = cli(["review", "--domain", "systemd", "--json"]);
-      const data = status(result);
-      const reconcile = (id) => agentNamed(data, id).systemd.heartbeat.reconcile;
-      assert.deepEqual(reconcile("alpha-pm"), { declared: "enabled", evidence: "state-missing" });
-      assert.ok(kindsOf(leafOf(agentNamed(data, "alpha-pm"), FIELDS.service)).includes("checkpoint-only"));
-      assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.service).state, "fail");
-      assert.deepEqual(reconcile("bravo-pm"), { declared: "disabled", evidence: "not-applicable" });
-      assert.ok(kindsOf(leafOf(agentNamed(data, "bravo-pm"), FIELDS.service)).includes("reconcile-opt-out-undeclared"));
-      assert.equal(leafOf(agentNamed(data, "bravo-pm"), FIELDS.service).state, "warn");
-      assert.deepEqual(reconcile("charlie-pm"), { declared: "opted-out", evidence: "not-applicable" });
-      assert.equal(leafOf(agentNamed(data, "charlie-pm"), FIELDS.service).state, "pass");
-      assert.deepEqual(reconcile("delta-pm"), { declared: "undeclared", evidence: "not-applicable" });
-      assert.ok(kindsOf(leafOf(agentNamed(data, "delta-pm"), FIELDS.service)).includes("reconcile-undeclared"));
-      assert.equal(leafOf(agentNamed(data, "delta-pm"), FIELDS.service).state, "warn", "a role that declares no policy is a gap to declare, not drift");
-      assert.deepEqual(reconcile("echo-pm"), { declared: "enabled", evidence: "full-run" });
-      assert.equal(leafOf(agentNamed(data, "echo-pm"), FIELDS.service).state, "pass");
-
-      // The state file's VALUES never leave it: only the presence of two keys
-      // is read, and `last_decision` carried a sentinel.
-      assert.equal(result.stdout.includes(SECRET_SENTINEL), false, "a value from the heartbeat state file reached stdout");
-
-      // The matrix's headline sub-case: reconcile ON with a state file that
-      // EXISTS and evidences only a checkpoint. `alpha-pm` above has no state
-      // file at all -- a different branch (`state-missing`) -- so the
-      // key-presence predicate was only ever exercised in its true form. Three
-      // shapes, because the predicate reads BOTH keys: with `||` in place of
-      // `&&`, or either key name dropped, the one-key rows report `full-run`.
-      for (const [label, body] of [
-        ["neither key", { last_decision: SECRET_SENTINEL }],
-        ["only last_full_run_epoch", { last_full_run_epoch: 1 }],
-        ["only last_runner_completed_at", { last_runner_completed_at: "2026-01-01T00:00:00Z" }],
-      ]) {
-        writeFileSync(alphaState, `${JSON.stringify(body)}\n`, "utf8");
-        setState(canonicalState());
-        const partial = systemdRun();
-        const alpha = agentNamed(partial, "alpha-pm");
-        assert.deepEqual(alpha.systemd.heartbeat.reconcile, { declared: "enabled", evidence: "checkpoint-only" }, label);
-        assert.ok(kindsOf(leafOf(alpha, FIELDS.service)).includes("checkpoint-only"), `${label}: ${JSON.stringify(kindsOf(leafOf(alpha, FIELDS.service)))}`);
-        assert.equal(leafOf(alpha, FIELDS.service).state, "fail", label);
-      }
-    } finally {
-      rmSync(statePath, { force: true });
-      rmSync(alphaState, { force: true });
-      for (const name of AGENT_IDS) {
-        writeFileSync(join(roleDirOf(name), "role.yaml"), YAML.stringify({ role: "pm", reconcile: { enabled: false, explicit_opt_out: true } }), "utf8");
+    for (const patch of Object.values(patches)) patch.present = { gateway: true, timer: true, service: true };
+    setState(canonicalState(patches));
+    const data = systemdRun();
+    const retired = hostNamed(data, "systemd.unregistered");
+    assert.equal(retired.state, "warn");
+    assert.equal(data.systemd.unregistered.by_class.retired, 10);
+    for (const id of AGENT_IDS) {
+      const agent = agentNamed(data, id);
+      assert.deepEqual(agent.observations.filter((o) => o.source === "fleet-systemd").map((o) => o.field).sort(), [...FIELD_ORDER].sort());
+      assert.equal("heartbeat" in agent.systemd, false);
+      assert.equal(leafOf(agent, FIELDS.topology).state, "pass");
+      for (const name of [unitsOf(id).timer, unitsOf(id).service]) {
+        const item = retired.items.find((item) => item.unit === name);
+        assert.equal(item.class, "retired");
+        assert.equal(item.guidance, "retirement");
+        assert.equal(item.detail, "retired:per-agent-heartbeat");
       }
     }
-    const after = snapshotTree("roles", reposRoot);
-    const changed = [...new Set([...Object.keys(before), ...Object.keys(after)])]
-      .filter((key) => before[key] !== after[key] && !key.includes("role.yaml") && !key.includes("continuous-ticket-sentinel-state.json") && !key.endsWith("runtime") && !key.endsWith(join("hermes", "pm")));
-    assert.deepEqual(changed, [], `the observer wrote to a role directory: ${changed.join(", ")}`);
+    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway).state, "pass");
+    const serialized = JSON.stringify(data);
+    assert.doesNotMatch(serialized, /USec|Monotonic|tick-overdue|schedule-off-policy|latest-result-failed/u);
+    assert.doesNotMatch(serialized, /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u);
   });
 
-  check("an unreadable reconcile policy or state file is an error, never a verdict", () => {
+  check("gateway-only employees need no installed heartbeat, tick or registry declaration", () => {
+    const registry = join(temp, "gateway-only-registry.yaml");
+    writeAgentRegistry(registry, AGENTS.map((a) => ({ ...a, rowOverrides: { systemd: { gateway_unit: unitsOf(a.name).gateway } } })));
+    setState(canonicalState());
+    const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
+    const alpha = agentNamed(data, "alpha-pm");
+    for (const field of FIELD_ORDER) assert.equal(leafOf(alpha, field).state, "pass");
+    assert.deepEqual(alpha.systemd.topology.expected, [unitsOf("alpha-pm").gateway]);
+    assert.equal(data.systemd.unregistered.total, 0);
+    for (const argv of fakeSystemctlInvocations(systemctlShim)) {
+      assert.equal(argv.some((arg) => /heartbeat/u.test(arg)), false, "no heartbeat name or property is requested");
+    }
+  });
+
+  check("historical heartbeat timer values remain inert in inventory and review", () => {
+    const variants = [undefined, "", unitsOf("alpha-pm").timer, "hermes-old-pm-heartbeat.timer", "historical-name"];
+    for (const value of variants) {
+      const systemd = { gateway_unit: unitsOf("alpha-pm").gateway };
+      if (value !== undefined) systemd.heartbeat_timer = value;
+      const registry = join(temp, `legacy-heartbeat-${variants.indexOf(value)}.yaml`);
+      writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" ? { ...a, rowOverrides: { systemd } } : a));
+      setState(canonicalState());
+      const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
+      const alpha = agentNamed(data, "alpha-pm");
+      for (const field of FIELD_ORDER) assert.equal(leafOf(alpha, field).state, "pass", String(value));
+      assert.deepEqual(alpha.systemd.topology.extra, []);
+      assert.equal("heartbeat" in alpha.systemd, false);
+      const roster = envelope(cli(["roster", "--agent", "alpha-pm", "--agent-registry", registry, "--json"]));
+      assert.equal(roster.ok, true);
+      assert.deepEqual(roster.data.rows[0].expected_units.value, [unitsOf("alpha-pm").gateway]);
+    }
+  });
+
+  check("a heartbeat stored as gateway stays misnamed and remains visible for retirement", () => {
+    for (const key of ["timer", "service"]) {
+      const unit = unitsOf("alpha-pm")[key];
+      const registry = join(temp, `heartbeat-as-gateway-${key}.yaml`);
+      writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm"
+        ? { ...a, rowOverrides: { systemd: { gateway_unit: unit } } } : a));
+      setState(canonicalState({ "alpha-pm": { present: { gateway: true, timer: true, service: true } } }));
+      const data = systemdRun(["--agent-registry", registry]);
+      const alpha = agentNamed(data, "alpha-pm");
+      assert.ok(kindsOf(leafOf(alpha, FIELDS.topology)).includes("misnamed-gateway"));
+      assert.equal(kindsOf(leafOf(alpha, FIELDS.topology)).includes("duplicate-gateway"), false);
+      assert.equal(alpha.systemd.topology.extra.some((entry) => entry.unit === unit), false);
+      const retired = hostNamed(data, "systemd.unregistered").items.find((entry) => entry.unit === unit);
+      assert.equal(retired.class, "retired");
+      assert.equal(retired.guidance, "retirement");
+      assert.equal(retired.detail, "retired:per-agent-heartbeat");
+    }
+  });
+
+  check("candidate-only retirement uses one consistent employee ID in repeated placeholders", () => {
+    const contract = writeContract("candidate-only", (doc) => {
+      doc.service_manifest.unregistered.retired_candidates.push("hermes-{agent_id}-old-poll.timer", "hermes-{agent_id}-echo-{agent_id}-old-echo.timer");
+    });
+    const single = "hermes-stray-pm-old-poll.timer";
+    const repeated = "hermes-stray-pm-echo-stray-pm-old-echo.timer";
+    const different = "hermes-stray-pm-echo-other-pm-old-echo.timer";
+    const state = canonicalState();
+    for (const unit of [single, repeated, different]) {
+      state.units[unit] = { Id: unit, LoadState: "loaded", UnitFileState: "disabled", ActiveState: "inactive", SubState: "dead" };
+      state.unit_files.push({ unit_file: unit, state: "disabled", preset: null });
+    }
+    assert.ok(contractDocument().retired.every((mode) => mode.detect.every((pattern) => !new RegExp(pattern, "u").test(single))));
+    setState(state);
+    const finding = hostNamed(systemdRun(["--contract", contract]), "systemd.unregistered");
+    assert.equal(finding.state, "warn");
+    for (const unit of [single, repeated]) {
+      const item = finding.items.find((entry) => entry.unit === unit);
+      assert.equal(item.class, "retired");
+      assert.equal(item.guidance, "retirement");
+      assert.equal(item.detail, "retired:candidate");
+    }
+    const nonmatch = finding.items.find((entry) => entry.unit === different);
+    assert.equal(nonmatch.class, "unclassified");
+    assert.equal(nonmatch.guidance, "manual-review");
+    assert.equal(nonmatch.detail, null);
+  });
+
+  check("an unregistered alias correlates Names to canonical Id without hiding ambiguous identity", () => {
+    const alias = "hermes-stray-pm-heartbeat.timer";
+    const canonical = "hermes-canonical-pm-heartbeat.timer";
+    const block = (id, names) => `Id=${id}\nNames=${names}\nLoadState=loaded\nUnitFileState=disabled\nActiveState=inactive\nSubState=dead\n`;
+    const cases = [
+      [block(canonical, `${canonical} ${alias}`), "warn", null],
+      [block(canonical, canonical), "error", "show-malformed"],
+      [block(canonical, `${canonical} ${alias}`) + "\n" + block("hermes-other-pm-heartbeat.timer", `hermes-other-pm-heartbeat.timer ${alias}`), "error", "show-malformed"],
+    ];
+    for (const [stdout, expectedState, reason] of cases) {
+      const state = canonicalState();
+      state.unit_files.push({ unit_file: alias, state: "disabled", preset: null });
+      setState({ ...state, classification: { stdout } });
+      const data = systemdRun();
+      const finding = hostNamed(data, "systemd.unregistered");
+      assert.equal(finding.state, expectedState, finding.summary);
+      assert.equal(data.systemd.unregistered.reason, reason);
+      const item = finding.items.find((entry) => entry.unit === alias);
+      assert.equal(item.class, "retired");
+      assert.equal(item.guidance, "retirement");
+      assert.equal(item.active, expectedState === "warn" ? "inactive" : null);
+      const argv = fakeSystemctlInvocations(systemctlShim).find((args) => args.includes(alias) && args.includes("show") && args.some((arg) => arg.includes("Names")));
+      assert.ok(argv, "classification must request Names for alias correlation");
+    }
+  });
+
+  check("retired timers retain observed enabled, active and substate words", () => {
+    setState(canonicalState({
+      "alpha-pm": { present: { gateway: true, timer: true }, timerEnabled: false },
+      "bravo-pm": { present: { gateway: true, timer: true }, timerActive: "inactive", timerSub: "dead" },
+      "charlie-pm": { present: { gateway: true, timer: true }, timerPaired: false },
+    }));
+    const data = systemdRun();
+    const items = hostNamed(data, "systemd.unregistered").items;
+    const timer = (id) => items.find((item) => item.unit === unitsOf(id).timer);
+    assert.equal(timer("alpha-pm").unit_file, "disabled");
+    assert.equal(timer("bravo-pm").active, "inactive");
+    assert.equal(timer("bravo-pm").sub, "dead");
+    assert.equal(timer("charlie-pm").class, "retired");
+    for (const id of ["alpha-pm", "bravo-pm", "charlie-pm"]) assert.equal(leafOf(agentNamed(data, id), FIELDS.topology).state, "pass");
+  });
+
+  check("disk-only and unregistered employee heartbeat units remain retired candidates", () => {
+    const timer = unitsOf("stray-pm").timer;
+    const service = unitsOf("alpha-pm").service;
+    setState(mergeUnitSets(canonicalState(), {
+      units: {
+        [timer]: { Id: timer, LoadState: "loaded", UnitFileState: "disabled", ActiveState: "inactive", SubState: "dead" },
+        [service]: { Id: service, LoadState: "not-found", UnitFileState: "", ActiveState: "inactive", SubState: "dead" },
+      },
+      unit_files: [
+        { unit_file: timer, state: "disabled", preset: null },
+        { unit_file: service, state: "static", preset: null },
+      ],
+    }));
+    const data = systemdRun();
+    const finding = hostNamed(data, "systemd.unregistered");
+    assert.equal(finding.state, "warn");
+    for (const name of [timer, service]) {
+      const item = finding.items.find((item) => item.unit === name);
+      assert.equal(item.class, "retired");
+      assert.equal(item.guidance, "retirement");
+      assert.equal(item.active, "inactive");
+      assert.equal(item.sub, "dead");
+    }
+    assert.equal(finding.items.find((item) => item.unit === service).load, "not-found");
+    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.topology).state, "pass");
+  });
+
+  check("failed and malformed retired-unit readings remain unable to assess with candidate names retained", () => {
+    const unit = unitsOf("alpha-pm").timer;
+    const shortTimeout = writeContract("retired-show-timeout", (document) => {
+      document.service_manifest.probe.timeout_ms = 400;
+    });
+    const cases = [
+      ["show-failed", { exit: 4 }, []],
+      ["show-timeout", { delay_ms: 3000 }, ["--contract", shortTimeout]],
+      ["show-malformed", { stdout: "unparseable\n" }, []],
+      ["show-malformed", { stdout: `Id=${unit}\nLoadState=loaded\nUnitFileState=disabled\nSubState=dead\n` }, []],
+      ["show-malformed", { stdout: `Id=${unit}\nLoadState=loaded\nUnitFileState=disabled\nActiveState=not a state\nSubState=dead\n` }, []],
+    ];
+    for (const [reason, classification, args] of cases) {
+      setState({ ...canonicalState(), classification, unit_files: [
+        ...canonicalState().unit_files,
+        { unit_file: unit, state: "disabled", preset: null },
+      ] });
+      const data = systemdRun(args);
+      const finding = hostNamed(data, "systemd.unregistered");
+      assert.equal(finding.state, "error", finding.summary);
+      assert.equal(data.systemd.unregistered.reason, reason);
+      const item = finding.items.find((item) => item.unit === unit);
+      assert.equal(item.class, "retired");
+      assert.equal(item.unit_file, "disabled", "the independently observed listing is retained");
+      assert.equal(item.active, classification.stdout?.includes("not a state") ? "unparsed" : null);
+      assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.topology).state, "pass");
+      assert.equal(data.health.proven, false);
+      assert.ok(data.probes.some((probe) => probe.id === "systemd:show:unregistered" && probe.outcome !== "ok"));
+    }
+  });
+
+  check("retired reconcile declarations and state-file key shapes have no review requirement", () => {
+    const policy = join(roleDirOf("alpha-pm"), "role.yaml");
+    const state = join(roleDirOf("alpha-pm"), "runtime", "continuous-ticket-sentinel-state.json");
+    const saved = readFileSync(policy, "utf8");
+    try {
+      for (const reconcile of [undefined, { enabled: true }, { enabled: false }, { enabled: false, explicit_opt_out: true }]) {
+        writeFileSync(policy, YAML.stringify({ role: "pm", reconcile }));
+        for (const body of [null, {}, { last_full_run_epoch: 1 }, { last_runner_completed_at: SECRET_SENTINEL }]) {
+          if (body === null) rmSync(state, { force: true }); else writeFileSync(state, JSON.stringify(body));
+          const before = snapshotTree("roles", reposRoot);
+          setState(canonicalState());
+          const data = systemdRun(["--agent", "alpha-pm"]);
+          for (const field of FIELD_ORDER) assert.equal(leafOf(agentNamed(data, "alpha-pm"), field).state, "pass");
+          assert.equal(JSON.stringify(data).includes(SECRET_SENTINEL), false);
+          assert.deepEqual(snapshotTree("roles", reposRoot), before);
+        }
+      }
+    } finally { writeFileSync(policy, saved); rmSync(state, { force: true }); }
+  });
+
+  check("malformed retired reconcile files are neither read nor required", () => {
     const policy = join(roleDirOf("alpha-pm"), "role.yaml");
     const saved = readFileSync(policy, "utf8");
-    writeFileSync(policy, YAML.stringify({ role: "pm", reconcile: { enabled: true } }), "utf8");
-    const statePath = join(roleDirOf("alpha-pm"), "runtime", "continuous-ticket-sentinel-state.json");
-    writeFileSync(statePath, "{not json\n", "utf8");
+    const state = join(roleDirOf("alpha-pm"), "runtime", "continuous-ticket-sentinel-state.json");
     try {
+      writeFileSync(policy, "reconcile: [broken YAML\n");
+      writeFileSync(state, "{not json\n");
+      const before = snapshotTree("roles", reposRoot);
       setState(canonicalState());
-      const data = systemdRun();
-      const alpha = agentNamed(data, "alpha-pm");
-      assert.deepEqual(alpha.systemd.heartbeat.reconcile, { declared: "enabled", evidence: "state-unreadable" });
-      assert.equal(leafOf(alpha, FIELDS.service).state, "error", "a file the observer could not parse is a collection failure, not drift");
-    } finally {
-      writeFileSync(policy, saved, "utf8");
-      rmSync(statePath, { force: true });
-    }
+      const data = systemdRun(["--agent", "alpha-pm"]);
+      for (const field of FIELD_ORDER) assert.equal(leafOf(agentNamed(data, "alpha-pm"), field).state, "pass");
+      assert.deepEqual(snapshotTree("roles", reposRoot), before);
+    } finally { writeFileSync(policy, saved); rmSync(state, { force: true }); }
   });
-
-  // -- AC5: topology drift ---------------------------------------------------
 
   check("retired keys, retired units, duplicates, misnames and absences are all topology", () => {
     const registry = join(temp, "topology-agents.yaml");
@@ -1235,51 +1212,34 @@ async function main() {
     ], JSON.stringify(bravo.systemd.topology.extra));
 
     const charlie = agentNamed(data, "charlie-pm");
-    const charlieRow = leafOf(charlie, FIELDS.heartbeatTimerRow);
-    assert.equal(charlieRow.state, "fail");
-    assert.deepEqual(kindsOf(charlieRow), ["registry-undeclared"]);
-
+    assert.equal(leafOf(charlie, FIELDS.topology).state, "pass");
     // `echo-pm` has no unit at all.
     const echo = agentNamed(data, "echo-pm");
     const echoTopology = leafOf(echo, FIELDS.topology);
     assert.equal(echoTopology.state, "fail");
-    assert.deepEqual(kindsOf(echoTopology).sort(), ["gateway-missing", "heartbeat-service-missing", "heartbeat-timer-missing"]);
+    assert.deepEqual(kindsOf(echoTopology).sort(), ["gateway-missing"]);
     assert.deepEqual(kindsOf(leafOf(echo, FIELDS.gateway)), ["absent"]);
-    assert.deepEqual(kindsOf(leafOf(echo, FIELDS.timer)), ["absent"]);
-    assert.deepEqual(kindsOf(leafOf(echo, FIELDS.service)), ["absent"]);
     // The SEVERITY, on all three: `absent` reaches `fail` through the default
     // arm of three separate ternaries, so moving it into any warn arm would
     // have downgraded every one of them silently.
-    for (const field of [FIELDS.gateway, FIELDS.timer, FIELDS.service]) {
+    for (const field of [FIELDS.gateway]) {
       assert.equal(leafOf(echo, field).state, "fail", `${field}: a registered agent with no unit is drift, not a warning`);
     }
-    assert.deepEqual(kindsOf(leafOf(echo, FIELDS.heartbeatTimerRow)), ["unit-missing"]);
-    assert.equal(leafOf(echo, FIELDS.heartbeatTimerRow).state, "fail", "a row naming a timer the manager does not load is drift");
     assert.deepEqual(echo.systemd.topology.installed, []);
-    assert.equal(echo.systemd.topology.missing.length, 3);
+    assert.equal(echo.systemd.topology.missing.length, 1);
   });
 
   // -- AC6: the unregistered sweep -------------------------------------------
 
-  check("a row naming a heartbeat timer the contract does not derive is misnamed, and fails", () => {
-    // The one branch of that leaf's three no case drove: delete the arm and a
-    // row pointing at a unit the provisioner will never touch reads `pass`.
-    const registry = join(temp, "misnamed-timer-agents.yaml");
-    writeAgentRegistry(registry, AGENTS.map((agent) => (
-      agent.name === "delta-pm"
-        ? { ...agent, rowOverrides: { systemd: { gateway_unit: unitsOf("delta-pm").gateway, heartbeat_timer: "hermes-delta-pm-tick.timer" } } }
-        : agent
-    )));
-    setState(canonicalState());
+  check("a historical heartbeat field never claims ownership of an installed retired unit", () => {
+    const registry = join(temp, "legacy-other-employee.yaml");
+    writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" ? { ...a, rowOverrides: { systemd: { gateway_unit: unitsOf(a.name).gateway, heartbeat_timer: unitsOf("delta-pm").timer } } } : a));
+    setState(canonicalState({ "delta-pm": { present: { gateway: true, timer: true } } }));
     const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
-    const row = leafOf(agentNamed(data, "delta-pm"), FIELDS.heartbeatTimerRow);
-    assert.deepEqual(detailsOf(row), ["misnamed-heartbeat-timer:hermes-delta-pm-tick.timer"], JSON.stringify(detailsOf(row)));
-    assert.equal(row.state, "fail");
-    assert.equal(agentNamed(data, "delta-pm").systemd.heartbeat.timer.unit, unitsOf("delta-pm").timer, "the LEAF still reads the canonical unit");
-    // Every other agent's row leaf is untouched by the rename.
-    for (const id of AGENT_IDS.filter((name) => name !== "delta-pm")) {
-      assert.equal(leafOf(agentNamed(data, id), FIELDS.heartbeatTimerRow).state, "pass", id);
-    }
+    const item = hostNamed(data, "systemd.unregistered").items.find((item) => item.unit === unitsOf("delta-pm").timer);
+    assert.equal(item.class, "retired");
+    assert.equal(item.correlated_profile, null);
+    for (const id of ["alpha-pm", "delta-pm"]) assert.equal(leafOf(agentNamed(data, id), FIELDS.topology).state, "pass");
   });
 
   check("every unregistered hermes unit lands in one of five classes and is left alone", () => {
@@ -1490,7 +1450,7 @@ async function main() {
     assert.equal(data.systemd.agents.unobserved, AGENTS.length - 1);
   });
 
-  check("--agent scope cannot see the two readings that need a listing, and the difference is pinned", () => {
+  check("--agent scope does not list duplicate gateways or retired heartbeat candidates", () => {
     // `duplicate-gateway` and the unit-file half of `registry-undeclared` both
     // come from the fleet listings, which an `--agent` run never spawns. That
     // is a real coverage difference and it was documented nowhere: the README
@@ -1516,7 +1476,7 @@ async function main() {
       detailsOf(leafOf(agentNamed(fleetWide, "alpha-pm"), FIELDS.topology)).includes("duplicate-gateway:hermes-alpha-pm-second-gateway.service"),
       JSON.stringify(detailsOf(leafOf(agentNamed(fleetWide, "alpha-pm"), FIELDS.topology))),
     );
-    assert.deepEqual(kindsOf(leafOf(agentNamed(fleetWide, "charlie-pm"), FIELDS.heartbeatTimerRow)), ["registry-undeclared"]);
+    assert.equal(leafOf(agentNamed(fleetWide, "charlie-pm"), FIELDS.topology).state, "pass");
 
     setState(mergeUnitSets(canonicalState(), second));
     const alphaOnly = status(cli(["review", "--domain", "systemd", "--json", "--agent", "alpha-pm", "--agent-registry", registry]));
@@ -1524,10 +1484,8 @@ async function main() {
     assert.deepEqual(agentNamed(alphaOnly, "alpha-pm").systemd.topology.extra, []);
     setState(mergeUnitSets(canonicalState(), second));
     const charlieOnly = status(cli(["review", "--domain", "systemd", "--json", "--agent", "charlie-pm", "--agent-registry", registry]));
-    assert.deepEqual(
-      kindsOf(leafOf(agentNamed(charlieOnly, "charlie-pm"), FIELDS.heartbeatTimerRow)), ["registry-undeclared"],
-      "the timer is LOADED here, so the row leaf still reads it without a listing",
-    );
+    assert.equal(leafOf(agentNamed(charlieOnly, "charlie-pm"), FIELDS.topology).state, "pass");
+
   });
 
   // -- AC8: collection failures ----------------------------------------------
@@ -1548,12 +1506,7 @@ async function main() {
         assert.equal(leaf.state, "error", `${id} ${field}`);
         assert.deepEqual(kindsOf(leaf), ["manager-unavailable"], `${id} ${field}`);
       }
-      // The UNIT each error leaf names. Asserting only `state` and the kind let
-      // the two heartbeat leaves swap units on every collection-error path --
-      // `expected` is sorted for the payload, and the canonical triple sorts
-      // gateway, heartbeat.service, heartbeat.timer, so a positional read handed
-      // the timer leaf the service and the service leaf the timer. This is the
-      // path where an operator has the least other evidence.
+      // Collection errors retain the canonical gateway name on both leaves.
       assertErrorLeavesNameTheirUnits(agentNamed(data, id), "manager-unavailable");
     }
     assert.equal(hostNamed(data, "systemd.manager").state, "error");
@@ -1647,7 +1600,6 @@ async function main() {
     assert.ok(detailsOf(alpha).includes("property-malformed:NRestarts"), JSON.stringify(detailsOf(alpha)));
     assert.equal(agentNamed(data, "alpha-pm").systemd.gateway.restarts, null);
     // Every other unit is unaffected.
-    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.timer).state, "pass");
     assert.equal(leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway).state, "pass");
     assert.equal(data.systemd.manager.code, "available");
 
@@ -1659,7 +1611,7 @@ async function main() {
     setState(canonicalState({
       "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewaySamples: [{ ActiveState: undefined }] },
       // The oneshot's own malformed-property site, which had no test at all.
-      "charlie-pm": { serviceExecStatus: "abc" },
+      "charlie-pm": { gatewayExecStatus: "abc" },
       // The CONTROL: an ABSENT unit reports every required property (systemd
       // prints all four for a `not-found` unit, with an empty UnitFileState),
       // so it must keep reading `absent` and never `property-malformed`.
@@ -1677,15 +1629,12 @@ async function main() {
     assert.equal(agentNamed(missing, "alpha-pm").systemd.gateway.active, null, "a property the manager did not report is null, never a word");
     // That unit's leaf ONLY: the same agent's other two units, and every other
     // agent, are read normally out of the same window.
-    assert.equal(leafOf(agentNamed(missing, "alpha-pm"), FIELDS.timer).state, "pass");
-    assert.equal(leafOf(agentNamed(missing, "alpha-pm"), FIELDS.service).state, "pass");
     assert.equal(leafOf(agentNamed(missing, "bravo-pm"), FIELDS.gateway).state, "pass");
 
-    const charlieService = leafOf(agentNamed(missing, "charlie-pm"), FIELDS.service);
+    const charlieService = leafOf(agentNamed(missing, "charlie-pm"), FIELDS.gateway);
     assert.equal(charlieService.state, "error");
     assert.ok(detailsOf(charlieService).includes("property-malformed:ExecMainStatus"), JSON.stringify(detailsOf(charlieService)));
-    assert.equal(agentNamed(missing, "charlie-pm").systemd.heartbeat.latest_result, "unknown");
-    assert.equal(agentNamed(missing, "charlie-pm").systemd.heartbeat.service.exec_status, null);
+    assert.equal(agentNamed(missing, "charlie-pm").systemd.gateway.exec_status, null);
 
     const deltaGateway = leafOf(agentNamed(missing, "delta-pm"), FIELDS.gateway);
     assert.deepEqual(kindsOf(deltaGateway), ["absent"], "an absent unit is a complete reading of a unit that is not there");
@@ -1748,13 +1697,10 @@ async function main() {
   check("an entrypoint that is neither the launcher nor the row's pinned executable is unpinned", () => {
     const stray = join(scratchHome, ".local", "share", "hermes-agent", "releases", "def", ".venv", "bin", "hermes");
     setState(canonicalState({
-      // BOTH units, because the row the matrix names (`automatic-ai-pm`) trips
-      // this on its heartbeat oneshot -- a branch no case in this suite ever
-      // reached, since nothing passed `serviceExec` at all.
+      // A gateway entered through an unpinned runtime executable.
       "alpha-pm": {
         gatewayEnabled: true, gatewayActive: true,
         gatewayExec: execLine(stray, "gateway", "run", "--replace"),
-        serviceExec: execLine(stray, "heartbeat"),
       },
       "delta-pm": { gatewayEnabled: true, gatewayActive: true, gatewayExec: execLine(HERMES_BIN, "gateway", "run", "--replace") },
     }));
@@ -1763,14 +1709,9 @@ async function main() {
     assert.deepEqual(alpha.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: false });
     assert.ok(kindsOf(leafOf(alpha, FIELDS.gateway)).includes("entrypoint-unpinned"));
     assert.equal(leafOf(alpha, FIELDS.gateway).state, "fail", "an unpinned entrypoint is drift, not a warning");
-    assert.deepEqual(alpha.systemd.heartbeat.service.entrypoint, { family: "hermes-bin", pinned: false });
-    assert.ok(kindsOf(leafOf(alpha, FIELDS.service)).includes("entrypoint-unpinned"), JSON.stringify(kindsOf(leafOf(alpha, FIELDS.service))));
-    assert.equal(leafOf(alpha, FIELDS.service).state, "fail");
     const delta = agentNamed(data, "delta-pm");
     assert.deepEqual(delta.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: true }, "the row's OWN hermes.bin is pinned");
     assert.equal(kindsOf(leafOf(delta, FIELDS.gateway)).includes("entrypoint-unpinned"), false);
-    assert.deepEqual(delta.systemd.heartbeat.service.entrypoint, { family: "launcher", pinned: true }, "and the role launcher is pinned on the oneshot too");
-    assert.equal(kindsOf(leafOf(delta, FIELDS.service)).includes("entrypoint-unpinned"), false);
 
     // A file whose name merely ENDS with the launcher's is not the launcher.
     // The family was matched by bare suffix, so `foo-credential-launch.sh`
@@ -1916,40 +1857,25 @@ async function main() {
     assert.equal(kindsOf(leafOf(agentNamed(data, "delta-pm"), FIELDS.gateway)).includes("unit-file-state-unclassified"), false);
   });
 
-  check("the heartbeat summary is the WORSE of its two leaves, carrying that leaf's code", () => {
-    // `agents[].systemd.heartbeat.state`/`.code` is the one line the human
-    // report paints for the heartbeat, and nothing asserted it: with the
-    // worse-leaf reduce replaced by "the first leaf", a fleet whose timers are
-    // disabled summarised as a `warn` about a reconcile policy.
-    const policy = join(roleDirOf("alpha-pm"), "role.yaml");
-    const saved = readFileSync(policy, "utf8");
-    try {
-      writeFileSync(policy, YAML.stringify({ role: "pm" }), "utf8");
-      setState(canonicalState({ "alpha-pm": { timerEnabled: false } }));
-      const data = systemdRun();
-      const alpha = agentNamed(data, "alpha-pm");
-      assert.equal(leafOf(alpha, FIELDS.timer).state, "fail", JSON.stringify(kindsOf(leafOf(alpha, FIELDS.timer))));
-      assert.equal(leafOf(alpha, FIELDS.service).state, "warn", JSON.stringify(kindsOf(leafOf(alpha, FIELDS.service))));
-      assert.equal(alpha.systemd.heartbeat.state, "fail", "the worse of the two halves decides the summary");
-      assert.equal(alpha.systemd.heartbeat.code, "timer-disabled", "and the code comes from the half that decided it");
-      // The rollup itself is proven by the two JSON assertions above. The human
-      // report paints `hb <latest_result>·<tick>` and never the state or the
-      // code, so all this adds is that the systemd cell is still rendered.
-      resetFakeSystemctl(systemctlShim);
-      const out = cli(["review", "--domain", "systemd"]).stdout;
-      assert.match(out, /gw .+ hb /u, "the systemd cell must still carry a gateway and a heartbeat reading");
-    } finally {
-      writeFileSync(policy, saved, "utf8");
-    }
+  check("the human review presents gateway health and retired cleanup without a heartbeat health cell", () => {
+    setState(canonicalState({ "alpha-pm": { present: { gateway: true, timer: true }, timerEnabled: false } }));
+    const data = systemdRun();
+    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway).state, "pass");
+    assert.equal(hostNamed(data, "systemd.unregistered").items[0].class, "retired");
+    resetFakeSystemctl(systemctlShim);
+    const out = cli(["review", "--domain", "systemd"]).stdout;
+    assert.match(out, /gw active/u);
+    assert.match(out, /retired/u);
+    assert.doesNotMatch(out, /hb |heartbeat healthy/u);
   });
 
-  check("a failed gateway result, an exec status, a non-oneshot type and an unloadable unit each say which", () => {
+  check("a failed gateway result, an exec status and an unloadable unit each say which", () => {
     // Four codes the README promises and no case drove. Every knob already
     // existed on the fixture; nothing had ever passed one.
     setState(canonicalState({
       "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayResult: "exit-code" },
       "delta-pm": { gatewayEnabled: true, gatewayActive: true, gatewayExecStatus: "3" },
-      "charlie-pm": { serviceType: "simple" },
+      "charlie-pm": { gatewayResult: "signal" },
       "echo-pm": { gatewayLoad: "error" },
     }));
     const data = systemdRun();
@@ -1963,10 +1889,7 @@ async function main() {
     assert.ok(detailsOf(deltaGateway).includes("exec-status:3"), JSON.stringify(detailsOf(deltaGateway)));
     assert.equal(agentNamed(data, "delta-pm").systemd.gateway.exec_status, 3);
 
-    const charlieService = leafOf(agentNamed(data, "charlie-pm"), FIELDS.service);
-    assert.ok(kindsOf(charlieService).includes("type-not-oneshot"), JSON.stringify(kindsOf(charlieService)));
-    assert.equal(charlieService.state, "fail");
-
+    assert.equal(agentNamed(data, "charlie-pm").systemd.gateway.result, "signal");
     // A unit the manager knows and cannot load is neither absent nor readable:
     // it stops the gateway reading right there, with the load state named.
     const echoGateway = leafOf(agentNamed(data, "echo-pm"), FIELDS.gateway);
@@ -1975,22 +1898,15 @@ async function main() {
     assert.equal(agentNamed(data, "echo-pm").systemd.gateway.load, "error");
   });
 
-  check("a completed oneshot resting at active/exited is not a tick in flight", () => {
-    // `RemainAfterExit=yes` leaves a SUCCESSFUL run sitting `active/exited`.
-    // Reading `ActiveState` alone called that mid-tick, and it would have aged
-    // into `stuck` and stayed there for the life of the unit.
-    setState(canonicalState({
-      "alpha-pm": { serviceActive: "active", serviceSub: "exited", serviceStartAgoUs: 3_600_000_000n, serviceExitAgoUs: 3_599_000_000n },
-    }));
+  check("a leftover heartbeat service on disk is retired regardless of its completed result", () => {
+    setState(canonicalState({ "alpha-pm": { present: { gateway: true, service: true }, serviceActive: "active", serviceSub: "exited" } }));
     const data = systemdRun();
-    const alpha = agentNamed(data, "alpha-pm");
-    assert.equal(alpha.systemd.heartbeat.latest_result, "success", "a completed run is a completed run");
-    assert.deepEqual(kindsOf(leafOf(alpha, FIELDS.timer)), [], JSON.stringify(detailsOf(leafOf(alpha, FIELDS.timer))));
-    assert.equal(leafOf(alpha, FIELDS.timer).state, "pass");
-    assert.equal(leafOf(alpha, FIELDS.service).state, "pass");
-    // The `activating` reading beside it still reports mid-tick.
-    setState(canonicalState({ "alpha-pm": { serviceActive: "activating", serviceSub: "start", serviceStartAgoUs: 60_000_000n } }));
-    assert.deepEqual(kindsOf(leafOf(agentNamed(systemdRun(), "alpha-pm"), FIELDS.timer)), ["in-progress"]);
+    const item = hostNamed(data, "systemd.unregistered").items.find((item) => item.unit === unitsOf("alpha-pm").service);
+    assert.equal(item.class, "retired");
+    assert.equal(item.active, "active");
+    assert.equal(item.sub, "exited");
+    assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway).state, "pass");
+    assert.equal("heartbeat" in agentNamed(data, "alpha-pm").systemd, false);
   });
 
   check("a quoted Environment value is read whole, not truncated at its first space", () => {
@@ -2149,9 +2065,9 @@ async function main() {
     // The clause names three code families; each one isolated on the agent
     // whose ONLY divergence is of that family. A SCHEDULE code: `bravo-pm` is
     // correctly deferred, so its off-policy timer is the whole divergence.
-    setState(canonicalState({ "bravo-pm": { onUnitInactiveSec: 300 } }));
-    const schedule = status(cli(["review", "--live", "--json", "--agent", "bravo-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
-    assert.ok(kindsOf(leafOf(agentNamed(schedule, "bravo-pm"), FIELDS.timer)).includes("schedule-off-policy"));
+    setState(canonicalState({ "alpha-pm": { gatewayExec: execLine("/other/hermes", "gateway") } }));
+    const schedule = status(cli(["review", "--live", "--json", "--agent", "alpha-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
+    assert.ok(kindsOf(leafOf(agentNamed(schedule, "alpha-pm"), FIELDS.gateway)).includes("entrypoint-unpinned"));
     assert.deepEqual(schedule.systemd.rule_agreement, { compared: 0, agree: 0, disagree: 0, not_compared: 1 });
 
     // A CHANNEL code: `echo-pm` declares no platform at all and its units are
@@ -2220,7 +2136,7 @@ async function main() {
     for (const agent of data.agents) assert.equal(agent.systemd, null);
   });
 
-  check("a contract with no service_manifest reports five unsupported leaves and blocks proof", () => {
+  check("a contract with no service_manifest reports two unsupported leaves and blocks proof", () => {
     const schema4 = writeContract("schema-4", (document) => {
       delete document.service_manifest;
       document.schema_version = 4;
@@ -2348,6 +2264,7 @@ async function main() {
     assert.equal(document.service_manifest.entrypoint.home_env, "HERMES_HOME");
     assert.equal(document.service_manifest.entrypoint.launcher, ".scripts/credential-launch.sh");
     assert.deepEqual(document.service_manifest.unregistered.retired_candidates, [
+      "hermes-{agent_id}-heartbeat.service", "hermes-{agent_id}-heartbeat.timer",
       "hermes-{agent_id}-consumer.service", "hermes-{agent_id}-checkpoint.timer", "hermes-{agent_id}-checkpoint.service",
     ]);
   });
@@ -2418,7 +2335,7 @@ async function main() {
     assert.match(out, /shared gateway healthy/u);
     assert.match(out, /capability \d+ active, \d+ deferred/u);
     assert.match(out, /gw deferred-but-enabled/u, "the agent cell must name the gateway's code");
-    assert.match(out, /hb success/u, "and the heartbeat's latest result");
+    assert.doesNotMatch(out, /hb |heartbeat healthy/u);
   });
 
   await checkAsync("the MCP adapter reports byte-identical data", async () => {
@@ -2557,7 +2474,7 @@ async function main() {
     const data = parsed.data;
     assert.equal(data.systemd.manager.code, "available", `the live manager reported ${data.systemd.manager.state}`);
 
-    // An INDEPENDENT reading of four units, compared field by field.
+    // An INDEPENDENT reading of the employee and shared gateways, compared field by field.
     const registry = YAML.parse(readFileSync(REAL_AGENT_REGISTRY, "utf8"));
     const liveIds = Object.keys(registry.agents ?? {});
     const liveId = liveIds.includes("pjangler-pm") ? "pjangler-pm" : liveIds[0];
@@ -2569,7 +2486,7 @@ async function main() {
       console.log(`       live: pjangler-pm is not on this host; the parser comparison ran against ${liveId}`);
     }
     const sharedUnit = data.systemd.shared.unit;
-    const units = [...Object.values(unitsOf(liveId)), sharedUnit].filter(Boolean);
+    const units = [unitsOf(liveId).gateway, sharedUnit].filter(Boolean);
     const show = spawnSync("systemctl", [
       "--user", "show", "--no-pager", "-p", "Id,LoadState,UnitFileState,ActiveState,SubState,Result,ExecMainStatus,NRestarts", ...units,
     ], { encoding: "utf8", timeout: 30_000, env: { ...process.env, SYSTEMD_PAGER: "", SYSTEMD_COLORS: "0", LC_ALL: "C" } });
@@ -2585,30 +2502,15 @@ async function main() {
     }
     const agent = data.agents.find((item) => item.agent_id === liveId);
     assert.ok(agent?.systemd, `${liveId} must carry a systemd summary`);
-    // Load state and unit-file state are STATIC between two reads seconds
-    // apart; activity is not, for the heartbeat pair specifically. The timer
-    // fires every 60 s by policy, so `waiting -> running -> waiting` and the
-    // oneshot's `dead -> start -> dead` are the fixture ticking under the
-    // comparison, not the observer disagreeing with systemd. Those two units
-    // are compared on what does not move plus a membership check on what does;
-    // the gateway, which is meant to be continuously running, is compared
-    // strictly.
-    const TIMER_STATES = new Set(["waiting", "running", "elapsed", "dead"]);
-    const compare = (view, map, label, { strictActivity = true } = {}) => {
+    // Compare the continuously running gateway against an independent read.
+    const compare = (view, map, label) => {
       assert.equal(view.load, map.get("LoadState"), `${label} LoadState`);
       const file = map.get("UnitFileState");
       assert.equal(view.unit_file, file === "" ? null : file, `${label} UnitFileState`);
-      if (strictActivity) {
-        assert.equal(view.active, map.get("ActiveState"), `${label} ActiveState`);
-        assert.equal(view.sub, map.get("SubState"), `${label} SubState`);
-        return;
-      }
-      assert.ok(["active", "inactive", "activating", "deactivating"].includes(view.active), `${label} ActiveState ${view.active}`);
-      assert.ok(TIMER_STATES.has(view.sub) || view.sub === map.get("SubState"), `${label} SubState ${view.sub} vs ${map.get("SubState")}`);
+      assert.equal(view.active, map.get("ActiveState"), `${label} ActiveState`);
+      assert.equal(view.sub, map.get("SubState"), `${label} SubState`);
     };
     compare(agent.systemd.gateway, observed.get(unitsOf(liveId).gateway), `${liveId} gateway`);
-    compare(agent.systemd.heartbeat.timer, observed.get(unitsOf(liveId).timer), `${liveId} timer`, { strictActivity: false });
-    compare(agent.systemd.heartbeat.service, observed.get(unitsOf(liveId).service), `${liveId} service`, { strictActivity: false });
     assert.equal(agent.systemd.gateway.result, observed.get(unitsOf(liveId).gateway).get("Result"), "gateway Result");
     assert.equal(String(agent.systemd.gateway.restarts), observed.get(unitsOf(liveId).gateway).get("NRestarts"), "gateway NRestarts");
     if (sharedUnit && observed.has(sharedUnit)) {
@@ -2629,7 +2531,7 @@ async function main() {
       const listed = JSON.parse(files.stdout).map((row) => row.unit_file);
       const owned = new Set();
       for (const id of Object.keys(registry.agents ?? {})) {
-        for (const unit of Object.values(unitsOf(id))) owned.add(unit);
+        owned.add(unitsOf(id).gateway);
         for (const suffix of ["consumer.service", "checkpoint.timer", "checkpoint.service"]) owned.add(`hermes-${id}-${suffix}`);
       }
       if (sharedUnit) owned.add(sharedUnit);
@@ -2665,18 +2567,8 @@ async function main() {
       // restart-looping, but `unstable` comes and goes between samples, and an
       // assertion on a flapping code is a test that fails on timing.
       //
-      // This row used to read the heartbeat ONESHOT's failed result off
-      // FIELDS.service. Per-agent heartbeat units are retired fleet-wide --
-      // `systemctl --user list-unit-files | grep -c heartbeat` returns 0, and
-      // every one of the 25 registered agents reads ["absent"] on both
-      // heartbeat leaves, with no exceptions. Liveness is the gateway's
-      // Restart=on-failure, scheduling is Bloodbank, persistence is krebs
-      // leases. `entrypoint-unpinned` is a real and current drift; it simply
-      // lives on the gateway leaf now, which is where the executable is.
+      // Executable pinning remains a gateway requirement after retirement.
       ["automatic-ai-pm", FIELDS.gateway, ["entrypoint-unpinned"]],
-      // The retirement itself, asserted rather than assumed: a heartbeat leaf
-      // reads absent, and it is the observer saying so, not the fixture.
-      ["automatic-ai-pm", FIELDS.service, ["absent"]],
       // A deferred agent whose empty delta inherits the fleet base's telegram.
       ["ssbnk-pm", FIELDS.gateway, ["platform-enablement-inherited:telegram"]],
       // A registered agent with no units at all.
@@ -2700,7 +2592,7 @@ async function main() {
       skipCase("live systemd", "this host's registry names none of the five agents the matrix rows annotate");
     }
     if (byId.has("delonet-director")) {
-      for (const field of [FIELDS.gateway, FIELDS.timer, FIELDS.service]) {
+      for (const field of [FIELDS.gateway]) {
         assert.deepEqual(liveCodes("delonet-director", field), ["absent"], `delonet-director ${field}`);
       }
     }
@@ -2713,6 +2605,10 @@ async function main() {
     // machine this suite does not own -- a red suite. What is always true, and
     // what this story owns, is that the host finding agrees with the reading it
     // is built from.
+    for (const employee of data.agents) {
+      assert.equal("heartbeat" in employee.systemd, false);
+      assert.equal(employee.observations.some((o) => /heartbeat/u.test(o.field ?? "")), false);
+    }
     const sharedFinding = hostNamed(data, "systemd.shared-gateway");
     assert.equal(
       sharedFinding.state,

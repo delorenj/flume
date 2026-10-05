@@ -79,6 +79,21 @@ const FLEET_CONTRACT_MAX_BYTES = 1_048_576;
 const DOCUMENT_PATH = "contract";
 
 const SEMVER = /^\d+\.\d+\.\d+$/u;
+
+/** Retirement became required in 1.5; supported older handbooks keep their grammar. */
+function heartbeatRetirementRequired(version: unknown): boolean {
+  if (typeof version !== "string" || !SEMVER.test(version)) return false;
+  const [major, minor] = version.split(".").map(Number);
+  return major! > 1 || (major === 1 && minor! >= 5);
+}
+
+/** Match the same safe employee ID at every placeholder, as derive() substitutes it. */
+export function matchesRetiredCandidate(pattern: string, unit: string): boolean {
+  const parts = pattern.split("{agent_id}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
+  if (parts.length < 2) return false;
+  const expression = parts[0] + "(?<agent_id>[a-z0-9][a-z0-9_-]{0,63})" + parts.slice(1).join("\\k<agent_id>");
+  return new RegExp(`^${expression}$`, "u").test(unit);
+}
 const OWNER_NAME = /^[a-z][a-z0-9-]*$/u;
 const ENV_KEY = /^[A-Z][A-Z0-9_]*$/u;
 const DIRECTION = /^[a-z0-9_]+_to_[a-z0-9_]+$/u;
@@ -543,17 +558,10 @@ function validateStructure(policy: Record<string, unknown>, extensions: readonly
       if (!isRecord(service[key])) fail(`service_model.${key}`, `${key} must be a mapping`);
     }
     const perAgent = isRecord(service.per_agent) ? service.per_agent : {};
-    for (const key of ["gateway_unit", "heartbeat_service", "heartbeat_timer"] as const) {
+    for (const key of ["gateway_unit"] as const) {
       const value = perAgent[key];
       if (typeof value !== "string" || value.length === 0) fail(`service_model.per_agent.${key}`, `${key} must be a unit name pattern`);
       else if (!value.includes("{agent_id}")) fail(`service_model.per_agent.${key}`, "a per-agent unit pattern must carry the {agent_id} placeholder");
-    }
-    // Three names for three roles. Collapsed to one string they all validate,
-    // and a provisioner then writes one unit where the contract declares two.
-    const unitNames = ["gateway_unit", "heartbeat_service", "heartbeat_timer"]
-      .map((key) => perAgent[key]).filter((value): value is string => typeof value === "string" && value.length > 0);
-    if (unitNames.length === 3 && new Set(unitNames).size !== 3) {
-      fail("service_model.per_agent", "gateway_unit, heartbeat_service and heartbeat_timer must be three distinct patterns");
     }
     const shared = isRecord(service.fleet_shared) ? service.fleet_shared : {};
     for (const key of ["bloodbank_gateway_unit", "bloodbank_gateway_profile", "command_subject", "target_field"] as const) {
@@ -676,6 +684,7 @@ function validateStructure(policy: Record<string, unknown>, extensions: readonly
       });
     });
     for (const id of FLEET_RETIRED_IDS) {
+      if (id === "per-agent-heartbeat" && !heartbeatRetirementRequired(policy.contract_version)) continue;
       if (!ids.has(id)) fail("retired", `retired must declare the superseded mode ${id}`);
     }
   }
@@ -758,6 +767,21 @@ function validateClassifications(contract: FleetContract): FleetDiagnostic[] {
 
 function validateRetiredModes(contract: FleetContract): FleetDiagnostic[] {
   const findings: FleetDiagnostic[] = [];
+
+  if (heartbeatRetirementRequired(contract.contract_version)) {
+    const detectors = contract.retired.flatMap((mode) => mode.detect.map((pattern) => new RegExp(pattern, "u")));
+    const unregistered = contract.service_manifest?.unregistered;
+    for (const suffix of ["service", "timer"]) {
+      const unit = `hermes-x-heartbeat.${suffix}`;
+      const detected = detectors.some((pattern) => pattern.test(unit));
+      const candidate = Array.isArray(unregistered?.retired_candidates) && unregistered.retired_candidates.some((pattern) => typeof pattern === "string" && matchesRetiredCandidate(pattern, unit));
+      const swept = typeof unregistered?.unit_glob === "string" && rootEntryGlob(unregistered.unit_glob).test(unit);
+      if (!detected && !(candidate && swept)) findings.push({
+        code: "INVALID_INPUT", path: "retired",
+        message: `heartbeat retirement must detect ${unit} through declared detectors or swept retired candidates`,
+      });
+    }
+  }
 
   // No key means enabled. Default-deny is RETIRED: an absent flag that read as
   // "disabled" is exactly how an accidental re-provision that dropped the key
@@ -1380,7 +1404,7 @@ const IDENTIFIER = /^[a-z][a-z0-9_-]*$/u;
  * Validate the optional `service_manifest` block (schema 5).
  *
  * OPTIONAL: a schema-1..4 contract carries none and still loads; the systemd
- * observer then reports every selected agent's five systemd leaves
+ * observer then reports every selected employee's two systemd leaves
  * `unsupported` with capability `systemd.manifest`. What it may not do is
  * carry a manifest that names nothing real: a window of zero samples, a probe
  * environment that cannot find `systemctl`, a messaging status field no
@@ -1435,7 +1459,8 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
     return out;
   };
 
-  closed(block, "service_manifest", FLEET_SERVICE_MANIFEST_KEYS);
+  const historical = !heartbeatRetirementRequired(policy.contract_version);
+  closed(block, "service_manifest", historical ? [...FLEET_SERVICE_MANIFEST_KEYS, "heartbeat"] : FLEET_SERVICE_MANIFEST_KEYS);
   const declared = declaredWritableFields(policy);
   const requireDeclared = (leaf: string, at: string): void => {
     if (!declared.has(leaf)) fail(at, `${leaf} is not declared writable by any authority`);
@@ -1538,7 +1563,7 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
 
   // -- heartbeat ----------------------------------------------------------------
   const heartbeat = block.heartbeat;
-  if (closed(heartbeat, "service_manifest.heartbeat", FLEET_SERVICE_MANIFEST_HEARTBEAT_KEYS)) {
+  if (historical && closed(heartbeat, "service_manifest.heartbeat", FLEET_SERVICE_MANIFEST_HEARTBEAT_KEYS)) {
     wholeNumber(heartbeat.on_boot_sec, "service_manifest.heartbeat.on_boot_sec", 1, 86_400, "on_boot_sec");
     wholeNumber(heartbeat.on_unit_inactive_sec, "service_manifest.heartbeat.on_unit_inactive_sec", 1, 86_400, "on_unit_inactive_sec");
     wholeNumber(heartbeat.overdue_multiplier, "service_manifest.heartbeat.overdue_multiplier", 1, 1_000, "overdue_multiplier");
@@ -1585,13 +1610,10 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
     }
   }
 
-  // The five leaves the observer files under are declared writable, so every
-  // observation resolves an owner: the three per-agent unit patterns, the two
-  // registry fields, and the fleet-shared gateway unit.
+  // The current gateway observations each resolve an authority owner.
   for (const pattern of perAgentPatterns) requireDeclared(`units.${pattern}`, "service_manifest");
   if (sharedUnit !== null) requireDeclared(`units.${sharedUnit}`, "service_manifest");
   requireDeclared("agents.{agent_id}.systemd.gateway_unit", "service_manifest");
-  requireDeclared("agents.{agent_id}.systemd.heartbeat_timer", "service_manifest");
 
   return findings;
 }

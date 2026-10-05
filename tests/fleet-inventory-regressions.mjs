@@ -1439,25 +1439,18 @@ try {
     assert.equal(health.healthy, false);
   });
 
-  checkWithAgents(1, "the gateway unit drifts against the gateway pattern, not against any of the three", () => {
-    // `expected_units` carries the gateway service, the heartbeat service AND
-    // the heartbeat timer. Comparing the stored gateway unit against the whole
-    // set meant storing the heartbeat timer name in `systemd.gateway_unit`
-    // reported no drift at all: the wrong unit, in the right set.
+  checkWithAgents(1, "a retired heartbeat timer in the gateway registry field remains gateway drift", () => {
     const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
-    const timerPattern = contract?.service_model?.per_agent?.heartbeat_timer;
-    if (typeof timerPattern !== "string") { skip("the gateway unit drifts against the gateway pattern", "the contract declares no heartbeat_timer pattern"); return; }
+    const timerPattern = contract.service_manifest.unregistered.retired_candidates.find((p) => p.endsWith("-heartbeat.timer"));
+    assert.ok(timerPattern, "the handbook declares the retired timer candidate");
     const victim = liveIds[0];
     const swapped = mutatedRegistry("gateway-is-the-timer", REAL_AGENT_REGISTRY, (doc) => {
       doc.setIn(["agents", victim, "systemd", "gateway_unit"], timerPattern.replaceAll("{agent_id}", victim));
     });
     const data = inventory(cli(["roster", "--agent-registry", swapped, "--agent", victim, "--json"]));
     const row = data.rows[0];
-    assert.ok(
-      row.expected_units.value.includes(row.gateway_unit.value),
-      "the stored name is deliberately one the contract derives -- just the wrong role",
-    );
-    assert.ok(row.findings.includes("systemd-unit-name-drift"), "a heartbeat timer in the gateway field is drift");
+    assert.deepEqual(row.expected_units.value, [contract.service_model.per_agent.gateway_unit.replaceAll("{agent_id}", victim)]);
+    assert.ok(row.findings.includes("systemd-unit-name-drift"), "a retired timer cannot satisfy the gateway field");
   });
 
   check("a registry announcing an unmodelled schema_version is refused, not read as v1", () => {

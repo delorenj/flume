@@ -102,7 +102,6 @@ interface RoleMeta {
   bloodbankEnabled: string;
   deploymentSystemd: string;
   serviceStateGateway: string;
-  serviceStateHeartbeat: string;
   legacyReconcileEnabled: string;
   legacyReconcileGraceHours: string;
   legacyReconcileAutoReview: string;
@@ -335,7 +334,6 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
         bloodbankEnabled: roleBloodbankEnabledText(text),
         deploymentSystemd: yamlGet(text, "deployment.systemd"),
         serviceStateGateway: yamlGet(text, "service_state.gateway"),
-        serviceStateHeartbeat: yamlGet(text, "service_state.heartbeat"),
         legacyReconcileEnabled: yamlGet(text, "reconcile.enabled"),
         legacyReconcileGraceHours: yamlGet(text, "reconcile.grace_hours"),
         legacyReconcileAutoReview: yamlGet(text, "reconcile.auto_review"),
@@ -1269,7 +1267,7 @@ function upsertRegistryEntry(role: RoleMeta, homeDir: string, changedFiles: stri
   const identityBlock = role.identity.state === "named"
     ? `    identity: ${role.identity.name}\n    hindsight:\n      write_bank: ${role.identity.writeBank}\n      recall_banks:\n${role.identity.recallBanks.map((bank) => `        - ${bank}\n`).join("")}`
     : "";
-  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n${identityBlock}    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n    systemd:\n      gateway_unit: hermes-${role.agentId}-gateway.service\n      heartbeat_timer: hermes-${role.agentId}-heartbeat.timer\n`;
+  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n${identityBlock}    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n    systemd:\n      gateway_unit: hermes-${role.agentId}-gateway.service\n`;
   const next = current.includes("agents: {}") ? current.replace("agents: {}", `agents:\n${block}`) : `${current.replace(/\s*$/, "\n")}${block}`;
   changedFiles.push(path);
   if (!dryRun) writeText(path, next);
@@ -1366,7 +1364,7 @@ function checkUnit(unit: string): { enabled: boolean; active: boolean } {
 
 function persistRoleServiceState(
   role: RoleMeta,
-  updates: Partial<Record<"gateway" | "heartbeat", "active" | "deferred">>,
+  updates: Partial<Record<"gateway", "active" | "deferred">>,
 ): { changed: boolean; error?: string } {
   try {
     const stat = lstatSync(role.roleYamlPath);
@@ -1414,15 +1412,12 @@ function reconcileHermesRoleUnits(
   details: string[],
 ): boolean {
   const gatewayUnit = `hermes-${role.agentId}-gateway.service`;
-  const heartbeatUnit = `hermes-${role.agentId}-heartbeat.timer`;
   const gatewayDeferred = role.serviceStateGateway === "deferred";
-  const stateUpdates: Partial<Record<"gateway" | "heartbeat", "active" | "deferred">> = {};
-  if (role.serviceStateHeartbeat !== "active") stateUpdates.heartbeat = "active";
+  const stateUpdates: Partial<Record<"gateway", "active" | "deferred">> = {};
   if (!gatewayDeferred && role.serviceStateGateway !== "active") stateUpdates.gateway = "active";
 
   if (ctx.dryRun) {
     details.push("would run: systemctl --user daemon-reload");
-    details.push(`would run: systemctl --user enable --now ${heartbeatUnit}`);
     details.push(`would run: systemctl --user ${gatewayDeferred ? "disable" : "enable"} --now ${gatewayUnit}`);
     if (Object.keys(stateUpdates).length) {
       if (!changedFiles.includes(role.roleYamlPath)) changedFiles.push(role.roleYamlPath);
@@ -1436,29 +1431,20 @@ function reconcileHermesRoleUnits(
     details.push(`script failed: systemctl --user daemon-reload: ${reload.stderr || reload.stdout || "unknown error"}`);
     return false;
   }
-  const heartbeat = systemctlUser(["enable", "--now", heartbeatUnit]);
   const gateway = systemctlUser([gatewayDeferred ? "disable" : "enable", "--now", gatewayUnit]);
-  if (!heartbeat.ok) {
-    details.push(`script failed: could not enable ${heartbeatUnit}: ${heartbeat.stderr || heartbeat.stdout || "unknown error"}`);
-  }
   if (!gateway.ok) {
     details.push(`script failed: could not ${gatewayDeferred ? "disable" : "enable"} ${gatewayUnit}: ${gateway.stderr || gateway.stdout || "unknown error"}`);
   }
-  if (!heartbeat.ok || !gateway.ok) return false;
+  if (!gateway.ok) return false;
 
-  const heartbeatState = checkUnit(heartbeatUnit);
   const gatewayState = checkUnit(gatewayUnit);
-  const heartbeatHealthy = heartbeatState.enabled && heartbeatState.active;
   const gatewayHealthy = gatewayDeferred
     ? !gatewayState.enabled && !gatewayState.active
     : gatewayState.enabled && gatewayState.active;
-  if (!heartbeatHealthy) {
-    details.push(`script failed: ${heartbeatUnit} did not become enabled+active after systemctl reported success`);
-  }
   if (!gatewayHealthy) {
     details.push(`script failed: ${gatewayUnit} did not become ${gatewayDeferred ? "disabled+inactive" : "enabled+active"} after systemctl reported success`);
   }
-  if (!heartbeatHealthy || !gatewayHealthy) return false;
+  if (!gatewayHealthy) return false;
 
   const persisted = persistRoleServiceState(role, stateUpdates);
   if (persisted.error) {
@@ -1469,7 +1455,7 @@ function reconcileHermesRoleUnits(
     if (!changedFiles.includes(role.roleYamlPath)) changedFiles.push(role.roleYamlPath);
     details.push(`atomically recorded verified service_state in ${relative(ctx.repoRoot, role.roleYamlPath)}`);
   }
-  details.push(`verified ${heartbeatUnit} enabled+active and ${gatewayUnit} ${gatewayDeferred ? "disabled+inactive" : "enabled+active"}`);
+  details.push(`verified ${gatewayUnit} ${gatewayDeferred ? "disabled+inactive" : "enabled+active"}`);
   return true;
 }
 
@@ -2309,13 +2295,10 @@ function realOrSelf(path: string): string {
 }
 
 
-// heartbeat.SERVICE (not just the .timer) also carries Environment= lines, so
-// omitting it leaves a stale HERMES_HOME and the dead HERMES_OAUTH_FILE behind.
+// Employee wiring excludes retired heartbeat units; the retirement sweep owns them.
 function profileUnits(role: RoleMeta): string[] {
   return [
     `hermes-${role.agentId}-gateway.service`,
-    `hermes-${role.agentId}-heartbeat.service`,
-    `hermes-${role.agentId}-heartbeat.timer`,
     `hermes-${role.agentId}-checkpoint.service`,
   ];
 }
@@ -3102,7 +3085,7 @@ return [
       }
       for (const role of roles) {
         const sysDir = join(ctx.homeDir, ".config", "systemd", "user");
-        const units = [`hermes-${role.agentId}-gateway.service`, `hermes-${role.agentId}-heartbeat.timer`];
+        const units = [`hermes-${role.agentId}-gateway.service`];
         const allUnitsPresent = units.every((unit) => existsSync(join(sysDir, unit)));
         // Existing units can still point at the checkout's former location.
         // In that case enabling them again preserves the stale ExecStart path,
@@ -3112,7 +3095,7 @@ return [
           if (text === null) return true;
           return text.includes("/agents/hermes/") && !text.includes(role.roleDir);
         });
-        const manifestNeedsReconcile = [role.serviceStateGateway, role.serviceStateHeartbeat]
+        const manifestNeedsReconcile = [role.serviceStateGateway]
           .some((state) => state === "pending" || state === "error");
         if (allUnitsPresent && !unitsStale && !manifestNeedsReconcile) {
           reconcileHermesRoleUnits(ctx, role, changedFiles, details);

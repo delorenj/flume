@@ -39,7 +39,7 @@
 # very drift this contract exists to name.
 
 schema_version: 5
-contract_version: 1.5.0
+contract_version: 1.4.0
 
 compatibility:
   min_schema_version: 1
@@ -236,17 +236,20 @@ authorities:
         provisioner, not by registry editing paths.
       - >-
         Every leaf below is OBSERVED by the systemd observer (story 1.8): the
-        per-agent gateway is sampled from the user manager over the window
-        `service_manifest.stabilization` declares, the gateway registry field is
-        compared against the name the contract derives, and the fleet-shared
+        three per-agent units are sampled from the user manager over the window
+        `service_manifest.stabilization` declares, the two registry fields are
+        compared against the names the contract derives, and the fleet-shared
         gateway is correlated once per fleet-scope run. The DESIRED gateway
         state is derived from the row's messaging declaration
         (`telegram.provisioning_status` / `slack.provisioning_status`), never
         read back from the unit.
     writable_fields:
       - units.hermes-{agent_id}-gateway.service
+      - units.hermes-{agent_id}-heartbeat.service
+      - units.hermes-{agent_id}-heartbeat.timer
       - units.hermes-fleet-bloodbank-gateway.service
       - agents.{agent_id}.systemd.gateway_unit
+      - agents.{agent_id}.systemd.heartbeat_timer
 
   bloodbank_activation:
     owner: agent-registry
@@ -422,6 +425,8 @@ classifications:
 service_model:
   per_agent:
     gateway_unit: hermes-{agent_id}-gateway.service
+    heartbeat_service: hermes-{agent_id}-heartbeat.service
+    heartbeat_timer: hermes-{agent_id}-heartbeat.timer
   fleet_shared:
     bloodbank_gateway_unit: hermes-fleet-bloodbank-gateway.service
     bloodbank_gateway_profile: fleet-bloodbank-gateway
@@ -696,8 +701,9 @@ profile_manifest:
 # What a deployed agent's SERVICE STATE should be, as POLICY about the user
 # manager rather than a copy of any unit file.
 #
-# The systemd observer proves the gateway topology and messaging health per
-# registered employee -- plus, once per
+# The systemd observer proves five things per registered agent -- the unit
+# topology against the row, the row's heartbeat_timer field, the messaging
+# gateway, the heartbeat timer and the heartbeat oneshot -- plus, once per
 # fleet-scope run, the fleet-shared Bloodbank gateway and every unregistered
 # `hermes-*` unit. This block says how: how many samples make an observation
 # window and how far apart (`stabilization`), how a `systemctl --user` child is
@@ -705,9 +711,9 @@ profile_manifest:
 # and which environment key names the profile home (`entrypoint`), how a
 # registry row DECLARES its messaging capability so the desired gateway state
 # is derived from the declaration and never read back from the unit
-# (`messaging`), which unit names are retired shapes (`unregistered`), and how
-# much may be read (`limits`). Historical heartbeat registry fields are accepted
-# but never required; leftover heartbeat units are unregistered retired candidates.
+# (`messaging`), what the heartbeat schedule and its reconcile evidence are
+# (`heartbeat`), which unit names are retired shapes (`unregistered`), and how
+# much may be read (`limits`). Every time-derived fact is reported as a BUCKET.
 service_manifest:
   # The template's own stability rule: several samples over a window, and a
   # unit that looked healthy and then changed is not proven.
@@ -770,16 +776,24 @@ service_manifest:
       slack:
         - bot_user_id
         - team_id
+  # The timer schedule `70-systemd.sh` writes (`OnBootSec=1min`,
+  # `OnUnitInactiveSec=1min`), the multiplier that turns "last triggered" into
+  # `current` or `overdue`, the ceiling on one tick when the unit declares no
+  # start timeout, and where the role keeps its reconcile policy and the state
+  # file the heartbeat writes (read for the PRESENCE of keys, never values).
+  heartbeat:
+    on_boot_sec: 60
+    on_unit_inactive_sec: 60
+    overdue_multiplier: 5
+    max_tick_seconds: 2700
+    reconcile_policy_file: role.yaml
+    reconcile_state_file: runtime/continuous-ticket-sentinel-state.json
   # The glob the fleet-scope sweep lists, and the per-agent unit names that
   # are retired shapes (see `retired` below): present on the manager they are
   # topology drift on the agent they name, and unregistered ones are `retired`.
-  # Heartbeat units are always unregistered retired candidates, even when their
-  # name includes a registered employee id. They are never required units.
   unregistered:
     unit_glob: "hermes-*"
     retired_candidates:
-      - "hermes-{agent_id}-heartbeat.service"
-      - "hermes-{agent_id}-heartbeat.timer"
       - "hermes-{agent_id}-consumer.service"
       - "hermes-{agent_id}-checkpoint.timer"
       - "hermes-{agent_id}-checkpoint.service"
@@ -811,15 +825,6 @@ activation:
       constraint: nonblank
 
 retired:
-  - id: per-agent-heartbeat
-    reason: Gateway restart owns runtime liveness; Bloodbank scheduling and Krebs
-      leases own scheduling and persistence. Per-employee heartbeat ticks are
-      retired.
-    superseded_by: service_model.per_agent.gateway_unit
-    detect:
-      - '-heartbeat\.(?:service|timer)$'
-      - 'heartbeat_service'
-      - 'heartbeat_timer'
   - id: per-agent-bloodbank-consumer
     reason: A per-agent consumer races the shared gateway and duplicates work.
     superseded_by: service_model.fleet_shared.bloodbank_gateway_unit
@@ -828,7 +833,7 @@ retired:
       - 'consumer_unit'
   - id: per-agent-checkpoint-timer
     reason: Checkpoint-only ticks proved liveness without proving health.
-    superseded_by: service_model.per_agent.gateway_unit
+    superseded_by: service_model.per_agent.heartbeat_timer
     detect:
       - '-checkpoint\.timer'
       - 'checkpoint_timer'

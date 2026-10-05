@@ -1025,8 +1025,8 @@ try {
       assert.deepEqual(Object.keys(agent.domains), ["systemd"], "the other eight must not be implied");
       assert.equal(agent.systemd.capability.declared, "deferred");
       assert.equal(agent.systemd.gateway.state, "pass", `${agent.agent_id}: ${JSON.stringify(agent.systemd.gateway)}`);
-      assert.equal(agent.systemd.heartbeat.latest_result, "success");
-      assert.equal(agent.systemd.heartbeat.tick, "current");
+      assert.equal("heartbeat" in agent.systemd, false);
+      assert.deepEqual(agent.systemd.topology.expected, [`hermes-${agent.agent_id}-gateway.service`]);
       assert.equal(agent.systemd.topology.state, "pass");
     }
     // The manager, the two listings, three samples, and nothing else. AC1's

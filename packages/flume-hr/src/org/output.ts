@@ -1358,24 +1358,17 @@ function agentLine(agent: FleetStatusAgent, width: number, domains: readonly Fle
     else if (profile.identity.state === "warn") cells.push(yellow("identity warn"));
     lines.push(`       ${dim(glyph.arrow)} ${joinDot(cells)}`);
   }
-  // The systemd cell: what the gateway reads as against the capability its own
-  // registry row DECLARES, and whether the last heartbeat tick actually
-  // succeeded. An active timer is not on this line, because an active timer
-  // proves nothing.
   if (agent.systemd) {
     const systemd = agent.systemd;
     const gateway = systemd.gateway;
-    const heartbeat = systemd.heartbeat;
     const paint = (state: FleetStatusState, text: string): string => (
       state === "pass" ? dim(text) : state === "warn" ? yellow(text) : state === "unobserved" || state === "unsupported" ? gray(text) : red(text)
     );
     const gatewayCell = gateway.state === "pass"
       ? `gw ${gateway.active ?? "-"}${gateway.stability.stable ? `${glyph.dot}stable` : ""}`
       : `gw ${gateway.code ?? gateway.active ?? "-"}`;
-    const heartbeatCell = `hb ${heartbeat.latest_result}${glyph.dot}${heartbeat.tick}`;
     const cells = [
       paint(gateway.state, gatewayCell),
-      paint(heartbeat.state, heartbeatCell),
       dim(`capability ${systemd.capability.declared}`),
       paint(systemd.topology.state, `units ${systemd.topology.installed.length}/${systemd.topology.expected.length}`),
     ];
@@ -1551,7 +1544,6 @@ export function formatFleetStatusReport(status: FleetStatus): string {
         dim(`agents ${counts.complete} complete of ${counts.selected} selected`),
         counts.gateway_healthy ? green(`${counts.gateway_healthy} gateway healthy`) : dim("0 gateway healthy"),
         counts.gateway_deferred ? dim(`${counts.gateway_deferred} gateway deferred`) : dim("0 gateway deferred"),
-        counts.heartbeat_healthy ? green(`${counts.heartbeat_healthy} heartbeat healthy`) : dim("0 heartbeat healthy"),
         counts.drifted ? red(`${counts.drifted} drifted`) : dim("0 drifted"),
         counts.incomplete ? yellow(`${counts.incomplete} incomplete`) : dim("0 incomplete"),
         counts.exception_authorized ? gray(`${counts.exception_authorized} exception`) : dim("0 exception"),
