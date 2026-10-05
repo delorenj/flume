@@ -21,3 +21,6 @@
 - source_spec: `spec-flume-15-heartbeat-retirement.md`
   summary: Describe known retirement classifications distinctly from unclassified units.
   evidence: B11; the existing report describes every non-exception class as having no contract classification.
+- source_spec: `spec-flume-32-hire-proof.md` and `spec-flume-15-heartbeat-retirement.md`
+  summary: Update the stale fleet-status test that assumes three classification policy domains.
+  evidence: Both saved pristine baselines fail the same assertion. The October 2 shared-board exceptions already declare project-registry, while fleet-status-regressions.mjs still expects only bloodbank, profile and systemd. No failure was quarantined and the production contract was preserved.
