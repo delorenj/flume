@@ -12,7 +12,7 @@ Template tested: 97f9ff82e087dad3273c5cc596feac6b39f2c370 (original pin, unchang
 - AC-3: PASS — `role-projection` covers named audit failures; `role-hire` refuses unresolved sets and incompatible packs before provisioning, and proves occupied-role refusal and real Copier failure.
 - AC-4: PASS — `role-projection` covers inherited chain, department manager default and preserved/reported explicit model overrides; `roles/README.md` documents the declaration and gateway surfaces.
 - AC-5: PASS — `role-contract`, `named-agent` and `named-agent-contract` pass with the same shared identity/skills definitions; `hermes-profile-inheritance` also passes.
-- AC-6: PASS — attributed to the orchestrator's live member-ledger proof on 2026-10-05, confirmed by `/tmp/flume-orch/flume32-brief.md` and the user. This worker made no gateway calls and adds no new live receipt; the orchestrator owns the current proof artifact.
+- AC-6: PASS (scope: `PASS_SEAM_ONLY`) — the orchestrator's authenticated live fallback/member-ledger proof is recorded in [live-fallback-20261005.json](/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-32/live-fallback-20261005.json). It proves the isolated Hermes AIAgent fallback seam, with multiplexed Bloodbank ingress outside its scope. This worker made no gateway calls and did not edit or regenerate that receipt.
 
 The historical entries below retain the observations and outstanding gates at the time they were written. Current acceptance and remaining integration work are recorded above and in the Real hire path section.
 
@@ -69,6 +69,18 @@ Verification actually executed:
 The supplied historical `/tmp/flume-orch/flume15-baseline.log` had 19/21 PASS with `fleet-status` and live `fleet-profile` failures. The latter passed in this worker's pristine baseline; neither baseline finding was hidden or quarantined.
 Parent main now has template pin `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`; this worker intentionally retains the original pin. Independent review and combined suites against the new pin remain parent responsibilities, including checking whether its registry preservation supersedes this worker's compatibility wrapper.
 No live profile, service, vault, gateway, Plane, canonical template WIP or other worktree was changed by this worker.
+
+## Recovered live fallback receipt (parent-owned AC-6)
+
+The parent recovered the completed request from rollout `01a0fd4b-f4df-7851-91ec-9b467ef27325`, recorded at `2026-10-05T03:50:24.398Z`, into [live-fallback-20261005.json](/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-32/live-fallback-20261005.json). The artifact was read to verify this attribution; no request was repeated.
+
+- Marker: `AAI_ROUTE_PROOF_5dfa0cf0a9e5b690369021babc832429`.
+- Completed effective chain: `automaticai/personal/sol-6.1` → `automaticai/personal/glm-5.3` → `automaticai/personal/kimi-2.8`.
+- Primary HTTP 503 was injected at the isolated Hermes desk transport, without server mutation; authenticated model availability was verified and the response completed using `automaticai/personal/glm-5.3`.
+- Ledger row `69879`, request `202610050350196487012018268d9d6Yv0xCfMk`, attributes the request to token name `aai:hermes-flume-pm:1790777406434714921`, account `zai-personal`, native model `glm-5.3`.
+- Ledger requested/effective effort is `max`, with `effort_defaulted: true`. The isolated client's outgoing effort fields are null, so this receipt establishes the ledger's actual effort rather than proving propagation of a configured fallback effort.
+
+The verdict remains `PASS_SEAM_ONLY`: actual authenticated live fallback with member attribution. It does not establish multiplexed Bloodbank ingress, live service activation, or this worker session's gateway routing.
 
 ## Worker #2 resume
 Start Plane comment: dcb452cd-432f-47e5-884b-caf41ca62146.
