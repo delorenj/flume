@@ -2,7 +2,7 @@
 title: 'Board Cranker: pick up triaged Todo tickets under the existing Momo lease'
 type: feature
 created: '2026-10-05'
-status: in-progress
+status: in-review
 route: dispatch
 baseline_commit: 8d110b043b8908fc5196e7e0d84cfd57cfec70d6
 review_loop_iteration: 0

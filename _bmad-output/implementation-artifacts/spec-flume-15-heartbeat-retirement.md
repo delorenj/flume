@@ -71,6 +71,33 @@ Retirement is already decided: gateway restart handles runtime liveness, Bloodba
 
 ## Review Triage Log
 
+All three review layers returned before triage. Each row below is an individual verdict; shared causes are grouped only after these decisions.
+
+| ID | Layer | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| B1 | Blind | medium | patch | The new unconditional retired-ID completeness loop rejects the original v1.4 schema-5 handbook and schema-4 documents; supported historical handbooks must remain readable. |
+| B2 | Blind | medium | patch | `collectSystemdHealth` puts any stored gateway name in `owned`; a stored heartbeat timer is therefore excluded before retirement classification and can become a duplicate gateway. |
+| B3 | Blind | medium | defer | Additional `per_agent.worker_service` declarations are ignored by the observer. The baseline also iterated only its three named canonical keys; retirement did not remove worker-service coverage. |
+| B4 | Blind | medium | patch | `profileUnits` still includes both heartbeat units. Its profile-wiring caller can mark a retired timer's stale home as employee drift even after the systemd observer retires that unit. |
+| B5 | Blind | medium | patch | Current retirement completeness checks only the ID. A current handbook can retain that ID while removing effective heartbeat detectors and candidates, producing unclassified cleanup entries; cover and validate effective current-handbook detection of both unit types while preserving older handbooks. |
+| B6 | Blind | medium | defer | The unregistered classification read omits the manifest byte cap. The baseline used the same unrestricted `probeText` read and parse; this is existing read-limit debt. |
+| B7 | Blind | medium | defer | `parseShowBlocks` retains the first duplicate block and first Id property. That parser and the baseline classification consumer already accepted these ambiguous identities. |
+| B8 | Blind | medium | defer | Unknown but syntactically valid state words reach `unitView` as observations. The baseline emitted the same words and did not validate systemd vocabulary. |
+| B9 | Blind | medium | defer | Gateway `Restart=no` is not rejected. `Restart` was sampled but never evaluated in the baseline; adding restart-policy compliance is a separate observation enhancement. |
+| B10 | Blind | medium | defer | The denominator is `items.length` after the unregistered cap. The same capped total and class counts existed in the baseline. |
+| B11 | Blind | low | defer | The description calls every non-exception class unclassified, including known retired units. This exact description predates retirement; retain the report-wording debt separately. |
+| E1 | Edge | medium | patch | The stale heartbeat stored as gateway is claimed by `owned` before retirement detection; same verified defect as B2. |
+| E2 | Edge | medium | patch | The new malformed-reading check requires `shown.get(requestedName)`. A valid systemd alias returning a canonical Id now produces `show-malformed`; correlate returned Names without accepting ambiguous identities. |
+| E3 | Edge | medium | defer | Classification bypasses `max_show_bytes`, as verified for B6; the baseline already had this unrestricted read. |
+| E4 | Edge | medium | patch | New candidate fallback substitutes an independent regex for each `{agent_id}`. `derive` replaces all occurrences with one employee, so a repeated-placeholder pattern can falsely classify inconsistent IDs as retired. |
+| E5 | Edge | medium | patch | The second stale-gateway claim also follows `owned` before the sweep, confirming B2/E1 rather than a separate cause. |
+| G1 | Verification gap | medium | patch | Filed mutation evidence: restoring heartbeat deferral and the summary line leaves all selected hire suites passing. Add successful built-CLI hire coverage with historical inactive heartbeat metadata. |
+| G2 | Verification gap | medium | patch | Filed mutation evidence: restoring the missing-row writer's heartbeat field leaves selected registry suites passing. Assert a repaired absent row has only the canonical gateway systemd mapping. |
+| G3 | Verification gap | medium | patch | Filed mutation evidence: disabling candidate-only fallback leaves existing retirement cases passing; a custom old-poll timer loses its retired class. Add the exact manifest-only candidate fixture. |
+| G4 | Verification gap, other | medium | patch | The compatibility claim is confirmed by the completeness loop and original historical documents, matching B1. |
+
+Patch groups: historical contract compatibility; stale registry retirement ownership; current profile-wiring retirement; effective current retirement detection; alias observation; consistent repeated placeholders; three targeted verification gaps. Baseline defects are recorded separately in `deferred-work.md`.
+
 ## Verification
 
 - `node scripts/run-tests.mjs` — typecheck/build hard gates and baseline comparison.
