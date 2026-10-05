@@ -24,6 +24,7 @@ function deploymentDeferrals(ctx: HermesAgentContext): string[] {
   const deferred: string[] = [];
   if (ctx.local || ctx.skipPlane) deferred.push("ticket-board provisioning");
   if (ctx.local || ctx.skipSystemd) deferred.push("systemd service activation");
+  if (ctx.local) deferred.push("automatic Skillex resync (host service)");
   const projectManifest = join(ctx.targetDir, ".project.json");
   if (!ctx.skipPlane && existsSync(projectManifest)) {
     try {
@@ -93,7 +94,22 @@ async function summaryResult(ctx: LifecycleContext): Promise<RecipeInitResult> {
  * doubled output.
  */
 export class HireRecipe extends Recipe {
-  readonly checks = createHermesChecks();
+  readonly checks = createHermesChecks().map((check) => ({
+    ...check,
+    audit: (ctx: LifecycleContext) => {
+      // A local hire proves the desk itself through runtime-singleton. Host
+      // automation is explicitly deferred; never probe or require a live
+      // resync service to complete a local deployment.
+      if (check.id === "hermes.skillex-resync" && (ctx as HermesAgentContext).local) {
+        return {
+          id: check.id, title: check.title, scope: "host" as const,
+          status: "skip" as const, fixable: false, details: [],
+          summary: "Automatic Skillex resync deferred for local deployment (host service)",
+        };
+      }
+      return check.audit(ctx);
+    },
+  }));
   readonly metadata: RecipeMetadata = {
     id: "hire",
     name: "hire",

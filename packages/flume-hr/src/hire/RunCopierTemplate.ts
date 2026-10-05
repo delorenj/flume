@@ -12,6 +12,7 @@ import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../k
 import { composeSoul, projectBankFor, soulIsReplaceable, soulRolesDir } from "../parity/rules";
 import { verifyTrustedCopierIdentity } from "../kernel/preflight";
 import { existingRoleRefusal } from "./ValidateHermesOptions";
+import { copierRegistryPath, preserveCopierRegistryComments } from "./PreserveRegistryComments";
 
 const TICKET_PROVIDER_CREDENTIAL_KEYS = new Set([
   "PLANE_API_KEY",
@@ -288,18 +289,31 @@ export class RunCopierTemplate extends Command {
       }
     }
 
-    // Ensure agents/hermes/ parent exists so copier doesn't have to create it
-    // (copier handles this fine, but creating it ourselves lets us catch
-    // permission issues earlier).
-    mkdirSync(join(ctx.targetDir, "agents", "hermes"), { recursive: true });
-
     const spinner = ctx.quiet ? undefined : p.spinner();
     spinner?.start(`Running copier copy  (target: agents/hermes/${safeRole})`);
     const copierExecutable = ctx.trustedCopier?.executable ?? "copier";
+    let restoreRegistryComments: (() => Promise<void>) | undefined;
+    try {
+      if (!ctx.deferredExternalEffects) {
+        env.REGISTRY_FILE = copierRegistryPath(env);
+        restoreRegistryComments = await preserveCopierRegistryComments(env.REGISTRY_FILE);
+      }
+    } catch (error) {
+      spinner?.stop("✗ registry preflight failed");
+      return { success: false, outcome: "failed", message: `Registry preflight: ${error instanceof Error ? error.message : String(error)}` };
+    }
+    // Invalid fleet data must be refused before creating any render directory.
+    mkdirSync(join(ctx.targetDir, "agents", "hermes"), { recursive: true });
     const result = spawnSync(copierExecutable, args, ctx.quiet
       ? { encoding: "utf8", env, cwd: ctx.targetDir }
       : { stdio: "inherit", env, cwd: ctx.targetDir });
     spinner?.stop(result.status === 0 ? "✓ copier run complete" : "✗ copier failed");
+
+    try {
+      await restoreRegistryComments?.();
+    } catch (error) {
+      return { success: false, outcome: "failed", message: `Registry comments: ${error instanceof Error ? error.message : String(error)}` };
+    }
 
     if (result.status !== 0) {
       return {

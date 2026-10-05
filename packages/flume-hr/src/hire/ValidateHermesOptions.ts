@@ -1,7 +1,8 @@
 import { lstatSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Command, type InvokeResult } from "../engine/Command";
-import { normalizeAgentRole, resolveContainedPath } from "../kernel/paths";
+import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../kernel/paths";
+import { declarationProblems, readRoleDeclaration, skillsProblems } from "../workforce/role";
 import type { HermesAgentContext } from "./types";
 
 export const EMAIL_UNSUPPORTED_MESSAGE =
@@ -83,6 +84,27 @@ export class ValidateHermesOptions extends Command {
         success: false,
         outcome: "failed",
         message: refusal,
+      };
+    }
+
+    // A bad declaration must be refused before Copier creates a desk or host
+    // config. The same declaration/resolver still owns the final projection.
+    try {
+      const declaration = readRoleDeclaration(
+        process.env.FLUME_ROLES_ROOT ?? resolveFlumeRoot(), role, ctx.agentId, ctx.profileName,
+      );
+      if (declaration.skills || declaration.chain || declaration.department || declaration.reports_to) {
+        const employee = ctx.agentId ?? "";
+        const problems = [
+          ...declarationProblems(declaration, employee),
+          ...await skillsProblems(declaration, employee),
+        ];
+        if (problems.length) throw new Error(problems.join("; "));
+      }
+    } catch (error) {
+      return {
+        success: false, outcome: "failed",
+        message: `Role declaration: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
 
