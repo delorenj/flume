@@ -81,7 +81,7 @@ try {
   const cliEnv={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath,PJ_SKILLS_REGISTRY_ROOT:skillex};
   const beforeOrg=readFileSync(org,'utf8'), beforeCfg=readFileSync(join(desk,'config.yaml'),'utf8');
   for(let i=0;i<2;i++) {
-    const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
+    const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
     assert.equal(onboard.status,0,`${onboard.stdout}\n${onboard.stderr}`);
   }
   assert.equal(readFileSync(org,'utf8'),beforeOrg);

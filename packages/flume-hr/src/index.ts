@@ -82,6 +82,7 @@ program
   .argument("[title]", "Job title to onboard", "pm")
   .description("Re-run the onboarding checklist for an existing employee; convergent by contract")
   .option("-y, --yes", "Non-interactive defaults", true)
+  .option("--target-repo <name>", "Target repo name (default: basename of cwd)")
   .option("--skip-telegram", "Skip the Telegram wire-up")
   .option("--skip-plane", "Skip creating or linking the ticket board")
   .option("--skip-systemd", "Skip installing systemd --user units")
