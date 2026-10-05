@@ -67,6 +67,40 @@ The parent board currently has active implementation tickets and a shared lease 
 
 ## Review Triage Log
 
+All three layers completed before classification. The source at `1e0d6641f610906ef02018a32cbf300f4cbb3b8e`, canonical receipt-search helper, and Pilot credential resolver were inspected. Individual findings precede grouping.
+
+| ID | Layer | Verdict | Route | Evidence |
+|---|---|---|---|---|
+| B1 | Blind | high | patch | `boardWip` exempts all workers with the saved ticket ID, ignoring command identity. A foreign execution on that ticket can coexist with replay. |
+| B2 | Blind | high | patch | Both written-dependency checks require zero native predecessors. A completed native predecessor allows an additional unresolved written prerequisite through. |
+| B3 | Blind | medium | patch | `if (board.cycle_view)` treats an absent or malformed cycle flag as disabled. A local probe admitted work with unknown cycle configuration. |
+| B4 | Blind | medium | patch | The critical-path score counts every unfinished blocking target without checking its other prerequisites, overstating what completing this work would unblock. |
+| B5 | Blind | high | patch | Journal loading checks envelope bytes but does not bind ticket/project/route identities to context. A changed journal.ticket_id can drive recovery PATCHes for a different ticket using the original receipts. |
+| B6 | Blind | medium | patch | Configuration digests use insertion-order-sensitive JSON.stringify. Reordering equivalent keys changes pending digests and prevents ordinary recovery. |
+| B7 | Blind | high | patch | Before publication, eligibility is rechecked but the saved prompt's title/acceptance revision is not. Changed yet eligible criteria can receive the old command. |
+| B8 | Blind | high | patch | Runtime facts are checked before board hydration; publication occurs afterward without a freshness/expiry check. Hydration can outlive the sixty-second worker observation. |
+| B9 | Blind | high | patch | skillDigest hashes only three Markdown files. Executable/schema changes leave accepted deployment fingerprints unchanged. |
+| B10 | Blind | medium | patch | Production relations are fetched serially on each full scan. Three 100-item scans at 150 ms each consume the entire forty-five-second pass before dispatch/readback. |
+| B11 | Blind | medium | patch | Canonical findLatestMatching starts 4096 sequences back and scans forward under the new 100-request cap; a second-newest retained match can remain unreachable on every identical retry. |
+| E1 | Edge | medium | patch | descriptionText calls replace on null, and rankCandidates computes acceptance before untriaged exclusion. A local mixed-board probe throws TypeError and aborts all selection. |
+| E2 | Edge | high | patch | The criteria parser does not stop at the next section and stops at interleaved prose. A local empty-AC/numbered-notes probe qualified unrelated notes; required later criteria can also be omitted. |
+| E3 | Edge | high | patch | Same demonstrated written/native prerequisite bypass as B2. |
+| E4 | Edge | high | patch | Same demonstrated foreign same-ticket worker exemption as B1. |
+| E5 | Edge | high | patch | Same validated-then-hydrate freshness window as B8. |
+| E6 | Edge | high | patch | Same saved-prompt/current-criteria mismatch as B7. |
+| E7 | Edge | high | patch | A renewed acceptance document can bind a new journal directory while the old uncertain intent remains elsewhere. Bind the canonical journal location persistently under the existing shared driver lease so receipt renewal cannot erase the fence. |
+| E8 | Edge | medium | patch | Pilot resolveKey uses execFileSync(op read) without a timeout. The CLI event-loop timer cannot interrupt it; supervise the pass externally to bound synchronous calls and their child processes. |
+| E9 | Edge claim | medium | patch | The claimed bounded-pass failure follows the same synchronous resolver and ineffective timer as E8. |
+| E10 | Edge claim | high | patch | The claimed single-worker failure follows the same same-ticket exemption as B1/E4. |
+| G1 | Verification gap | medium | patch | Filed mutation evidence: removing start_after and finish_after leaves 41 tests green. Cover each sequencing-only predecessor in incomplete and completed states. |
+| G2 | Verification gap | medium | patch | Filed mutation evidence: discarding nonempty production relations leaves 41 tests green. Exercise readiness on boards hydrated by the real Pilot adapter. |
+| G3 | Verification gap | medium | patch | Filed mutation evidence: breaking production cycle membership mapping leaves 41 tests green. Cover enabled cycles and both string/object issue references through adapter hydration. |
+| G4 | Verification gap | medium | patch | Filed mutation evidence: production started/completed ports can return no evidence while all tests pass. Exercise canonical direct-get traversal and its dispatch/reconciliation consumers. |
+| G5 | Verification gap | high | patch | Filed mutation evidence: forcing CLI execute=true preserves 41 green library tests. Invoke inspect and both dry-run modes in subprocesses and prove zero writes/publication. |
+| G6 | Verification gap, other | high | patch | The reported additional written prerequisite bypass is confirmed by the zero-native-predecessor guard, matching B2/E3. |
+
+All survivors route to bounded corrections of demonstrated states without a new public command or runtime activation. Group only shared defects: same-ticket worker identity; written prerequisites; saved ticket revision; runtime freshness; bounded supervision. The five verification gaps retain their separate obligations.
+
 ## Verification
 
 - Run the new fixture suite and existing Momo hardening suites with their actual supported runner.
