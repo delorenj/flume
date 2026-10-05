@@ -1,3 +1,64 @@
+FLUME-15 review-fix closeout — October 5, 2026
+
+**Status: DONE_WITH_CONCERNS.** All nine assigned review fixes are implemented and committed in the existing worker. Four affected suites pass. Typecheck and build pass. No full verification, fresh live review, template change, push, merge, or rebase was performed for this review pass. Parent handles merge overlap with FLUME-32, the new template pin, independent acceptance and combined verification.
+
+**Review commits**
+
+- `2d4c1ad82da2ea5fd522857630fdf728a121810d` — historical handbook compatibility, effective retirement detection, stale heartbeat ownership, alias identity and consistent candidate substitutions.
+- `6cfeea5fdc69ff3ae64929bbc11a50dad177669e` — exclude heartbeat profile wiring and add missing-row registry remediation and successful built-CLI hire coverage.
+
+**Changes addressing the review**
+
+1. `org/contract.ts` and `types.ts` gate heartbeat retirement completeness to contract 1.5 or newer. Historical heartbeat manifest fields retain their original validation. Exact original v1.4/schema-5 bytes load, as does its supported schema-4 form with service_manifest omitted. The untouched original v1.3/schema-4 document still returns its established `RETIRED_MODE` quarantine-by-omission diagnostic; execution-authority defaults were not relaxed.
+2. `org/systemd.ts` keeps `misnamed-gateway` for a stored heartbeat name while excluding it from owned and duplicate-gateway attribution. Both heartbeat service and timer remain visible with retired/retirement cleanup guidance.
+3. `parity/rules.ts` removes heartbeat service/timer from profile wiring audit and remediation. PJAN-48 proves stale heartbeat homes and dead OAuth settings do not fail current employee wiring, that remediation leaves them untouched, and that stale current gateway wiring still fails.
+4. Current handbooks require effective detection of both canonical heartbeat unit types through declared detectors or swept candidates. Contract tests cover removed detection, each missing unit type, custom regex detectors, candidate-only and mixed policies.
+5. Unregistered classification requests `Names` and correlates a requested alias to a canonical `Id`. Missing correlation and overlapping alias claims retain `show-malformed` uncertainty.
+6. Candidate matching uses a single named capture and repeated backreferences, consistent with derive's replaceAll substitution. Matching and inconsistent repeated-ID fixtures use distinct suffixes to avoid accidental overlap with the single-placeholder fixture.
+7. PJAN-86 runs a successful real built-CLI `hire dev --yes` lifecycle using scratch Copier and systemd fixtures. The gateway is enabled and active; historical heartbeat metadata remains installed. The outcome is verified, without deferral or a heartbeat summary line. The final sentinel audit passes.
+8. PJAN-48 remedies a missing registry row and asserts its systemd mapping is exactly `{ gateway_unit: canonicalGateway }`. It has no heartbeat fields, and the subsequent registry audit passes.
+9. Systemd tests exercise the custom candidate `hermes-stray-pm-old-poll.timer`, prove no retired detector matches it, and assert `retired`, `retirement`, `retired:candidate`.
+
+**Executed focused verification**
+
+All commands ran in `/home/delorenj/code/33GOD/flume/.worktrees/flume-15`.
+
+```sh
+node scripts/run-tests.mjs fleet-contract fleet-systemd > /tmp/flume-orch/flume15-review-checkpoint.log 2>&1
+node scripts/run-tests.mjs fleet-contract fleet-systemd > /tmp/flume-orch/flume15-review-checkpoint-final.log 2>&1
+node scripts/run-tests.mjs --no-build --no-typecheck fleet-contract > /tmp/flume-orch/flume15-review-contract-final.log 2>&1
+node scripts/run-tests.mjs --no-build --no-typecheck pjan-48 pjan-86 > /tmp/flume-orch/flume15-review-parity-hire.log 2>&1
+node scripts/run-tests.mjs --no-build --no-typecheck pjan-86 > /tmp/flume-orch/flume15-review-hire-final.log 2>&1
+git diff --check
+git diff 827ac7b HEAD --check
+git status --short
+git ls-tree HEAD templates/hermes-agent
+git unpushed > /tmp/flume-orch/flume15-review-unpushed.log 2>&1
+```
+
+The last gated run passed typecheck in 2.6s and build in 202ms. All final TypeScript source was present for those gates; subsequent changes were test fixtures/assertions only, so focused reruns reused that built output. Earlier failures are retained honestly: the first checkpoint exposed original v1.3 default-deny rejection and an overlapping candidate fixture; the second passed systemd but the contract test had an incorrect expected exit code (5 instead of 4); the first hire fixture omitted required gateway model routes and effort. Those fixture/expectation issues were corrected without relaxing source semantics or assertions.
+
+| Affected suite | Final result | Duration | Evidence |
+| --- | --- | --- | --- |
+| fleet-contract | PASS | 24.7s | flume15-review-contract-final.log |
+| fleet-systemd | PASS | 239.8s | flume15-review-checkpoint-final.log |
+| pjan-48 | PASS | 15.9s | flume15-review-parity-hire.log |
+| pjan-86 | PASS | 11.9s | flume15-review-hire-final.log |
+
+These are four passing selected suites across the listed runs, not a new full-suite result. Machine-readable receipts, SHA-256 log digests and source digests are in `/tmp/flume-orch/flume15-review-fixes-verification.json`.
+
+**Boundaries and remaining work**
+
+The worker tree is clean. Its template gitlink remains `97f9ff82e087dad3273c5cc596feac6b39f2c370`. Canonical template retirement is already landed separately as `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`; parent reports FLUME-32 landed on main `3630ca8` and will integrate overlap and the new pin. Those parent results are parent-provided evidence, not newly executed worker verification.
+
+No live state was changed or freshly sampled. `/tmp/flume-orch/flume15-live-review.json` and its standalone human-readable companion `/tmp/flume-orch/flume15-live-review.md` retain the saved before/after evidence for `827ac7b842f3eea342eb288f986de9033102c1df`. Their 28→0 required-heartbeat employee failures and 112→0 required observations, as well as the original full 20/21 result, belong to that original implementation commit. They do not claim live or full verification of the review-fix commits.
+
+The machine-wide `git unpushed` audit returned exit 1, reporting 309 repositories with local work. Unrelated repositories were left unchanged; the worker's two review commits intentionally remain local for the parent, per the task-specific landing boundary. The pending risks are parent integration, new-pin combined verification, and the previously recorded unrelated fleet-status failure.
+
+---
+
+Original implementation closeout below; all full-suite and live evidence in that section is for `827ac7b842f3eea342eb288f986de9033102c1df`.
+
 FLUME-15 implementation report — October 5, 2026
 
 **Status: DONE_WITH_CONCERNS.** Implementation and worker verification are complete.

@@ -1,0 +1,59 @@
+{
+  "observed_at": "2026-10-05T12:20:15.685615+00:00",
+  "source_revision": "c48ee0242007880c397917266b4107d2b669f938",
+  "installed_cli": "/home/delorenj/.local/bin/flume",
+  "resolved_cli": "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+  "contract_version": "1.5.0",
+  "selected_employees": 28,
+  "current_systemd_observations": 56,
+  "required_heartbeat_observations": 0,
+  "employees_failing_heartbeat_requirements": 0,
+  "manager": {
+    "state": "degraded",
+    "code": "available"
+  },
+  "health": {
+    "healthy": false,
+    "complete": true,
+    "fleet_complete": false,
+    "failed": 26,
+    "warned": 2,
+    "skipped": 0,
+    "unsupported": 0,
+    "unobserved": 0,
+    "errors": 0,
+    "collection_errors": 0,
+    "truncated": false,
+    "verdict": "unhealthy",
+    "proven": false,
+    "exit_category": "unhealthy",
+    "stale": 0,
+    "freshness_unknown": 0,
+    "unjustified": 3,
+    "contradictions": 0,
+    "members": {
+      "healthy": 6,
+      "unhealthy": 22,
+      "incomplete": 0,
+      "deferred": 0,
+      "exception": 0,
+      "unclassified": 0
+    }
+  },
+  "unregistered": {
+    "coverage": "swept",
+    "reason": null,
+    "total": 4,
+    "by_class": {
+      "retired": 0,
+      "transient": 1,
+      "profile-correlated": 1,
+      "managed-exception": 0,
+      "unclassified": 2
+    },
+    "listed": 4,
+    "truncated": false
+  },
+  "template_pin": "4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74",
+  "mode": "read-only; no remediation or service/profile mutation"
+}
