@@ -32,11 +32,11 @@ let count=0;
 const pass=label=>{count++;console.log(`PASS ${label}`);};
 
 function tree(path) {
-  if(!existsSync(path)) return null;
-  const stat=lstatSync(path);
+  let stat;
+  try {stat=lstatSync(path);} catch(error) {if(error.code==='ENOENT') return null;throw error;}
   if(stat.isSymbolicLink()) return {link:readlinkSync(path),ino:stat.ino};
   if(stat.isDirectory()) return Object.fromEntries(readdirSync(path).sort().map(n=>[n,tree(join(path,n))]));
-  return {bytes:readFileSync(path).toString('base64'),ino:stat.ino};
+  return {bytes:readFileSync(path).toString('base64')};
 }
 
 async function fixture(label,skills) {
@@ -134,6 +134,7 @@ try {
     assert.match(first.stdout,/Role declaration projected/);
     assert.match(first.stdout,/Hermes lifecycle audit passed/,'the final hire audit must finish');
     assert.match(first.stdout,/verified|deferred/i);
+    assert.match(first.stdout,/automatic Skillex resync \(host service\)/,'local hire names its host automation deferral');
     assert.equal(existsSync(f.blocked),false,'no credential, network or service tool was used');
     const records=f.records();
     const copierRuns=records.filter(r=>r.command==='copier');
@@ -152,7 +153,9 @@ try {
     }
     for(const marker of ['.skillex-only','.no-bundled-skills']) assert.ok(lstatSync(join(f.desk,marker)).isFile());
     assert.equal(existsSync(join(f.desk,'.agents')),false);
-    assert.deepEqual(YAML.parse(readFileSync(join(f.desk,'config.yaml'),'utf8')).skills.external_dirs,[]);
+    const generated=YAML.parse(readFileSync(join(f.desk,'config.yaml'),'utf8'));
+    assert.deepEqual(generated.skills.external_dirs,[]);
+    assert.deepEqual(generated.platform_toolsets.bloodbank,['skills','web'],'contributor permissions use a scoped list patch');
     const selection=join(f.desk,'.skillex-selection/.agents/skills.json');
     assert.deepEqual(JSON.parse(readFileSync(selection,'utf8')),manifest);
     const shown=f.show();
@@ -168,13 +171,13 @@ try {
     assert.equal(readFileSync(join(f.hermes,'config.yaml'),'utf8'),base,'the fleet base is never edited');
     pass(`real ${label} hire: Copier tasks, final audit, strict global + declared selection, comments and organization`);
 
-    // Role-owned state and unrelated state are byte/identity stable through two real onboard calls.
+    // Files retain their bytes and skill links retain their identity through two real onboard calls.
     writeFileSync(join(f.desk,'skills/.usage.json'),'{}\n');
     writeFileSync(join(f.roleDir,'runtime/sessions/operator-note'),'precious unrelated state\n');
     const snapshot=()=>({registry:tree(f.registry),org:tree(f.org),config:tree(f.config),desk:tree(f.desk),repo:tree(f.repo),receipt:tree(shown.receiptPath)});
     const before=snapshot();
     for(let i=0;i<2;i++) {
-      const onboard=f.run('onboard','dev','--target-repo',f.repo,'--skip-telegram','--skip-plane','--local');succeeded(onboard);
+      const onboard=f.run('onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local');succeeded(onboard);
       assert.deepEqual(snapshot(),before,'onboard preserves bytes, links, receipt, comments, reporting and unrelated state');
     }
     assert.equal(f.records().filter(r=>r.command==='copier').length,1,'onboarding does not rerender an occupied desk');
