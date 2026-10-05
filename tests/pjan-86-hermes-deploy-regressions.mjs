@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import YAML from "yaml";
+import { syncProfile } from "@delorenj/skillex";
 import { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -933,6 +935,86 @@ exit 1
   assert.equal(failedResult.status, "blocked", JSON.stringify(failedResult));
   assert.match(failedResult.details.join("\n"), /did not become disabled\+inactive/);
   assert.equal(readFileSync(failureRolePath, "utf8"), failureRoleSource);
+
+  // Successful built-CLI hire: an inactive historical heartbeat must neither
+  // defer deployment nor reappear in the final service summary. Copier's render
+  // and the external user manager are scratch fixtures; the lifecycle is real.
+  {
+    const repo = makeRepo(join(temp, "verified-repo"));
+    const home = join(temp, "verified-home");
+    const fleet = join(home, ".hermes");
+    const agent = "verified-repo-dev";
+    const profile = join(fleet, "profiles", agent);
+    const catalog = join(temp, "verified-catalog");
+    const declarations = join(temp, "verified-declarations");
+    const state = join(temp, "verified-systemd-state");
+    const unitDir = join(home, ".config", "systemd", "user");
+    for (const path of [profile, join(profile, "skills"), join(profile, "hindsight"), join(catalog, "all-skills"), join(declarations, "roles"), state, unitDir, join(repo, ".agents")]) mkdirSync(path, { recursive: true });
+    writeFileSync(join(declarations, "roles", "dev.md"), "---\nrole: dev\n---\nDevelopment contributor.\n");
+    writeFileSync(join(repo, ".project.json"), JSON.stringify({ project_name: "verified-repo", repo_path: repo, ticket_provider: { type: "plane", state: "linked" }, agents: {} }));
+    writeFileSync(join(repo, ".agents", "skills.json"), JSON.stringify({ sets: [], inherit_global: false }));
+    const model = "automaticai/personal/kimi-2.8";
+    const base = {
+      model: { provider: "automaticai", default: model },
+      auxiliary: { free_only: true, discovery: false },
+      moa: { presets: { default: { enabled: false } } },
+      providers: { automaticai: { api: "https://api.automaticai.io/v1", key_env: "AUTOMATICAI_GATEWAY_KEY", extra_body: { reasoning_effort: "high" }, models: [
+        "automaticai/personal/sol-6.1", "automaticai/personal/sol", "automaticai/personal/astra",
+        "automaticai/personal/claude-opus-5.5", "automaticai/intelliforia/claude-opus-5.5",
+        "automaticai/personal/claude-sonnet-5.5", "automaticai/intelliforia/claude-sonnet-5.5",
+        "automaticai/personal/kimi-k3", "automaticai/personal/kimi-k3s", model,
+        "automaticai/personal/glm-5.3", "automaticai/personal/glm-5.3-flash",
+      ] } },
+      delegation: { provider: "automaticai", model },
+      secrets: { onepassword: { enabled: true, env: { AUTOMATICAI_GATEWAY_KEY: "op://fixture/gateway/credential" } } },
+      memory: { provider: "hindsight" },
+      hooks: Object.fromEntries(["on_session_start", "on_session_end", "pre_tool_call", "post_tool_call"].map((event) => [event, [{ command: `${join(home, ".agents", "hooks", "bb-hook")} --cli hermes --native ${event}` }]])),
+      platform_toolsets: { bloodbank: ["delegation", "terminal", "file", "skills"] },
+      timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
+      wake_word: { enabled: true, start_new_session: false },
+    };
+    writeFileSync(join(fleet, "config.yaml"), YAML.stringify(base));
+    writeFileSync(join(fleet, ".env"), "");
+    writeFileSync(join(profile, "config.yaml"), "# GENERATED FILE -- DO NOT EDIT\n" + YAML.stringify(base));
+    writeFileSync(join(profile, "config.delta.yaml"), "{}\n");
+    writeFileSync(join(profile, "hindsight", "config.json"), JSON.stringify({ bank_id: `agent-${agent}` }));
+    writeFileSync(join(fleet, "agents-registry.yaml"), "schema_version: 1\nagents: {}\n");
+    const gateway = `hermes-${agent}-gateway.service`;
+    writeFileSync(join(unitDir, gateway), `[Service]\nEnvironment=HERMES_HOME=${profile}\n`);
+    for (const leaf of ["enabled", "active"]) writeFileSync(join(state, `${gateway}.${leaf}`), "");
+    const env = {
+      ...commandEnv, HOME: home, XDG_CONFIG_HOME: join(home, ".config"), XDG_STATE_HOME: join(home, ".local", "state"),
+      HERMES_TEMPLATE_CONFIG: join(home, ".config", "hermes-agent-template", "config.toml"),
+      HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: join(fleet, "agents-registry.yaml"), HERMES_FLEET_REGISTRY_FILE: join(fleet, "agents-registry.yaml"),
+      HERMES_FLEET_ENV: join(fleet, "fleet.env"), PJAN86_SYSTEMD_STATE: state,
+      PJ_SKILLS_REGISTRY_ROOT: catalog, FLUME_ROLES_ROOT: declarations, PJANGLER_BIN: join(temp, "unavailable-pj"),
+    };
+    const skills = await syncProfile(agent, { project: repo, home, hermesRoot: fleet, registryRoot: catalog, env });
+    assert.ok(skills.ok, JSON.stringify(skills.findings));
+    const previousCopier = readFileSync(fakeCopier, "utf8");
+    writeFileSync(fakeCopier, `#!${process.execPath}
+const {mkdirSync,writeFileSync}=require('node:fs');
+const {join}=require('node:path');
+const dir=process.argv[4];
+mkdirSync(join(dir,'runtime'),{recursive:true});
+writeFileSync(join(dir,'role.yaml'),${JSON.stringify(`repo: verified-repo\nrole: dev\nagent_id: ${agent}\nprofile: ${agent}\nbloodbank:\n  enabled: false\nservice_state:\n  gateway: active\n  heartbeat: installed\n`)});
+writeFileSync(join(dir,'hermes'),${JSON.stringify(`#!/usr/bin/env bash\nHERMES_HOME="${profile}"\n`)});
+for(const name of ['state.db','kanban.db'])writeFileSync(join(dir,'runtime',name),'');
+`);
+    try {
+      const hired = run(["hire", "dev", "--yes"], repo, env);
+      const output = `${hired.stdout}\n${hired.stderr}`;
+      assert.equal(hired.status, 0, output);
+      assert.match(output, /Hermes deployment verified/);
+      assert.doesNotMatch(output, /healthy with deferred capabilities|^deferred:|^heartbeat:/m);
+      assert.match(output, /^gateway: active$/m);
+      const role = YAML.parse(readFileSync(join(repo, "agents", "hermes", "dev", "role.yaml"), "utf8"));
+      assert.equal(role.service_state.heartbeat, "installed", "retain historical non-active metadata throughout hire");
+      const audit = run(["audit", repo, "--json"], repo, env);
+      const sentinel = JSON.parse(audit.stdout).rules.find((rule) => rule.id === "systemd.sentinel");
+      assert.equal(sentinel.status, "pass", JSON.stringify(sentinel));
+    } finally { writeFileSync(fakeCopier, previousCopier); }
+  }
 
   // Source-level orchestration tripwires complement the process tests: summary
   // is final-only and explicit --force is the sole overwrite path.

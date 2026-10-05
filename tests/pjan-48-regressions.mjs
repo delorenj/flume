@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import YAML from "yaml";
 import {
   chmodSync,
   existsSync,
@@ -209,6 +210,50 @@ try {
       "pass",
       JSON.stringify(finding(postAudit, "hermes.registry-parity")),
     );
+  }
+
+  {
+    const repo = makeRepo("missing-registry-row");
+    const home = makeHome("missing-registry-row");
+    const agentId = "pjan48-missing-pm";
+    makeRole(repo, agentId);
+    const registryPath = join(home, ".hermes", "agents-registry.yaml");
+    writeFileSync(registryPath, "schema_version: 1\nagents: {}\n");
+    const audit = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
+    assert.equal(finding(audit, "hermes.registry-parity").status, "fail");
+    const migrated = jsonCommand(["remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, home });
+    assert.equal(migrated.result.status, 0, migrated.result.stderr);
+    assert.equal(migrationResult(migrated.json, "hermes.registry-parity").status, "applied");
+    const row = YAML.parse(readFileSync(registryPath, "utf8")).agents[agentId];
+    assert.deepEqual(row.systemd, { gateway_unit: `hermes-${agentId}-gateway.service` });
+    const post = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
+    assert.equal(finding(post, "hermes.registry-parity").status, "pass");
+  }
+
+  {
+    const repo = makeRepo("retired-profile-wiring");
+    const home = makeHome("retired-profile-wiring");
+    const agentId = "pjan48-wiring-pm";
+    const role = makeRole(repo, agentId);
+    const profile = join(home, ".hermes", "profiles", agentId);
+    const unitDir = join(home, ".config", "systemd", "user");
+    mkdirSync(unitDir, { recursive: true });
+    writeFileSync(join(role, "hermes"), `#!/usr/bin/env bash\nHERMES_HOME="${profile}"\n`);
+    const gateway = join(unitDir, `hermes-${agentId}-gateway.service`);
+    writeFileSync(gateway, `[Service]\nEnvironment=HERMES_HOME=${profile}\n`);
+    const retired = ["service", "timer"].map((suffix) => join(unitDir, `hermes-${agentId}-heartbeat.${suffix}`));
+    const stale = "[Service]\nEnvironment=HERMES_HOME=/old/retired/profile\nEnvironment=HERMES_OAUTH_FILE=/old/retired/auth\n";
+    for (const path of retired) writeFileSync(path, stale);
+    const audit = () => finding(jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json, "hermes.profile-wiring");
+    assert.equal(audit().status, "pass", "retired heartbeat environments do not affect current wiring");
+    const migration = jsonCommand(["remediate", "hermes.profile-wiring", repo, "--json"], { cwd: repo, home }).json;
+    assert.deepEqual(migrationResult(migration, "hermes.profile-wiring").changedFiles, []);
+    for (const path of retired) assert.equal(readFileSync(path, "utf8"), stale);
+    writeFileSync(gateway, stale);
+    const failure = audit();
+    assert.equal(failure.status, "fail", "the current gateway still requires correct wiring");
+    assert.ok(failure.details.some((detail) => detail.includes(`hermes-${agentId}-gateway.service`)));
+    assert.equal(failure.details.some((detail) => detail.includes("heartbeat")), false);
   }
 
   {
