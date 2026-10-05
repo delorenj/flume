@@ -779,9 +779,7 @@ case "$command_name" in
   is-system-running|daemon-reload) exit 0 ;;
   enable)
     unit="\${4:-}"
-    if [ "\${PJAN86_HEARTBEAT_VERIFY_FAIL:-}" = "1" ] && printf '%s' "$unit" | grep -q heartbeat; then
-      exit 0
-    fi
+    case "$unit" in *heartbeat*) exit 9 ;; esac
     : > "$state_dir/$unit.enabled"
     : > "$state_dir/$unit.active"
     exit 0
@@ -808,9 +806,8 @@ exit 1
 `);
   chmodSync(fakeSystemctl, 0o755);
 
-  // systemd parity evaluates heartbeat and gateway independently: an active
-  // heartbeat plus deferred gateway is healthy only while the gateway is
-  // disabled and inactive.
+  // Historical heartbeat state is inert. A deferred gateway is healthy only
+  // while disabled and inactive, with no heartbeat unit required.
   const parityRepo = makeRepo(join(temp, "parity-repo"));
   const parityHome = join(temp, "parity-home");
   const parityRole = join(parityRepo, "agents", "hermes", "pm");
@@ -822,7 +819,7 @@ exit 1
   writeFileSync(join(parityRole, "role.yaml"), `repo: parity-repo\nrole: pm\nagent_id: parity-repo-pm\ndeployment:\n  systemd: required\nservice_state:\n  gateway: deferred\n  heartbeat: active\n`);
   const parityGateway = "hermes-parity-repo-pm-gateway.service";
   const parityHeartbeat = "hermes-parity-repo-pm-heartbeat.timer";
-  for (const unit of [parityGateway, parityHeartbeat]) {
+  for (const unit of [parityGateway]) {
     writeFileSync(join(systemdDir, unit), "[Unit]\nDescription=fixture\n");
   }
   writeFileSync(join(parityState, `${parityHeartbeat}.enabled`), "");
@@ -851,8 +848,8 @@ exit 1
   assert.equal(unsafeFinding.status, "fail");
   assert.match(unsafeFinding.details.join("\n"), /deferred and should be disabled\+inactive/);
 
-  // installed -> active becomes durable only after enable + active probes.
-  // The deferred gateway remains deferred, and the immediate post-audit passes.
+  // Gateway reconciliation leaves deferred and historical heartbeat metadata
+  // unchanged, and the immediate post-audit passes.
   const migrateRepo = makeRepo(join(temp, "migrate-repo"));
   const migrateHome = join(temp, "migrate-home");
   const migrateRole = join(migrateRepo, "agents", "hermes", "pm");
@@ -864,7 +861,7 @@ exit 1
   mkdirSync(migrateState, { recursive: true });
   const migrateRoleSource = `# preserve role comment\nrepo: migrate-repo\nrole: pm\nagent_id: migrate-repo-pm\ndeployment:\n  systemd: required\nservice_state:\n  gateway: deferred\n  heartbeat: installed\n`;
   writeFileSync(migrateRolePath, migrateRoleSource);
-  for (const unit of ["hermes-migrate-repo-pm-gateway.service", "hermes-migrate-repo-pm-heartbeat.timer"]) {
+  for (const unit of ["hermes-migrate-repo-pm-gateway.service"]) {
     writeFileSync(join(migrateSystemd, unit), "[Unit]\nDescription=fixture\n");
   }
   const migrated = run(["migrate", "systemd.sentinel", migrateRepo, "--json"], migrateRepo, {
@@ -876,10 +873,11 @@ exit 1
   const migratedReport = JSON.parse(migrated.stdout);
   const migratedResult = migratedReport.results.find((result) => result.id === "systemd.sentinel");
   assert.equal(migratedResult.status, "applied", JSON.stringify(migratedResult));
-  assert.ok(migratedResult.changedFiles.includes(migrateRolePath));
+  assert.equal(migratedResult.changedFiles.includes(migrateRolePath), false, "historical heartbeat state is never promoted to active");
   const migratedRole = readFileSync(migrateRolePath, "utf8");
   assert.match(migratedRole, /^# preserve role comment$/m);
-  assert.match(migratedRole, /service_state:\n\s+gateway: deferred\n\s+heartbeat: active/);
+  assert.equal(migratedRole, migrateRoleSource, "gateway-only reconciliation preserves historical metadata");
+  assert.equal(existsSync(join(migrateState, "hermes-migrate-repo-pm-heartbeat.timer.enabled")), false, "migration never enables a retired timer");
   const migratedAudit = run(["audit", migrateRepo, "--json"], migrateRepo, {
     ...commandEnv,
     HOME: migrateHome,
@@ -887,6 +885,25 @@ exit 1
   });
   const migratedFinding = JSON.parse(migratedAudit.stdout).rules.find((rule) => rule.id === "systemd.sentinel");
   assert.equal(migratedFinding.status, "pass", JSON.stringify(migratedFinding));
+
+  // Installed gateway -> active becomes durable only after enabled and active
+  // postconditions. Preserve the comment and retired heartbeat metadata.
+  writeFileSync(migrateRolePath, migrateRoleSource.replace("gateway: deferred", "gateway: installed"));
+  const activated = run(["migrate", "systemd.sentinel", migrateRepo, "--json"], migrateRepo, {
+    ...commandEnv, HOME: migrateHome, PJAN86_SYSTEMD_STATE: migrateState,
+  });
+  assert.equal(activated.status, 0, `${activated.stdout}\n${activated.stderr}`);
+  const activatedResult = JSON.parse(activated.stdout).results.find((result) => result.id === "systemd.sentinel");
+  assert.equal(activatedResult.status, "applied");
+  assert.ok(activatedResult.changedFiles.includes(migrateRolePath));
+  assert.equal(readFileSync(migrateRolePath, "utf8"), migrateRoleSource.replace("gateway: deferred", "gateway: active"));
+  assert.ok(existsSync(join(migrateState, "hermes-migrate-repo-pm-gateway.service.enabled")));
+  assert.ok(existsSync(join(migrateState, "hermes-migrate-repo-pm-gateway.service.active")));
+  assert.equal(existsSync(join(migrateState, "hermes-migrate-repo-pm-heartbeat.timer.enabled")), false);
+  const activatedAudit = run(["audit", migrateRepo, "--json"], migrateRepo, {
+    ...commandEnv, HOME: migrateHome, PJAN86_SYSTEMD_STATE: migrateState,
+  });
+  assert.equal(JSON.parse(activatedAudit.stdout).rules.find((rule) => rule.id === "systemd.sentinel").status, "pass");
 
   // A successful disable command followed by a still-active deferred gateway
   // is a failed postcondition. role.yaml must remain byte-identical.
@@ -901,7 +918,7 @@ exit 1
   mkdirSync(failureState, { recursive: true });
   const failureRoleSource = `repo: failure-repo\nrole: pm\nagent_id: failure-repo-pm\ndeployment:\n  systemd: required\nservice_state:\n  gateway: deferred\n  heartbeat: installed\n`;
   writeFileSync(failureRolePath, failureRoleSource);
-  for (const unit of ["hermes-failure-repo-pm-gateway.service", "hermes-failure-repo-pm-heartbeat.timer"]) {
+  for (const unit of ["hermes-failure-repo-pm-gateway.service"]) {
     writeFileSync(join(failureSystemd, unit), "[Unit]\nDescription=fixture\n");
   }
   const failedMigration = run(["migrate", "systemd.sentinel", failureRepo, "--json"], failureRepo, {

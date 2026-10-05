@@ -224,7 +224,6 @@ try {
 
     const units = [
       `hermes-${agentId}-gateway.service`,
-      `hermes-${agentId}-heartbeat.timer`,
     ];
     for (const unit of units) {
       writeFileSync(join(sysDir, unit), "ExecStart=/old/location/pjangler/agents/hermes/pm/runtime/bin/hermes\n");

@@ -5,8 +5,8 @@
 // SERVICE state too -- exactly as story 1.7 made every fixture profile
 // renderer-clean. Without it the suites would either read this developer's own
 // user manager (a fixture agent's units are not on it, so every agent would
-// read `gateway-missing`) or read no manager at all (`manager-unavailable`, five
-// `error` leaves per agent) and every "this agent is healthy" assertion would go
+// read `gateway-missing`) or read no manager at all (`manager-unavailable`, two
+// `error` leaves per employee) and every "this agent is healthy" assertion would go
 // red for a reason that has nothing to do with what it tests.
 //
 // The fake is installed on a case's PATH as `systemctl`, reads a JSON state
@@ -134,13 +134,9 @@ export function fakeSystemctlChildEnvs(dir) {
  */
 export function deferredAgentUnits({ agentId, profileName, profileRoot, roleDir, hermesBin = null, nowUs = monotonicNowUs() }) {
   const gateway = `hermes-${agentId}-gateway.service`;
-  const timer = `hermes-${agentId}-heartbeat.timer`;
-  const service = `hermes-${agentId}-heartbeat.service`;
   const launcher = roleDir === null ? (hermesBin ?? "/nonexistent/hermes") : join(roleDir, ".scripts", "credential-launch.sh");
   const home = join(profileRoot, profileName ?? agentId);
   const exec = (path, ...args) => `{ path=${path} ; argv[]=${[path, ...args].join(" ")} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }`;
-  const start = nowUs - 30_000_000n;
-  const exit = nowUs - 29_000_000n;
   return {
     units: {
       [gateway]: {
@@ -151,37 +147,12 @@ export function deferredAgentUnits({ agentId, profileName, profileRoot, roleDir,
         Environment: `HERMES_HOME=${home}`,
         ExecMainStartTimestampMonotonic: "0", ExecMainExitTimestampMonotonic: "0", TimeoutStartUSec: "1min 30s",
       },
-      [timer]: {
-        Id: timer, Names: timer, LoadState: "loaded", LoadError: "", UnitFileState: "enabled",
-        ActiveState: "active", SubState: "waiting", Result: "success",
-        FragmentPath: "", DropInPaths: "", Unit: service, Triggers: service,
-        TimersMonotonic: [
-          `{ OnUnitInactiveUSec=1min ; next_elapse=${formatTimespan(nowUs + 30_000_000n)} }`,
-          `{ OnBootUSec=1min ; next_elapse=1min }`,
-        ],
-        LastTriggerUSecMonotonic: formatTimespan(exit),
-        NextElapseUSecMonotonic: formatTimespan(nowUs + 30_000_000n),
-      },
-      [service]: {
-        Id: service, Names: service, LoadState: "loaded", LoadError: "", UnitFileState: "static",
-        ActiveState: "inactive", SubState: "dead", Result: "success", ExecMainStatus: "0", ExecMainCode: "1",
-        FragmentPath: "", DropInPaths: "", Type: "oneshot", TriggeredBy: timer,
-        ExecStart: exec(launcher, "heartbeat"),
-        Environment: `HERMES_HOME=${home}`,
-        ExecMainStartTimestampMonotonic: String(start),
-        ExecMainExitTimestampMonotonic: String(exit),
-        TimeoutStartUSec: "45min",
-      },
     },
     list_units: [
       { unit: gateway, load: "loaded", active: "inactive", sub: "dead", description: `${agentId} gateway` },
-      { unit: timer, load: "loaded", active: "active", sub: "waiting", description: `${agentId} heartbeat timer` },
-      { unit: service, load: "loaded", active: "inactive", sub: "dead", description: `${agentId} heartbeat` },
     ],
     unit_files: [
       { unit_file: gateway, state: "disabled", preset: null },
-      { unit_file: timer, state: "enabled", preset: null },
-      { unit_file: service, state: "static", preset: null },
     ],
   };
 }

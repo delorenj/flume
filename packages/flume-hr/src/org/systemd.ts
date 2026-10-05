@@ -3,59 +3,14 @@
 // over a declared stabilization window, and proven against the DESIRED state
 // the registry's own messaging declaration derives.
 //
-// Before this, `systemd` reported every agent `unsupported` (the `unit_topology`
-// deferral): unit names were expectations `service_model.per_agent` derives,
-// never observations. On the live fleet that hid real drift -- a gateway
-// enabled+active for an agent whose row declares its channels deferred, a
-// verified-Telegram agent whose gateway is disabled, a heartbeat oneshot whose
-// latest result is an exit code, a deferred agent whose empty delta inherits
-// the fleet base's platform enablement, heartbeat pairs on disk the registry
-// never recorded, a registered agent with no units at all, a retired consumer
-// reference, and a set of unregistered `hermes-*` units nothing reported.
+// Gateway health follows each employee's messaging declaration and the
+// contract's stabilization window. Retired heartbeat units are observed only
+// by the unregistered sweep, with the other cleanup candidates.
 //
-// Seven disciplines:
-//
-//   * READ-ONLY, AND STRUCTURALLY SO. The only `systemctl --user` verbs this
-//     module can spawn are the four in `SYSTEMD_READ_VERBS`. There is no code
-//     path to `enable`, `start`, `daemon-reload` or `reset-failed`, no write
-//     anywhere under the unit directory, and every child receives an
-//     ALLOWLISTED environment (the manifest's `probe.env_allowlist` plus the
-//     four pager/locale pins) rather than a filtered copy of this process's.
-//   * SAMPLE THE MANAGER, NOT THE AGENTS. One `show` carries every unit of
-//     interest, so a window is `stabilization.samples` children regardless of
-//     fleet size -- and every agent's window is the SAME window, which is what
-//     makes "stable over the window" a fleet-wide claim rather than 84
-//     unrelated ones. A failed manager probe skips sampling entirely.
-//   * DESIRED STATE COMES FROM THE DECLARATION, NOT FROM THE UNIT. The
-//     provisioner enables a gateway only when a platform's `provisioning_status`
-//     is `verified`, and disables it otherwise. Reading that declaration back
-//     off the registry makes "deferred but enabled" and "verified but disabled"
-//     visible as drift instead of two alternate healthy modes, and makes a row
-//     that declares nothing `undeclared` -- an active gateway there is the
-//     liveness theatre the epic forbids, never health.
-//   * THE TEMPLATE'S STABILITY RULE IS THE CONTRACT. `_lib.sh`'s
-//     `systemd_wait_for_stable_health` rejects any window in which a unit looked
-//     healthy and then changed, and `systemd_timer_health_snapshot` refuses a
-//     oneshot that has not completed (systemd pre-initialises `Result=success`
-//     before the first exit). Both are encoded here, so a deploy's "stabilized"
-//     claim and this reading can never disagree about what stable means.
-//   * BUCKETS, NEVER AGES. No timestamp, age, pid, duration or completion order
-//     reaches `data`. Monotonic properties are compared against
-//     `process.hrtime.bigint()` -- CLOCK_MONOTONIC, the same clock systemd's
-//     `*USecMonotonic` properties use -- and reduced to `current | overdue |
-//     never | unknown` and `success | failed | in-progress | stuck | never |
-//     unknown`. Two runs over unchanged state produce identical bytes; a tick
-//     between them is a real change.
-//   * UNREGISTERED UNITS ARE FINDINGS, NEVER A LICENCE. Every `hermes-*` unit no
-//     registered row claims lands in exactly one of five classes with bounded
-//     evidence and guidance, and is left alone. None is assigned to the nearest
-//     agent name, and every one carries `process_reference: "unobserved"` --
-//     attributing the process behind a unit is story 1.9.
-//   * BOUNDED AND NARROW. From `Environment=` only the two declared keys; from
-//     `ExecStart=` only `path=` and the first argv token; from a transient
-//     scope's `Description=` only an exact `--profile <name>` token naming a
-//     REGISTERED profile. Nothing else from those properties reaches `data`,
-//     notes, items or diagnostics, and every path goes through `shown`.
+// Only SYSTEMD_READ_VERBS can be spawned. Children receive an allowlisted
+// environment, one show samples all units per window, and output carries
+// bounded state words rather than timestamps, credentials or file bodies.
+// Unregistered units retain their own identity and are reported for review.
 //
 // This module never constructs a `FleetStatusObservation`. It returns typed
 // per-agent aspect results, a manager record, a shared-gateway record, an
@@ -81,13 +36,8 @@ import {
   type FleetSystemdExtraClass,
   type FleetSystemdHomeState,
   type FleetSystemdItemKind,
-  type FleetSystemdLatestResult,
   type FleetSystemdManagerCode,
-  type FleetSystemdReconcileDeclaration,
-  type FleetSystemdReconcileEvidence,
-  type FleetSystemdSchedule,
   type FleetSystemdSharedState,
-  type FleetSystemdTick,
   type FleetSystemdUnregisteredClass,
 } from "./types";
 
@@ -114,7 +64,7 @@ export const SYSTEMD_CHILD_FLAGS = ["--no-pager", "--plain", "--no-legend"] as c
 /**
  * Environment keys pinned on every child regardless of the manifest allowlist.
  *
- * `LC_ALL=C` fixes the duration and state spellings this module parses;
+ * `LC_ALL=C` fixes the state spellings this module parses;
  * the three `SYSTEMD_*` keys turn off the pager, colour and URL hyperlinking
  * that would otherwise arrive as escape sequences inside a property value.
  */
@@ -137,8 +87,6 @@ export const SYSTEMD_SHOW_PROPERTIES = [
   "Id", "Names", "LoadState", "LoadError", "UnitFileState", "ActiveState", "SubState",
   "Result", "ExecMainStatus", "ExecMainCode", "NRestarts",
   "FragmentPath", "DropInPaths", "ExecStart", "Environment", "Type", "Restart",
-  "ExecMainStartTimestampMonotonic", "ExecMainExitTimestampMonotonic", "TimeoutStartUSec",
-  "Unit", "Triggers", "TriggeredBy", "TimersMonotonic", "LastTriggerUSecMonotonic", "NextElapseUSecMonotonic",
 ] as const;
 
 /** The properties the ONE classification `show` over unregistered units asks for. Narrower still. */
@@ -197,9 +145,6 @@ export const SYSTEMD_REQUIRED_PROPERTIES = ["LoadState", "UnitFileState", "Activ
 const ENABLED_STATES: ReadonlySet<string> = new Set(["enabled", "enabled-runtime", "linked", "linked-runtime", "alias"]);
 /** `UnitFileState` values that mean the unit will not start on its own. */
 const DISABLED_STATES: ReadonlySet<string> = new Set(["disabled", "masked", "masked-runtime"]);
-/** `SubState` values a healthy timer sits in (`_lib.sh:systemd_timer_health_snapshot`). */
-const TIMER_SUBSTATES: ReadonlySet<string> = new Set(["waiting", "running", "elapsed"]);
-
 /** A unit name this module is willing to name: a systemd unit name and nothing else. */
 export const UNIT_NAME = /^[A-Za-z0-9:_.@\\-]{1,255}\.(?:service|timer|socket|target|path|slice|scope|mount|automount|swap|device)$/u;
 /** One safe lower-case identifier segment, for an agent id or a profile name inside a derived unit name. */
@@ -208,25 +153,6 @@ const SAFE_SEGMENT = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 const WORD = /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,63}$/u;
 /** `--profile <name>` in a transient scope's description. EXACT token, never a substring guess. */
 const PROFILE_TOKEN = /(?:^|\s)--profile[\s=]+([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?:\s|$)/u;
-
-/**
- * Microseconds per systemd duration unit, looked up by EXACT suffix.
- *
- * The lookup is an equality match on the whole suffix a token carries, not a
- * prefix scan, so ordering carries no meaning: `min` and `m` are both here and
- * `1min` can never be read as one minute plus an `in`. systemd itself accepts
- * a bare `m` for minutes (`systemd.time(7)`), which is why it is listed.
- */
-const DURATION_UNITS: ReadonlyArray<readonly [string, bigint]> = [
-  ["usec", 1n], ["us", 1n], ["msec", 1_000n], ["ms", 1_000n],
-  ["minutes", 60_000_000n], ["minute", 60_000_000n], ["min", 60_000_000n], ["m", 60_000_000n],
-  ["seconds", 1_000_000n], ["second", 1_000_000n], ["sec", 1_000_000n], ["s", 1_000_000n],
-  ["hours", 3_600_000_000n], ["hour", 3_600_000_000n], ["hr", 3_600_000_000n], ["h", 3_600_000_000n],
-  ["days", 86_400_000_000n], ["day", 86_400_000_000n], ["d", 86_400_000_000n],
-  ["weeks", 604_800_000_000n], ["week", 604_800_000_000n], ["w", 604_800_000_000n],
-  ["months", 2_629_800_000_000n], ["month", 2_629_800_000_000n], ["M", 2_629_800_000_000n],
-  ["years", 31_557_600_000_000n], ["year", 31_557_600_000_000n], ["y", 31_557_600_000_000n],
-];
 
 // ---------------------------------------------------------------------------
 // Inputs
@@ -244,12 +170,10 @@ export interface FleetSystemdAgentInput {
   agentId: string;
   /** The row's `profile_name`, for the profile home and the delta read. Null when the row records none. */
   profileName: string | null;
-  /** The role directory, for the reconcile policy and its state file. Null when neither can be derived. */
+  /** The role directory, for the pinned gateway launcher. */
   roleDir: string | null;
   /** The row's `systemd.gateway_unit`, verbatim. Null or blank when it records none. */
   storedGatewayUnit: string | null;
-  /** The row's `systemd.heartbeat_timer`, verbatim. */
-  storedHeartbeatTimer: string | null;
   /** Every key the row's `systemd` block carries, sorted. Keys the contract does not declare are retired. */
   storedSystemdKeys: readonly string[];
   /** The row's `hermes.bin`: the executable the registry pins for this agent. */
@@ -288,8 +212,6 @@ export interface FleetSystemdContext {
   sweep: boolean;
   /** A path as it may be shown: bounded and home-redacted. Never a realpath. */
   shown: (path: string) => string;
-  /** CLOCK_MONOTONIC now, in microseconds. Injected so a suite can pin a window without sleeping. */
-  monotonicNowUs: bigint;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +228,7 @@ export interface FleetSystemdItem {
   detail: string | null;
 }
 
-/** One of the five per-agent leaves, before it becomes an observation. */
+/** One of the two per-agent leaves, before it becomes an observation. */
 export interface FleetSystemdAspect {
   state: FleetStatusState;
   items: FleetSystemdItem[];
@@ -343,8 +265,6 @@ export interface FleetSystemdAgentResult {
     missing: string[];
     extra: Array<{ unit: string; class: FleetSystemdExtraClass }>;
   };
-  /** The registry's own `systemd.heartbeat_timer` field. */
-  heartbeatTimerRow: FleetSystemdAspect;
   capability: {
     declared: FleetSystemdCapabilityState;
     platforms: Record<string, "verified" | "deferred" | "undeclared">;
@@ -359,24 +279,6 @@ export interface FleetSystemdAgentResult {
     entrypoint: { family: FleetSystemdEntrypointFamily; pinned: boolean };
     home: FleetSystemdHomeState;
     stability: { samples: number; stable: boolean; transitions: string[] };
-  };
-  timer: FleetSystemdAspect & {
-    view: FleetStatusSystemdUnitView;
-    /** The stable code of the item that decided this leaf's state, or null. */
-    code: string | null;
-    paired: boolean;
-    schedule: FleetSystemdSchedule;
-    tick: FleetSystemdTick;
-  };
-  service: FleetSystemdAspect & {
-    view: FleetStatusSystemdUnitView;
-    /** The stable code of the item that decided this leaf's state, or null. */
-    code: string | null;
-    result: string | null;
-    execStatus: number | null;
-    entrypoint: { family: FleetSystemdEntrypointFamily; pinned: boolean };
-    latestResult: FleetSystemdLatestResult;
-    reconcile: { declared: FleetSystemdReconcileDeclaration; evidence: FleetSystemdReconcileEvidence };
   };
 }
 
@@ -430,7 +332,7 @@ function aspect(state: FleetStatusState, items: FleetSystemdItem[], observed: st
  *
  * `items[0]` was not it: an `error` leaf whose first item is a `warn` reported
  * the warning's code beside the error's state, so the one line an operator
- * reads (`gw <code>` / `hb <code>`) named a reading that did not cause the
+ * reads (`gw <code>`) named a reading that did not cause the
  * verdict. The first item whose OWN rank equals the leaf's state is the cause;
  * the first item is the fallback, which is what a `pass` leaf with items or a
  * rank function and a state that disagree would fall back to.
@@ -479,45 +381,13 @@ export function systemctlEnv(ctx: FleetSystemdContext): NodeJS.ProcessEnv {
 }
 
 /**
- * A systemd time value in microseconds, or null.
- *
- * TWO spellings, one function. `ExecMainStartTimestampMonotonic` is a raw
- * decimal count of microseconds; `TimeoutStartUSec` and
- * `LastTriggerUSecMonotonic` are timespan strings systemd renders itself
- * (`1w 5d 14h 16min 26.297365s`, `45min`, `500ms`, `12us`). `infinity` and an
- * unparseable value are null -- never zero, which is a real reading (a unit
- * that has never run).
- */
-export function parseSystemdUsec(raw: string | undefined): bigint | null {
-  if (raw === undefined) return null;
-  const value = raw.trim();
-  if (value === "" || value === "infinity" || value === "n/a") return null;
-  if (/^\d+$/u.test(value)) return BigInt(value);
-  let total = 0n;
-  let matched = false;
-  const token = /(\d+(?:\.\d+)?)\s*([A-Za-z]+)/gu;
-  let hit: RegExpExecArray | null;
-  while ((hit = token.exec(value)) !== null) {
-    const unit = DURATION_UNITS.find(([name]) => name === hit![2]);
-    if (unit === undefined) return null;
-    // Fractional seconds are real (`26.297365s`); the multiplication is done in
-    // floating point and then floored to whole microseconds, which is the
-    // resolution the value itself has.
-    total += BigInt(Math.floor(Number(hit[1]) * Number(unit[1])));
-    matched = true;
-  }
-  return matched ? total : null;
-}
-
-/**
  * One `show` payload as a map from unit id to its properties.
  *
  * Blocks are separated by ONE blank line and each carries its own `Id=`, which
  * is what the map is keyed on -- never the argv order, which systemd does not
- * promise to preserve. A repeated key accumulates (`TimersMonotonic` prints one
- * line per timer expression); a key with an empty value is kept as an empty
+ * promise to preserve. A repeated key accumulates; a key with an empty value is kept as an empty
  * string, because "present and empty" and "absent" are different readings
- * (`LoadError=` on a healthy unit versus a timer that has no `Result`).
+ * (`LoadError=` on a healthy unit versus a unit that has no `Result`).
  */
 export function parseShowBlocks(text: string): Map<string, Map<string, string[]>> {
   const units = new Map<string, Map<string, string[]>>();
@@ -639,18 +509,6 @@ export function splitEnvironmentLine(line: string): string[] {
   return out;
 }
 
-/** The monotonic expression each `TimersMonotonic={ OnXUSec=... ; ... }` line declares, in microseconds. */
-export function parseTimersMonotonic(lines: readonly string[]): Map<string, bigint> {
-  const out = new Map<string, bigint>();
-  for (const line of lines) {
-    const hit = /\{\s*([A-Za-z]+USec)\s*=\s*([^;}]+?)\s*(?:;|\})/u.exec(line);
-    if (hit === null) continue;
-    const usec = parseSystemdUsec(hit[2]);
-    if (usec !== null && !out.has(hit[1]!)) out.set(hit[1]!, usec);
-  }
-  return out;
-}
-
 /** A unit's five reported words, bounded. The `FleetStatusSystemdUnitView` every leaf carries. */
 function unitView(unit: string, sample: Sample): FleetStatusSystemdUnitView {
   // A property the manager did not report is `null`, never the word
@@ -675,6 +533,11 @@ function numeric(sample: Sample, key: string): number | undefined {
   const raw = one(sample, key);
   if (raw === undefined || raw === "") return undefined;
   return /^-?\d+$/u.test(raw.trim()) ? Number(raw.trim()) : Number.NaN;
+}
+
+/** A retired heartbeat is observed only by the unregistered sweep. */
+function isRetiredHeartbeat(pattern: string): boolean {
+  return /-heartbeat\.(?:service|timer)$/u.test(pattern);
 }
 
 /** A unit name derived from a pattern, or null when the id could not be substituted safely. */
@@ -973,34 +836,6 @@ function evaluateStability(samples: readonly Sample[]): Stability {
   return { stable: stable && !crashLooping, crashLooping, transitions, restarts: last, malformed };
 }
 
-/**
- * Is the heartbeat oneshot mid-tick, and has it been mid-tick too long?
- *
- * Computed ONCE and reported on the TIMER leaf, because "is the tick
- * happening" is the timer's question -- the same leaf that owns
- * `tick-overdue`, `tick-never` and `schedule-off-policy` -- while "did the last
- * COMPLETED run succeed" (`latest-result-failed`) is the oneshot's. systemd
- * pre-initialises `Result=success` before the first exit, so an activating
- * oneshot is never read as a success; whether it is merely running or wedged is
- * the unit's OWN start timeout, floored by the manifest's ceiling for a unit
- * that declares none.
- */
-function evaluateTickActivation(sample: Sample, monotonicNowUs: bigint, maxTickSeconds: number): "in-progress" | "stuck" | null {
-  if (sample === null || one(sample, "LoadState") !== "loaded") return null;
-  const active = one(sample, "ActiveState") ?? "";
-  if (active !== "activating" && active !== "active") return null;
-  // `RemainAfterExit=yes` leaves a SUCCESSFULLY completed oneshot sitting at
-  // `active/exited`. That is a finished tick, not one in flight: reading it as
-  // `in-progress` would age into `stuck` and never recover. Every heartbeat
-  // unit this fleet provisions is `RemainAfterExit=no`, so this is the latent
-  // half of the rule rather than the live one.
-  if (one(sample, "SubState") === "exited") return null;
-  const timeout = parseSystemdUsec(one(sample, "TimeoutStartUSec")) ?? BigInt(maxTickSeconds) * 1_000_000n;
-  const start = parseSystemdUsec(one(sample, "ExecMainStartTimestampMonotonic"));
-  const age = start === null || start === 0n ? null : monotonicNowUs - start;
-  return age !== null && age >= timeout ? "stuck" : "in-progress";
-}
-
 /** Which executable family a unit's `ExecStart` path belongs to, and whether the registry pins it. */
 function classifyEntrypoint(
   path: string | null,
@@ -1092,90 +927,27 @@ function readDeltaEnablement(ctx: FleetSystemdContext, profileName: string | nul
   return { enabled, secrets, read };
 }
 
-/** What the role's reconcile policy declares, and what its state file evidences. Presence of keys only. */
-function readReconcile(ctx: FleetSystemdContext, roleDir: string | null): {
-  declared: FleetSystemdReconcileDeclaration;
-  evidence: FleetSystemdReconcileEvidence;
-  kind: FleetSystemdItemKind | null;
-} {
-  const { reconcile_policy_file, reconcile_state_file } = ctx.manifest.heartbeat;
-  if (roleDir === null) return { declared: "unverifiable", evidence: "not-read", kind: "reconcile-unverifiable" };
-  const policyPath = join(roleDir, ...reconcile_policy_file.split("/"));
-  if (entryStat(policyPath).kind !== "file") return { declared: "undeclared", evidence: "not-applicable", kind: "reconcile-undeclared" };
-  const read = readBounded(policyPath, ctx.manifest.limits.max_file_bytes);
-  if (!("bytes" in read)) return { declared: "unreadable", evidence: "not-read", kind: "policy-unreadable" };
-  let document: unknown;
-  try { document = YAML.parse(read.bytes.toString("utf8")); } catch { return { declared: "unreadable", evidence: "not-read", kind: "policy-unreadable" }; }
-  const block = typeof document === "object" && document !== null && !Array.isArray(document)
-    ? (document as Record<string, unknown>).reconcile
-    : undefined;
-  if (typeof block !== "object" || block === null || Array.isArray(block)) {
-    return { declared: "undeclared", evidence: "not-applicable", kind: "reconcile-undeclared" };
-  }
-  const record = block as Record<string, unknown>;
-  if (record.enabled !== true) {
-    if (record.explicit_opt_out === true) return { declared: "opted-out", evidence: "not-applicable", kind: null };
-    return { declared: "disabled", evidence: "not-applicable", kind: "reconcile-opt-out-undeclared" };
-  }
-  // Reconcile is ON: the heartbeat must be evidencing a FULL run, not only a
-  // checkpoint tick. The state file is read for the PRESENCE of two keys and
-  // nothing else -- never a value, never a decision, never a timestamp.
-  const statePath = join(roleDir, ...reconcile_state_file.split("/"));
-  if (entryStat(statePath).kind !== "file") return { declared: "enabled", evidence: "state-missing", kind: "checkpoint-only" };
-  const state = readBounded(statePath, ctx.manifest.limits.max_file_bytes);
-  if (!("bytes" in state)) return { declared: "enabled", evidence: "state-unreadable", kind: "state-unreadable" };
-  let parsed: unknown;
-  try { parsed = JSON.parse(state.bytes.toString("utf8")); } catch { return { declared: "enabled", evidence: "state-unreadable", kind: "state-unreadable" }; }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { declared: "enabled", evidence: "state-unreadable", kind: "state-unreadable" };
-  }
-  const keys = parsed as Record<string, unknown>;
-  const full = keys.last_full_run_epoch !== undefined && keys.last_runner_completed_at !== undefined;
-  return { declared: "enabled", evidence: full ? "full-run" : "checkpoint-only", kind: full ? null : "checkpoint-only" };
-}
-
 /** Every leaf reads `error` with one collection code: what a failed manager or an unsampled window leaves behind. */
 function erroredAspect(kind: FleetSystemdItemKind, unit: string, detail: string, summary: string): FleetSystemdAspect {
   return aspect("error", [{ path: unit, kind, desired: "an observation of the user manager", observed: kind, detail }], kind, "an observation of the user manager", summary);
 }
 
-/**
- * Every leaf of one agent, filled in with a collection failure.
- *
- * The three unit names arrive BY KEY, never as positions in `expected`.
- * `expected` is SORTED for the payload, and the canonical triple sorts
- * `…-gateway.service`, `…-heartbeat.service`, `…-heartbeat.timer` -- so
- * destructuring it as `[gateway, timer, service]` handed the heartbeat SERVICE
- * to the timer leaf and the TIMER to the service leaf on every
- * `manager-unavailable`, `manager-timeout` and `show-failed` result. The error
- * path is exactly where an operator has the least other evidence, so it is the
- * worst place to name the wrong unit.
- */
 function emptyAgentResult(
   input: FleetSystemdAgentInput,
   expected: string[],
-  units: { gateway: string | null; timer: string | null; service: string | null },
+  units: { gateway: string | null },
   failure: (unit: string) => FleetSystemdAspect,
   platforms: readonly string[],
 ): FleetSystemdAgentResult {
   const view = (unit: string): FleetStatusSystemdUnitView => ({ unit, load: null, unit_file: null, active: null, sub: null });
-  const { gateway: gatewayUnit, timer: timerUnit, service: serviceUnit } = units;
-  // ONE aspect per leaf, and its code comes from that aspect's own item -- the
-  // same rule a READ leaf follows. Hardcoding `code: null` here blanked
-  // `agents[].systemd.gateway.code` and `.heartbeat.code` on every collection
-  // failure: the leaves still carried an item naming the failure, and the two
-  // summary fields a JSON consumer reads to learn WHY the domain is not proven
-  // said nothing at all.
+  const { gateway: gatewayUnit } = units;
   const gatewayAspect = failure(gatewayUnit ?? input.agentId);
-  const timerAspect = failure(timerUnit ?? input.agentId);
-  const serviceAspect = failure(serviceUnit ?? input.agentId);
   const codeOf = (leaf: FleetSystemdAspect): string | null => (
     leaf.items.length === 0 ? null : leaf.items[0]!.detail ?? leaf.items[0]!.kind
   );
   return {
     agentId: input.agentId,
     topology: { ...gatewayAspect, expected, installed: [], missing: [], extra: [] },
-    heartbeatTimerRow: timerAspect,
     capability: {
       declared: "undeclared",
       platforms: Object.fromEntries(platforms.map((platform) => [platform, "undeclared" as const])),
@@ -1187,12 +959,6 @@ function emptyAgentResult(
       entrypoint: { family: "unknown", pinned: false }, home: "unknown",
       stability: { samples: 0, stable: false, transitions: [] },
     },
-    timer: { ...timerAspect, view: view(timerUnit ?? "(underivable)"), code: codeOf(timerAspect), paired: false, schedule: "unknown", tick: "unknown" },
-    service: {
-      ...serviceAspect, view: view(serviceUnit ?? "(underivable)"), code: codeOf(serviceAspect),
-      result: null, execStatus: null, entrypoint: { family: "unknown", pinned: false },
-      latestResult: "unknown", reconcile: { declared: "unverifiable", evidence: "not-read" },
-    },
   };
 }
 
@@ -1201,17 +967,15 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   const platforms = manifest.messaging.platforms;
   const perAgent = ctx.serviceModel?.per_agent ?? {};
   const gatewayUnit = derive(perAgent.gateway_unit, input.agentId);
-  const timerUnit = derive(perAgent.heartbeat_timer, input.agentId);
-  const serviceUnit = derive(perAgent.heartbeat_service, input.agentId);
-  const expected = [gatewayUnit, timerUnit, serviceUnit].filter((unit): unit is string => unit !== null).sort();
+  const expected = [gatewayUnit].filter((unit): unit is string => unit !== null).sort();
 
   // -- the collection gates, carried onto every leaf --------------------------
   if (shared.manager.code !== "available") {
     const kind: FleetSystemdItemKind = shared.manager.code === "manager-timeout" ? "manager-timeout" : "manager-unavailable";
-    return emptyAgentResult(input, expected, { gateway: gatewayUnit, timer: timerUnit, service: serviceUnit }, (unit) => erroredAspect(kind, unit, shared.manager.code, `not observed: ${shared.manager.detail}`), platforms);
+    return emptyAgentResult(input, expected, { gateway: gatewayUnit }, (unit) => erroredAspect(kind, unit, shared.manager.code, `not observed: ${shared.manager.detail}`), platforms);
   }
-  if (gatewayUnit === null || timerUnit === null || serviceUnit === null) {
-    return emptyAgentResult(input, expected, { gateway: gatewayUnit, timer: timerUnit, service: serviceUnit }, (unit) => aspect(
+  if (gatewayUnit === null) {
+    return emptyAgentResult(input, expected, { gateway: gatewayUnit }, (unit) => aspect(
       "error",
       [{ path: unit, kind: "agent-id-unsafe", desired: "a unit name derived from service_model.per_agent", observed: "underivable", detail: null }],
       "underivable", "a unit name derived from service_model.per_agent",
@@ -1220,7 +984,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   }
   if (shared.window.taken === 0) {
     const kind: FleetSystemdItemKind = shared.window.error === "show-timeout" ? "show-timeout" : shared.window.error === "show-too-large" ? "show-too-large" : "show-failed";
-    return emptyAgentResult(input, expected, { gateway: gatewayUnit, timer: timerUnit, service: serviceUnit }, (unit) => erroredAspect(kind, unit, shared.window.error ?? "show-failed", "not observed: the stability window produced no sample of the user manager"), platforms);
+    return emptyAgentResult(input, expected, { gateway: gatewayUnit }, (unit) => erroredAspect(kind, unit, shared.window.error ?? "show-failed", "not observed: the stability window produced no sample of the user manager"), platforms);
   }
 
   const samplesOf = (unit: string): Sample[] => shared.window.samples.get(unit) ?? [];
@@ -1257,7 +1021,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   const missing: string[] = [];
   const extra: Array<{ unit: string; class: FleetSystemdExtraClass }> = [];
   for (const [unit, kind] of [
-    [gatewayUnit, "gateway-missing"], [timerUnit, "heartbeat-timer-missing"], [serviceUnit, "heartbeat-service-missing"],
+    [gatewayUnit, "gateway-missing"],
   ] as ReadonlyArray<readonly [string, FleetSystemdItemKind]>) {
     if (loaded(unit)) installed.push(unit);
     else {
@@ -1284,6 +1048,8 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   }
   // Retired shapes: on the manager or on disk, they are drift on the agent they name.
   for (const pattern of manifest.unregistered.retired_candidates) {
+    // Heartbeats belong to the fleet retired-candidate sweep, never this employee's required observations.
+    if (isRetiredHeartbeat(pattern)) continue;
     const unit = derive(pattern, input.agentId);
     if (unit === null) continue;
     const present = loaded(unit) || shared.listing.units.has(unit) || shared.listing.files.has(unit)
@@ -1294,7 +1060,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   }
   // Registry keys the contract does not declare writable are retired keys.
   for (const key of input.storedSystemdKeys) {
-    if (ctx.declaredSystemdKeys.includes(key)) continue;
+    if (ctx.declaredSystemdKeys.includes(key) || key === "heartbeat_timer") continue;
     topologyItems.push({ path: `systemd.${word(key)}`, kind: "registry-retired-key", desired: "absent", observed: word(key), detail: `registry-retired-key:${word(key)}` });
   }
   extra.sort((a, b) => (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
@@ -1310,27 +1076,6 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
     ),
     expected, installed, missing, extra,
   };
-
-  // -- the registry's heartbeat_timer field ----------------------------------
-  const rowItems: FleetSystemdItem[] = [];
-  const stored = input.storedHeartbeatTimer !== null && input.storedHeartbeatTimer !== "" ? input.storedHeartbeatTimer : null;
-  const timerOnDisk = shared.listing.files.has(timerUnit) || loaded(timerUnit);
-  if (stored === null) {
-    if (timerOnDisk) {
-      rowItems.push({ path: timerUnit, kind: "registry-undeclared", desired: timerUnit, observed: "absent", detail: "registry-undeclared" });
-    }
-  } else if (stored !== timerUnit) {
-    rowItems.push({ path: unitWord(stored), kind: "misnamed-heartbeat-timer", desired: timerUnit, observed: unitWord(stored), detail: `misnamed-heartbeat-timer:${unitWord(stored)}` });
-  } else if (!loaded(timerUnit)) {
-    rowItems.push({ path: timerUnit, kind: "unit-missing", desired: "loaded", observed: word(one(latest(timerUnit), "LoadState") ?? "not-found"), detail: "unit-missing" });
-  }
-  const heartbeatTimerRow = aspect(
-    rowItems.length === 0 ? "pass" : "fail", rowItems,
-    stored === null ? "absent" : unitWord(stored), timerUnit,
-    rowItems.length === 0
-      ? stored === null ? "the row declares no heartbeat timer and none is installed" : "the row's heartbeat timer is the canonical name and the manager loads it"
-      : "the row's heartbeat_timer field and the units on this manager disagree",
-  );
 
   // -- the gateway -----------------------------------------------------------
   const gatewaySamples = samplesOf(gatewayUnit);
@@ -1519,201 +1264,11 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
     stability: { samples: gatewaySamples.length, stable: gatewayRead === "readable" && gatewayStability.stable, transitions: gatewayStability.transitions },
   };
 
-  // -- the heartbeat timer ---------------------------------------------------
-  const timerSample = latest(timerUnit);
-  const timerItems: FleetSystemdItem[] = [];
-  const timerRead = unitDefects(timerUnit, timerSample, timerItems);
-  const timers = parseTimersMonotonic(all(timerSample, "TimersMonotonic"));
-  let schedule: FleetSystemdSchedule = "unknown";
-  let tick: FleetSystemdTick = "unknown";
-  let paired = false;
-  const serviceSample = latest(serviceUnit);
-  // Whether the tick is HAPPENING is the timer's question, and the answer is
-  // read off the oneshot: this leaf already carries `tick-overdue`,
-  // `tick-never` and `schedule-off-policy`, and a wedged oneshot is the same
-  // fact one step further along. The oneshot's own leaf keeps whether the last
-  // COMPLETED run succeeded, and reports this reading as its `latest_result`
-  // bucket.
-  const activation = evaluateTickActivation(serviceSample, ctx.monotonicNowUs, manifest.heartbeat.max_tick_seconds);
-  if (timerRead === "readable") {
-    const timerFileState = one(timerSample, "UnitFileState") ?? "";
-    if (!ENABLED_STATES.has(timerFileState)) timerItems.push({ path: timerUnit, kind: "timer-disabled", desired: "enabled", observed: word(timerFileState || "absent"), detail: "timer-disabled" });
-    const timerActive = one(timerSample, "ActiveState") ?? "";
-    if (timerActive !== "active") timerItems.push({ path: timerUnit, kind: "timer-inactive", desired: "active", observed: word(timerActive), detail: "timer-inactive" });
-    const timerSub = one(timerSample, "SubState") ?? "";
-    if (!TIMER_SUBSTATES.has(timerSub)) timerItems.push({ path: timerUnit, kind: "timer-substate", desired: [...TIMER_SUBSTATES].join("|"), observed: word(timerSub), detail: "timer-substate" });
-    paired = one(timerSample, "Unit") === serviceUnit || all(timerSample, "Triggers").some((value) => value.split(/\s+/u).includes(serviceUnit));
-    if (!paired) timerItems.push({ path: timerUnit, kind: "timer-unpaired", desired: serviceUnit, observed: unitWord(one(timerSample, "Unit") ?? "none"), detail: "timer-unpaired" });
-
-    // The schedule, compared to the policy EXACTLY: `OnUnitInactiveUSec` and
-    // `OnBootUSec` are the two expressions `70-systemd.sh` writes, and a timer
-    // that fires on a different cadence is a different agent contract.
-    const inactive = timers.get("OnUnitInactiveUSec");
-    const boot = timers.get("OnBootUSec");
-    const wantInactive = BigInt(manifest.heartbeat.on_unit_inactive_sec) * 1_000_000n;
-    const wantBoot = BigInt(manifest.heartbeat.on_boot_sec) * 1_000_000n;
-    // Reported in the MANIFEST's vocabulary, never systemd's. `OnUnitInactiveUSec`
-    // is a property NAME rather than a value, but a payload that may carry no
-    // `USec` reading is easier to keep true when the string never appears at
-    // all -- and `on_unit_inactive_sec` is the key an operator would edit.
-    if (inactive === undefined && boot === undefined) {
-      schedule = "unknown";
-      timerItems.push({ path: timerUnit, kind: "schedule-unknown", desired: `on_unit_inactive_sec ${manifest.heartbeat.on_unit_inactive_sec}s`, observed: "no monotonic expression", detail: "schedule-unknown" });
-    } else if ((inactive !== undefined && inactive !== wantInactive) || (boot !== undefined && boot !== wantBoot)) {
-      schedule = "off-policy";
-      timerItems.push({
-        path: timerUnit, kind: "schedule-off-policy",
-        desired: `on_unit_inactive_sec ${manifest.heartbeat.on_unit_inactive_sec}s, on_boot_sec ${manifest.heartbeat.on_boot_sec}s`,
-        observed: [inactive === undefined ? null : `on_unit_inactive_sec ${inactive / 1_000_000n}s`, boot === undefined ? null : `on_boot_sec ${boot / 1_000_000n}s`].filter((value) => value !== null).join(", "),
-        detail: "schedule-off-policy",
-      });
-    } else schedule = "within-policy";
-
-    // The tick, as a BUCKET. `LastTriggerUSecMonotonic` and the oneshot's exit
-    // are both CLOCK_MONOTONIC in microseconds, the same clock
-    // `process.hrtime.bigint()` reads, so the comparison is exact and the
-    // ANSWER is a word -- never an age, which would move between two runs over
-    // unchanged state.
-    const lastTrigger = parseSystemdUsec(one(timerSample, "LastTriggerUSecMonotonic"));
-    const lastExit = parseSystemdUsec(one(serviceSample, "ExecMainExitTimestampMonotonic"));
-    const latestTick = [lastTrigger, lastExit].filter((value): value is bigint => value !== null && value > 0n).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))[0] ?? null;
-    const overdueAfter = BigInt(manifest.heartbeat.on_unit_inactive_sec) * BigInt(manifest.heartbeat.overdue_multiplier) * 1_000_000n;
-    if (latestTick === null) {
-      // Never triggered. Only claim `never` once the boot delay has had time to
-      // elapse twice over; before that, "not yet" and "never" are the same
-      // reading and this says so.
-      tick = ctx.monotonicNowUs > BigInt(manifest.heartbeat.on_boot_sec) * 2n * 1_000_000n ? "never" : "unknown";
-      if (tick === "never") timerItems.push({ path: timerUnit, kind: "tick-never", desired: "a completed tick since boot", observed: "never", detail: "tick-never" });
-      else timerItems.push({ path: timerUnit, kind: "tick-unknown", desired: "a completed tick since boot", observed: "not yet due", detail: "tick-unknown" });
-    } else if (latestTick > ctx.monotonicNowUs) {
-      tick = "unknown";
-      timerItems.push({ path: timerUnit, kind: "tick-unknown", desired: "a monotonic reading inside this boot", observed: "ahead of the monotonic clock", detail: "tick-unknown" });
-    } else if (ctx.monotonicNowUs - latestTick > overdueAfter) {
-      tick = "overdue";
-      timerItems.push({
-        path: timerUnit, kind: "tick-overdue",
-        desired: `a tick within ${manifest.heartbeat.on_unit_inactive_sec * manifest.heartbeat.overdue_multiplier}s`,
-        observed: "overdue", detail: "tick-overdue",
-      });
-    } else tick = "current";
-
-    // The oneshot mid-tick, on the leaf that owns whether the tick happens.
-    // `path` names the ONESHOT, because that is the unit an operator would look
-    // at -- the item is on the timer's leaf, not about the timer's own state.
-    if (activation !== null) {
-      timerItems.push({
-        path: serviceUnit, kind: activation, desired: "a completed tick",
-        observed: activation === "stuck" ? "activating past its own start timeout" : "activating",
-        detail: activation,
-      });
-    }
-  }
-  const timerRank = (kind: FleetSystemdItemKind): FleetStatusState => (
-    kind === "property-malformed" ? "error"
-      : kind === "tick-unknown" || kind === "schedule-unknown" || kind === "in-progress" ? "warn"
-        : "fail"
-  );
-  let timerState: FleetStatusState = "pass";
-  for (const item of timerItems) timerState = worseOf(timerState, timerRank(item.kind));
-  const timer = {
-    ...aspect(
-      timerState, timerItems,
-      timerRead !== "readable" ? timerRead : `${word(one(timerSample, "UnitFileState") ?? "absent")}/${word(one(timerSample, "ActiveState"))}/${word(one(timerSample, "SubState"))} tick ${tick}`,
-      `enabled, active and waiting, paired with ${serviceUnit}, on the declared schedule, with a current tick`,
-      timerItems.length === 0
-        ? "the heartbeat timer is enabled, active, correctly paired, on policy and current"
-        : `${timerItems.length} heartbeat-timer defect(s): an active timer proves nothing on its own`,
-    ),
-    view: unitView(timerUnit, timerSample),
-    code: decisiveCode(timerItems, timerState, timerRank),
-    paired, schedule, tick,
-  };
-
-  // -- the heartbeat oneshot -------------------------------------------------
-  const serviceItems: FleetSystemdItem[] = [];
-  const serviceRead = unitDefects(serviceUnit, serviceSample, serviceItems);
-  const serviceExec = parseExecStart(one(serviceSample, "ExecStart"));
-  const serviceEntrypoint = classifyEntrypoint(serviceExec.path, input.roleDir, manifest.entrypoint.launcher, input.hermesBin);
-  const serviceResult = one(serviceSample, "Result") ?? null;
-  const serviceStatus = numeric(serviceSample, "ExecMainStatus");
-  let latestResult: FleetSystemdLatestResult = "unknown";
-  const reconcile = readReconcile(ctx, input.roleDir);
-  if (serviceRead === "readable") {
-    if ((one(serviceSample, "Type") ?? "") !== "oneshot") {
-      serviceItems.push({ path: serviceUnit, kind: "type-not-oneshot", desired: "oneshot", observed: word(one(serviceSample, "Type") ?? "absent"), detail: "type-not-oneshot" });
-    }
-    const start = parseSystemdUsec(one(serviceSample, "ExecMainStartTimestampMonotonic"));
-    const exit = parseSystemdUsec(one(serviceSample, "ExecMainExitTimestampMonotonic"));
-    if (activation !== null) {
-      // Mid-tick: the BUCKET is reported here, the ITEM on the timer leaf.
-      // systemd pre-initialises `Result=success` before the first exit, so an
-      // activating oneshot is never read as a success -- and it has no
-      // completed run for THIS leaf to fault either.
-      latestResult = activation;
-    } else if (serviceResult !== null && serviceResult !== "success") {
-      latestResult = "failed";
-      serviceItems.push({ path: serviceUnit, kind: "latest-result-failed", desired: "success", observed: word(serviceResult), detail: `latest-result-failed:${word(serviceResult)}` });
-    } else if (serviceStatus !== undefined && Number.isNaN(serviceStatus)) {
-      latestResult = "unknown";
-      serviceItems.push({ path: serviceUnit, kind: "property-malformed", desired: "a whole number", observed: "unparsed", detail: "property-malformed:ExecMainStatus" });
-    } else if (serviceStatus !== undefined && serviceStatus !== 0) {
-      latestResult = "failed";
-      serviceItems.push({ path: serviceUnit, kind: "latest-result-failed", desired: "0", observed: String(serviceStatus), detail: `latest-result-failed:exit-${serviceStatus}` });
-    } else if (start === null || start === 0n) {
-      latestResult = "never";
-      serviceItems.push({ path: serviceUnit, kind: "never-completed", desired: "a completed tick since boot", observed: "never started", detail: "never-completed" });
-    } else if (exit === null || exit < start) {
-      latestResult = "never";
-      serviceItems.push({ path: serviceUnit, kind: "never-completed", desired: "an exit at or after the last start", observed: "no exit recorded", detail: "never-completed" });
-    } else if (serviceResult === null) {
-      latestResult = "unknown";
-      serviceItems.push({ path: serviceUnit, kind: "latest-result-unknown", desired: "success", observed: "no Result property", detail: "latest-result-unknown" });
-    } else latestResult = "success";
-
-    if (!serviceEntrypoint.pinned) {
-      serviceItems.push({ path: serviceUnit, kind: "entrypoint-unpinned", desired: "the role launcher or the executable the row pins", observed: serviceEntrypoint.family, detail: "entrypoint-unpinned" });
-    }
-    if (reconcile.kind !== null) {
-      serviceItems.push({
-        path: manifest.heartbeat.reconcile_policy_file, kind: reconcile.kind,
-        desired: "reconcile.enabled: true with a full-run state file, or an explicit opt-out",
-        observed: `${reconcile.declared}/${reconcile.evidence}`, detail: reconcile.kind,
-      });
-    }
-  }
-  const serviceRank = (kind: FleetSystemdItemKind): FleetStatusState => (
-    kind === "property-malformed" || kind === "policy-unreadable" || kind === "state-unreadable" ? "error"
-      : kind === "reconcile-undeclared" || kind === "reconcile-opt-out-undeclared" || kind === "reconcile-unverifiable" || kind === "latest-result-unknown" ? "warn"
-        : "fail"
-  );
-  let serviceState: FleetStatusState = "pass";
-  for (const item of serviceItems) serviceState = worseOf(serviceState, serviceRank(item.kind));
-  const service = {
-    ...aspect(
-      serviceState, serviceItems,
-      serviceRead !== "readable" ? serviceRead : `${word(one(serviceSample, "ActiveState"))}/${word(one(serviceSample, "SubState"))} ${latestResult}`,
-      "a oneshot whose latest invocation completed successfully, entered from the pinned entrypoint",
-      serviceItems.length === 0
-        ? "the heartbeat oneshot completed its latest tick successfully"
-        : `${serviceItems.length} heartbeat-service defect(s): an active timer proves nothing without a successful tick`,
-    ),
-    view: unitView(serviceUnit, serviceSample),
-    code: decisiveCode(serviceItems, serviceState, serviceRank),
-    result: serviceResult === null ? null : word(serviceResult),
-    execStatus: serviceStatus === undefined || Number.isNaN(serviceStatus) ? null : serviceStatus,
-    entrypoint: serviceEntrypoint,
-    latestResult,
-    reconcile: { declared: reconcile.declared, evidence: reconcile.evidence },
-  };
-
   return {
     agentId: input.agentId,
     topology,
-    heartbeatTimerRow,
     capability: { declared: capability, platforms: declaredPlatforms, deltaDisabled: delta.enabled },
     gateway,
-    timer,
-    service,
   };
 }
 
@@ -1818,19 +1373,30 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
     reason: result.outcome === "ok" ? null : result.outcome === "timeout" ? "show-timeout" : "show-failed",
   };
   const shown = result.outcome === "ok" ? parseShowBlocks(result.value ?? "") : new Map<string, Map<string, string[]>>();
+  if (result.outcome === "ok" && kept.some((unit) => {
+    const sample = shown.get(unit) ?? null;
+    return sample === null || SYSTEMD_REQUIRED_PROPERTIES.some((key) => {
+      const values = all(sample, key);
+      return values.length !== 1 || (values[0] !== "" && !WORD.test(values[0]!)) || (key !== "UnitFileState" && values[0] === "");
+    });
+  })) {
+    probe.outcome = "failed";
+    probe.reason = "show-malformed";
+  }
   const registeredProfiles = new Set(ctx.registeredProfileNames);
   const retiredPatterns = ctx.retired.flatMap((mode) => mode.detect.map((pattern) => ({ id: mode.id, pattern })));
 
   const items: FleetStatusSystemdUnregisteredItem[] = kept.map((unit) => {
     const sample = shown.get(unit) ?? null;
     const listed = shared.listing.units.get(unit);
-    const fileState = shared.listing.files.get(unit) ?? (sample === null ? null : one(sample, "UnitFileState") || null);
+    const observed = unitView(unit, sample);
+    const fileState = shared.listing.files.get(unit) ?? observed.unit_file;
     const view: FleetStatusSystemdUnitView = {
       unit,
-      load: listed?.load ?? (sample === null ? null : word(one(sample, "LoadState"))),
+      load: listed?.load ?? observed.load,
       unit_file: fileState === null ? null : word(fileState),
-      active: listed?.active ?? (sample === null ? null : word(one(sample, "ActiveState"))),
-      sub: listed?.sub ?? (sample === null ? null : word(one(sample, "SubState"))),
+      active: listed?.active ?? observed.active,
+      sub: listed?.sub ?? observed.sub,
     };
 
     const claim = declaredUnitClaim(ctx, unit);
@@ -1852,6 +1418,13 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
     });
     if (retiredHit !== undefined) {
       return { ...view, class: "retired", correlated_profile: null, process_reference: "unobserved", guidance: "retirement", detail: `retired:${word(retiredHit.id)}` };
+    }
+    const retiredCandidate = ctx.manifest.unregistered.retired_candidates.find((pattern) => {
+      const escaped = pattern.split("{agent_id}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("[a-z0-9][a-z0-9_-]{0,63}");
+      return new RegExp(`^${escaped}$`, "u").test(unit);
+    });
+    if (retiredCandidate !== undefined) {
+      return { ...view, class: "retired", correlated_profile: null, process_reference: "unobserved", guidance: "retirement", detail: "retired:candidate" };
     }
     // A profile correlation: the unit's own `HERMES_HOME` names a directory
     // under the profile root. The DIRECTORY, never a name similarity.
@@ -1905,15 +1478,15 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
   const interest = new Set<string>();
   const owned = new Set<string>();
   for (const agent of ctx.agents) {
-    for (const pattern of [perAgent.gateway_unit, perAgent.heartbeat_timer, perAgent.heartbeat_service]) {
+    for (const pattern of [perAgent.gateway_unit]) {
       const unit = derive(pattern, agent.agentId);
       if (unit !== null) { interest.add(unit); owned.add(unit); }
     }
     for (const pattern of ctx.manifest.unregistered.retired_candidates) {
       const unit = derive(pattern, agent.agentId);
-      if (unit !== null) { interest.add(unit); owned.add(unit); }
+      if (unit !== null && !isRetiredHeartbeat(pattern)) { interest.add(unit); owned.add(unit); }
     }
-    for (const stored of [agent.storedGatewayUnit, agent.storedHeartbeatTimer]) {
+    for (const stored of [agent.storedGatewayUnit]) {
       if (stored !== null && stored !== "" && UNIT_NAME.test(stored)) { interest.add(stored); owned.add(stored); }
     }
   }
@@ -1921,13 +1494,13 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
   // not select them: an `--agent` run must not report another agent's gateway
   // as an unregistered unit, and a fleet-scope sweep must not either.
   for (const agentId of ctx.registeredAgentIds) {
-    for (const pattern of [perAgent.gateway_unit, perAgent.heartbeat_timer, perAgent.heartbeat_service]) {
+    for (const pattern of [perAgent.gateway_unit]) {
       const unit = derive(pattern, agentId);
       if (unit !== null) owned.add(unit);
     }
     for (const pattern of ctx.manifest.unregistered.retired_candidates) {
       const unit = derive(pattern, agentId);
-      if (unit !== null) owned.add(unit);
+      if (unit !== null && !isRetiredHeartbeat(pattern)) owned.add(unit);
     }
   }
   if (ctx.sweep && ctx.sharedGateway.unit !== null) { interest.add(ctx.sharedGateway.unit); owned.add(ctx.sharedGateway.unit); }
@@ -1981,7 +1554,10 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
   else {
     const swept = await classifyUnregistered(ctx, shared, owned);
     unregistered = swept.record;
-    if (swept.probe !== null) probes.push(swept.probe);
+    if (swept.probe !== null) {
+      probes.push(swept.probe);
+      if (swept.probe.outcome !== "ok") unregisteredReason = swept.probe.reason;
+    }
   }
 
   // Deduped by id and stably sorted: two runs over unchanged state must emit

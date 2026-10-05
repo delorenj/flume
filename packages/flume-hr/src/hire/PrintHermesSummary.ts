@@ -6,21 +6,19 @@ import type { HermesAgentContext } from "./types";
 
 interface DurableServiceState {
   gateway: string;
-  heartbeat: string;
 }
 
 function readServiceState(roleDir: string | undefined): DurableServiceState {
-  if (!roleDir || !existsSync(join(roleDir, "role.yaml"))) return { gateway: "planned", heartbeat: "planned" };
+  if (!roleDir || !existsSync(join(roleDir, "role.yaml"))) return { gateway: "planned" };
   try {
     const role = YAML.parse(readFileSync(join(roleDir, "role.yaml"), "utf8")) as {
-      service_state?: { gateway?: unknown; heartbeat?: unknown };
+      service_state?: { gateway?: unknown };
     } | null;
     return {
       gateway: typeof role?.service_state?.gateway === "string" ? role.service_state.gateway : "unknown",
-      heartbeat: typeof role?.service_state?.heartbeat === "string" ? role.service_state.heartbeat : "unknown",
     };
   } catch {
-    return { gateway: "unknown", heartbeat: "unknown" };
+    return { gateway: "unknown" };
   }
 }
 
@@ -41,7 +39,6 @@ export function renderHermesSummary(ctx: HermesAgentContext): string {
     `agent_id: ${ctx.agentId ?? "planned"}`,
     `role_dir: ${ctx.roleDir ?? join(ctx.targetDir, "agents", "hermes", ctx.role ?? "pm")}`,
     `runtime: local role runtime (${join(ctx.roleDir ?? join(ctx.targetDir, "agents", "hermes", ctx.role ?? "pm"), "runtime")})`,
-    `heartbeat: ${service.heartbeat}`,
     `gateway: ${service.gateway}`,
   ];
   if (deferrals.length) lines.push(`deferred: ${deferrals.join(", ")}`);

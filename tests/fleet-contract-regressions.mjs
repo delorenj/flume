@@ -268,7 +268,8 @@ try {
       assert.ok(out.includes(klass), `report must name lifecycle class ${klass}`);
     }
     assert.ok(out.includes("hermes-{agent_id}-gateway.service"), "report must name the per-agent gateway unit");
-    assert.ok(out.includes("hermes-{agent_id}-heartbeat.timer"), "report must name the per-agent heartbeat timer");
+    assert.doesNotMatch(out, /heartbeat.timer/, "heartbeat is no longer a required employee unit");
+    assert.ok(out.includes("per-agent-heartbeat"), "retirement remains declared");
     assert.ok(out.includes("hermes-fleet-bloodbank-gateway.service"), "report must name the fleet-shared gateway");
     for (const mode of ["per-agent-bloodbank-consumer", "per-agent-checkpoint-timer", "n8n-owned-truth", "activation-by-discovery", "hard-coded-hermes-checkout-path"]) {
       assert.ok(out.includes(mode), `report must name superseded mode ${mode}`);
@@ -303,7 +304,7 @@ try {
     assert.equal(parsed.data.authorities.length, 7, "envelope must carry exactly the declared authorities");
     assert.equal(parsed.data.projections.length, 6, "envelope must carry exactly the declared projections");
     assert.equal(parsed.data.classifications.length, 5, "envelope must carry five lifecycle classes");
-    assert.equal(parsed.data.retired.length, 5, "envelope must carry exactly the declared retired modes");
+    assert.equal(parsed.data.retired.length, 6, "envelope must carry exactly the declared retired modes, including heartbeat");
     assert.equal(parsed.data.byte_stable, true, "tracked contract must round-trip byte-stably");
     assert.deepEqual(parsed.data.truncated, [], "the tracked contract must fit the envelope bounds without clipping");
   });
@@ -943,6 +944,18 @@ try {
     assert.match(JSON.stringify(parsed.error), /per-agent-checkpoint-timer/);
   });
 
+  check("heartbeat retirement cannot be removed from the current handbook", () => {
+    const path = mutated("dropped-heartbeat-retirement", (doc) => {
+      const modes = doc.get("retired");
+      const index = modes.items.findIndex((item) => String(item.get("id")) === "per-agent-heartbeat");
+      assert.notEqual(index, -1);
+      modes.items.splice(index, 1);
+    });
+    const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
+    assert.equal(errorCode(parsed), "INVALID_INPUT");
+    assert.match(JSON.stringify(parsed.error), /per-agent-heartbeat/);
+  });
+
   check("a duplicate retired id cannot stand in for the mode it shadows", () => {
     const path = mutated("duplicate-retired", (doc) => {
       const modes = doc.get("retired");
@@ -1057,14 +1070,24 @@ try {
     assert.match(JSON.stringify(parsed.error), /one direction only|already fed by/);
   });
 
-  check("the per-agent unit patterns must stay three distinct names", () => {
-    const path = mutated("collapsed-units", (doc) => {
-      doc.setIn(["service_model", "per_agent", "heartbeat_service"], "hermes-{agent_id}-gateway.service");
+  check("the current gateway pattern must carry the employee placeholder", () => {
+    const path = mutated("gateway-no-placeholder", (doc) => {
+      doc.setIn(["service_model", "per_agent", "gateway_unit"], "hermes-gateway.service");
     });
-    const result = cli(["handbook", "validate", "--contract", path, "--json"]);
-    const parsed = envelope(result);
+    const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
     assert.equal(errorCode(parsed), "INVALID_INPUT");
-    assert.match(JSON.stringify(parsed.error), /three distinct patterns/);
+    assert.match(JSON.stringify(parsed.error), /agent_id.*placeholder/);
+  });
+
+  check("the current handbook requires only the gateway and explicitly retires heartbeat units", () => {
+    const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
+    assert.equal(contract.contract_version, "1.5.0");
+    assert.deepEqual(contract.service_model.per_agent, { gateway_unit: "hermes-{agent_id}-gateway.service" });
+    assert.equal("heartbeat" in contract.service_manifest, false);
+    assert.equal(contract.authorities.systemd_lifecycle.writable_fields.some((field) => field.includes("heartbeat")), false);
+    for (const suffix of ["service", "timer"]) assert.ok(contract.service_manifest.unregistered.retired_candidates.includes(`hermes-{agent_id}-heartbeat.${suffix}`));
+    assert.ok(contract.retired.some((mode) => mode.id === "per-agent-heartbeat"));
+    assert.equal(envelope(cli(["handbook", "validate", "--json"])).ok, true);
   });
 
   check("the generated profile file may not shadow the override SSOT", () => {

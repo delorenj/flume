@@ -124,6 +124,14 @@ if (verb === "show") {
   // `includes("NRestarts")` meant dropping that property from the observer
   // would have frozen every window at sample 0 with the suite still green.
   const sampled = properties.length > FAKE_SAMPLED_PROPERTY_FLOOR;
+  if (!sampled && state.classification) {
+    sleepMs(state.classification.delay_ms ?? 0);
+    if (state.classification.exit) process.exit(state.classification.exit);
+    if (typeof state.classification.stdout === "string") {
+      process.stdout.write(state.classification.stdout);
+      process.exit(0);
+    }
+  }
   const index = sampled ? readCounter() : Math.max(0, readCounter() - 1);
   const blocks = units.map((unit) => {
     const found = sampleOf(unit, index) ?? NOT_FOUND(unit);

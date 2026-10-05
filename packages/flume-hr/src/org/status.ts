@@ -394,7 +394,7 @@ const CAPABILITY_PROFILE_MANIFEST = "profile.manifest";
 /**
  * The systemd observer's own gap (story 1.8): a contract with no
  * `service_manifest` declares no canonical service state, so every selected
- * agent's five systemd leaves are `unsupported` under this capability --
+ * employee's two systemd leaves are `unsupported` under this capability --
  * unjustified unless the policy says otherwise, exactly like the five above.
  */
 const CAPABILITY_SYSTEMD_MANIFEST = "systemd.manifest";
@@ -508,24 +508,13 @@ const SYSTEMD_SHARED_RULE_ID = "systemd.shared-gateway";
 const SYSTEMD_UNREGISTERED_RULE_ID = "systemd.unregistered";
 
 /**
- * The five leaves the systemd observer reports on.
- *
- * Two registry fields and three unit names, and every one of them is declared
- * writable under the contract's `systemd_lifecycle` authority -- so `ownerOf`
- * answers `runtime-template` for each and no finding ships without an
- * owner. Never `agents.{agent_id}.systemd.gateway_unit` ALONE for all five: the
- * three unit leaves are about units on this manager and the two registry leaves
- * are about the row, and `by_state` counts agents per aspect only when the
- * aspects have separate fields.
+ * Employee topology belongs to the registry gateway field; gateway health
+ * belongs to the unit. Both fields resolve a systemd_lifecycle owner.
  */
 const SYSTEMD_FIELD_TOPOLOGY = "agents.{agent_id}.systemd.gateway_unit";
-const SYSTEMD_FIELD_HEARTBEAT_TIMER_ROW = "agents.{agent_id}.systemd.heartbeat_timer";
 const SYSTEMD_FIELD_GATEWAY = "units.hermes-{agent_id}-gateway.service";
-const SYSTEMD_FIELD_TIMER = "units.hermes-{agent_id}-heartbeat.timer";
-const SYSTEMD_FIELD_SERVICE = "units.hermes-{agent_id}-heartbeat.service";
 const SYSTEMD_FIELDS = [
-  SYSTEMD_FIELD_TOPOLOGY, SYSTEMD_FIELD_HEARTBEAT_TIMER_ROW,
-  SYSTEMD_FIELD_GATEWAY, SYSTEMD_FIELD_TIMER, SYSTEMD_FIELD_SERVICE,
+  SYSTEMD_FIELD_TOPOLOGY, SYSTEMD_FIELD_GATEWAY,
 ] as const;
 
 /**
@@ -540,9 +529,8 @@ const SYSTEMD_FIELDS = [
  *
  * The subset is narrow on purpose. The sentinel reads enablement, activity and
  * unit-file presence and NOTHING else -- no stability window, no channel
- * declaration, no schedule, no heartbeat result -- so an observer finding on
- * `unstable`, `crash-looping`, `channel-*`, `schedule-*`, `tick-*` or any
- * heartbeat-result code is coverage the rule never had, and is `not_compared`.
+ * declaration -- so findings on `unstable`, `crash-looping` or `channel-*`
+ * are coverage the rule never had, and are `not_compared`.
  */
 const SYSTEMD_RULE_DETAIL_PATTERNS: readonly RegExp[] = [
   /should be enabled\+active/u,
@@ -557,8 +545,7 @@ const SYSTEMD_PARITY_DETAIL_PATTERNS: readonly RegExp[] = [
 const SYSTEMD_RULE_COVERED_KINDS: ReadonlySet<string> = new Set([
   "deferred-but-enabled", "deferred-but-active",
   "verified-channel-gateway-disabled", "verified-channel-gateway-inactive",
-  "timer-disabled", "timer-inactive",
-  "gateway-missing", "heartbeat-timer-missing", "heartbeat-service-missing",
+  "gateway-missing",
   "retired-unit", "registry-retired-key",
 ]);
 
@@ -1767,7 +1754,7 @@ function observeFromProfile(ctx: FleetStatusContext, input: ProfileObservationIn
 
 
 // ---------------------------------------------------------------------------
-// The systemd observer's five leaves (story 1.8)
+// The systemd observer's two leaves (story 1.8)
 // ---------------------------------------------------------------------------
 
 interface SystemdObservationInput {
@@ -1780,14 +1767,7 @@ interface SystemdObservationInput {
   notes: string[];
 }
 
-/**
- * Five observations per agent: two registry leaves and three unit leaves.
- *
- * Five fields, not one, and all five declared writable under the contract's
- * `systemd_lifecycle` authority -- so `ownerOf` answers for each, a topology
- * `fail` never contradicts the inventory (which sits on `profile_name` and
- * `expected_units`), and `by_state` counts agents per aspect rather than units.
- */
+/** Two observations per employee: registry topology and gateway health. */
 function observeFromSystemd(ctx: FleetStatusContext, input: SystemdObservationInput): {
   observations: FleetStatusObservation[];
   summary: FleetStatusAgentSystemd | null;
@@ -1809,9 +1789,7 @@ function observeFromSystemd(ctx: FleetStatusContext, input: SystemdObservationIn
     };
   }
   if (result === undefined) {
-    // Unreachable when the observer ran over the selected agents, and kept
-    // honest anyway: five `unobserved` leaves, never one, so a consumer that
-    // counts agents per aspect still sees the five declared fields.
+    // Keep both declared fields visible when the observer produces no result.
     return {
       observations: SYSTEMD_FIELDS.map((field) => observation(ctx, {
         domain: "systemd", agentId, state: "unobserved",
@@ -1819,7 +1797,7 @@ function observeFromSystemd(ctx: FleetStatusContext, input: SystemdObservationIn
         summary: "the systemd observer produced no result for this agent",
         source: SOURCE_SYSTEMD,
         observed: "no result",
-        desired: "five systemd observations for this agent",
+        desired: "two systemd observations for this employee",
       })),
       summary: null,
     };
@@ -1868,28 +1846,7 @@ function observeFromSystemd(ctx: FleetStatusContext, input: SystemdObservationIn
     }));
   };
   emit(SYSTEMD_FIELD_TOPOLOGY, result.topology);
-  emit(SYSTEMD_FIELD_HEARTBEAT_TIMER_ROW, result.heartbeatTimerRow);
   emit(SYSTEMD_FIELD_GATEWAY, result.gateway);
-  emit(SYSTEMD_FIELD_TIMER, result.timer);
-  emit(SYSTEMD_FIELD_SERVICE, result.service);
-
-  // The two heartbeat leaves roll into ONE `heartbeat` reading on the summary:
-  // the timer and the oneshot are two halves of one tick, and an operator
-  // reading "the heartbeat is fine" over a timer that fires into a failing
-  // service would have been told the opposite of the truth.
-  // The WORSE leaf decides both the state and the code. Reading the oneshot's
-  // code beside the timer's state would name the wrong half: a heartbeat that
-  // is `fail` because its timer is disabled must not be summarised by the
-  // oneshot's warning.
-  const heartbeatLeaves = [result.service, result.timer];
-  const worseHeartbeat = heartbeatLeaves
-    .reduce((worst, leaf) => (stateRank(leaf.state) < stateRank(worst.state) ? leaf : worst), heartbeatLeaves[0]!);
-  const heartbeatState = worseHeartbeat.state;
-  // The code comes from the leaf's OWN `code`, which names the item whose rank
-  // equals that leaf's state -- the item that caused the verdict, not whichever
-  // one happened to be pushed first.
-  const codeSource = worseHeartbeat.items.length > 0 ? worseHeartbeat : heartbeatLeaves.find((leaf) => leaf.items.length > 0);
-  const heartbeatCode = codeSource === undefined ? null : codeSource.code;
 
   return {
     observations,
@@ -1922,21 +1879,6 @@ function observeFromSystemd(ctx: FleetStatusContext, input: SystemdObservationIn
           stable: result.gateway.stability.stable,
           transitions: result.gateway.stability.transitions.map((line) => bounded(line, 128)),
         },
-      },
-      heartbeat: {
-        state: heartbeatState,
-        code: heartbeatCode === null ? null : bounded(heartbeatCode, 64),
-        timer: { ...result.timer.view, paired: result.timer.paired },
-        service: {
-          ...result.service.view,
-          result: result.service.result,
-          exec_status: result.service.execStatus,
-          entrypoint: { ...result.service.entrypoint },
-        },
-        schedule: result.timer.schedule,
-        latest_result: result.service.latestResult,
-        tick: result.timer.tick,
-        reconcile: { ...result.service.reconcile },
       },
     },
   };
@@ -1980,7 +1922,7 @@ function systemdParityVerdict(rule: Record<string, unknown> | undefined): "pass"
  */
 function systemdObserverDrift(result: FleetSystemdAgentResult | undefined): boolean | null {
   if (result === undefined) return null;
-  const leaves = [result.topology, result.heartbeatTimerRow, result.gateway, result.timer, result.service];
+  const leaves = [result.topology, result.gateway];
   if (leaves.some((leaf) => leaf.state === "error")) return null;
   const covered = leaves.some((leaf) => leaf.items.some((item) => SYSTEMD_RULE_COVERED_KINDS.has(item.kind)));
   if (covered) return true;
@@ -2494,7 +2436,6 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   const registeredAgentIds: string[] = [];
   const systemdRowByAgent = new Map<string, {
     storedGatewayUnit: string | null;
-    storedHeartbeatTimer: string | null;
     storedSystemdKeys: string[];
     hermesBin: string | null;
     messaging: Record<string, { status: string | null; identity: Record<string, boolean> }>;
@@ -2539,7 +2480,6 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     }
     systemdRowByAgent.set(entry.key, {
       storedGatewayUnit: nonEmptyString(systemdBlock.gateway_unit),
-      storedHeartbeatTimer: nonEmptyString(systemdBlock.heartbeat_timer),
       storedSystemdKeys: Object.keys(systemdBlock).sort(),
       hermesBin: nonEmptyString(hermes.bin) === null ? null : expandHome(nonEmptyString(hermes.bin)!, home),
       messaging,
@@ -2899,7 +2839,6 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
           profileName: profileNameByAgent.get(agentId) ?? null,
           roleDir: profileRoleDirByAgent.get(agentId) ?? null,
           storedGatewayUnit: row?.storedGatewayUnit ?? null,
-          storedHeartbeatTimer: row?.storedHeartbeatTimer ?? null,
           storedSystemdKeys: row?.storedSystemdKeys ?? [],
           hermesBin: row?.hermesBin ?? null,
           messaging: row?.messaging ?? {},
@@ -2910,10 +2849,6 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       // unregistered unit -- and says so rather than reading as an empty sweep.
       sweep: scope.kind === "fleet",
       shown: shownPath,
-      // CLOCK_MONOTONIC, the same clock systemd's `*USecMonotonic` properties
-      // use. Read once for the whole run so every agent's tick bucket is
-      // computed against ONE instant.
-      monotonicNowUs: process.hrtime.bigint() / 1_000n,
     });
     ctx.probes.push(...systemdHealth.probes);
   }
@@ -2921,7 +2856,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   const systemdCounts = {
     total_registered: inventory.totals.registered_agents,
     selected: agentIds.length,
-    complete: 0, topology_ok: 0, gateway_healthy: 0, gateway_deferred: 0, heartbeat_healthy: 0,
+    complete: 0, topology_ok: 0, gateway_healthy: 0, gateway_deferred: 0,
     unstable: 0, crash_looping: 0, drifted: 0, incomplete: 0, exception_authorized: 0, unobserved: 0,
   };
   const systemdCapability = Object.fromEntries(FLEET_SYSTEMD_CAPABILITY_STATES.map((state) => [state, 0])) as Record<FleetSystemdCapabilityState, number>;
@@ -3242,7 +3177,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   // `scaffold.source` and the profile observer's three are -- once, in
   // `data.host`, through the same classifier -- and their consequence for the
   // agents rides on the agents' own records: an unavailable manager makes every
-  // selected agent's five leaves `error`, and never fails a repository.
+  // selected employee's two leaves `error`, and never fails a repository.
   if (systemdHealth !== null) {
     const hostRetrieval = retrievalFor(null, "systemd", live);
     const hostFinding = (
@@ -3365,9 +3300,11 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
         const spread = FLEET_SYSTEMD_UNREGISTERED_CLASSES.filter((klass) => byClass[klass] > 0).map((klass) => `${byClass[klass]} ${klass}`).join(", ");
         hostFinding(
           SYSTEMD_UNREGISTERED_RULE_ID,
-          unruled.length === 0 ? "pass" : "warn",
+          systemdHealth.unregisteredReason !== null ? "error" : unruled.length === 0 ? "pass" : "warn",
           SYSTEMD_FIELD_TOPOLOGY,
-          all.length === 0
+          systemdHealth.unregisteredReason !== null
+            ? `unregistered unit names were swept but their state could not be observed (${systemdHealth.unregisteredReason})`
+            : all.length === 0
             ? `the user manager carries no unregistered ${serviceManifest!.unregistered.unit_glob} unit`
             : unruled.length === 0
               ? `${all.length} unregistered unit(s) are classified by the contract (${spread})`
@@ -3510,7 +3447,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       }
     }
 
-    // Story 1.8: the systemd observer's five observations and per-agent
+    // Story 1.8: the systemd observer's two observations and per-agent
     // summary. The same rule as the scaffold's and the profile's: counted
     // HERE, over every selected agent, before the record cap.
     let systemdSummary: FleetStatusAgentSystemd | null = null;
@@ -3529,7 +3466,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       systemdSummary = systemd.summary;
       if (!systemdObserved) systemdCounts.unobserved += 1;
       else {
-        const leaves = [systemdResult.topology, systemdResult.heartbeatTimerRow, systemdResult.gateway, systemdResult.timer, systemdResult.service];
+        const leaves = [systemdResult.topology, systemdResult.gateway];
         systemdCapability[systemdResult.capability.declared] += 1;
         if (leaves.every((leaf) => leaf.state !== "error" && leaf.state !== "unobserved")) systemdCounts.complete += 1;
         if (systemdResult.topology.state === "pass") systemdCounts.topology_ok += 1;
@@ -3537,7 +3474,6 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
           if (systemdResult.capability.declared === "deferred") systemdCounts.gateway_deferred += 1;
           else systemdCounts.gateway_healthy += 1;
         }
-        if (systemdResult.timer.state === "pass" && systemdResult.service.state === "pass") systemdCounts.heartbeat_healthy += 1;
         // A crash loop is counted as its own cause AND as an instability: the
         // window was not unanimous either way, and an operator scanning for
         // "how many gateways moved under the observation" must see both.
@@ -3832,9 +3768,8 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       // scoped and file into `data.host`, so they never meet an agent's
       // observations in `detectContradictions` at all. Compared over the subset
       // all three read -- enablement, activity, unit presence, retired units and
-      // retired registry keys. Stability, channel declaration, schedule, tick
-      // and heartbeat result are `not_compared` by construction: neither rule
-      // looks at any of them.
+      // retired registry keys. Stability and channel declarations remain
+      // `not_compared`: neither rule looks at them.
       if (systemdObserved) {
         const sentinel = systemdRuleVerdict((audit.rules ?? []).find((rule) => nonEmptyString(rule.id) === "systemd.sentinel"));
         const parity = systemdParityVerdict((audit.rules ?? []).find((rule) => nonEmptyString(rule.id) === "hermes.registry-parity"));
@@ -4204,7 +4139,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
         const byClass = Object.fromEntries(FLEET_SYSTEMD_UNREGISTERED_CLASSES.map((klass) => [klass, items.filter((item) => item.class === klass).length])) as Record<FleetSystemdUnregisteredClass, number>;
         return {
           coverage: systemdHealth?.unregistered ? "swept" as const : "not-swept" as const,
-          reason: systemdHealth === null ? "manifest-undeclared" : systemdHealth.unregistered ? null : bounded(systemdHealth.unregisteredReason ?? "not-swept", 64),
+          reason: systemdHealth === null ? "manifest-undeclared" : systemdHealth.unregisteredReason === null && systemdHealth.unregistered ? null : bounded(systemdHealth.unregisteredReason ?? "not-swept", 64),
           total: items.length,
           by_class: byClass,
           listed: Math.min(items.length, FLEET_STATUS_MAX_ITEMS),

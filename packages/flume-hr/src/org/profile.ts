@@ -328,7 +328,7 @@ export interface EntryStat {
  * `lstat`, never `stat`: what the path IS, established without following it.
  *
  * Exported for the systemd observer (story 1.8), which reads a role's
- * reconcile policy and heartbeat state file with the same idiom.
+ * gateway profile inputs with the same idiom.
  */
 export function entryStat(path: string): EntryStat {
   try {
