@@ -2,7 +2,7 @@
 title: 'FLUME-15: retire heartbeat requirements from employee reviews'
 type: enhancement
 created: '2026-10-05'
-status: in-progress
+status: in-review
 route: dispatch
 baseline_commit: 2034f78322b89af2b74db69bb182085a6966c20f
 review_loop_iteration: 0

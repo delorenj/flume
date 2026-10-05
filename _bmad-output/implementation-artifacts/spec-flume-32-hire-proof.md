@@ -2,7 +2,7 @@
 title: 'FLUME-32: prove the real hire path for a declared role'
 type: bugfix
 created: '2026-10-05'
-status: in-progress
+status: in-review
 route: dispatch
 baseline_commit: 2034f78322b89af2b74db69bb182085a6966c20f
 review_loop_iteration: 0
@@ -67,6 +67,26 @@ The saved brief confirms the onboarding flag fix and live AC-6 proof are already
 ## Spec Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Route | Verified evidence |
+|---|---|---|---|
+| B1 | high | patch | Supported fleet-home expansion and quoted comments become literal paths; parent reproduced the variable path and checked the canonical parser tests. |
+| B2 | medium | patch | Parent reproduced an unresolved old alias after a changed anchored list; reconciliation mutates the alias resolution document. |
+| B3 | low | patch | Parent reproduced deletion of a comment on the surviving general sequence item; direct comment-transfer correction is appropriate. |
+| B4 | high | patch | The restoration read and write have no registry lock after Copier releases its own lock; a concurrent registration can be overwritten. |
+| B5 | high | patch | The live shared registry is written with truncating writeFileSync; interruption can replace valid YAML with a partial document. |
+| B6 | medium | patch | The generated removal patch contains only tools present at creation; its later existence skips restriction after base tools grow, causing onboarding audit failure. |
+| B7 | medium | patch | The reviewed test verifies inherited permissions only; explicit list and list-patch preservation are unprotected at the new onboarding consumer. |
+| V1 | medium | patch | Pre-verified gap: invalid reporting or routing is covered at helpers/audit, not the new hire preflight before Copier effects. |
+| V2 | medium | patch | Pre-verified gap: an unconditional restriction would strip operator-owned Bloodbank permissions while current hire fixtures remained green. |
+| V3 | high | patch | Same verified literal fleet-home path as B1; pinning the wrong value propagates it into actual Copier registry writes. |
+| V4 | high | patch | Same verified unlocked restoration window as B4; template concurrency tests do not execute this added writer. |
+| E1 | high | patch | Same verified unlocked restoration window as B4; shared-writer serialization must cover read through publication. |
+| E2 | high | patch | Same verified supported expansion/comment grammar divergence as B1; reuse the canonical parser. |
+| E3 | high | patch | The new fixed temporary filename is neither exclusive nor checked; write_text follows an existing symlink and os.replace moves that symlink into the delta path. |
+| E4 | high | patch | Same verified truncation issue as B5; atomic replacement is needed to preserve the complete prior registry on write failure. |
+| E5 | medium | patch | Parent reproduced an unresolved incoming alias when an equal retained node kept the old anchor name; keep the after document authoritative. |
+| E6 | medium | patch | Same verified incomplete generated restriction as B6; storing the complete forbidden-tool removal keeps later base growth restricted. |
 
 ## Verification
 
