@@ -1,0 +1,19 @@
+{
+  "observed_at": "2026-10-05T12:39:32.076871+00:00",
+  "cron_records": [],
+  "installed_skill_root": "/home/delorenj/code/skillex/all-skills/momo",
+  "installed_adapter_exists": false,
+  "activation_performed": false,
+  "cron_store": "/home/delorenj/.hermes/cron/jobs.json",
+  "cron_store_schema": {
+    "root_type": "object",
+    "root_keys": [
+      "jobs",
+      "updated_at"
+    ],
+    "jobs_type": "array",
+    "jobs_count": 0
+  },
+  "cron_scope": "Global jobs store only; earlier disabled-record evidence is historical. No all-profile schedule-absence claim.",
+  "schema_inspection": "Read-only key/type/count inspection during final closeout; no operator file writes."
+}

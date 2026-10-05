@@ -2,7 +2,7 @@
 title: 'FLUME-15: retire heartbeat requirements from employee reviews'
 type: enhancement
 created: '2026-10-05'
-status: in-review
+status: done
 route: dispatch
 baseline_commit: 2034f78322b89af2b74db69bb182085a6966c20f
 review_loop_iteration: 0
@@ -49,12 +49,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `contracts/handbook.yaml` — advance to 1.5.0; retire heartbeat units and fields; remove obsolete schedule and supersession requirements.
-- [ ] `packages/flume-hr/src/org/` and related parity/hire consumers — remove heartbeat requirements and evaluations while preserving retired-unit detection and historical record compatibility.
-- [ ] `tests/` — convert heartbeat coverage; prove gateway-only employee requirements, retired-unit reporting, and compatibility.
-- [ ] `/tmp/flume-orch/flume15-template-followup.md` — describe any template leftovers after checking canonical origin/main.
-- [ ] `/tmp/flume-orch/flume15-live-review.json` — save read-only before/after counts and concise samples.
-- [ ] `/tmp/flume-orch/flume15-report.md` — record commits, paths, exact verification, baseline comparison, and remaining concerns.
+- [x] `contracts/handbook.yaml` — advance to 1.5.0; retire heartbeat units and fields; remove obsolete schedule and supersession requirements.
+- [x] `packages/flume-hr/src/org/` and related parity/hire consumers — remove heartbeat requirements and evaluations while preserving retired-unit detection and historical record compatibility.
+- [x] `tests/` — convert heartbeat coverage; prove gateway-only employee requirements, retired-unit reporting, and compatibility.
+- [x] `/tmp/flume-orch/flume15-template-followup.md` — describe any template leftovers after checking canonical origin/main.
+- [x] `/tmp/flume-orch/flume15-live-review.json` — save read-only before/after counts and concise samples.
+- [x] `/tmp/flume-orch/flume15-report.md` — record commits, paths, exact verification, baseline comparison, and remaining concerns.
 
 **Acceptance Criteria:**
 - Given a valid employee with only its gateway unit, when the handbook is validated and the employee reviewed, then no heartbeat service, timer, schedule, or tick is required.
@@ -105,3 +105,11 @@ Patch groups: historical contract compatibility; stale registry retirement owner
 - `node scripts/run-tests.mjs` — typecheck/build hard gates and baseline comparison.
 - Read-only `node packages/flume-hr/dist/index.js review --domain systemd --json` before/after; never remediate.
 - `git diff --check` — scoped, whitespace-clean commits for independent review.
+
+## Resolution and integration — October 5, 2026
+
+All three independent review layers completed. Every patch verdict was resolved; each deferred baseline observer issue remains explicitly recorded in `deferred-work.md`. Supported v1.4/schema-5 and schema-4 handbooks remain readable, historical semantic rejection remains intact, and current retirement detection, aliases, repeated placeholders, profile wiring, successful hire and absent-row repair have regression coverage.
+
+Reviewed source landed and was pushed on main through `c48ee0242007880c397917266b4107d2b669f938`, consuming canonical template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`. Typecheck/build passed; combined verification passed 22 of 23 suites. An isolated fleet-status rerun passed the repository no-write assertion and confirmed the sole remaining assertion is the pre-existing policy-domain test debt. Logs and exact commands are retained in `recovery-delivery.md`.
+
+The installed `~/.local/bin/flume` resolves to this main build. Its read-only live review with the actual user bus selected 28 employees and produced 56 current systemd observations, zero required-heartbeat observations and zero employees failing heartbeat requirements. The workforce remains unhealthy for unrelated gateway/topology reasons: 22 unhealthy and six healthy employees. See `FLUME-15/installed-review.md` and `installed-review-summary.json`. No operator profiles or services were remediated. The completed worktree and feature branch were removed.

@@ -1,3 +1,11 @@
+# Parent integration complete — October 5, 2026
+
+Reviewed hire source landed and was pushed through `3630ca8f3f9b81712ca013a616159a41bd742cdb`. Combined main `c48ee0242007880c397917266b4107d2b669f938` passed typecheck/build and 22/23 suites at canonical template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`. The isolated fleet-status rerun confirmed only the pre-existing policy-domain assertion remains and its repository no-write check passes. All review patches are resolved; the completed worktree and branch are removed. AC-6 retains its `PASS_SEAM_ONLY` limit. See `../recovery-delivery.md`.
+
+The following worker handoff is historical; its pending parent obligations have completed as stated above.
+
+---
+
 # FLUME-32 worker handoff — 2026-10-05
 
 Status: DONE_WITH_CONCERNS

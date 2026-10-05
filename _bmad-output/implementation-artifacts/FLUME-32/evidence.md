@@ -1,6 +1,6 @@
 # FLUME-32 worker evidence
 
-Status: IMPLEMENTED; targeted verification PASS; independent review and parent integration pending
+Status: SOURCE_LANDED_AND_PUSHED; independent review complete; combined typecheck/build PASS and 22/23 suites PASS with one pre-existing fleet-status assertion failure
 Worker: flume-32-hire-proof
 Worktree: /home/delorenj/code/33GOD/flume/.worktrees/flume-32-hire
 Branch: feat/flume-32-hire-proof
@@ -14,7 +14,7 @@ Template tested: 97f9ff82e087dad3273c5cc596feac6b39f2c370 (original pin, unchang
 - AC-5: PASS — `role-contract`, `named-agent` and `named-agent-contract` pass with the same shared identity/skills definitions; `hermes-profile-inheritance` also passes.
 - AC-6: PASS (scope: `PASS_SEAM_ONLY`) — the orchestrator's authenticated live fallback/member-ledger proof is recorded in [live-fallback-20261005.json](/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-32/live-fallback-20261005.json). It proves the isolated Hermes AIAgent fallback seam, with multiplexed Bloodbank ingress outside its scope. This worker made no gateway calls and did not edit or regenerate that receipt.
 
-The historical entries below retain the observations and outstanding gates at the time they were written. Current acceptance and remaining integration work are recorded above and in the Real hire path section.
+The historical entries below retain the observations and outstanding gates at the time they were written. Reviewed hire source landed through `3630ca8f3f9b81712ca013a616159a41bd742cdb`; combined main `c48ee0242007880c397917266b4107d2b669f938` was verified at canonical template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`. The isolated fleet-status rerun passed its repository no-write assertion and confirmed only the pre-existing policy-domain assertion remains. The completed worktree and branch are removed. Current delivery and scoped AC-6 limits are recorded above and in `../recovery-delivery.md`; earlier statements about pending parent review/integration are historical.
 
 ## Real hire path (2026-10-05)
 

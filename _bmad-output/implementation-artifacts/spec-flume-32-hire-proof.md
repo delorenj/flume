@@ -2,7 +2,7 @@
 title: 'FLUME-32: prove the real hire path for a declared role'
 type: bugfix
 created: '2026-10-05'
-status: in-review
+status: done
 route: dispatch
 baseline_commit: 2034f78322b89af2b74db69bb182085a6966c20f
 review_loop_iteration: 0
@@ -48,11 +48,11 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tests/role-hire-regressions.mjs` — add the real CLI/Copier hire regression, strict loadout checks, and repeat-onboarding proof.
-- [ ] `scripts/run-tests.mjs` — register the new suite; preserve the existing gate order.
-- [ ] `packages/flume-hr/src/hire/` — fix only the Flume-owned behavior demonstrated to be wrong by the regression.
-- [ ] `_bmad-output/implementation-artifacts/FLUME-32/evidence.md` — correct stale acceptance status and add reproducible hire evidence; preserve recorded member-attributed AC-6 evidence.
-- [ ] `/tmp/flume-orch/flume32-report.md` — record changes, actual execution, test results, and unresolved boundaries.
+- [x] `tests/role-hire-regressions.mjs` — add the real CLI/Copier hire regression, strict loadout checks, and repeat-onboarding proof.
+- [x] `scripts/run-tests.mjs` — register the new suite; preserve the existing gate order.
+- [x] `packages/flume-hr/src/hire/` — fix only the Flume-owned behavior demonstrated to be wrong by the regression.
+- [x] `_bmad-output/implementation-artifacts/FLUME-32/evidence.md` — correct stale acceptance status and add reproducible hire evidence; preserve recorded member-attributed AC-6 evidence.
+- [x] `/tmp/flume-orch/flume32-report.md` — record changes, actual execution, test results, and unresolved boundaries.
 
 **Acceptance Criteria:**
 - Given a fresh scratch repository and valid declared role, when the built CLI runs `hire dev --yes --skip-telegram --skip-plane --local`, then actual Copier tasks and declaration projection complete and the expected employee profile is verifiably strict.
@@ -93,3 +93,11 @@ The saved brief confirms the onboarding flag fix and live AC-6 proof are already
 - `node scripts/run-tests.mjs role-hire role-projection role-selection role-contract named-agent hermes-profile-inheritance` — typecheck/build and every selected suite pass.
 - `node scripts/run-tests.mjs` — compare final results to `/tmp/flume-orch/flume15-baseline.log`; investigate any new regression without hiding it.
 - `git diff --check` — no whitespace errors; commits remain reviewable in the existing worker branch until parent integration.
+
+## Resolution and integration — October 5, 2026
+
+All three independent review layers completed; every patch verdict above was resolved. The parser, immutable YAML comment transfer, locked atomic registry publication, exclusive delta temporary files, inherited permission restrictions and operator override preservation are covered by the actual CLI/Copier and registry regressions. Reviewed hire source landed and was pushed on main through `3630ca8f3f9b81712ca013a616159a41bd742cdb`.
+
+Combined Flume main at `c48ee0242007880c397917266b4107d2b669f938`, with canonical template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`, passed typecheck/build and 22 of 23 suites. All previously passing suites remain passing. The full run's fleet-status repository snapshot assertion observed the parent's concurrent documentation commit; the isolated rerun passed that no-write assertion and retained only the pre-existing policy-domain assertion. No test was quarantined or authority contract weakened. Logs: `/tmp/flume-orch/main-combined-verification.log` and `/tmp/flume-orch/main-fleet-status-isolated.log`.
+
+The completed hire worktree and feature branch were removed after integration. AC-6 remains `PASS_SEAM_ONLY`; its retained matching request does not prove multiplexed Bloodbank ingress. Current evidence and delivery limits are recorded in `FLUME-32/evidence.md` and `recovery-delivery.md`.

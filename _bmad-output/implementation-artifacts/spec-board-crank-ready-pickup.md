@@ -2,7 +2,7 @@
 title: 'Board Cranker: pick up triaged Todo tickets under the existing Momo lease'
 type: feature
 created: '2026-10-05'
-status: in-review
+status: done
 route: dispatch
 baseline_commit: 8d110b043b8908fc5196e7e0d84cfd57cfec70d6
 review_loop_iteration: 0
@@ -51,11 +51,11 @@ context: []
 
 ## Tasks & Acceptance
 
-- [ ] `skill/scripts/momo-board-crank.*` and small supporting module(s) — bounded control-pass adapter with inspect/dry-run and execute modes, injection seams for fixture tests, durable journal/replay, shared lease, exact-lane readiness, deterministic ranking, command/receipt handling and guarded ticket transition.
-- [ ] `skill/contracts/board.crank.v1.*` — versioned input/runtime/receipt contract; invocation carries contractor/version, project, ticket, workdir and explicit memory policy. Validate prerequisites before execution.
-- [ ] `skill/references/board-clearing-loop.md` — document hourly adapter, normal pipeline delegation, independence, busy/refusal/uncertainty behavior, and deployment gate.
-- [ ] `skill/scripts/tests/test_board_crank.*` — meaningful hermetic idle/busy/two-ready/unfortified/dependency/dispatch-failure/ack/replay/partial-write/mode/independence regressions. A fake transport must not count as live proof.
-- [ ] `/tmp/flume-orch/board-crank-report.md` — full commit SHA, changed paths, exact tests and results, runtime deployment requirements, any acceptance gaps and concerns.
+- [x] `skill/scripts/momo-board-crank.*` and small supporting module(s) — bounded control-pass adapter with inspect/dry-run and execute modes, injection seams for fixture tests, durable journal/replay, shared lease, exact-lane readiness, deterministic ranking, command/receipt handling and guarded ticket transition.
+- [x] `skill/contracts/board.crank.v1.*` — versioned input/runtime/receipt contract; invocation carries contractor/version, project, ticket, workdir and explicit memory policy. Validate prerequisites before execution.
+- [x] `skill/references/board-clearing-loop.md` — document hourly adapter, normal pipeline delegation, independence, busy/refusal/uncertainty behavior, and deployment gate.
+- [x] `skill/scripts/tests/test_board_crank.*` — meaningful hermetic idle/busy/two-ready/unfortified/dependency/dispatch-failure/ack/replay/partial-write/mode/independence regressions. A fake transport must not count as live proof.
+- [x] `/tmp/flume-orch/board-crank-report.md` — full commit SHA, changed paths, exact tests and results, runtime deployment requirements, any acceptance gaps and concerns.
 
 **Acceptance:** Given direct-in-Todo triaged ready work and a free valid runtime, an execution selects and durably dispatches one existing Momo per-ticket pipeline and changes its state/date only after matching started acknowledgement. Given busy/uncertain execution, reruns never start a second worker or mutate another ticket. Given mode/route/runtime/readiness uncertainty, the pass exits with a truthful reason. Source tests and fixture receipts are explicitly distinguished from installed cron and live runtime proof.
 
@@ -106,3 +106,11 @@ All survivors route to bounded corrections of demonstrated states without a new 
 - Run the new fixture suite and existing Momo hardening suites with their actual supported runner.
 - Run syntax/import checks for authored scripts and `git diff --check`.
 - Report all unresolved dependencies; no claim of live activation without installed/triggered cron and durable receipt proof.
+
+## Resolution and integration — October 5, 2026
+
+All three independent review layers completed, and every patch verdict above was resolved. Exact command/ticket worker fences, journal context and persistent storage identity, complete prerequisites and acceptance sections, explicit cycle truth, canonical configuration hashes, saved ticket revision, fresh runtime/lease checks, bundle fingerprints, bounded hydration and canonical receipt traversal, subprocess supervision and real public CLI coverage are implemented.
+
+Reviewed corrections `c32901220716c5b3a1f09332c3ff37a15b6edafd` landed and were pushed in Momo main `4029c3471a738bd4dfcdca3038abdbebcc6971ae`. The final combined library and CLI run passed all 62 tests; earlier unchanged Python hardening passed 79 tests. The canonical source CLI refused both missing and disabled configuration with exit 78, while watched operator registry, cron and driver-lease files remained byte-identical. Evidence is in `Board-Cranker/source-refusal.json` and the updated implementation report.
+
+This spec's source delivery is complete. Live activation remains gated: the installed catalog at `/home/delorenj/code/skillex/all-skills/momo` does not contain the new adapter, and the earlier read-only board snapshot retains implementation WIP and unresolved contractor/runtime prerequisites. No installed busy/idle invocation, live started/completed receipt, cron activation or Plane write is claimed. See `board-crank-runtime-gate.md`. The completed implementation worktree and feature branch were removed.

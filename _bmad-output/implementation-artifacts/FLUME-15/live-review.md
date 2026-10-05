@@ -1,3 +1,11 @@
+# Current installed evidence — October 5, 2026
+
+This document preserves the worker's before/after snapshots. Subsequent independent review, combined main verification and integration have completed. The current installed CLI proof at reviewed main `c48ee0242007880c397917266b4107d2b669f938` and template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74` is in `installed-review.md` and `installed-review-summary.json`. It selects 28 employees, produces 56 current systemd observations and zero required-heartbeat observations. The workforce remains unhealthy for unrelated findings. See `../recovery-delivery.md` for the final verification boundary.
+
+Pending-parent statements in the historical snapshot below describe its recording time.
+
+---
+
 FLUME-15 consolidated live evidence — October 5, 2026
 
 The read-only review now has **zero required heartbeat observations**, compared

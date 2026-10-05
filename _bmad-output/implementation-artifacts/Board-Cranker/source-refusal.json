@@ -1,0 +1,34 @@
+{
+  "observed_at": "2026-10-05T12:32:13.670850+00:00",
+  "source_revision": "4029c3471a738bd4dfcdca3038abdbebcc6971ae",
+  "scope": "actual canonical source CLI; no cron or live activation acceptance",
+  "results": [
+    {
+      "case": "missing-config",
+      "exit_code": 78,
+      "receipt": {
+        "contract": "board.crank.v1",
+        "status": "refused",
+        "reason": "invalid input or unavailable dependency/runtime; no activation performed",
+        "live_execution_proof": false
+      }
+    },
+    {
+      "case": "disabled-config",
+      "exit_code": 78,
+      "receipt": {
+        "contract": "board.crank.v1",
+        "status": "refused",
+        "reason": "runtime configuration is absent or disabled",
+        "live_execution_proof": false
+      }
+    }
+  ],
+  "operator_files_unchanged": true,
+  "watched_paths": [
+    "/home/delorenj/.hermes/agents-registry.yaml",
+    "/home/delorenj/.hermes/cron/jobs.json",
+    "/home/delorenj/code/33GOD/agents/hermes/pm/runtime/wip-driver.lock"
+  ],
+  "activation": false
+}

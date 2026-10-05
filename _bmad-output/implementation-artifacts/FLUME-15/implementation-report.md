@@ -1,3 +1,13 @@
+# Parent integration complete — October 5, 2026
+
+Reviewed retirement source landed and was pushed through `c48ee0242007880c397917266b4107d2b669f938`, consuming template `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`. Combined typecheck/build passed with 22/23 suites; the isolated fleet-status run confirms the remaining baseline policy-domain assertion and passes the no-write check. All patch verdicts are resolved; existing observer debt is retained in `../deferred-work.md`. The completed worktree and branch are removed.
+
+The installed main CLI validates handbook 1.5.0 and observes all 28 employees with zero required-heartbeat observations. Overall health still contains unrelated gateway/topology failures. See `installed-review.md`, `installed-review-summary.json` and `../recovery-delivery.md`.
+
+The following review-fix handoff is historical; its pending parent obligations have completed as stated above.
+
+---
+
 FLUME-15 review-fix closeout — October 5, 2026
 
 **Status: DONE_WITH_CONCERNS.** All nine assigned review fixes are implemented and committed in the existing worker. Four affected suites pass. Typecheck and build pass. No full verification, fresh live review, template change, push, merge, or rebase was performed for this review pass. Parent handles merge overlap with FLUME-32, the new template pin, independent acceptance and combined verification.
