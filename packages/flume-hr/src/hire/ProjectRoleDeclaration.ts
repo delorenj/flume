@@ -9,7 +9,7 @@ import {spawnSync} from "node:child_process";
 // contributor must not inherit those unattended permissions: the final hire
 // audit correctly refuses them. Preserve explicit desk overrides for review.
 const RESTRICT_INHERITED_BLOODBANK = String.raw`
-import importlib.util, os, sys
+import importlib.util, os, sys, tempfile
 source, profile = sys.argv[1:3]
 spec = importlib.util.spec_from_file_location("flume_renderer", source)
 r = importlib.util.module_from_spec(spec)
@@ -28,15 +28,19 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
     if "bloodbank" not in tools and "platform_toolsets.bloodbank" not in patches:
         inherited = (r.load_yaml(r.BASE).get("platform_toolsets") or {}).get("bloodbank")
         if isinstance(inherited, list):
-            removed = [tool for tool in inherited if tool in {"delegation", "terminal", "file"}]
-            if removed:
-                delta[r.LIST_PATCH_KEY] = {**directive, "list_patches": {
-                    **patches, "platform_toolsets.bloodbank": {"remove": removed}}}
-                temporary = path.with_name(".config.delta.yaml.hire-tmp")
-                temporary.write_text(r.dump_yaml(delta))
-                os.chmod(temporary, 0o600)
+            delta[r.LIST_PATCH_KEY] = {**directive, "list_patches": {
+                **patches, "platform_toolsets.bloodbank": {"remove": ["delegation", "terminal", "file"]}}}
+            fd, temporary = tempfile.mkstemp(prefix=".config.delta.yaml.hire-", dir=pdir)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                    stream.write(r.dump_yaml(delta))
+                    stream.flush()
+                    os.fsync(stream.fileno())
                 os.replace(temporary, path)
-                r.write_generated(pdir / "config.yaml", r.deep_merge(r.load_yaml(r.BASE), delta))
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            r.write_generated(pdir / "config.yaml", r.deep_merge(r.load_yaml(r.BASE), delta))
 `;
 
 /** Role-owned projection, after the existing template has established the desk. */

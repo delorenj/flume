@@ -113,7 +113,22 @@ async function fixture(label,skills) {
   return {dir,home,hermes,skillex,repo,registry,org,config,env,desk,roleDir,run,show,records,blocked};
 }
 const hire=f=>f.run('hire','dev','--yes','--skip-telegram','--skip-plane','--local');
+const onboard=f=>f.run('onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local');
 const succeeded=result=>assert.equal(result.status,0,`${result.error?.message??''}\n${result.stdout}\n${result.stderr}`);
+const writeDelta=(f,delta)=>{
+  const dumped=spawnSync(python,['-I','-c','import json,sys,yaml; print(yaml.safe_dump(json.load(sys.stdin),default_flow_style=False,sort_keys=False,width=100),end="")'],
+    {env:f.env,input:JSON.stringify(delta),encoding:'utf8'});
+  assert.equal(dumped.status,0,dumped.stderr);
+  writeFileSync(join(f.desk,'config.delta.yaml'),dumped.stdout);
+};
+const removeBloodbankPatch=delta=>{
+  const directive=delta['x-pjangler-merge'];
+  if(directive?.list_patches) {
+    delete directive.list_patches['platform_toolsets.bloodbank'];
+    if(!Object.keys(directive.list_patches).length) delete directive.list_patches;
+    if(!Object.keys(directive).length) delete delta['x-pjangler-merge'];
+  }
+};
 
 try {
   // Verify the checkout matches the parent's pin, without touching the canonical template checkout.
@@ -130,6 +145,12 @@ try {
   ]) {
     const f=await fixture(label,skills),base=readFileSync(join(f.hermes,'config.yaml'),'utf8');
     const beforeRegistry=YAML.parse(readFileSync(f.registry,'utf8'));
+    // Drive parser semantics through the real consumer too, with neither
+    // explicit registry override available to hide a bad fleet.env resolution.
+    delete f.env.HERMES_AGENTS_REGISTRY;delete f.env.HERMES_FLEET_REGISTRY_FILE;
+    writeFileSync(join(f.hermes,'fleet.env'),label==='set'
+      ? `HERMES_FLEET_REGISTRY_FILE=$HERMES_FLEET_HOME/agents-registry.yaml # registry\n`
+      : `HERMES_FLEET_REGISTRY_FILE="${f.registry}" # registry\n`);
     const first=hire(f);succeeded(first);
     assert.match(first.stdout,/Role declaration projected/);
     assert.match(first.stdout,/Hermes lifecycle audit passed/,'the final hire audit must finish');
@@ -187,6 +208,54 @@ try {
     const refused=hire(f);assert.notEqual(refused.status,0);assert.match(refused.stdout+refused.stderr,/target directory is not empty.*--force/s);
     assert.deepEqual(snapshot(),before);assert.equal(f.records().filter(r=>r.command==='copier').length,1);
     pass(`${label} occupied role: unforced noninteractive hire refuses before any mutation`);
+
+    if(label==='set') {
+      const deltaPath=join(f.desk,'config.delta.yaml'),basePath=join(f.hermes,'config.yaml');
+      const modifiedBase=YAML.parse(base);modifiedBase.platform_toolsets.bloodbank=['delegation','skills'];
+      writeFileSync(basePath,YAML.stringify(modifiedBase));
+      let delta=YAML.parse(readFileSync(deltaPath,'utf8'));removeBloodbankPatch(delta);
+      delta['x-operator-note']={keep:['unrelated','state']};writeDelta(f,delta);
+      const victim=join(f.dir,'operator-owned'),trap=join(f.desk,'.config.delta.yaml.hire-tmp');
+      writeFileSync(victim,'precious operator file\n');symlinkSync(victim,trap);
+      const trapInode=lstatSync(trap).ino;
+      succeeded(onboard(f));
+      delta=YAML.parse(readFileSync(deltaPath,'utf8'));
+      assert.deepEqual(delta['x-pjangler-merge'].list_patches['platform_toolsets.bloodbank'],{remove:['delegation','terminal','file']});
+      assert.deepEqual(delta['x-operator-note'],{keep:['unrelated','state']});
+      assert.equal(lstatSync(deltaPath).isSymbolicLink(),false);assert.equal(lstatSync(deltaPath).mode&0o777,0o600);
+      assert.equal(lstatSync(trap).ino,trapInode);assert.equal(readlinkSync(trap),victim);
+      assert.equal(readFileSync(victim,'utf8'),'precious operator file\n');
+      assert.deepEqual(readdirSync(f.desk).filter(n=>n.startsWith('.config.delta.yaml.hire-')),['.config.delta.yaml.hire-tmp']);
+      pass('onboard uses an exclusive delta temporary; a pre-existing temp symlink and its target survive');
+
+      modifiedBase.platform_toolsets.bloodbank=['delegation','terminal','file','skills','web'];
+      const grownBase=YAML.stringify(modifiedBase);writeFileSync(basePath,grownBase);
+      succeeded(onboard(f));
+      assert.deepEqual(YAML.parse(readFileSync(join(f.desk,'config.yaml'),'utf8')).platform_toolsets.bloodbank,['skills','web']);
+      assert.equal(readFileSync(basePath,'utf8'),grownBase);
+      const stable=snapshot();succeeded(onboard(f));assert.deepEqual(snapshot(),stable);
+      assert.equal(readFileSync(victim,'utf8'),'precious operator file\n');
+      pass('complete generated restriction survives later base growth and repeat onboarding');
+
+      for(const kind of ['direct-list','list-patch']) {
+        delta=YAML.parse(readFileSync(deltaPath,'utf8'));removeBloodbankPatch(delta);
+        delete delta.platform_toolsets?.bloodbank;
+        if(kind==='direct-list') delta.platform_toolsets={...delta.platform_toolsets,bloodbank:['terminal','skills']};
+        else delta['x-pjangler-merge']={list_patches:{'platform_toolsets.bloodbank':{remove:['delegation','file'],add:['web']}}};
+        writeDelta(f,delta);
+        const operatorDelta=readFileSync(deltaPath,'utf8'),operatorNote=readFileSync(victim,'utf8');
+        for(let i=0;i<2;i++) {
+          succeeded(onboard(f));
+          assert.equal(readFileSync(deltaPath,'utf8'),operatorDelta,'operator-owned delta stays byte-identical');
+          assert.equal(readFileSync(victim,'utf8'),operatorNote);
+          const tools=YAML.parse(readFileSync(join(f.desk,'config.yaml'),'utf8')).platform_toolsets.bloodbank;
+          assert.ok(tools.includes('terminal'),'explicit operator permission is never silently stripped');
+          assert.equal(tools.includes('delegation'),false);assert.equal(lstatSync(trap).ino,trapInode);
+        }
+        assert.equal(readFileSync(basePath,'utf8'),grownBase);assert.equal(existsSync(f.blocked),false);
+        pass(`onboard preserves explicit Bloodbank ${kind}, unrelated delta and operator files`);
+      }
+    }
   }
 
   for(const [label,skills,needle] of [
@@ -199,6 +268,31 @@ try {
     assert.deepEqual(f.records(),[]);assert.equal(existsSync(f.desk),false);assert.equal(existsSync(f.blocked),false);
     pass(`${label}: named declaration failure before provisioning`);
   }
+
+  for(const [label,fields,needle] of [
+    ['missing-department',{department:'unknown-department'},/unknown-department absent from org/],
+    ['missing-manager',{reports_to:'missing-boss'},/missing-boss absent from registry/],
+    ['reporting-cycle',{reports_to:'demo-dev'},/reporting cycle/],
+    ['unknown-route',{chain:['automaticai/personal/unknown-route']},/unknown-route absent from gateway catalog/],
+    ['unreadable-catalog',{chain:['automaticai/personal/sol-6.1']},/gateway catalog unavailable/],
+  ]) {
+    const f=await fixture(label,{set:'dev-set'});
+    writeFileSync(join(f.dir,'declarations/roles/dev.md'),'---\n'+YAML.stringify({role:'dev',skills:{set:'dev-set'},department:'engineering',reports_to:'boss',...fields})+'---\nFixture role\n');
+    if(label==='unreadable-catalog') rmSync(f.env.FLUME_GATEWAY_CATALOG);
+    const before={home:tree(f.home),repo:tree(f.repo),catalog:tree(f.skillex)};
+    const refused=hire(f);assert.notEqual(refused.status,0);assert.match(refused.stdout+refused.stderr,needle);
+    assert.deepEqual({home:tree(f.home),repo:tree(f.repo),catalog:tree(f.skillex)},before);
+    assert.deepEqual(f.records(),[]);assert.equal(existsSync(f.desk),false);assert.equal(existsSync(f.blocked),false);
+    pass(`${label}: built hire preflight refuses before any provisioning or operator data change`);
+  }
+
+  const malformed=await fixture('invalid-fleet-env',{set:'dev-set'});
+  const fleetEnv=join(malformed.hermes,'fleet.env');writeFileSync(fleetEnv,'HERMES_FLEET_REGISTRY_FILE="/tmp/registry" trailing\n');
+  const untouched={home:tree(malformed.home),repo:tree(malformed.repo)};
+  const refused=hire(malformed);assert.notEqual(refused.status,0);assert.match(refused.stdout+refused.stderr,/Registry preflight: Fleet environment:/);
+  assert.deepEqual({home:tree(malformed.home),repo:tree(malformed.repo)},untouched);
+  assert.deepEqual(malformed.records(),[]);assert.equal(existsSync(malformed.desk),false);assert.equal(existsSync(malformed.blocked),false);
+  pass('built hire refuses invalid canonical fleet data before Copier or any fixture mutation');
 
   const f=await fixture('copier-failure',{set:'dev-set'});
   rmSync(join(f.repo,'.agents/skills.json'));

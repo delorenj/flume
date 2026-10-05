@@ -45,7 +45,7 @@ The runtime task invokes the built Flume CLI's real `migrate hermes.runtime-sing
 After Copier, Flume projects the declared loadout and organization and completes the final hire audit.
 The initial project selection is deliberately `deploy, lint`; the final desk is exactly global `global` plus declared `build, review`, with resolving catalog symlinks, strict markers, `skills.external_dirs: []`, no desk `.agents`, and a receipt owned by the role selection.
 
-The nine assertion groups cover a set hire, a versioned pack hire, two onboard calls for each,
+The initial nine assertion groups covered a set hire, a versioned pack hire, two onboard calls for each,
 occupied-role refusal for each, an unresolved set, incompatible packs, and a real Copier task failure.
 Onboarding preserves file bytes and symlink identities, including unrelated desk/runtime state, registry/org comments and manager information.
 Regular file inode equality is deliberately not required: the canonical renderer may atomically replace an unchanged generated config.
@@ -69,6 +69,26 @@ Verification actually executed:
 The supplied historical `/tmp/flume-orch/flume15-baseline.log` had 19/21 PASS with `fleet-status` and live `fleet-profile` failures. The latter passed in this worker's pristine baseline; neither baseline finding was hidden or quarantined.
 Parent main now has template pin `4ae890a5f27c8f6ee914fa80a0a66b0e1ca63f74`; this worker intentionally retains the original pin. Independent review and combined suites against the new pin remain parent responsibilities, including checking whether its registry preservation supersedes this worker's compatibility wrapper.
 No live profile, service, vault, gateway, Plane, canonical template WIP or other worktree was changed by this worker.
+
+## Review corrections (2026-10-05)
+
+The review exposed parser divergence, alias/list-comment loss, an unlocked truncating registry publication, unsafe fixed delta temporary naming, and incomplete generated Bloodbank removals. These are corrected in the worker branch:
+
+- Registry paths use the canonical template `fleet-env.sh` loader and `parse-fleet-env.py`, including supported expansion, quoted comments, existing-variable precedence and invalid-data refusal. Invalid fleet data is refused before render directories or Copier are created.
+- The latest YAML AST, anchors and aliases remain authoritative. Comment transfer reads an immutable original snapshot and preserves surviving reordered list-item comments and concurrent comment blocks, including repeated lines.
+- Snapshot and restoration reuse `withRegistryLock` and the template's existing `<registry>.lock`. Restoration holds that lock from the latest read through exclusive temporary creation, file flush, atomic rename and directory flush; it releases before Copier's own writer runs. The latest concurrent employee and comments survive, and a flush failure leaves the complete current registry unchanged.
+- The contributor delta uses `tempfile.mkstemp` in the profile directory and atomic replacement. The old fixed-name symlink and its unrelated target stay unchanged.
+- Generated restrictions store all of `delegation`, `terminal`, `file`, preventing later base growth from restoring those permissions. Operator-authored direct lists and list patches remain byte-identical through onboarding.
+
+`tests/role-hire-regressions.mjs` now has 19 assertion groups: the original real Copier/hire cases plus actual fleet parser consumption, reporting/routing preflight refusal before provisioning, temporary-symlink safety, later base growth and explicit Bloodbank overrides. The new registered `tests/registry-comments-regressions.mjs` has 25 focused groups for parser semantics, immutable alias/comment transfer, concurrent writers, reader-visible atomic publication, permissions under restrictive umask, and flush failure.
+
+Only affected tests were run after the review fixes:
+
+```sh
+node scripts/run-tests.mjs role-hire registry-comments role-projection
+```
+
+Typecheck/build PASS; all 3 suites PASS (27.1 seconds), saved in `/tmp/flume-orch/flume32-review-targeted.log` and the updated `/tmp/flume-orch/flume32-after.log`. Full verification remains with the parent. The original worker verification log is preserved as `/tmp/flume-orch/flume32-after-initial.log`. AC-6 and the template pin were not changed or rerun.
 
 ## Recovered live fallback receipt (parent-owned AC-6)
 

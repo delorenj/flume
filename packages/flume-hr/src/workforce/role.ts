@@ -84,7 +84,7 @@ function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocum
   edit(doc);const after=String(doc);if(after!==before){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,after);}
 }
 /** The same projection runs on hire and onboard. Never writes the fleet base. */
-async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T> {
+export async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T> {
   mkdirSync(dirname(path),{recursive:true});
   const lock=path+'.lock';
   if(existsSync(lock)&&lstatSync(lock).isSymbolicLink()) throw new Error(`Refusing registry lock symlink ${lock}`);
