@@ -1,0 +1,78 @@
+# Framework-agnostic employee identity: bounded OSS comparison
+
+**Decision date / sources accessed:** 2026-10-10
+
+**Scenario supplied by requester:** one developer, approximately 30 software employees; stable identity, proof of caller, requesting service API credentials, permissions and retirement.
+
+**Method:** public primary sources only; no project files read or used as evidence. Two discovery searches, one GitHub metadata/README query, one GitHub documentation-path lookup, and three primary-document retrievals: **7 public research commands**, plus one local web-search diagnostic. Six cited primary sources. Search snippets were discovery aids, not evidence. No software was installed or tested.
+
+## Recommendation
+
+**Start with Keycloak service accounts if the immediate need is “each employee authenticates to our credential broker.” Choose SPIRE instead when the requirement is “prove which running workload this is, without handing every workload a reusable bootstrap secret.” Do not deploy both by default.** This is a fit judgment for the supplied small-team scenario, not a measured operating-cost result. Keycloak explicitly supports client credentials and signed client assertions; SPIRE explicitly supports node/process attestation and rotating workload identities. [S2, S3, S4, S5]
+
+Keep an immutable employee ID separate from its name, role, workstation and current credentials. Map that ID to the selected identity system and to external-service principals. This is a recommended application design, not a feature automatically supplied by any compared product.
+
+**Use a separate, narrow credential-broker boundary backed by a secret store or supported external token exchange.** These are different responsibilities: identifying the caller does not itself obtain a GitHub-, ticket-system-, or other service-issued credential. SPIRE's documentation explicitly describes authentication *to* secret stores/cloud services; Keycloak's service-account flow returns a Keycloak access token. [S1, S5]
+
+**Watch AGNTCY Identity, but do not make its badge system the sole production caller-authentication or credential-broker foundation yet.** It is real Apache-2.0 OSS with a backend, CLI and releases—not just a proposal—but the inspected implementation documents demonstrate issuance/verification of identity metadata and credentials, not a complete third-party API-token lifecycle. [S6]
+
+## Comparison
+
+| Dimension | SPIFFE / SPIRE | Keycloak | AGNTCY Identity |
+|---|---|---|---|
+| What it is | SPIFFE is an identity specification; SPIRE is a workload-attestation and credential-issuance implementation. [S1–S3] | General identity/access-management server; an OIDC client has a built-in service account. [S4, S5] | Agent/MCP/multi-agent-system identity metadata, unique identifiers and signed badges/verifiable credentials. [S6] |
+| OSS license | **SPIRE: Apache-2.0**, verified in GitHub repository metadata. Do not confuse the specification with the implementation. [S1] | **Apache-2.0**, repository license metadata and README agree. [S4] | **Apache-2.0**, repository license metadata and README agree. [S6] |
+| Stable identity | A registered SPIFFE ID is mapped to workload selectors; rotating SVIDs prove that identity. Stability across moves depends on retaining the ID and updating registration conditions. [S2, S3; last clause is design inference] | One confidential OIDC client/service account per employee is a practical mapping. Preserve a separate canonical employee ID rather than treating display names or secrets as identity. [S5; mapping is recommendation] | Supports unique IDs, bring-your-own IDs from IdPs or agent cards, and DID-based IDs; IDs link to metadata and badges. [S6] |
+| Proof of caller | Workload API obtains process identity from the OS/platform and matches selectors; X.509-SVIDs support mTLS, JWT-SVIDs support token-based authentication. [S1–S3] | Client credentials authenticate to the token endpoint; the docs explicitly allow signed JWT client assertions as an alternative to shared secrets. The example resource token is a bearer token. [S5] | Demonstrated proof is verification of issuer-signed badges/metadata. The inspected README does **not establish that presenting a copied badge proves control of the running employee**; a live authentication protocol must still be validated. [S6] |
+| Requesting service credentials | Suitable authentication root for a secret store, broker or compatible cloud federation. Does not itself become a universal SaaS API-token mint. [S1, S2; universal-mint limit is scoped architectural inference] | Issues its own access tokens. A broker can accept those tokens and authorize credential requests; arbitrary external-service token acquisition/refresh is not established by the inspected service-account flow. [S5] | The documented `vault` stores cryptographic keys used for badge signing. Do **not** read that name as evidence of a general SaaS credential broker. [S6] |
+| Permissions and retirement | Registration controls **who receives which identity**. Resource/action policy must be enforced by the relying service or broker. Short-lived identity issuance/rotation is documented; instant invalidation of already issued credentials was not verified. [S2, S3] | Token roles are the intersection of service-account roles and client scope mappings. The docs describe expiry/re-authentication and a revocation endpoint. External-service access and enforcement of already issued tokens remain separate integration questions. [S5] | Multiple task-specific badges are described, but action-policy enforcement and comprehensive revocation/offboarding behavior were not demonstrated in the inspected material. [S6] |
+| Framework dependence | No LLM framework required. Workload API, X.509/JWT and proxy/library integrations; Kubernetes is **not** required. [S1–S3] | Standard HTTP OAuth/OIDC service-account flow; no LLM framework required. [S5] | Standalone issuer CLI and backend; agent/MCP examples are not an obligatory LLM runtime. The demo uses Okta and Ollama, so do not confuse its demo dependencies with verified independence from all IdPs. [S6] |
+| Operational tradeoff | Server plus an agent on each workload node, identity registrations, attestors and trust material. Strongest match for workload-origin proof; more machinery than issuing service-account tokens. [S3; relative complexity is assessment] | Authentication server plus per-employee client credentials/keys and role/scope configuration. Straightforward fit for an HTTP broker, but secret/key possession is not OS/process attestation. [S4, S5; fit is assessment] | Issuer, signing-key storage, metadata/backend and verifier integration. Adds useful identity-description machinery but does not remove the caller-authentication and external credential-integration work. [S6; fit is assessment] |
+
+### Maturity: verified signals, not guarantees
+
+- **SPIRE:** repository created 2017-08-11; observed latest release **v1.15.3, 2026-08-21**. README says CNCF graduated; architecture docs call it production-ready. README links third-party assessments and production adopters, but this run did not independently inspect those reports/adopter deployments. **High confidence in established implementation; medium confidence in fit for this particular installation.** [S1, S3]
+- **Keycloak:** repository created 2013-07-02; observed latest release **26.8.0, 2026-10-01**. Mature repository and concrete, version-pinned service-account documentation support selecting it over an unproven agent-specific identity stack. No deployment benchmark, support commitment or maintenance-cost measurement was performed. **High confidence in documented capability; medium confidence in operational preference.** [S4, S5]
+- **AGNTCY Identity:** repository created 2025-05-27; observed latest release **v0.0.26, 2026-09-29**; README links `v1alpha1` API specifications and supplies runnable CLI/backend instructions. These are real implementation signals, but not evidence of production assurance or API stability. **High confidence in existence/license/documented badge features; low-to-medium confidence in readiness as the central employment access authority.** [S6]
+
+## Four boundaries that must not be collapsed
+
+1. **Employee identity:** a durable identifier for the employee across renamed roles, different runtimes and rotated keys. Recommended application-owned record; map it to SPIFFE IDs, OIDC clients or AGNTCY identifiers. [Design recommendation informed by S3, S5, S6]
+2. **Authentication:** evidence that the requester controls the identity now. A name in a prompt, configuration field or HTTP header is not a substitute for the authenticated mechanisms documented above. A verified identity badge is also not, by itself, verified live key possession. [Inference from S3, S5, S6]
+3. **Authorization and brokerage:** decide whether that employee may request credential X for service Y; obtain/refresh it from the authorized source, or execute an allowed request without exposing the credential. This is a proposed broker responsibility—not a claim that all three products ship it. [Design recommendation informed by S1, S5, S6]
+4. **Native external authorship:** the service's own account/bot/service-principal mapping determines whose credential is being used. **None of the compared packages, as evidenced here, automatically creates a distinct native author for every employee in every external service.** A broker sharing one upstream identity cannot claim distinct upstream authors merely because its internal audit log records different employee IDs. Native account enrollment, credential issuance and retirement require service-specific adapters and evidence. [Architectural inference from S1, S5, S6; external services themselves were not surveyed in this bounded run]
+
+This also distinguishes **a secret manager** (stores/protects secret material), **a token broker** (mediates credential acquisition/exchange and policy), and **an identity issuer** (establishes identity and issues evidence). SPIRE and Keycloak can help authenticate to the other layers; AGNTCY's signing-key vault is not evidence that it replaces them. [S1, S5, S6]
+
+## Smallest useful acceptance experiment
+
+This is a proposed experiment, not work performed:
+
+- Enroll two employees with immutable IDs and distinct credentials; let both use the same existing employee runtime.
+- Authenticate each to one broker endpoint using Keycloak signed client assertions, or SPIRE-attested SVIDs if workload-origin proof is the selected requirement.
+- Permit only employee A to request a credential for one test service; prove B and an unauthenticated caller are denied.
+- Rotate A's authentication material without changing its employee ID. Retire A and measure when both new requests and already-issued credentials cease to work.
+- Make one upstream action with A's service-specific credential; read back the **native author** from that service, not merely the broker's actor label.
+
+Choose Keycloak unless this experiment requires attestation that client-key possession cannot supply. Choose SPIRE if runtime provenance is the decisive requirement. Defer AGNTCY until cross-organization badge/agent-metadata verification is a real need.
+
+## Unknowns and exclusions
+
+- No test established how the actual approximately 30 employees are isolated. If every process has indistinguishable attestation selectors or shares accessible keys, neither a label nor product selection creates employee separation. SPIRE's selector mechanism makes this a deployment-design question. [S3; implication is inference]
+- Instant offboarding, sender-constrained resource tokens, external-token refresh, credential-leasing semantics and upstream native-account provisioning were not verified end to end. Do not promise them from a successful login alone.
+- Chose **Keycloak**, satisfying the requested “Keycloak or authentik” comparison. Authentik was not evaluated.
+- Aembit, Auth0 Token Vault, AgentAuth and similarly named “Agent Identity Protocol” projects were **not verified as complete, self-hostable OSS alternatives in this source budget**. They are not labeled OSS here. This is an evidence limit, not a finding that each lacks useful products or open-source components. AGNTCY was selected because its exact repository, license and implementation were verified.
+- No performance, cost, exploit resistance, independent audit conclusions or guaranteed maintenance claims are made. Vendor/project documentation establishes advertised mechanisms; it does not establish an actual deployment's security.
+
+## Source ledger
+
+All sources below were retrieved **2026-10-10**. Confidence rates the specific source-backed claims, not every claim the publisher might make. Living documentation without a visible publication date is explicitly undated.
+
+| ID | Primary source / URL | Publisher | Publication or version date | Evidence and confidence |
+|---|---|---|---|---|
+| S1 | [SPIRE repository](https://github.com/spiffe/spire) — README and repository/release/license metadata retrieved via `gh api graphql` | SPIFFE/SPIRE maintainers | README: undated living document; observed latest release v1.15.3 published **2026-08-21** | Apache-2.0; implementation role; mTLS/JWT; integration with secret stores/cloud services; server/agent binaries; CNCF graduation as project-reported. **High** for license/features/release metadata; no independent adoption verification. |
+| S2 | [SPIFFE Overview](https://spiffe.io/docs/latest/spiffe-about/overview/) | SPIFFE project | Undated living documentation, `/latest/` | Specifications, short-lived SVIDs, automatic rotation, X.509/JWT, supported deployment/federation mechanisms. **High** for documented mechanisms. |
+| S3 | [SPIRE Concepts](https://spiffe.io/docs/latest/spire-about/spire-concepts/) | SPIFFE/SPIRE project | Undated living documentation, `/latest/` | Server/node-agent architecture; registry; attestation; process/kernel selectors; Unix/Docker/Kubernetes support. **High** for architecture; production-ready status is publisher's assertion. |
+| S4 | [Keycloak repository](https://github.com/keycloak/keycloak) — README and repository/release/license metadata retrieved via `gh api graphql` | Keycloak maintainers | README: undated living document; observed latest release 26.8.0 published **2026-10-01** | Apache-2.0; identity/access-management scope; historical repository and current release signals. **High** for these facts; operating burden not measured. |
+| S5 | [Using a service account — Keycloak 26.8.0](https://github.com/keycloak/keycloak/blob/26.8.0/docs/documentation/server_admin/topics/clients/oidc/proc-using-a-service-account.adoc) — content retrieved through `gh api` | Keycloak maintainers | Pinned to **26.8.0**, release **2026-10-01**; individual document date not established | Built-in service accounts; client credentials; signed JWT alternative; role/scope intersection; bearer access token; expiry/re-authentication and revocation endpoint. **High** for documented behavior, not independently tested. |
+| S6 | [AGNTCY Identity repository](https://github.com/agntcy/identity) — README and repository/release/license metadata retrieved via `gh api graphql` | AGNTCY contributors | README: undated living document; observed latest release v0.0.26 published **2026-09-29** | Apache-2.0; IDs/VCs/badges; issuer CLI/node backend; signing-key vault purpose; demo and alpha API signals. **High** for existence/license/documented components; **low-to-medium** for production suitability and unverified live-authentication/lifecycle behavior. |
