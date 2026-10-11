@@ -1,0 +1,79 @@
+- id: "FLUME-47"
+  title: Enroll an existing employee without changing who they are
+  description: >-
+    Implement CAP-1 using every acceptance criterion of Story 1.1 in the adopted epics.md
+    and the groomed FLUME-47 ticket, preserving existing people/post/memory identities.
+    Produce a versioned enrollment/readiness preview with isolated migration and conflict regressions, without live account creation.
+  spec_checkpoint: false
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read SPEC.md and all companions including execution.md. Work only on FLUME-47;
+    use px show FLUME-47 --json for the current grooming additions and claim only when implementation starts.
+    Record actual verification, retain unrelated WIP, and follow the loop handback/publication boundary in execution.md.
+- id: "FLUME-48"
+  title: Authenticate employee access requests independently of the harness
+  description: >-
+    Implement CAP-2 using all Story 1.2 acceptance criteria after FLUME-47 is verified,
+    with JWT validation, authenticated subject/run mapping and explicit grant policy.
+    Use isolated two-client fixtures and no production Cloudflare or vault provisioning.
+  spec_checkpoint: false
+  done_checkpoint: true
+  invoke_dev_with: >-
+    Read all SPEC companions and the completed FLUME-47 story; px show FLUME-48 --json
+    supplies current grooming. Implement fixture-proven capability only, report live Access proof as pending,
+    and do not weaken provider/launcher isolation criteria or bypass them using string identity claims.
+- id: "FLUME-49"
+  title: Receive company mail without buying employee mailboxes
+  description: >-
+    Implement CAP-3 and every Story 1.3 criterion after identity/access foundations,
+    including literal subdomain rules, isolated retrieval and bounded replay-safe storage.
+    Live DNS, mail delivery and cost gates require explicit authorization and cannot be replaced by fixture success.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read all companions and px show FLUME-49 --json; preserve apex mail and unrelated DNS.
+    Stop at live provisioning requirements; never enable paid features or declare real delivery from a mock.
+- id: "FLUME-50"
+  title: Obtain a GitHub credential for only the approved repository
+  description: >-
+    Implement CAP-4 credential acquisition and every Story 1.4 criterion after FLUME-47/48,
+    with employee-bound app/installation mapping and scoped provider-issued credentials.
+    Keep operator enrollment and live sandbox token proof explicit; no human-account signup or shared PAT fallback.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read all companions and px show FLUME-50 --json. Use provider libraries and vaulted references;
+    fixture tests do not authorize app registration, installation, token minting or production API effects.
+- id: "FLUME-51"
+  title: Leave code-review comments with verified employee authorship
+  description: >-
+    Complete CAP-4 comment attribution using all Story 1.5 criteria after FLUME-50,
+    testing issue/PR conversation and inline-review endpoints with replay reconciliation.
+    Native author readback from two distinct authorized sandbox apps is required separately from local adapter tests.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read all companions and px show FLUME-51 --json. Never post production smoke comments,
+    infer native authorship from text/email, or claim a shared bot is two native actors.
+- id: "FLUME-52"
+  title: Bind employees to verified native Plane identities
+  description: >-
+    Implement CAP-5 and all Story 1.6 criteria, consuming the Pilot-owned PX-13 result
+    and existing employee/access foundations rather than another Plane writer.
+    Missing provider receipts or account prerequisites block full acceptance and must not be fabricated.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read all companions, px show FLUME-52 --json and px show PX-13 --json.
+    Reconcile existing native principals; keep Pilot, Krebs and PJangler ownership intact and stop on unresolved PX-13 dependency.
+- id: "FLUME-53"
+  title: Retire access without losing the employee's history
+  description: >-
+    Implement CAP-6 with every Story 1.7 criterion after mail, GitHub and Plane adapters
+    have their required acceptance evidence, reusing FLUME-39 AutomaticAI ownership.
+    Prove suspension/rotation/history continuity and report real provider revocation or residual lifetime without false live success.
+  spec_checkpoint: true
+  done_checkpoint: false
+  invoke_dev_with: >-
+    Read all companions and px show FLUME-53 --json; check FLUME-39 and PX-13 dependencies.
+    Production employee offboarding or credential revocation is not authorized by a fixture test or by starting this epic loop.

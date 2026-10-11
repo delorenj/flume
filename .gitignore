@@ -48,3 +48,4 @@ agents/hermes/*/runtime/
 
 # Canonical agent config lives in .agents; generated skill projections stay local.
 /.agents/skills
+_bmad/render/
