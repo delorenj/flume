@@ -150,7 +150,7 @@ function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: s
   const blockers: IdentityBlocker[] = [];
   if (!HANDLE.test(handle)) blockers.push({ code: "invalid-handle", detail: `handle "${handle}" must match ${HANDLE.source}` });
   if (RESERVED_HANDLES.has(handle)) blockers.push({ code: "handle-reserved", detail: `"${handle}" is an RFC 2142 role mailbox` });
-  const ownPost = target.kind === "specialist" && target.person === handle;
+  const ownPost = target.kind === "specialist" && target.posts.includes(handle);
   if (census.postIds.includes(handle) && !ownPost) blockers.push({ code: "handle-reserved", detail: `"${handle}" is a registry post id; a person's handle never names a post` });
   const bindings = bindingKeys(target.block);
   for (const other of census.definitions) {
@@ -299,7 +299,8 @@ export async function setEmployeeStatus(employee: string, status: string, option
     const target = resolveEmployee(census, employee);
     const blockers: IdentityBlocker[] = [];
     if (!STATUSES.includes(status as CompanyIdentityStatus)) blockers.push({ code: "invalid-status", detail: `status must be one of ${STATUSES.join(", ")}` });
-    if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+    if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
+    else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });

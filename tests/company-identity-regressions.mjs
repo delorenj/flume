@@ -313,6 +313,26 @@ try {
     pass("RFC 2142 role names and other registry post ids are handle-reserved");
   }
   {
+    const f = fixture("handle-reserved-unhired");
+    // A definition-less registry row still reserves its post id, and an unhired
+    // desk with the same id must not claim it as a handle (review fix: identity
+    // is not ownership — only an enrolled specialist's posts[] count).
+    const doc = YAML.parseDocument(readFileSync(f.registry, "utf8"));
+    doc.setIn(["agents", "ada"], { profile_name: "ada" });
+    writeFileSync(f.registry, String(doc));
+    const desk = join(f.home, ".agents/workforce/ada");
+    mkdirSync(desk, { recursive: true });
+    writeFileSync(join(desk, "agent.yaml"), YAML.stringify({ schema_version: 1, id: "ada", display_name: "Ada", role: "ops", charter: { purpose: "p" }, skills: { set: "x" }, memory: { write_bank: "agent-ada" } }));
+    blocked(f, ["enroll", "ada"], "handle-reserved");
+    pass("an unhired desk cannot claim a handle reserved by a definition-less registry post id");
+  }
+  {
+    const f = fixture("status-missing-definition");
+    f.post("gone-pm"); // registry row and role dir, but role.yaml was never written
+    blocked(f, ["status", "gone-pm", "suspended"], "invalid-definition");
+    pass("status on a deleted/missing definition reports invalid-definition, never not-enrolled");
+  }
+  {
     const f = fixture("invalid");
     const desk = join(f.home, ".agents/workforce/early");
     mkdirSync(desk, { recursive: true });
