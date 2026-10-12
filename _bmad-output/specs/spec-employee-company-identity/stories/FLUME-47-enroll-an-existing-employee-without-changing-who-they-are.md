@@ -3,7 +3,7 @@ title: 'FLUME-47 — Enroll an existing employee without changing who they are'
 type: 'feature'
 created: '2026-10-11'
 status: 'done'
-baseline_revision: 1dd81676dcf018b366a97c1c85a9dd51aebdfdbc
+baseline_revision: 0a65771a901595d6c46d074b26d55022a5dec055
 review_loop_iteration: 0
 followup_review_recommended: true
 context:
