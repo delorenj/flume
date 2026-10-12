@@ -74,6 +74,7 @@ const SUITES = [
   "tests/skillex-only-config-regressions.mjs",
   "tests/skillex-resync-regressions.mjs",
   "tests/company-identity-regressions.mjs",
+  "tests/employee-access-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);

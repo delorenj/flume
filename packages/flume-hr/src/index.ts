@@ -29,6 +29,8 @@ import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
 import { identityReadiness } from "./workforce/readiness";
+import { accessConfigPath, loadAccessConfig, requestAccess, startAccessServer } from "./workforce/access";
+import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -271,6 +273,70 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (options) => {
     await identityResult(() => identityReadiness({ probe: options.probe }), options.json);
+  });
+
+// ============================================================================
+// EMPLOYEE ACCESS
+// ============================================================================
+//
+// Authenticate who is asking, independently of the harness. `serve` is the
+// facade; `run` and `launch` are the trusted launchers; `request` is the plain
+// client. Only a fixture grant is issued: no provider is called.
+
+const accessCmd = program
+  .command("access")
+  .description("Employee access: authenticate requests by Cloudflare Access assertion plus a launcher-signed run");
+
+accessCmd
+  .command("serve")
+  .description("Run the access facade (fixture grants only); put Cloudflare Access in front of it")
+  .option("--config <path>", "Access configuration (default: FLUME_ACCESS_CONFIG or ~/.config/flume/employee-access.yaml)")
+  .option("--host <host>", "Listen host (default: config listen.host or 127.0.0.1)")
+  .option("--port <port>", "Listen port (default: config listen.port or 8787)", (value: string) => Number(value))
+  .action(async (options) => {
+    try {
+      const configPath = options.config ?? accessConfigPath();
+      const { server, url } = await startAccessServer(loadAccessConfig(configPath), { host: options.host, port: options.port, configPath });
+      await writeStdout(`${JSON.stringify({ event: "listening", url, evidence: "fixture" })}\n`);
+      const stop = () => server.close(() => process.exit(0));
+      process.once("SIGTERM", stop);
+      process.once("SIGINT", stop);
+    } catch (error) {
+      console.error((error as Error).message);
+      await exitAfterFlush(1);
+    }
+  });
+
+accessCmd
+  .command("run")
+  .argument("<employee>", "Enrolled employee (registry id, desk name or person)")
+  .argument("<command...>", "Command to run, after --")
+  .option("--cwd <directory>", "Working directory (default: caller's current directory)")
+  .description("Run any command as an enrolled employee with only that employee's access (trusted launcher)")
+  .action(async (employee: string, command: string[], options) => {
+    try { process.exitCode = await runEmployeeCommand(employee, command, options.cwd); }
+    catch (error) { console.error((error as Error).message); process.exitCode = 1; }
+  });
+
+accessCmd
+  .command("request")
+  .description("Request access as the launched employee; identity comes from the launcher's environment, never a flag")
+  .requiredOption("--service <service>", "Service the access is for")
+  .requiredOption("--resource <resource>", "Resource within the service")
+  .requiredOption("--permission <permission>", "Permission wanted (repeatable)", (value: string, previous: string[] = []) => [...previous, value])
+  .option("--lifetime <seconds>", "Requested lifetime in seconds", (value: string) => Number(value))
+  .option("--request-id <id>", "Idempotency key (default: a fresh one)")
+  .option("--employee <employee>", "May only repeat the authenticated employee; anything else is denied")
+  .action(async (options) => {
+    guardBrokenPipe();
+    try {
+      const result = await requestAccess({ service: options.service, resource: options.resource, permissions: options.permission, lifetimeSeconds: options.lifetime, requestId: options.requestId, employee: options.employee });
+      await writeStdout(`${JSON.stringify(result.body, null, 2)}\n`);
+      await exitAfterFlush(result.body.status === "granted" ? 0 : 1);
+    } catch (error) {
+      await writeStdout(`${JSON.stringify({ ok: false, status: "error", error: (error as Error).message }, null, 2)}\n`);
+      await exitAfterFlush(1);
+    }
   });
 
 // ============================================================================

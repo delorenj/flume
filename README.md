@@ -41,6 +41,10 @@ flume identity show <employee>             # read it back; legacy definitions st
 flume identity status <employee> <status>  # active | suspended | retired (local only; revokes nothing); preview unless --apply
 flume identity readiness                   # what is unproven about the accounts; --probe cloudflare measures with GETs only
 
+flume access serve                         # employee access facade: Access assertion + launcher-signed run; fixture grants only (docs/employee-access.md)
+flume access run <employee> -- <cmd>       # trusted launcher for any command; `flume launch` is the Hermes equivalent
+flume access request --service s --resource r --permission p   # plain client; the employee comes from the launcher, never a flag
+
 flume roster                  # the org chart, and where the two registries disagree
 flume review [--agent <id>]   # performance review across nine observation domains
 flume record [--agent <id>]   # employment records: the build each employee runs

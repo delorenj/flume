@@ -41,6 +41,11 @@ flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
 
+flume access serve                         # employee access facade: Cloudflare Access assertion + launcher-signed run, fixture grants only
+flume access run <employee> -- <cmd>       # trusted launcher for any plain command: only that employee's access in its env
+flume access request --service s --resource r --permission p   # plain client; identity comes from the launcher, never a flag
+flume launch <employee> -- <args>          # the Hermes launcher uses the same contract (see docs/employee-access.md)
+
 flume org                     # the org chart
 flume roster                  # who works here
 flume review [employee]       # performance review

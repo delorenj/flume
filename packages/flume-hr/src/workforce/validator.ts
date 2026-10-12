@@ -6,6 +6,7 @@ import { showPack, showSet } from "@delorenj/skillex";
 import namedSchema from "../../../../contracts/named-agent.schema.json";
 import roleSchema from "../../../../contracts/role.schema.json";
 import companyIdentitySchema from "../../../../contracts/company-identity.schema.json";
+import employeeAccessSchema from "../../../../contracts/employee-access.schema.json";
 import { readRoleIdentity } from "./identity";
 import type { AgentSkillsBinding, CompanyIdentity, NamedAgentContract, ResolvedNamedAgentContract, ResolvedSkill, ValidationDiagnostic, ValidationOptions } from "./types.js";
 
@@ -17,10 +18,29 @@ export class NamedAgentValidationError extends Error {
 const AjvCtor = (Ajv2020 as unknown as { default?: typeof Ajv2020 }).default ?? Ajv2020;
 const ajv = new AjvCtor({ allErrors: true, strict: false });
 ajv.addSchema(companyIdentitySchema);
+ajv.addSchema(employeeAccessSchema);
 ajv.addSchema(namedSchema);
 const validateNamed = ajv.getSchema(namedSchema.$id)!;
 const validateRole = ajv.compile(roleSchema);
 const validateCompany = ajv.getSchema(companyIdentitySchema.$id)!;
+const validateAccessRequestSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/request`)!;
+const validateAccessConfigSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/config`)!;
+
+/** Field-and-keyword diagnostics only: never the offending value, which may be hostile input. */
+function schemaProblems(validate: { errors?: Array<{ instancePath: string; keyword: string; message?: string; params: Record<string, unknown> }> | null }): string[] {
+  return (validate.errors ?? []).map(err => {
+    const extra = err.keyword === "additionalProperties" ? ` (${String(err.params.additionalProperty)})` : "";
+    return `${err.instancePath.replace(/^\//u, "").replace(/\//gu, ".") || "(request)"}: ${err.message ?? err.keyword}${extra}`;
+  });
+}
+/** Problems with an access request body, or an empty list. */
+export function accessRequestProblems(input: unknown): string[] {
+  return validateAccessRequestSchema(input) ? [] : schemaProblems(validateAccessRequestSchema);
+}
+/** Problems with the operator-authored access configuration, or an empty list. */
+export function accessConfigProblems(input: unknown): string[] {
+  return validateAccessConfigSchema(input) ? [] : schemaProblems(validateAccessConfigSchema);
+}
 
 /** The company mail subdomain every personal address lives under. */
 export const COMPANY_MAIL_DOMAIN = "agents.delo.sh";

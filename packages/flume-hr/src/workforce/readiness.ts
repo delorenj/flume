@@ -19,6 +19,7 @@ const UNPROVEN: Record<string, string> = {
   cloudflare_plan: `Cloudflare plan and entitlements for ${APEX_DOMAIN} (Email Routing, Workers, storage) are not measured`,
   mail_dns_conflicts: `MX records on ${COMPANY_MAIL_DOMAIN} and the apex ${APEX_DOMAIN}, and Email Routing state, are not measured`,
   service_token_capacity: "Access service-token count against the documented 50-per-account default is not measured",
+  access_assertion_policy: "The Cloudflare Access application, its service-token policy, audience and issuer for the employee access facade are not proven live; only fixture evidence exists",
   provider_account_rights: "GitHub App, Plane membership and AutomaticAI rights are provider facts this command does not measure",
 };
 

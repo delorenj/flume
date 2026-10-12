@@ -10,6 +10,7 @@ import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths, updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { provisionDesk, renderDeskContract, resolveDeskPath } from "./desk";
 import { readRoleIdentity } from "./identity";
+import { employeeAccessEnv, employeeChildEnv } from "./launcher";
 import { withRegistryLock } from "./role";
 import { applyRoleSelection, auditRoleSelection, planRoleSelection, previewRoleSelection, type SelectionContext } from "./selection";
 import { validateNamedAgent } from "./validator";
@@ -234,11 +235,12 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
     } catch { throw new Error(`Deployment dependency: declared Hermes runtime unavailable: ${runtime}`); }
   }
   const reference = `op://DeLoSecrets/hermes-${employee}/credential`;
-  const access = spawnSync("op", ["read", reference], { encoding: "utf8", timeout: 30_000, maxBuffer: 64 * 1024 });
-  if (access.error || access.status !== 0 || !access.stdout.trim()) throw new Error(`Deployment dependency: employee member token unavailable at ${reference} (FLUME-39)`);
-  const env = { ...process.env, HERMES_HOME: audited.profile, AUTOMATICAI_GATEWAY_KEY: access.stdout.trim() };
-  // Explicit profile config owns provider routing; inherited fallback keys cannot answer for it.
-  for (const key of ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "HERMES_API_KEY", "HERMES_BASE_URL", "HERMES_MODEL", "LLM_MODEL", "HERMES_PROVIDER"]) delete (env as NodeJS.ProcessEnv)[key];
+  const gateway = spawnSync("op", ["read", reference], { encoding: "utf8", timeout: 30_000, maxBuffer: 64 * 1024 });
+  if (gateway.error || gateway.status !== 0 || !gateway.stdout.trim()) throw new Error(`Deployment dependency: employee member token unavailable at ${reference} (FLUME-39)`);
+  // Who this run is comes from enrolled configuration; unenrolled, inactive or unbound employees are refused here.
+  const access = await employeeAccessEnv(employee, "hermes");
+  // The shared scrub drops the vault token, foreign Access/run secrets and explicit-provider fallback keys; only this employee's access is added back.
+  const env = employeeChildEnv(process.env, { ...access.env, HERMES_HOME: audited.profile, AUTOMATICAI_GATEWAY_KEY: gateway.stdout.trim() });
   return new Promise<number>((resolveExit, reject) => {
     const child = spawn(runtime, ["--profile", employee, ...args], { cwd: resolve(cwd), env, stdio: "inherit" });
     child.once("error", () => reject(new Error("Deployment dependency: Hermes CLI runtime unavailable")));
