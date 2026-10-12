@@ -300,6 +300,7 @@ export async function setEmployeeStatus(employee: string, status: string, option
     const blockers: IdentityBlocker[] = [];
     if (!STATUSES.includes(status as CompanyIdentityStatus)) blockers.push({ code: "invalid-status", detail: `status must be one of ${STATUSES.join(", ")}` });
     if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+    else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider_revocation: "not_performed" as const, note: PROVIDER_REVOCATION_NOTE };

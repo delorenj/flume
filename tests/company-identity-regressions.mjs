@@ -85,7 +85,7 @@ async function fakeCloudflare(routes) {
     const route = routes[new URL(req.url, "http://x").pathname + new URL(req.url, "http://x").search] ?? routes[new URL(req.url, "http://x").pathname];
     const [status, body] = route ?? [404, { success: false, errors: [{ code: 7003, message: "not found" }] }];
     res.writeHead(status, { "content-type": "application/json" });
-    res.end(JSON.stringify(body));
+    res.end(typeof body === "string" ? body : JSON.stringify(body));
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   return { seen, base: `http://127.0.0.1:${server.address().port}/client/v4`, close: () => new Promise((r) => server.close(r)) };
@@ -211,6 +211,27 @@ try {
     assert.equal(shown.identity.subject, applied.identity.subject);
     assert.ok(s.json(s.run(["audit", "--employee", "specialist", "--json"])).ok);
     pass("renamed display name keeps the same subject");
+
+    // Status on a specialist: the block is replaced in place, schema_version stays 2, the desk contract follows.
+    const suspended = s.json(s.run(["identity", "status", "specialist", "suspended", "--apply", "--json"]));
+    assert.deepEqual(suspended.writes, [agentPath, contractPath]);
+    const stored = YAML.parse(readFileSync(agentPath, "utf8"));
+    assert.equal(stored.schema_version, 2);
+    assert.equal(stored.company_identity.status, "suspended");
+    assert.equal(stored.company_identity.subject, applied.identity.subject);
+    assert.equal(YAML.parse(readFileSync(contractPath, "utf8")).company_identity.status, "suspended");
+    assert.equal(s.json(s.run(["audit", "--employee", "specialist", "--json"])).standing, "in good standing");
+    pass("specialist status change keeps schema_version 2, refreshes contract.yaml and stays in good standing");
+
+    // Hire never introduces a block: only `identity enroll` censuses every other definition first.
+    const forged = join(s.dir, "forged.yaml");
+    writeFileSync(forged, YAML.stringify({ ...renamed, id: "forger", display_name: "Forger", memory: { write_bank: "agent-forger" }, company_identity: { ...stored.company_identity, status: "active" } }));
+    const homeBefore = tree(s.home);
+    const forgedHire = s.run(["hire", "--definition", forged, "--json"]);
+    assert.notEqual(forgedHire.status, 0);
+    assert.match(forgedHire.stdout + forgedHire.stderr, /never introduce a company_identity/);
+    assert.deepEqual(tree(s.home), homeBefore);
+    pass("hire --definition carrying a company_identity block is refused before any write");
   }
 
   // -- Legacy read ------------------------------------------------------------------------
@@ -314,7 +335,43 @@ try {
     const rolePath = f.post("link-pm");
     symlinkSync(real, rolePath);
     blocked(f, ["enroll", "link-pm"], "invalid-definition");
-    pass("a symlinked definition is refused before any write");
+    writeFileSync(real, `role: pm\nagent_id: link-pm\nidentity:\n  name: hal\n${f.yamlBlock({ subject: "99999999-9999-4999-8999-999999999999", handle: "hal" })}`);
+    const preview = f.json(f.run(["identity", "status", "link-pm", "suspended", "--json"]), 1);
+    assert.deepEqual(preview.blockers.map((b) => b.code), ["invalid-definition"]);
+    blocked(f, ["status", "link-pm", "suspended"], "invalid-definition");
+    pass("a symlinked definition is refused before any write, for enroll and status alike");
+  }
+  {
+    const f = fixture("unresolvable");
+    f.named("una-pm", "una");
+    const before = tree(f.dir);
+    blocked(f, ["enroll", "una-pm", "--handle", "Una_Upper"], "invalid-handle");
+    const missing = f.json(f.run(["identity", "show", "nobody", "--json"]), 1);
+    assert.match(missing.error, /Employee not found: nobody/);
+    const probe = f.json(f.run(["identity", "readiness", "--probe", "github", "--json"]), 1);
+    assert.match(probe.error, /Unsupported probe: github/);
+    assert.deepEqual(tree(f.dir), before);
+    pass("a malformed handle is invalid-handle; an unknown employee or probe exits 1 with nothing written");
+  }
+
+  // -- Reconciliation inventory: bound candidates and the override path -------------------
+  {
+    const f = fixture("reconcile");
+    const inventory = join(f.dir, "candidates.yaml");
+    writeFileSync(inventory, YAML.stringify({ schema_version: 1, candidates: [
+      { provider: "plane", principal: "p-1", person: "zed", description: "already adopted elsewhere" },
+      { provider: "plane", principal: "p-2", post: "zed-pm", description: "free" },
+      { provider: "plane", principal: "p-3", person: "nobody-here" },
+    ] }));
+    const holder = f.named("yan-pm", "yan", f.yamlBlock({ subject: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", handle: "yan", bindings: { plane: { principal: "p-1" } } }));
+    f.named("zed-pm", "zed");
+    const result = f.json(f.run(["identity", "enroll", "zed-pm", "--json"], { FLUME_IDENTITY_CANDIDATES: inventory }));
+    assert.deepEqual(result.reconcile.map((c) => [c.principal, c.state, c.bound_at]), [["p-1", "bound", holder], ["p-2", "unadopted", undefined]]);
+    assert.deepEqual(result.warnings, []);
+    const absent = f.json(f.run(["identity", "enroll", "zed-pm", "--json"], { FLUME_IDENTITY_CANDIDATES: join(f.dir, "absent.yaml") }));
+    assert.deepEqual(absent.reconcile, []);
+    assert.match(absent.warnings[0], /candidate inventory not found/);
+    pass("a candidate already bound elsewhere is reported bound with its holder; a missing inventory is a warning");
   }
 
   // -- Move and rotate keep the subject ---------------------------------------------------
@@ -373,6 +430,17 @@ try {
     blocked(f, ["status", "jo-pm", "fired"], "invalid-status");
     blocked(f, ["enroll", "kim-pm", "--handle", "jo"], "handle-taken");
     pass("suspend/retire are recorded locally with provider_revocation not_performed; retired is terminal and keeps its handle");
+
+    // A block in the middle of the file is replaced in place; what follows it keeps every byte.
+    const head = "role: pm\nagent_id: mid-pm\nidentity:\n  name: mo\n";
+    const tail = "\n# trailing operator note\ndeployment:\n  local_only: true\n";
+    const midPath = f.post("mid-pm", `${head}${f.yamlBlock({ subject: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", handle: "mo" })}${tail}`);
+    f.json(f.run(["identity", "status", "mid-pm", "suspended", "--apply", "--json"]));
+    const mid = readFileSync(midPath, "utf8");
+    assert.ok(mid.startsWith(head) && mid.endsWith(tail), mid);
+    assert.equal(YAML.parse(mid).company_identity.status, "suspended");
+    assert.equal(YAML.parse(mid).deployment.local_only, true);
+    pass("status on a mid-file block keeps every byte before and after it");
   }
 
   // -- Readiness ---------------------------------------------------------------------------
@@ -389,6 +457,8 @@ try {
     assert.equal(cf.seen.length, 0, "no probe flag means zero network");
     const missing = JSON.parse((await f.runAsync(["identity", "readiness", "--probe", "cloudflare", "--json"], { FLUME_CLOUDFLARE_API_BASE: cf.base })).stdout);
     assert.match(missing.probes.cloudflare, /^not_run/u);
+    const human = await f.runAsync(["identity", "readiness", "--probe", "cloudflare"], { FLUME_CLOUDFLARE_API_BASE: cf.base });
+    assert.match(human.stdout, /probe cloudflare: not_run: CLOUDFLARE_API_TOKEN is not set/);
     assert.equal(cf.seen.length, 0);
     await cf.close();
     pass("without measurement every check is unproven, not ready and not free; no flag or no token means no request");
@@ -425,6 +495,17 @@ try {
     assert.equal(measured.checks.provider_account_rights.status, "unproven");
     await live.close();
     pass("authorized --probe cloudflare records GET-only time, path, HTTP status and exact values; an HTTP error stays unproven");
+
+    // A 200 that names no zone, or is not JSON at all, measured nothing.
+    for (const body of [{ success: true, result: [] }, "<html>proxy login</html>"]) {
+      const blind = await fakeCloudflare({ "/client/v4/zones?name=delo.sh": [200, body] });
+      const report = JSON.parse((await f.runAsync(["identity", "readiness", "--probe", "cloudflare", "--json"], { FLUME_CLOUDFLARE_API_BASE: blind.base, CLOUDFLARE_API_TOKEN: "fixture-secret-token" })).stdout);
+      assert.equal(report.checks.cloudflare_plan.status, "unproven", JSON.stringify(report.checks.cloudflare_plan));
+      assert.ok(report.checks.cloudflare_plan.evidence[0].error);
+      assert.equal(blind.seen.length, 1);
+      await blind.close();
+    }
+    pass("a 200 with no visible zone or no JSON body stays unproven");
   }
 
   console.log(`\n${count} company identity check groups passed`);

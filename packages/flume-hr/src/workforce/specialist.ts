@@ -124,9 +124,10 @@ function ownership(p: Prepared, hire: boolean) {
 /** Onboarding refreshes an employee; it never drops, mints or rewrites who they are. */
 function identityContinuity(p: Prepared): void {
   const path = join(p.desk, "agent.yaml");
-  if (!existsSync(path)) return;
-  const enrolled = (YAML.parse(readFileSync(path, "utf8")) as { company_identity?: unknown } | null)?.company_identity ?? null;
+  const enrolled = existsSync(path) ? (YAML.parse(readFileSync(path, "utf8")) as { company_identity?: unknown } | null)?.company_identity ?? null : null;
   const incoming = p.definition.company_identity ?? null;
+  // Only `flume identity enroll` mints a block: it alone censuses every other definition first.
+  if (!enrolled && incoming) throw new Error("Company identity continuity: hire and onboard never introduce a company_identity; remove it from the definition and run `flume identity enroll`");
   if (!isDeepStrictEqual(enrolled, incoming)) throw new Error("Company identity continuity: the definition's company_identity differs from the enrolled desk agent.yaml; carry the enrolled block forward (flume identity show) or onboard with --employee");
 }
 

@@ -228,6 +228,7 @@ function formatIdentityResult(result: Record<string, any>): string {
     lines.push(`${name}: ${check.status}, not ready — ${check.detail}`);
     for (const e of check.evidence) lines.push(`  GET ${e.path} -> ${e.http_status ?? "no response"} at ${e.observed_at}${e.error ? ` (${e.error})` : ` ${JSON.stringify(e.measured)}`}`);
   }
+  for (const [name, state] of Object.entries(result.probes ?? {})) lines.push(`probe ${name}: ${state}`);
   if (result.note) lines.push(result.note);
   return `${lines.join("\n")}\n`;
 }

@@ -28,9 +28,10 @@ async function get(base: string, token: string, path: string): Promise<ProbeReco
     const response = await fetch(`${base}${path}`, { method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     let body: any;
     try { body = await response.json(); } catch { body = undefined; }
-    const failed = !response.ok || body?.success === false;
+    // A 200 that is not a JSON answer measured nothing.
+    const failed = !response.ok || body === undefined || body?.success === false;
     const errors = Array.isArray(body?.errors) ? body.errors.map((e: { code?: unknown; message?: unknown }) => `${e.code ?? ""} ${e.message ?? ""}`.trim()).join("; ") : "";
-    return { observed_at, method: "GET", path, http_status: response.status, body, ...(failed ? { error: errors || `HTTP ${response.status}` } : {}) };
+    return { observed_at, method: "GET", path, http_status: response.status, body, ...(failed ? { error: errors || (body === undefined ? `HTTP ${response.status} without a JSON body` : `HTTP ${response.status}`) } : {}) };
   } catch (error) {
     return { observed_at, method: "GET", path, http_status: null, error: (error as Error).name === "TimeoutError" ? "timed out" : (error as Error).message };
   }
@@ -48,9 +49,11 @@ async function probeCloudflare(token: string, checks: Record<string, ReadinessCh
   const base = (process.env.FLUME_CLOUDFLARE_API_BASE || "https://api.cloudflare.com/client/v4").replace(/\/$/u, "");
   const zones = await get(base, token, `/zones?name=${APEX_DOMAIN}`);
   const zone = zones.body?.result?.[0];
-  checks.cloudflare_plan!.evidence.push(record(zones, zone
+  const found = record(zones, zone
     ? { zone: zone.name, zone_id: zone.id, plan: zone.plan?.name ?? null, plan_price: zone.plan?.price ?? null, plan_currency: zone.plan?.currency ?? null, account_id: zone.account?.id ?? null }
-    : { zones_found: 0 }));
+    : { zones_found: 0 });
+  // No visible zone means the plan was not observed, so the check stays unproven.
+  checks.cloudflare_plan!.evidence.push(zone ? found : { ...found, error: found.error ?? `zone ${APEX_DOMAIN} is not visible to this token` });
   if (!zone?.id) return;
   for (const name of [COMPANY_MAIL_DOMAIN, APEX_DOMAIN]) checks.mail_dns_conflicts!.evidence.push(mx(await get(base, token, `/zones/${zone.id}/dns_records?type=MX&name=${name}`)));
   const routing = await get(base, token, `/zones/${zone.id}/email/routing`);
