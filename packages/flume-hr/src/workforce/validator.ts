@@ -5,8 +5,9 @@ import YAML from "yaml";
 import { showPack, showSet } from "@delorenj/skillex";
 import namedSchema from "../../../../contracts/named-agent.schema.json";
 import roleSchema from "../../../../contracts/role.schema.json";
+import companyIdentitySchema from "../../../../contracts/company-identity.schema.json";
 import { readRoleIdentity } from "./identity";
-import type { AgentSkillsBinding, NamedAgentContract, ResolvedNamedAgentContract, ResolvedSkill, ValidationDiagnostic, ValidationOptions } from "./types.js";
+import type { AgentSkillsBinding, CompanyIdentity, NamedAgentContract, ResolvedNamedAgentContract, ResolvedSkill, ValidationDiagnostic, ValidationOptions } from "./types.js";
 
 export class NamedAgentValidationError extends Error {
   constructor(message: string, readonly diagnostics: ValidationDiagnostic[] = []) {
@@ -15,9 +16,16 @@ export class NamedAgentValidationError extends Error {
 }
 const AjvCtor = (Ajv2020 as unknown as { default?: typeof Ajv2020 }).default ?? Ajv2020;
 const ajv = new AjvCtor({ allErrors: true, strict: false });
+ajv.addSchema(companyIdentitySchema);
 ajv.addSchema(namedSchema);
 const validateNamed = ajv.getSchema(namedSchema.$id)!;
 const validateRole = ajv.compile(roleSchema);
+const validateCompany = ajv.getSchema(companyIdentitySchema.$id)!;
+
+/** The company mail subdomain every personal address lives under. */
+export const COMPANY_MAIL_DOMAIN = "agents.delo.sh";
+/** RFC 2142 mailbox names: never a person's handle. */
+export const RESERVED_HANDLES = new Set(["abuse", "ftp", "hostmaster", "info", "marketing", "news", "noc", "postmaster", "sales", "security", "support", "usenet", "uucp", "webmaster", "www"]);
 
 export function parseNamedAgentYaml(text: string): unknown {
   const doc = YAML.parseDocument(text, { uniqueKeys: true });
@@ -51,7 +59,15 @@ export function validateNamedAgentSchema(input: unknown): NamedAgentContract {
   if (contract.identity && contract.identity.name !== contract.id) throw new NamedAgentValidationError("identity.name must equal id");
   semanticIdentity({name: contract.id, ...contract.memory}, "", "");
   if (contract.identity) semanticIdentity(contract.identity, "", "");
+  if (contract.company_identity) validateCompanyIdentity(contract.company_identity);
   return contract;
+}
+/** A company_identity block, structurally and semantically, wherever it is declared. */
+export function validateCompanyIdentity(input: unknown): CompanyIdentity {
+  const block = structural(input, validateCompany) as CompanyIdentity;
+  if (block.email !== `${block.handle}@${COMPANY_MAIL_DOMAIN}`) throw new NamedAgentValidationError(`company_identity.email must be ${block.handle}@${COMPANY_MAIL_DOMAIN}`);
+  if (RESERVED_HANDLES.has(block.handle)) throw new NamedAgentValidationError(`company_identity.handle "${block.handle}" is an RFC 2142 role mailbox`);
+  return block;
 }
 export interface RoleDeclaration {
   role: string;

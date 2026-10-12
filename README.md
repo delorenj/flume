@@ -36,6 +36,11 @@ flume hire <title>            # bring on a new employee for this repo (title def
 flume onboard [title]         # re-run the onboarding checklist; convergent, no --force
 flume offboard <employee>     # remove the org-chart row; dry run unless --apply
 
+flume identity enroll <employee>           # one subject + <handle>@agents.delo.sh on the employee's own definition; preview unless --apply
+flume identity show <employee>             # read it back; legacy definitions stay readable
+flume identity status <employee> <status>  # active | suspended | retired (local only; revokes nothing); preview unless --apply
+flume identity readiness                   # what is unproven about the accounts; --probe cloudflare measures with GETs only
+
 flume roster                  # the org chart, and where the two registries disagree
 flume review [--agent <id>]   # performance review across nine observation domains
 flume record [--agent <id>]   # employment records: the build each employee runs

@@ -73,6 +73,7 @@ const SUITES = [
   "tests/pjan-86-hermes-deploy-regressions.mjs",
   "tests/skillex-only-config-regressions.mjs",
   "tests/skillex-resync-regressions.mjs",
+  "tests/company-identity-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);

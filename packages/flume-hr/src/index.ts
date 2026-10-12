@@ -27,6 +27,8 @@ import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
+import { enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { identityReadiness } from "./workforce/readiness";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -187,6 +189,87 @@ program
     const result = offboardEmployee(employee, { apply: Boolean(options.apply) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+// ============================================================================
+// COMPANY IDENTITY
+// ============================================================================
+//
+// Who an employee is to the company: one subject and `<handle>@agents.delo.sh`
+// on the definition the employee already owns. `enroll` and `status` preview
+// unless `--apply`; a blocker writes nothing and exits 1.
+
+const identityCmd = program
+  .command("identity")
+  .description("Company identity: one subject and address per employee, on the definition they already own");
+
+async function identityResult(action: () => Promise<{ ok: boolean }>, json: boolean): Promise<void> {
+  guardBrokenPipe();
+  let result: { ok: boolean };
+  try { result = await action(); }
+  catch (error) { result = { ok: false, error: (error as Error).message } as { ok: boolean }; }
+  await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : formatIdentityResult(result as Record<string, any>));
+  await exitAfterFlush(result.ok ? 0 : 1);
+}
+
+function formatIdentityResult(result: Record<string, any>): string {
+  const lines: string[] = [];
+  if (result.error) lines.push(`✗ ${result.error}`);
+  if (result.definition) lines.push(`${result.employee}: ${result.kind} definition ${result.definition}${result.person ? ` (person ${result.person})` : ""}`);
+  if (result.identity) lines.push(`  subject ${result.identity.subject}  ${result.identity.email}  ${result.identity.status}`);
+  else if (result.enrolled === false && result.ok) lines.push("  not enrolled");
+  if (result.from !== undefined) lines.push(`  status ${result.from ?? "none"} -> ${result.to}${result.apply ? "" : " (preview)"}`);
+  if (result.changed !== undefined && result.ok) lines.push(`  ${result.changed ? (result.apply ? "written" : "would change (preview; pass --apply)") : "no change"}`);
+  for (const write of result.writes ?? []) lines.push(`  wrote ${write}`);
+  for (const blocker of result.blockers ?? []) lines.push(`  ✗ ${blocker.code}: ${blocker.detail}`);
+  for (const candidate of result.reconcile ?? []) lines.push(`  reconcile ${candidate.provider} ${candidate.principal} (${candidate.state}) ${candidate.description ?? ""}`.trimEnd());
+  for (const warning of result.warnings ?? []) lines.push(`  ! ${warning}`);
+  for (const [name, check] of Object.entries(result.checks ?? {}) as [string, any][]) {
+    lines.push(`${name}: ${check.status}, not ready — ${check.detail}`);
+    for (const e of check.evidence) lines.push(`  GET ${e.path} -> ${e.http_status ?? "no response"} at ${e.observed_at}${e.error ? ` (${e.error})` : ` ${JSON.stringify(e.measured)}`}`);
+  }
+  if (result.note) lines.push(result.note);
+  return `${lines.join("\n")}\n`;
+}
+
+identityCmd
+  .command("enroll")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("Give an existing employee one persistent subject and address on their own definition")
+  .option("--handle <handle>", "Handle to enroll under (default: the person's name; immutable once enrolled)")
+  .option("--apply", "Write the enrollment (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(() => enrollEmployee(employee, { apply: Boolean(options.apply), handle: options.handle }), options.json);
+  });
+
+identityCmd
+  .command("show")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("Read an employee's company identity; legacy definitions stay readable")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(async () => showEmployeeIdentity(employee), options.json);
+  });
+
+identityCmd
+  .command("status")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .argument("<status>", "active | suspended | retired (retired is terminal)")
+  .description("Record local employment status; provider access is not revoked here")
+  .option("--apply", "Write the change (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, status: string, options) => {
+    await identityResult(() => setEmployeeStatus(employee, status, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
+  .command("readiness")
+  .description("What is unproven about the accounts company identity needs; never ready, never free")
+  .option("--probe <provider>", "Measure with read-only GET requests (cloudflare; token from CLOUDFLARE_API_TOKEN)", (value: string, previous: string[] = []) => [...previous, value])
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    await identityResult(() => identityReadiness({ probe: options.probe }), options.json);
   });
 
 // ============================================================================

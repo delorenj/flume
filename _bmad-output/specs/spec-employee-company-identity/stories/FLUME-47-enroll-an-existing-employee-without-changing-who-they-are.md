@@ -2,8 +2,8 @@
 title: 'FLUME-47 — Enroll an existing employee without changing who they are'
 type: 'feature'
 created: '2026-10-11'
-status: 'ready-for-dev'
-baseline_revision: '7d04e90236794de6e5c4db6fdcaa6b7751e25a30'
+status: 'in-review'
+baseline_revision: 1dd81676dcf018b366a97c1c85a9dd51aebdfdbc
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -119,13 +119,3 @@ Known limitation: deleting a retired definition file removes its tombstone; this
 - `git diff --check` -- expected: no output.
 - `node scripts/run-tests.mjs company-identity` -- expected: typecheck+build ok, suite PASS.
 - `node scripts/run-tests.mjs named-agent role-contract registry-comments company-identity employee-access specialist-hire` -- expected: all selected suites PASS.
-
-## Auto Run Result
-
-Status: blocked
-Blocking condition: no subagents
-
-- Run date: 2026-10-11. Planning finished and the spec passed the READY FOR DEVELOPMENT gate (it went to `ready-for-dev`, then to `in-progress` with `baseline_revision` 7d04e90236794de6e5c4db6fdcaa6b7751e25a30).
-- Step 3 requires a fresh implementation subagent. All three subagent launches (Explore x2 during planning, general-purpose for implementation) failed with `API Error 429 · automaticai/auto: no eligible route for role subagent: orchestrator_only:reserve (3); account:exhausted:five_hour (1)`. Per workflow.md → Subagents, the run halted instead of implementing in the orchestrator session.
-- No source, contract, test or runtime file was changed. Only this story spec was written. FLUME-47 was not claimed on Plane because implementation never started. No live account, DNS, Plane or vault effect occurred.
-- To resume: once the AutomaticAI gateway routes the `subagent` role again (five-hour window or route policy), set this file's `status` back to `ready-for-dev` (keep `baseline_revision` or re-capture it) and re-dispatch FLUME-47. Step 1 will route straight to implementation. The Code Map and Design Notes above carry the full investigation.

@@ -121,6 +121,15 @@ function ownership(p: Prepared, hire: boolean) {
   return marker;
 }
 
+/** Onboarding refreshes an employee; it never drops, mints or rewrites who they are. */
+function identityContinuity(p: Prepared): void {
+  const path = join(p.desk, "agent.yaml");
+  if (!existsSync(path)) return;
+  const enrolled = (YAML.parse(readFileSync(path, "utf8")) as { company_identity?: unknown } | null)?.company_identity ?? null;
+  const incoming = p.definition.company_identity ?? null;
+  if (!isDeepStrictEqual(enrolled, incoming)) throw new Error("Company identity continuity: the definition's company_identity differs from the enrolled desk agent.yaml; carry the enrolled block forward (flume identity show) or onboard with --employee");
+}
+
 function deskContractDiffers(p: Prepared): boolean {
   const path = join(p.desk, "contract.yaml");
   return !existsSync(path) || readFileSync(path, "utf8") !== renderDeskContract(p.definition);
@@ -139,6 +148,7 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
   const apply = async () => {
     const p = await prepare(definitionPath, options.expectedEmployee || initial.definition.id);
     ownership(p, !onboard);
+    identityContinuity(p);
     const preview = projection(p, true);
     await profileOwnership(p);
     if (options.dryRun) return { ok: true, dryRun: true, id: p.definition.id, desk: p.desk, profile: p.profile, projection: preview, selection: await previewRoleSelection(p.definition.id, p.plan, p.selection) };

@@ -36,6 +36,11 @@ flume hire <title>            # bring on a new employee for this repo
 flume onboard                 # run the onboarding checklist (idempotent)
 flume offboard <employee>     # retire an employee
 
+flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
+flume identity show <employee>             # read an employee's company identity
+flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
+flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
+
 flume org                     # the org chart
 flume roster                  # who works here
 flume review [employee]       # performance review

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/company-identity.schema.json",
+  "title": "Company identity block (version 1)",
+  "description": "Who an employee is to the company: an immutable subject, a non-recycled handle, the derived address, local employment status and reference-only provider bindings. Lives on the employee's existing owning definition (role.yaml or a schema_version 2 agent.yaml), never in a second registry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "subject", "handle", "email", "status", "enrolled_at"],
+  "properties": {
+    "version": {"const": 1},
+    "subject": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "handle": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,57}$"},
+    "email": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,57}@agents\\.delo\\.sh$"},
+    "status": {"enum": ["active", "suspended", "retired"]},
+    "enrolled_at": {"$ref": "#/$defs/timestamp"},
+    "status_changed_at": {"$ref": "#/$defs/timestamp"},
+    "bindings": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z0-9][a-z0-9_-]*$"},
+      "additionalProperties": {"$ref": "#/$defs/binding"}
+    }
+  },
+  "$defs": {
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?Z$"},
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal"],
+      "properties": {
+        "principal": {"type": "string", "minLength": 1},
+        "instance": {"type": "string", "minLength": 1},
+        "credential_ref": {"type": "string", "pattern": "^op://"},
+        "attribution_mode": {"enum": ["native", "shared_bot_attributed"]}
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+# Native provider principals that may already belong to an employee.
+#
+# Reconciliation input only: `flume identity enroll` lists the candidates that
+# match the person or post being enrolled under `reconcile[]` and never binds,
+# selects, adopts or creates an account from this file. FLUME-52 owns verified
+# Plane adoption through Pilot (users/me plus membership readback).
+#
+# Source: krebs/docs/activation.md "Identities" (re-verified 2026-10-06).
+# Secret-free by contract: principals and descriptions only, no key references.
+# Override the path with FLUME_IDENTITY_CANDIDATES.
+schema_version: 1
+candidates:
+  - provider: plane
+    principal: db1ac9dc-6180-47d0-aa87-e1bf46d10707
+    person: grolf
+    description: jaradd+grolf, created 2026-09-17; member of 33GOD and PX among others, 403 on JIMB
+  - provider: plane
+    principal: b29eaffc-cc8d-4de1-a10b-7425c67177ab
+    post: 33god-pm
+    description: 33god-pm@delo.sh, created 2026-09-20; workspace member, member of neither 33GOD nor PX
+  - provider: plane
+    principal: 62b4fef6-b0fe-4cd2-bcd7-53737a61feb4
+    person: grolf
+    description: grolf@delo.sh, stale; inactive workspace membership, no project membership, do not bind

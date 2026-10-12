@@ -5,6 +5,8 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "id", "display_name", "role", "charter", "skills", "memory"],
+  "if": {"required": ["company_identity"]},
+  "then": {"properties": {"schema_version": {"minimum": 2}}},
   "$defs": {
     "identity": {
       "type": "object", "additionalProperties": false, "required": ["name"],
@@ -50,6 +52,7 @@
     "desk": {
       "type": "object", "additionalProperties": false, "required": ["path"],
       "properties": {"path": {"type": "string", "minLength": 1}}
-    }
+    },
+    "company_identity": {"$ref": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/company-identity.schema.json"}
   }
 }

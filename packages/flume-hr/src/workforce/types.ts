@@ -33,6 +33,30 @@ export interface NamedAgentContract {
   skills: AgentSkillsBinding;
   memory: AgentMemoryBinding;
   desk?: AgentDeskManifest;
+  /** Requires schema_version 2; see contracts/company-identity.schema.json. */
+  company_identity?: CompanyIdentity;
+}
+
+export type CompanyIdentityStatus = "active" | "suspended" | "retired";
+
+/** A provider principal held by reference only; never a resolved credential. */
+export interface CompanyIdentityBinding {
+  principal: string;
+  instance?: string;
+  credential_ref?: string;
+  attribution_mode?: "native" | "shared_bot_attributed";
+}
+
+/** Who an employee is to the company. The subject never changes once enrolled. */
+export interface CompanyIdentity {
+  version: 1;
+  subject: string;
+  handle: string;
+  email: string;
+  status: CompanyIdentityStatus;
+  enrolled_at: string;
+  status_changed_at?: string;
+  bindings?: Record<string, CompanyIdentityBinding>;
 }
 
 export interface ResolvedSkill {
