@@ -29,7 +29,7 @@
     including literal subdomain rules, isolated retrieval and bounded replay-safe storage.
     Live DNS, mail delivery and cost gates require explicit authorization and cannot be replaced by fixture success.
   spec_checkpoint: true
-  done_checkpoint: false
+  done_checkpoint: true
   invoke_dev_with: >-
     Read all companions and px show FLUME-49 --json; preserve apex mail and unrelated DNS.
     Stop at live provisioning requirements; never enable paid features or declare real delivery from a mock.
