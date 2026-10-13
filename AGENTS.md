@@ -40,6 +40,8 @@ flume identity enroll <employee>           # company subject + <handle>@agents.d
 flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
+flume identity recent <employee> [--touch p] # the recall compass: last 5 projects, MRU-first (preview unless --apply)
+flume identity recall <employee> [--narrow]  # write bank + declared banks most-recently-interacted first
 
 flume access serve                         # employee access facade: Cloudflare Access assertion + launcher-signed run, fixture grants only
 flume access run <employee> -- <cmd>       # trusted launcher for any plain command: only that employee's access in its env

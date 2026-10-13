@@ -29,6 +29,7 @@ import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
 import { identityReadiness } from "./workforce/readiness";
+import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { accessConfigPath, loadAccessConfig, requestAccess, startAccessServer } from "./workforce/access";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
@@ -273,6 +274,33 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (options) => {
     await identityResult(() => identityReadiness({ probe: options.probe }), options.json);
+  });
+
+identityCmd
+  .command("recent")
+  .argument("<employee>", "Registry id, unhired specialist, or person name (must be a NAMED person)")
+  .description("The recall compass: the named agent's last 5 projects, most-recent-first")
+  .option("--touch <project>", "Record an interaction with this project (preview unless --apply)")
+  .option("--at <iso8601>", "Interaction timestamp (default: now)")
+  .option("--source <label>", "Interaction source label", "manual")
+  .option("--apply", "Write the touch (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    if (options.touch) {
+      await identityResult(() => touchProject(employee, options.touch, { apply: Boolean(options.apply), at: options.at, source: options.source }), options.json);
+    } else {
+      await identityResult(async () => readRecency(employee), options.json);
+    }
+  });
+
+identityCmd
+  .command("recall")
+  .argument("<employee>", "Registry id, unhired specialist, or person name (must be a NAMED person)")
+  .description("Effective personal recall list: write bank, then declared banks most-recently-interacted first")
+  .option("--narrow", "Intersect the declared set with recent projects instead of re-ordering")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(async () => effectiveRecall(employee, { narrow: Boolean(options.narrow) }), options.json);
   });
 
 // ============================================================================

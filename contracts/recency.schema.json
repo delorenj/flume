@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/recency.schema.json",
+  "title": "Named-agent recency state (recall compass)",
+  "description": "Machine-owned most-recent-first list of the last 5 projects a named agent interacted with. Written only by flume; never prompt text. Used to order or narrow the employee's declared personal recall banks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "employee", "entries"],
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "employee": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,57}$",
+      "description": "The named person's name (identity.name / specialist id), not a registry post id."
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 5,
+      "description": "Most-recent-first; deduplicated by project; the 6th interaction evicts the oldest.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["project", "last_seen", "source"],
+        "properties": {
+          "project": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "description": "Project identity as resolved by the touching caller (registry project id or repo name)."
+          },
+          "last_seen": {"type": "string", "format": "date-time"},
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Interaction source label, e.g. manual, hook:session-start, candystore-replay. Observable and replayable."
+          }
+        }
+      }
+    }
+  }
+}
