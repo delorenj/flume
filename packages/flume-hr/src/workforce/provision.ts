@@ -81,7 +81,7 @@ function opRead(reference: string): string {
   return read.stdout.trim();
 }
 
-interface OpItemField { id: string; label?: string; value?: string }
+interface OpItemField { id: string; label?: string; value?: string; section?: { id?: string; label?: string } }
 interface OpItem { id: string; title: string; fields: OpItemField[] }
 
 function opItemGet(title: string, vault: string): OpItem | null {
@@ -113,17 +113,20 @@ function opItemCreate(handle: string, email: string, vault: string): OpItem {
 }
 
 /** Set one field on an item; returns the field id for op:// references. */
-function opItemFieldSet(item: OpItem, label: string, type: "text" | "concealed", value: string, vault: string): string {
-  const existing = item.fields.find(f => (f.label ?? "").toLowerCase() === label.toLowerCase());
+function opItemFieldSet(item: OpItem, section: string, label: string, type: "text" | "concealed", value: string, vault: string): string {
+  // Identity items carry multiple same-named fields across sections (e.g. the
+  // GitHub App's Client ID next to the Access service token's). Only the
+  // SECTION-qualified field is ours to read or write.
+  const existing = item.fields.find(f => (f.label ?? "").toLowerCase() === label.toLowerCase() && (f.section?.label ?? "") === section);
   if (existing) {
-    if (existing.value !== undefined && existing.value !== value) throw new Error(`vault item "${item.title}" field "${label}" already holds a different value; refusing to overwrite`);
+    if (existing.value !== undefined && existing.value !== value) throw new Error(`vault item "${item.title}" field "${section}.${label}" already holds a different value; refusing to overwrite`);
     return existing.id;
   }
-  const edit = op(["item", "edit", item.id, "--vault", vault, `${label}[${type}]=${value}`]);
-  if (!edit.ok) throw new Error(`op item edit failed for field "${label}": ${edit.stderr}`);
+  const edit = op(["item", "edit", item.id, "--vault", vault, `${section}.${label}[${type}]=${value}`]);
+  if (!edit.ok) throw new Error(`op item edit failed for field "${section}.${label}": ${edit.stderr}`);
   const after = opItemGet(item.title, vault);
-  const field = after?.fields.find(f => (f.label ?? "").toLowerCase() === label.toLowerCase());
-  if (!field) throw new Error(`op item edit reported success but field "${label}" is not readable`);
+  const field = after?.fields.find(f => (f.label ?? "").toLowerCase() === label.toLowerCase() && (f.section?.label ?? "") === section);
+  if (!field) throw new Error(`op item edit reported success but field "${section}.${label}" is not readable`);
   return field.id;
 }
 
@@ -186,8 +189,8 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     const vault = config.onepassword.vault;
     try {
       const item = opFindIdentityItem(block.handle, vault) ?? opItemCreate(block.handle, block.email, vault);
-      opItemFieldSet(item, "Client ID", "text", token.client_id, vault);
-      const secretField = opItemFieldSet(item, "Client Secret", "concealed", token.client_secret, vault);
+      opItemFieldSet(item, "Identity Service Token", "Client ID", "text", token.client_id, vault);
+      const secretField = opItemFieldSet(item, "Identity Service Token", "Client Secret", "concealed", token.client_secret, vault);
       const boundResult = await bindEmployeeProvider(block.handle, "cloudflare_access", {
         principal: token.client_id,
         instance: access_issuer,

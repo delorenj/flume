@@ -26,7 +26,6 @@ const ISSUER = "https://fixture.cloudflareaccess.com";
 const CF_TOKEN = "fixture-cloudflare-provisioning-token";
 const TOKEN_REF = "op://DeLoSecrets/Cloudflare/provisioning-token";
 const CREATED_SECRET = "created-access-client-secret-value";
-const CREATED_CLIENT_ID = "f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6.access";
 /** Every secret the suite creates; scanned for in every artifact at the end. */
 const secrets = new Set([CF_TOKEN, CREATED_SECRET]);
 
@@ -64,7 +63,8 @@ if (args[0] === "item" && args[1] === "create") {
   const item = { id: "item-" + title.toLowerCase(), title, fields: [] };
   for (const a of args.slice(3)) {
     const m = a.match(/^([^\\[]+)\\[([^\\]]+)\\]=(.*)$/s);
-    if (m) item.fields.push({ id: fid(m[1]), label: m[1], type: m[2], value: m[3] });
+    if (m) { const dot = m[1].lastIndexOf("."); const sec = dot > 0 ? m[1].slice(0, dot) : ""; const lbl = dot > 0 ? m[1].slice(dot + 1) : m[1];
+      item.fields.push({ id: fid(m[1]), label: lbl, type: m[2], value: m[3], section: sec ? { label: sec } : undefined }); }
   }
   const list = items(); list.push(item); save(list);
   process.stdout.write(JSON.stringify(item));
@@ -78,9 +78,12 @@ if (args[0] === "item" && args[1] === "edit") {
   for (const a of args.slice(3)) {
     const m = a.match(/^([^\\[]+)\\[([^\\]]+)\\]=(.*)$/s);
     if (!m) continue;
-    const existing = item.fields.find((f) => f.label === m[1]);
+    const dot = m[1].lastIndexOf(".");
+    const sec = dot > 0 ? m[1].slice(0, dot) : "";
+    const lbl = dot > 0 ? m[1].slice(dot + 1) : m[1];
+    const existing = item.fields.find((f) => f.label === lbl && (f.section?.label ?? "") === sec);
     if (existing) { if (existing.value !== m[3]) { process.stderr.write("field holds a different value\\n"); process.exit(1); } }
-    else item.fields.push({ id: fid(m[1]), label: m[1], type: m[2], value: m[3] });
+    else item.fields.push({ id: fid(m[1]), label: lbl, type: m[2], value: m[3], section: sec ? { label: sec } : undefined });
   }
   save(list);
   process.stdout.write(JSON.stringify(item));
@@ -105,7 +108,7 @@ const server = createServer((req, res) => {
     if (req.headers.authorization !== `Bearer ${CF_TOKEN}`) return send(403, { success: false, errors: [{ message: "bad token" }] });
     if (req.method === "GET" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) return ok(cf.tokens);
     if (req.method === "POST" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
-      const token = { id: `token-${randomUUID().slice(0, 8)}`, name: JSON.parse(body).name, client_id: CREATED_CLIENT_ID, client_secret: CREATED_SECRET, expires_at: "2027-10-13T00:00:00Z" };
+      const token = { id: `token-${randomUUID().slice(0, 8)}`, name: JSON.parse(body).name, client_id: `${randomUUID().replace(/-/g, "")}.access`, client_secret: CREATED_SECRET, expires_at: "2027-10-13T00:00:00Z" };
       cf.tokens.push(token);
       return ok(token);
     }
@@ -194,9 +197,9 @@ const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"))
   assert.equal(applied.capabilities.mailbox.action, "created");
   assert.equal(applied.capabilities["vault-item"].action, "created");
   const block = desk().company_identity;
-  assert.equal(block.bindings.cloudflare_access.principal, CREATED_CLIENT_ID);
+  assert.equal(block.bindings.cloudflare_access.principal, cf.tokens[0].client_id);
   assert.equal(block.bindings.cloudflare_access.instance, ISSUER);
-  assert.match(block.bindings.cloudflare_access.credential_ref, /^op:\/\/DeLoSecrets\/item-rhea\/client-secret$/u);
+  assert.match(block.bindings.cloudflare_access.credential_ref, /^op:\/\/DeLoSecrets\/item-rhea\/identity-service-token-client-secret$/u);
   assert.equal(cf.tokens.length, 1);
   assert.equal(cf.rules.length, 1);
   assert.equal(cf.rules[0].actions[0].type, "worker");
@@ -271,6 +274,58 @@ const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"))
   assert.equal(result.blockers[0].code, "not-enrolled");
   pass("an unenrolled employee is refused before any provider call");
 }
+
+// -- 6. section-qualified vault fields ---------------------------------------------------------
+{
+  // Real collision (operator's items, 2026-10-13): an identity item whose
+  // Github App section already holds a different "Client ID" must not block
+  // provisioning; the Access service token's fields belong to the
+  // "Identity Service Token" section.
+  const deskDir5 = join(home, ".agents/workforce/iris");
+  mkdirSync(deskDir5, { recursive: true });
+  writeFileSync(join(deskDir5, "agent.yaml"), YAML.stringify({
+    schema_version: 1, id: "iris", display_name: "Iris", role: "infra",
+    charter: { purpose: "Fixture employee" }, skills: { set: "first" }, memory: { write_bank: "agent-iris", recall_banks: [] },
+  }));
+  json(spawnSync(process.execPath, [cli, "identity", "enroll", "iris", "--apply", "--json"], { env: baseEnv, cwd: dir, encoding: "utf8" }));
+  const itemsPath = join(dir, "op-items.json");
+  const seeded = JSON.parse(readFileSync(itemsPath, "utf8"));
+  seeded.push({ id: "item-iris", title: "Iris", fields: [
+    { id: "iris-gh", label: "Client ID", value: "github-app-client-id-value", section: { label: "Github App" } },
+    { id: "iris-gh-secret", label: "Client Secret", value: "github-app-secret", section: { label: "Github App" } },
+  ] });
+  writeFileSync(itemsPath, JSON.stringify(seeded, null, 2));
+
+  const applied = json(await runAsync(["identity", "provision", "iris", "--apply", "--json"]));
+  assert.equal(applied.ok, true, JSON.stringify(applied));
+  assert.equal(applied.capabilities["access-token"].action, "created");
+  const irisItem = JSON.parse(readFileSync(itemsPath, "utf8")).find((i) => i.id === "item-iris");
+  assert.equal(irisItem.fields.find((f) => f.section?.label === "Github App" && f.label === "Client ID").value, "github-app-client-id-value", "GitHub App field was overwritten");
+  assert.ok(irisItem.fields.some((f) => f.section?.label === "Identity Service Token" && f.label === "Client ID"), "sectioned Access field not written");
+
+  // The overwrite guard still holds WITHIN the section: a pre-existing
+  // different Access Client ID is a refusal, and its orphan is deleted.
+  const seeded2 = JSON.parse(readFileSync(itemsPath, "utf8"));
+  seeded2.push({ id: "item-finch", title: "Finch", fields: [
+    { id: "finch-cid", label: "Client ID", value: "existing-different.access", section: { label: "Identity Service Token" } },
+  ] });
+  writeFileSync(itemsPath, JSON.stringify(seeded2, null, 2));
+  const deskDir6 = join(home, ".agents/workforce/finch");
+  mkdirSync(deskDir6, { recursive: true });
+  writeFileSync(join(deskDir6, "agent.yaml"), YAML.stringify({
+    schema_version: 1, id: "finch", display_name: "Finch", role: "infra",
+    charter: { purpose: "Fixture employee" }, skills: { set: "first" }, memory: { write_bank: "agent-finch", recall_banks: [] },
+  }));
+  json(spawnSync(process.execPath, [cli, "identity", "enroll", "finch", "--apply", "--json"], { env: baseEnv, cwd: dir, encoding: "utf8" }));
+  const refused = json(await runAsync(["identity", "provision", "finch", "--apply", "--json"]), 1);
+  assert.equal(refused.ok, false);
+  assert.equal(refused.capabilities["access-token"].action, "blocked");
+  assert.match(refused.capabilities["access-token"].detail, /already holds a different value/u);
+  assert.equal(cf.tokens.filter((t) => t.name === "employee-finch").length, 0, "orphan finch token survived");
+  pass("vault fields are section-qualified: a GitHub App Client ID never blocks, a different Access Client ID refuses");
+}
+
+// -- 7. no secret lands in any artifact ---------------------------------------------------------
 
 // -- 6. no secret lands in any artifact ---------------------------------------------------------
 {
