@@ -5,12 +5,13 @@
 // employee's secrets with `op read` itself, mints a run assertion, strips the
 // vault credential and every foreign bootstrap secret out of the child's
 // environment, and hands over only this employee's access.
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { importPKCS8 } from "jose";
 import { loadAccessConfig, signRunAssertion } from "./access";
 import { identityCensus, resolveEmployee } from "./company";
+import { readVaultSecret } from "./vault";
 
 /**
  * Env names that carry vault, Access, run or inference credentials, plus any inherited variable whose NAME looks like
@@ -36,12 +37,7 @@ export function employeeChildEnv(parent: NodeJS.ProcessEnv, additions: Record<st
   return { ...env, ...additions };
 }
 
-/** Resolve one secret with the vault CLI. The value is returned, never logged or put in an error. */
-export function readVaultSecret(reference: string, label: string): string {
-  const read = spawnSync("op", ["read", reference], { encoding: "utf8", timeout: 30_000, maxBuffer: 64 * 1024 });
-  if (read.error || read.status !== 0 || !read.stdout.trim()) throw new Error(`Deployment dependency: ${label} unavailable at ${reference}`);
-  return read.stdout.trim();
-}
+export { readVaultSecret };
 
 export interface EmployeeAccess { subject: string; handle: string; runId: string; harness: string; env: Record<string, string> }
 

@@ -9,11 +9,14 @@
 // request to the run that was actually launched for that employee.
 //
 // Authorization is an operator-authored grant list in the configuration. This
-// module never writes that file and has no approve endpoint. Only a FIXTURE
-// grant is issued: no provider is called and no live Access proof is claimed.
+// module never writes that file and has no approve endpoint. Every service
+// except `github` gets a FIXTURE grant; `github` goes to the App adapter in
+// ./github, which mints a single-repository installation token with the
+// authenticated employee's own App. No live Access proof is claimed.
 //
 // Trust model, stated plainly: the evidence is possession of a scoped
 // credential. A shared Unix UID is not a hostile-process boundary.
+import { spawn } from "node:child_process";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -21,8 +24,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
 import { SignJWT, createRemoteJWKSet, importSPKI, jwtVerify, type CryptoKey, type JWTVerifyGetKey, type KeyObject } from "jose";
-import { identityCensus } from "./company";
+import { identityCensus, resolveEmployee } from "./company";
+import { githubBindingOf, githubEvidence, githubRequestShape, inspectGithubApp, issueGithubToken, type GithubInspection, type GithubRequestShape } from "./github";
 import { accessConfigProblems, accessRequestProblems } from "./validator";
+import type { CompanyIdentityBinding } from "./types";
 
 export const RUN_ISSUER = "flume-launcher";
 export const RUN_AUDIENCE = "flume-access";
@@ -94,7 +99,9 @@ class AccessState {
   }
   audit(line: Record<string, unknown>): void { this.append("audit.jsonl", { at: new Date().toISOString(), event: "access.request", ...line }); }
   ledger(line: Record<string, unknown>): void { this.append("fixture-ledger.jsonl", { at: new Date().toISOString(), provider: "fixture", ...line }); }
-  idempotency(): Record<string, { hash: string; result: Record<string, unknown> }> {
+  /** IDs, scopes, expiry, HTTP status and x-github-request-id. Never a token, key, app JWT or a prefix/hash of one. */
+  providerLedger(line: Record<string, unknown>): void { this.append("provider-ledger.jsonl", { at: new Date().toISOString(), provider: "github", ...line }); }
+  idempotency(): Record<string, { hash: string; result: Record<string, unknown>; http_status?: number }> {
     const path = join(this.dir, "idempotency.json");
     return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
   }
@@ -116,7 +123,10 @@ function canonical(value: unknown): string {
 // The facade
 // ---------------------------------------------------------------------------
 
-const FIXTURE = { evidence: "fixture", provider: "fixture" } as const;
+type Tag = { evidence: string; provider: string };
+const FIXTURE: Tag = { evidence: "fixture", provider: "fixture" };
+/** What a result says about where it came from: real provider evidence only against the real GitHub API. */
+const tagFor = (service: string): Tag => (service === "github" ? { evidence: githubEvidence(), provider: "github" } : FIXTURE);
 
 /** One line to stderr, never a secret: the first line of the message only. */
 function logFailure(what: string, error: unknown): void {
@@ -126,8 +136,8 @@ function logFailure(what: string, error: unknown): void {
 /** The scope and requested lifetime of a validated request, for audit lines. */
 const scopeOf = (request: AccessRequest) => ({ service: request.service, resource: request.resource, permissions: request.permissions, ...(request.lifetime_seconds !== undefined ? { lifetime_seconds: request.lifetime_seconds } : {}) });
 
-function refusal(http_status: number, code: string, detail: string, kind: "error" | "denied" = "error"): AccessResult {
-  return { http_status, body: { ok: false, status: kind, code, detail, ...FIXTURE } };
+function refusal(http_status: number, code: string, detail: string, kind: "error" | "denied" = "error", tag: Tag = FIXTURE): AccessResult {
+  return { http_status, body: { ok: false, status: kind, code, detail, ...tag } };
 }
 
 function header(headers: IncomingMessage["headers"], name: string): string | undefined {
@@ -198,25 +208,30 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
     return undefined;
   }
 
-  const decide = (subject: string, handle: string, run: { runId: string; harness: string }, request: AccessRequest): AccessResult => {
+  const decide = async (subject: string, handle: string, binding: CompanyIdentityBinding | undefined, run: { runId: string; harness: string }, request: AccessRequest): Promise<AccessResult> => {
     const who = { subject, handle, run_id: run.runId, harness: run.harness, request_id: request.request_id, ...scopeOf(request) };
     const key = `${subject}/${request.request_id}`;
     const hash = createHash("sha256").update(canonical(request)).digest("hex");
     const records = state.idempotency();
     const stored = records[key];
+    const github = request.service === "github", tag = tagFor(request.service);
     if (stored) {
-      if (stored.hash !== hash) return finish(refusal(409, "conflict", "request_id was already used with a different request body"), who);
+      if (stored.hash !== hash) return finish(refusal(409, "conflict", "request_id was already used with a different request body", "error", tag), who);
       // The credential was never stored, so a replay returns the original grant identity and expiry, not the value.
-      return finish({ http_status: 200, body: { ...stored.result, replayed: true, ...(stored.result.status === "granted" ? { credential_redelivered: false } : {}) } }, who);
+      return finish({ http_status: stored.http_status ?? 200, body: { ...stored.result, replayed: true, ...(stored.result.status === "granted" ? { credential_redelivered: false } : {}) } }, who);
     }
+    // github: the request shape is checked before policy, and a malformed request is a denial that is never persisted.
+    const shaped = github ? githubRequestShape(request.resource, request.permissions, request.lifetime_seconds) : undefined;
+    if (shaped && "problem" in shaped) return finish(refusal(403, shaped.problem.code, shaped.problem.detail, "denied", tag), who);
     const approved = policy(subject, request);
     let body: Record<string, unknown>;
     if (!approved) {
-      body = { ok: false, status: "approval_required", version: 1, request_id: request.request_id, subject, handle, run_id: run.runId, harness: run.harness, service: request.service, resource: request.resource, permissions: request.permissions, reason: "outside the operator-approved grants; the employee cannot approve its own access", replayed: false, ...FIXTURE };
+      body = { ok: false, status: "approval_required", version: 1, request_id: request.request_id, subject, handle, run_id: run.runId, harness: run.harness, service: request.service, resource: request.resource, permissions: request.permissions, reason: "outside the operator-approved grants; the employee cannot approve its own access", replayed: false, ...tag };
       records[key] = { hash, result: body };
       state.saveIdempotency(records);
       return finish({ http_status: 200, body }, who);
     }
+    if (shaped && "shape" in shaped) return decideGithub(subject, handle, binding, run, request, shaped.shape, approved.lifetime, { key, hash, records, who });
     const issuedAt = new Date(), grantId = randomUUID(), expiresAt = new Date(issuedAt.getTime() + approved.lifetime * 1000).toISOString();
     const { permissions } = request;
     body = { ok: true, status: "granted", version: 1, request_id: request.request_id, subject, handle, run_id: run.runId, harness: run.harness, grant_id: grantId, service: request.service, resource: request.resource, permissions, lifetime_seconds: approved.lifetime, issued_at: issuedAt.toISOString(), expires_at: expiresAt, replayed: false, ...FIXTURE };
@@ -226,6 +241,35 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
     state.saveIdempotency(records);
     return finish({ http_status: 200, body: { ...body, credential: { kind: "fixture-bearer", value: `fixture-${randomBytes(18).toString("hex")}` } } }, { ...who, grant_id: grantId });
   };
+
+  /** The operator approved this github request: bind check, then the provider. Only granted and unverified outcomes persist. */
+  async function decideGithub(subject: string, handle: string, binding: CompanyIdentityBinding | undefined, run: { runId: string; harness: string }, request: AccessRequest, shape: GithubRequestShape, approvedLifetime: number, ctx: { key: string; hash: string; records: ReturnType<AccessState["idempotency"]>; who: Record<string, unknown> }): Promise<AccessResult> {
+    const tag = tagFor("github");
+    const bound = githubBindingOf(binding);
+    if ("code" in bound) return finish(refusal(403, bound.code, bound.detail, "denied", tag), ctx.who);
+    const grantId = randomUUID();
+    const outcome = await issueGithubToken({
+      facts: bound.facts, shape, approvedLifetimeSeconds: approvedLifetime,
+      context: { grant_id: grantId, subject, run_id: run.runId, request_id: request.request_id },
+      ledger: line => state.providerLedger(line),
+    });
+    const persist = (body: Record<string, unknown>, http_status: number) => {
+      ctx.records[ctx.key] = { hash: ctx.hash, result: body, ...(http_status !== 200 ? { http_status } : {}) };
+      state.saveIdempotency(ctx.records);
+    };
+    if (outcome.status === "denied") return finish(refusal(403, outcome.code, outcome.detail, "denied", tag), ctx.who);
+    if (outcome.status === "error") return finish(refusal(outcome.http_status, outcome.code, outcome.detail, "error", tag), ctx.who);
+    if (outcome.status === "unverified") {
+      const body = { ok: false, status: "unverified", code: outcome.code, version: 1, request_id: request.request_id, subject, handle, run_id: run.runId, harness: run.harness, service: request.service, resource: request.resource, permissions: request.permissions, detail: outcome.detail, ...(outcome.cause ? { cause: outcome.cause } : {}), ...(outcome.residual_expires_at ? { residual_expires_at: outcome.residual_expires_at } : {}), replayed: false, ...tag };
+      persist(body, 502);
+      return finish({ http_status: 502, body }, ctx.who);
+    }
+    const lifetime = Math.max(0, Math.round((Date.parse(outcome.expires_at) - Date.parse(outcome.issued_at)) / 1000));
+    const body = { ok: true, status: "granted", version: 1, request_id: request.request_id, subject, handle, run_id: run.runId, harness: run.harness, grant_id: grantId, service: request.service, resource: request.resource, repository: outcome.repository, permissions: outcome.permissions, repository_selection: outcome.repository_selection, app_id: outcome.app_id, installation_id: outcome.installation_id, lifetime_seconds: lifetime, issued_at: outcome.issued_at, expires_at: outcome.expires_at, replayed: false, ...tag };
+    // The idempotency record never holds the token; the first response is its only channel.
+    persist(body, 200);
+    return finish({ http_status: 200, body: { ...body, credential: { kind: "github-installation-token", value: outcome.token } } }, { ...ctx.who, grant_id: grantId });
+  }
 
   return {
     async handle(headers, readBody) {
@@ -253,9 +297,9 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
         const request = body as AccessRequest;
         // 5. employee and status checks
         if (request.employee !== undefined && request.employee !== handle && request.employee !== subject) {
-          return finish(refusal(403, "employee-mismatch", "the request names a different employee than the one Access authenticated", "denied"), { ...who, request_id: request.request_id, ...scopeOf(request) });
+          return finish(refusal(403, "employee-mismatch", "the request names a different employee than the one Access authenticated", "denied", tagFor(request.service)), { ...who, request_id: request.request_id, ...scopeOf(request) });
         }
-        if (block.status !== "active") return finish(refusal(403, `employee-${block.status}`, `the employee is ${block.status}; no new access is issued`, "denied"), { ...who, request_id: request.request_id, ...scopeOf(request) });
+        if (block.status !== "active") return finish(refusal(403, `employee-${block.status}`, `the employee is ${block.status}; no new access is issued`, "denied", tagFor(request.service)), { ...who, request_id: request.request_id, ...scopeOf(request) });
         // 6-8. idempotency, policy, fixture issue
         return await serialized(async () => {
           if (options.configPath) {
@@ -263,7 +307,7 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
             // fails closed: a revoked grant must not stay live behind a YAML or schema error.
             try { grants = loadAccessConfig(options.configPath).grants; } catch (error) { grants = []; logFailure(`grants reload failed for ${options.configPath}; every request needs approval`, error); }
           }
-          return decide(subject, handle, run, request);
+          return await decide(subject, handle, block.bindings?.github, run, request);
         });
       } catch (error) {
         logFailure("internal error", error);
@@ -341,4 +385,43 @@ export async function requestAccess(input: AccessClientInput, env: NodeJS.Proces
   let parsed: Record<string, unknown>;
   try { parsed = JSON.parse(text); } catch { parsed = { ok: false, status: "error", code: "bad-response", detail: `HTTP ${response.status} without a JSON body` }; }
   return { http_status: response.status, body: parsed };
+}
+
+/** The result with any non-fixture credential value removed: a GitHub token is delivered to a child, never printed. */
+export function printableResult(body: Record<string, unknown>): Record<string, unknown> {
+  const credential = body.credential as { kind?: unknown } | undefined;
+  if (!credential || credential.kind === "fixture-bearer") return body;
+  return { ...body, credential: { kind: credential.kind, delivered: false, note: "withheld from output; only `--exec` delivers it, to the consumer's environment" } };
+}
+
+/**
+ * `flume access request --exec -- <consumer>`: the only way a GitHub token leaves the client. The consumer gets the
+ * parent environment minus the Access client secret and run assertion, plus GH_TOKEN, GITHUB_TOKEN and the grant's id
+ * and expiry. The token reaches no stdout, stderr or file of ours. Resolves to the consumer's exit code.
+ */
+export function execWithGithubToken(body: Record<string, unknown>, command: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
+  const credential = body.credential as { kind?: string; value?: string } | undefined;
+  if (body.status === "granted" && body.replayed === true) throw new Error("This request_id was already granted: the token is delivered only on the first response, so pass a fresh --request-id (or omit it)");
+  if (body.status !== "granted" || credential?.kind !== "github-installation-token" || !credential.value) throw new Error("No GitHub installation token was granted; the consumer was not started");
+  const { CF_ACCESS_CLIENT_SECRET: _secret, FLUME_RUN_ASSERTION: _assertion, ...rest } = env;
+  const childEnv: NodeJS.ProcessEnv = { ...rest, GH_TOKEN: credential.value, GITHUB_TOKEN: credential.value, FLUME_GRANT_ID: String(body.grant_id), FLUME_GRANT_EXPIRES_AT: String(body.expires_at) };
+  return new Promise<number>((resolveExit, reject) => {
+    const child = spawn(command[0]!, command.slice(1), { env: childEnv, stdio: "inherit" });
+    child.once("error", error => reject(new Error(`Cannot run ${command[0]}: ${error.message}`)));
+    child.once("close", (code, signal) => resolveExit(code ?? (signal ? 1 : 0)));
+  });
+}
+
+/** `flume access github-inspect`: read-only discovery for an enrolled employee's binding, or an explicit App. */
+export async function githubInspect(options: { employee?: string; appId?: string; keyRef?: string }): Promise<GithubInspection> {
+  if (options.employee && (options.appId || options.keyRef)) return { ok: false, observed_at: new Date().toISOString(), evidence: githubEvidence(), error: "pass --employee, or --app-id with --key-ref, not both" };
+  if (options.employee) {
+    const target = resolveEmployee(identityCensus(), options.employee);
+    if (target.problem) return { ok: false, observed_at: new Date().toISOString(), evidence: githubEvidence(), error: `definition for ${options.employee} is unreadable: ${target.problem}` };
+    const bound = githubBindingOf(target.block?.bindings?.github);
+    if ("code" in bound) return { ok: false, observed_at: new Date().toISOString(), evidence: githubEvidence(), error: `${bound.code}: ${bound.detail}` };
+    return inspectGithubApp({ appId: bound.facts.appId, keyRef: bound.facts.keyRef });
+  }
+  if (!options.appId || !options.keyRef) return { ok: false, observed_at: new Date().toISOString(), evidence: githubEvidence(), error: "pass --employee, or both --app-id and --key-ref" };
+  return inspectGithubApp({ appId: options.appId, keyRef: options.keyRef });
 }

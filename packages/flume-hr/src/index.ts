@@ -27,11 +27,12 @@ import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
-import { enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { bindProvider, enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
 import { provisionEmployee } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
-import { accessConfigPath, loadAccessConfig, requestAccess, startAccessServer } from "./workforce/access";
+import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, startAccessServer } from "./workforce/access";
+import { githubApiBase, githubEvidence } from "./workforce/github";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -280,6 +281,21 @@ identityCmd
   });
 
 identityCmd
+  .command("bind")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .argument("<provider>", "Provider key, e.g. github")
+  .description("FLUME-50: bind one provider principal to an enrolled employee, by reference only (preview unless --apply). github: principal = App ID, instance = installation ID, credential-ref = op://<vault>/<item-uuid>/<field-id> of the App private key")
+  .option("--principal <id>", "Provider principal (github: the numeric App ID)")
+  .option("--instance <id>", "Provider instance (github: the numeric installation ID)")
+  .option("--credential-ref <ref>", "op:// reference to the credential; never a value")
+  .option("--attribution-mode <mode>", "native | shared_bot_attributed")
+  .option("--apply", "Write the binding (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, provider: string, options) => {
+    await identityResult(() => bindProvider(employee, provider, { principal: options.principal, instance: options.instance, credentialRef: options.credentialRef, attributionMode: options.attributionMode }, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
   .command("readiness")
   .description("What is unproven about the accounts company identity needs; never ready, never free")
   .option("--probe <provider>", "Measure with read-only GET requests (cloudflare; token from CLOUDFLARE_API_TOKEN)", (value: string, previous: string[] = []) => [...previous, value])
@@ -321,7 +337,8 @@ identityCmd
 //
 // Authenticate who is asking, independently of the harness. `serve` is the
 // facade; `run` and `launch` are the trusted launchers; `request` is the plain
-// client. Only a fixture grant is issued: no provider is called.
+// client. Fixture grants for every service but github, which mints a real
+// single-repository installation token for the employee's own App.
 
 const accessCmd = program
   .command("access")
@@ -329,7 +346,7 @@ const accessCmd = program
 
 accessCmd
   .command("serve")
-  .description("Run the access facade (fixture grants only); put Cloudflare Access in front of it")
+  .description("Run the access facade (fixture grants; GitHub App installation tokens for service github); put Cloudflare Access in front of it")
   .option("--config <path>", "Access configuration (default: FLUME_ACCESS_CONFIG or ~/.config/flume/employee-access.yaml)")
   .option("--host <host>", "Listen host (default: config listen.host or 127.0.0.1)")
   .option("--port <port>", "Listen port (default: config listen.port or 8787)", (value: string) => Number(value))
@@ -337,7 +354,7 @@ accessCmd
     try {
       const configPath = options.config ?? accessConfigPath();
       const { server, url } = await startAccessServer(loadAccessConfig(configPath), { host: options.host, port: options.port, configPath });
-      await writeStdout(`${JSON.stringify({ event: "listening", url, evidence: "fixture" })}\n`);
+      await writeStdout(`${JSON.stringify({ event: "listening", url, github_api_base: githubApiBase() })}\n`);
       const stop = () => server.close(() => process.exit(0));
       process.once("SIGTERM", stop);
       process.once("SIGINT", stop);
@@ -360,23 +377,55 @@ accessCmd
 
 accessCmd
   .command("request")
+  .argument("[command...]", "With --exec: the consumer to run, after --")
   .description("Request access as the launched employee; identity comes from the launcher's environment, never a flag")
   .requiredOption("--service <service>", "Service the access is for")
-  .requiredOption("--resource <resource>", "Resource within the service")
-  .requiredOption("--permission <permission>", "Permission wanted (repeatable)", (value: string, previous: string[] = []) => [...previous, value])
-  .option("--lifetime <seconds>", "Requested lifetime in seconds", (value: string) => Number(value))
+  .requiredOption("--resource <resource>", "Resource within the service (github: owner/repo)")
+  .requiredOption("--permission <permission>", "Permission wanted (repeatable; github: <name>:<read|write>)", (value: string, previous: string[] = []) => [...previous, value])
+  .option("--lifetime <seconds>", "Requested lifetime in seconds (not supported for github)", (value: string) => Number(value))
   .option("--request-id <id>", "Idempotency key (default: a fresh one)")
   .option("--employee <employee>", "May only repeat the authenticated employee; anything else is denied")
-  .action(async (options) => {
+  .option("--exec", "Run the consumer after -- with the granted GitHub token as GH_TOKEN/GITHUB_TOKEN; the token is never printed")
+  .action(async (command: string[], options) => {
     guardBrokenPipe();
     try {
+      const github = options.service === "github";
+      if (github && !options.exec) throw new Error("service github delivers its token only with --exec -- <consumer>; a GitHub token is never printed");
+      if (options.exec && !github) throw new Error("--exec delivers a GitHub installation token; use it with --service github");
+      if (options.exec && !command.length) throw new Error("--exec needs a consumer after --");
+      if (!options.exec && command.length) throw new Error("A command after -- needs --exec");
       const result = await requestAccess({ service: options.service, resource: options.resource, permissions: options.permission, lifetimeSeconds: options.lifetime, requestId: options.requestId, employee: options.employee });
-      await writeStdout(`${JSON.stringify(result.body, null, 2)}\n`);
+      if (options.exec && result.body.status === "granted") {
+        // stdout belongs to the consumer: the redacted receipt goes to stderr.
+        process.stderr.write(`${JSON.stringify(printableResult(result.body), null, 2)}\n`);
+        await exitAfterFlush(await execWithGithubToken(result.body, command));
+        return;
+      }
+      await writeStdout(`${JSON.stringify(printableResult(result.body), null, 2)}\n`);
       await exitAfterFlush(result.body.status === "granted" ? 0 : 1);
     } catch (error) {
       await writeStdout(`${JSON.stringify({ ok: false, status: "error", error: (error as Error).message }, null, 2)}\n`);
       await exitAfterFlush(1);
     }
+  });
+
+accessCmd
+  .command("github-inspect")
+  .description("Read-only discovery of a GitHub App and its installations (app-JWT GETs only; never mints, writes or adopts)")
+  .option("--employee <employee>", "Inspect the App in this employee's github binding")
+  .option("--app-id <id>", "Inspect this App (with --key-ref)")
+  .option("--key-ref <ref>", "op:// reference to the App private key (with --app-id)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    guardBrokenPipe();
+    let report: Awaited<ReturnType<typeof githubInspect>>;
+    try { report = await githubInspect({ employee: options.employee, appId: options.appId, keyRef: options.keyRef }); }
+    catch (error) { report = { ok: false, observed_at: new Date().toISOString(), evidence: githubEvidence(), error: (error as Error).message }; }
+    const lines = report.ok && report.app
+      ? [`app ${report.app.id} ${report.app.slug} (client ${report.app.client_id ?? "?"}) owned by ${report.app.owner.login ?? "?"}`, `bot_login ${report.bot_login}`, ...(report.installations ?? []).map(i => `installation ${i.id}: ${i.account ?? "?"} (${i.repository_selection ?? "?"}) ${i.suspended ? "SUSPENDED " : ""}${Object.entries(i.permissions).map(([k, v]) => `${k}:${v}`).join(",")}`), ...(report.truncated ? ["(installation list truncated)"] : []), `observed_at ${report.observed_at} evidence ${report.evidence}`]
+      : [`✗ ${report.error}`];
+    await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join("\n")}\n`);
+    await exitAfterFlush(report.ok ? 0 : 1);
   });
 
 // ============================================================================

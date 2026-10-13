@@ -40,13 +40,16 @@ flume identity enroll <employee>           # company subject + <handle>@agents.d
 flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)
 flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
+flume identity bind <employee> <provider> --principal --instance --credential-ref  # bind a provider by reference only (preview unless --apply); github: App ID, installation ID, op://<vault>/<item-uuid>/<field-id>
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
 flume identity recent <employee> [--touch p] # the recall compass: last 5 projects, MRU-first (preview unless --apply)
 flume identity recall <employee> [--narrow]  # write bank + declared banks most-recently-interacted first
 
-flume access serve                         # employee access facade: Cloudflare Access assertion + launcher-signed run, fixture grants only
+flume access serve                         # employee access facade: Cloudflare Access assertion + launcher-signed run; fixture grants, and a real single-repository GitHub App token for service github
 flume access run <employee> -- <cmd>       # trusted launcher for any plain command: only that employee's access in its env
 flume access request --service s --resource r --permission p   # plain client; identity comes from the launcher, never a flag
+flume access request --service github --resource owner/repo --permission issues:write --exec -- <cmd>   # the GitHub token reaches only <cmd>'s env (GH_TOKEN/GITHUB_TOKEN), never output
+flume access github-inspect (--employee e | --app-id id --key-ref op://...)   # read-only: the App and its installations (app-JWT GETs only)
 flume launch <employee> -- <args>          # the Hermes launcher uses the same contract (see docs/employee-access.md)
 
 flume org                     # the org chart

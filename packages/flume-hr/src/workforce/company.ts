@@ -20,6 +20,7 @@ import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
+import { githubBindingProblems, githubCredentialRefProblem } from "./github";
 import { readRoleIdentity } from "./identity";
 import { withRegistryLock } from "./role";
 import { COMPANY_MAIL_DOMAIN, RESERVED_HANDLES, parseNamedAgentYaml, validateCompanyIdentity, validateNamedAgent, validateNamedAgentSchema } from "./validator";
@@ -350,6 +351,32 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     return { ok: true, changed: true, binding, blockers, writes, ...base };
   };
   return options.apply ? withRegistryLock(environment().registryPath, run) : run();
+}
+
+export interface BindInput { principal?: string; instance?: string; credentialRef?: string; attributionMode?: string }
+
+/**
+ * `flume identity bind`: validate the operator's input, then reuse bindEmployeeProvider and its blockers. For `github`
+ * the principal is the App ID and the instance the installation ID (both digits), and the credential_ref is the
+ * App private key by item UUID and field ID. Preview unless `--apply`.
+ */
+export async function bindProvider(employee: string, provider: string, input: BindInput, options: IdentityOptions = {}) {
+  const blockers: IdentityBlocker[] = [];
+  const problem = (code: string, detail: string) => blockers.push({ code, detail });
+  if (!input.principal) problem("invalid-binding", "--principal is required");
+  if (input.attributionMode !== undefined && !["native", "shared_bot_attributed"].includes(input.attributionMode)) problem("invalid-binding", "--attribution-mode must be native or shared_bot_attributed");
+  if (provider === "github") {
+    for (const detail of githubBindingProblems({ principal: input.principal, instance: input.instance, credential_ref: input.credentialRef })) if (!(detail.startsWith("principal") && !input.principal)) problem("invalid-binding", detail);
+    if (input.credentialRef) { const detail = githubCredentialRefProblem(input.credentialRef); if (detail) problem("invalid-credential-ref", detail); }
+  } else if (input.credentialRef !== undefined && !input.credentialRef.startsWith("op://")) problem("invalid-credential-ref", "credential_ref must be an op:// reference");
+  if (blockers.length) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], employee, provider, apply: Boolean(options.apply) };
+  const binding: CompanyIdentityBinding = {
+    principal: input.principal!,
+    ...(input.instance ? { instance: input.instance } : {}),
+    ...(input.credentialRef ? { credential_ref: input.credentialRef } : {}),
+    ...(input.attributionMode ? { attribution_mode: input.attributionMode as CompanyIdentityBinding["attribution_mode"] } : {}),
+  };
+  return bindEmployeeProvider(employee, provider, binding, options);
 }
 
 /** Read-only: legacy (unenrolled) definitions stay readable. */
