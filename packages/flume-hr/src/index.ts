@@ -28,6 +28,7 @@ import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { provisionEmployee } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { accessConfigPath, loadAccessConfig, requestAccess, startAccessServer } from "./workforce/access";
@@ -225,6 +226,7 @@ function formatIdentityResult(result: Record<string, any>): string {
   if (result.changed !== undefined && result.ok) lines.push(`  ${result.changed ? (result.apply ? "written" : "would change (preview; pass --apply)") : "no change"}`);
   for (const write of result.writes ?? []) lines.push(`  wrote ${write}`);
   for (const blocker of result.blockers ?? []) lines.push(`  ✗ ${blocker.code}: ${blocker.detail}`);
+  for (const [name, cap] of Object.entries(result.capabilities ?? {}) as [string, any][]) lines.push(`  ${name}: ${cap.action} — ${cap.detail}`);
   for (const candidate of result.reconcile ?? []) lines.push(`  reconcile ${candidate.provider} ${candidate.principal} (${candidate.state}) ${candidate.description ?? ""}`.trimEnd());
   for (const warning of result.warnings ?? []) lines.push(`  ! ${warning}`);
   for (const [name, check] of Object.entries(result.checks ?? {}) as [string, any][]) {
@@ -265,6 +267,16 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, status: string, options) => {
     await identityResult(() => setEmployeeStatus(employee, status, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
+  .command("provision")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-56: live provider accounts for an enrolled employee — Access service token, mailbox rule + allowlist, vault item (preview unless --apply)")
+  .option("--apply", "Perform the provider mutations (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(() => provisionEmployee(employee, { apply: Boolean(options.apply) }), options.json);
   });
 
 identityCmd

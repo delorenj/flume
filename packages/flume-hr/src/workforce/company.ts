@@ -23,7 +23,7 @@ import { renderDeskContract } from "./desk";
 import { readRoleIdentity } from "./identity";
 import { withRegistryLock } from "./role";
 import { COMPANY_MAIL_DOMAIN, RESERVED_HANDLES, parseNamedAgentYaml, validateCompanyIdentity, validateNamedAgent, validateNamedAgentSchema } from "./validator";
-import type { CompanyIdentity, CompanyIdentityStatus } from "./types";
+import type { CompanyIdentity, CompanyIdentityBinding, CompanyIdentityStatus } from "./types";
 
 const HANDLE = /^[a-z0-9][a-z0-9_-]{0,57}$/u;
 const EMPLOYEE = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
@@ -310,6 +310,44 @@ export async function setEmployeeStatus(employee: string, status: string, option
     const identity: CompanyIdentity = { ...target.block, status: status as CompanyIdentityStatus, status_changed_at: new Date().toISOString() };
     const writes = options.apply ? await writeDefinition(target, identity) : [];
     return { ok: true, changed: true, from: target.block.status, to: status, identity, blockers, writes, ...base };
+  };
+  return options.apply ? withRegistryLock(environment().registryPath, run) : run();
+}
+
+/**
+ * Bind one provider principal to an enrolled employee (FLUME-56 provisioning).
+ * Same-provider rebinding to a DIFFERENT principal is refused: rotation is a
+ * deliberate lifecycle act (FLUME-53), never a side effect of provisioning.
+ */
+export async function bindEmployeeProvider(employee: string, provider: string, binding: CompanyIdentityBinding, options: IdentityOptions = {}) {
+  const run = async () => {
+    const census = identityCensus();
+    const target = resolveEmployee(census, employee);
+    const blockers: IdentityBlocker[] = [];
+    if (!/^[a-z][a-z0-9_]{0,31}$/u.test(provider)) blockers.push({ code: "invalid-provider", detail: `provider "${provider}" must be a short snake_case key` });
+    if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
+    else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+    else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
+    else if (target.block.status === "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity never gains bindings" });
+    const base = { employee, ...summary(target), apply: Boolean(options.apply), provider };
+    if (blockers.length || !target.block) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], ...base };
+    const block = target.block;
+    const existing = block.bindings?.[provider];
+    if (existing) {
+      if (isDeepStrictEqual(existing, binding)) return { ok: true, changed: false, binding: existing, blockers, writes: [] as string[], ...base };
+      return { ok: false, changed: false, binding: existing, blockers: [...blockers, { code: "binding-conflict", detail: `${provider} is already bound to principal ${existing.principal}; rotation is deliberate — unbind by hand first` }], writes: [] as string[], ...base };
+    }
+    const next: CompanyIdentity = { ...block, bindings: { ...(block.bindings ?? {}), [provider]: binding } };
+    // Duplicate-binding check against every OTHER definition (conflicts() skips by
+    // reference, so it cannot see a modified copy of the target — do it directly).
+    const key = `${provider}\u0000${binding.instance ?? ""}\u0000${binding.principal}`;
+    for (const other of census.definitions) {
+      if (other.path === target.path || other.missing || other.problem) continue;
+      if (bindingKeys(other.block).includes(key)) blockers.push({ code: "binding-duplicate", detail: `${provider} principal ${binding.principal} is also recorded at ${other.path}`, path: other.path });
+    }
+    if (blockers.length) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], ...base };
+    const writes = options.apply ? await writeDefinition(target, next) : [];
+    return { ok: true, changed: true, binding, blockers, writes, ...base };
   };
   return options.apply ? withRegistryLock(environment().registryPath, run) : run();
 }

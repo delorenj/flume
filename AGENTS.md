@@ -37,6 +37,7 @@ flume onboard                 # run the onboarding checklist (idempotent)
 flume offboard <employee>     # retire an employee
 
 flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
+flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)
 flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only

@@ -7,6 +7,7 @@ import namedSchema from "../../../../contracts/named-agent.schema.json";
 import roleSchema from "../../../../contracts/role.schema.json";
 import companyIdentitySchema from "../../../../contracts/company-identity.schema.json";
 import employeeAccessSchema from "../../../../contracts/employee-access.schema.json";
+import identityProvisioningSchema from "../../../../contracts/identity-provisioning.schema.json";
 import { readRoleIdentity } from "./identity";
 import type { AgentSkillsBinding, CompanyIdentity, NamedAgentContract, ResolvedNamedAgentContract, ResolvedSkill, ValidationDiagnostic, ValidationOptions } from "./types.js";
 
@@ -19,12 +20,14 @@ const AjvCtor = (Ajv2020 as unknown as { default?: typeof Ajv2020 }).default ?? 
 const ajv = new AjvCtor({ allErrors: true, strict: false });
 ajv.addSchema(companyIdentitySchema);
 ajv.addSchema(employeeAccessSchema);
+ajv.addSchema(identityProvisioningSchema);
 ajv.addSchema(namedSchema);
 const validateNamed = ajv.getSchema(namedSchema.$id)!;
 const validateRole = ajv.compile(roleSchema);
 const validateCompany = ajv.getSchema(companyIdentitySchema.$id)!;
 const validateAccessRequestSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/request`)!;
 const validateAccessConfigSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/config`)!;
+const validateProvisioningConfigSchema = ajv.getSchema(identityProvisioningSchema.$id)!;
 
 /** Field-and-keyword diagnostics only: never the offending value, which may be hostile input. */
 function schemaProblems(validate: { errors?: Array<{ instancePath: string; keyword: string; message?: string; params: Record<string, unknown> }> | null }): string[] {
@@ -40,6 +43,10 @@ export function accessRequestProblems(input: unknown): string[] {
 /** Problems with the operator-authored access configuration, or an empty list. */
 export function accessConfigProblems(input: unknown): string[] {
   return validateAccessConfigSchema(input) ? [] : schemaProblems(validateAccessConfigSchema);
+}
+/** Problems with the operator-authored provisioning configuration, or an empty list. */
+export function provisioningConfigProblems(input: unknown): string[] {
+  return validateProvisioningConfigSchema(input) ? [] : schemaProblems(validateProvisioningConfigSchema);
 }
 
 /** The company mail subdomain every personal address lives under. */

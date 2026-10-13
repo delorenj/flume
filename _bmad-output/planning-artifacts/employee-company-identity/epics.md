@@ -200,6 +200,23 @@ So that access stops while previous work stays attributable.
 
 **Evidence:** deterministic lifecycle/fault tests; provider readbacks; measured revocation/residual windows; two-harness receipts. Root initiative accepts the combined result. No general rollout until that acceptance, and no silent claims of same-UID isolation.
 
+### Story 1.8: Provision live provider accounts on hire
+
+As the operator,
+I want one command to provision an enrolled employee's live company accounts,
+So that hiring never requires a hand-run Cloudflare/1Password runbook.
+
+**Scope/owner:** Flume provisioning coordinator and contract; agents-facade KV allowlist projection. **Depends on:** 1.1, 1.2, 1.3 ingress slice. **Requirements:** FR2, FR3, FR4, FR10; NFR1/3/4/5. **Ticket:** FLUME-56.
+
+**Acceptance Criteria:**
+
+1. Preview reads live provider state only and writes nothing anywhere.
+2. First apply creates the Access service token, vaults its secret, binds `(issuer, client_id)` on the employee's own definition, creates the literal routing rule and the KV allowlist key; a second apply is a no-op.
+3. Foreign rule/name collisions are conflict blockers, never clobbers; a vault failure after token creation deletes the orphan at the provider.
+4. Receipts, definitions, stdout and config carry IDs and op:// references only; unenrolled/suspended/retired employees are refused before any provider call.
+
+**Evidence:** `tests/identity-provision-regressions.mjs` (six cases, fake Cloudflare API + stateful fake `op`). GitHub App creation (manifest flow via ego-browser), GPG and Plane membership remain with their owning stories.
+
 ## Sequencing and boundaries
 
 - Start **1.1**, then **1.2**. Mail (1.3), GitHub access (1.4) and owner-led Plane work can proceed independently after their prerequisites.

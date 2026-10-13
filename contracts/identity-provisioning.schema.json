@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flume.delorenj.dev/contracts/identity-provisioning.schema.json",
+  "title": "Identity provisioning configuration (version 1)",
+  "description": "FLUME-56: operator-authored live-provisioning configuration. Secrets are 1Password references only; a resolved credential never lands in this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "cloudflare", "mailbox", "onepassword"],
+  "properties": {
+    "version": { "const": 1 },
+    "cloudflare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["api_token_ref", "account_id", "zone_id", "access_issuer"],
+      "properties": {
+        "api_token_ref": {
+          "type": "string",
+          "pattern": "^op://",
+          "description": "1Password reference to the Cloudflare credential (global key or a scoped provisioning token); resolved with `op read` at call time."
+        },
+        "account_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "zone_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "access_issuer": { "type": "string", "pattern": "^https://[^/]+\\.cloudflareaccess\\.com$" }
+      }
+    },
+    "mailbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["worker", "kv_namespace_id"],
+      "properties": {
+        "worker": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "kv_namespace_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+      }
+    },
+    "onepassword": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vault"],
+      "properties": {
+        "vault": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
