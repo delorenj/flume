@@ -88,7 +88,21 @@ HTTP status only.
 
 ## Rererere
 
-Installation of App 5296560 (`colrerererebot`) was still pending at the time of writing (see below for the final poll result).
+NOT proven; an operator blocker. App `colrerererebot` (id 5296560, bot login `colrerererebot[bot]`) has no
+installation: `flume access github-inspect --app-id 5296560 --key-ref op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/sxskdgqeniqpfjftucu6rz7u2i`
+returned `installations: []` on 15 polls, 60s apart (2026-10-14T23:29Z to 23:44Z). The earlier Install click for
+`delorenj/flume-identity-sandbox` + `delorenj/n8n-nodes-hermes` is waiting on the operator's passkey (GitHub sudo prompt).
+Nothing was bound or granted for Rererere, and no installation id exists.
+
+Next step (operator): complete the passkey prompt on the pending install request at
+`https://github.com/apps/colrerererebot/installations/new` (select only the sandbox repo and `n8n-nodes-hermes`), then run
+`flume access github-inspect --app-id 5296560 --key-ref ...` to read the installation id and repeat:
+`flume identity bind rererere github --principal 5296560 --instance <installation id> --credential-ref op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/sxskdgqeniqpfjftucu6rz7u2i --attribution-mode native --apply`,
+add a sandbox grant for subject `1dca27f5-06e8-47a3-86c9-49bc3ed5331c`, and run proof (a).
+
+Definition location: `~/.agents/workforce/rererere/{agent.yaml,contract.yaml}`. That directory is inside the git
+repo `~/.agents` (delorenj/agents) but is **untracked** (`?? workforce/rererere/`), so there was nothing of mine to
+commit there; the bind will need `flume onboard --employee rererere` afterwards to refresh `contract.yaml`.
 
 ## State left behind
 
