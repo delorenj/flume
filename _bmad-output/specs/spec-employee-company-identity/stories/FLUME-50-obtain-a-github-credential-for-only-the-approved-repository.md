@@ -285,3 +285,13 @@ This pass patched three findings:
 - One operator grant per employee, with `max_lifetime_seconds` ≥ 3600.
 
 Until all of these exist, `github_sandbox_installation` stays `unproven`.
+
+## Live AC4 evidence (2026-10-14)
+
+Grolf (App 5296475, installation 170872985) against sandbox `delorenj/flume-identity-sandbox`, through the real
+launcher -> Cloudflare Access (`identity.delo.sh`) -> Worker -> facade path: allowed repository granted with the
+provider's expiry and scopes (`contents:read, issues:write, metadata:read, pull_requests:write`, selected, 3600s);
+token confined to one repository (`/installation/repositories` total 1, private repos 404); `n8n-nodes-hermes`
+`provider-refused`; foreign owner `repository-not-installed`; ungranted repo/permissions `approval_required`;
+ledgers secret-free. Receipt: `_bmad-output/implementation-artifacts/FLUME-50/live-proof-2026-10-14.md`.
+Rererere installation pending operator passkey; not part of AC4.

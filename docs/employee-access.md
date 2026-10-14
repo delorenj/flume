@@ -252,10 +252,23 @@ company_identity:
       credential_ref: op://DeLoSecrets/<item-uuid>/<field>   # the client secret
 ```
 
-## Pending live proof
+## Live deployment (2026-10-14) and what is still unproven
 
-Not done here, and `flume identity readiness` reports `access_assertion_policy` as
-`unproven`: the real Access application and policy, per-employee service tokens,
-the launcher signing-key vault item, and a Hermes tool that consumes the environment.
-The GitHub sandbox gate above is separate. The test suite's fake edge mints assertions the way Cloudflare
-does; only the issuer differs in production.
+A real Access-fronted path exists and carried the FLUME-50 GitHub proof
+(`_bmad-output/implementation-artifacts/FLUME-50/live-proof-2026-10-14.md`):
+
+```
+flume access run <e> -> https://identity.delo.sh   (Cloudflare Access app "identity", service-token policy)
+  -> Worker agents-facade (route identity.delo.sh/*, var ACCESS_FACADE_ORIGIN=https://identity-origin.delo.sh)
+  -> Traefik dynamic/flume-access.yml -> user unit flume-access.service (`flume access serve`, port 18791)
+```
+
+The origin hostname grants nothing alone: the facade refuses any request without a verifiable
+`Cf-Access-Jwt-Assertion` (pinned issuer and audience). The launcher signing key is the 1Password item
+"Flume Access Launcher Signing Key". Operator grants live in `~/.config/flume/employee-access.yaml`.
+
+Still unproven, and `flume identity readiness` keeps `access_assertion_policy` `unproven`: a Hermes tool
+that consumes the launcher environment, and a negative live matrix for the Access layer itself
+(unknown/revoked token, wrong audience). `github_sandbox_installation` stays `unproven` in readiness by
+design (it is a static list); the GitHub sandbox proof for Grolf is recorded in the FLUME-50 receipt.
+The test suite's fake edge mints assertions the way Cloudflare does; only the issuer differs in production.
