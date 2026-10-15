@@ -74,6 +74,57 @@
     Prove suspension/rotation/history continuity and report real provider revocation or residual lifetime without false live success.
   spec_checkpoint: true
   done_checkpoint: false
-  invoke_dev_with: >-
+  invoke_dev_with: |-
     Read all companions and px show FLUME-53 --json; check FLUME-39 and PX-13 dependencies.
     Production employee offboarding or credential revocation is not authorized by a fixture test or by starting this epic loop.
+
+    SUPERVISOR DESIGN CONSTRAINTS (2026-10-14; they refine, never weaken, the four ACs). Facts verified live today:
+    FLUME-47..52 and 56 are landed; local status already exists (`setEmployeeStatus`, facade denies `employee-<status>` per request
+    from the freshly read definition); `provision.ts` owns Cloudflare/KV/vault helpers; Pilot owns `px identity verify`; the gateway
+    authority is ~/docker/stacks/ai/newapi/ops/gateway-tokens.py (`status|revoke|rotate <consumer>`) and the live consumer is read from the
+    desk's `AUTOMATICAI_GATEWAY_KEY: op://.../<consumer>` reference (never inferred from a name). FLUME-39 is the gateway enrollment owner:
+    link its ticket/evidence, do not re-implement minting. There is NO mail-read endpoint yet (FLUME-49 shipped ingress to R2 + KV allowlist only).
+
+    1. Lifecycle coordinator (new module under packages/flume-hr/src/workforce/, adapters injectable so tests use fakes; all base URLs
+       overridable like FLUME_GITHUB_API_BASE / FLUME_CLOUDFLARE_API_BASE; add FLUME_GATEWAY_TOKENS_BIN and reuse FLUME_PX_BIN):
+         flume identity suspend <e> [--revoke <adapter>...] [--apply] [--json]
+         flume identity restore <e> [--apply] [--json]          (suspended -> active only; retired is a tombstone)
+         flume identity retire  <e> [--revoke <adapter>...|all] [--apply] [--json]
+         flume identity credentials <e> [--json]                (read-only inventory of every outstanding credential)
+         flume identity rotate <e> <provider> --credential-ref op://... [--apply]   (same principal/instance/native_actor_id, new ref only)
+         flume identity continuity <e> [--record] [--comment emp:id ...]             (subject/handle/email/actor/principal snapshot vs ledger)
+       Preview is the default. Reversible controls run by default on suspend (local status first, then the mail allowlist KV key
+       `allowlist/<address>` deleted and verified by readback). Provider-destructive revocations (Access service token DELETE, GitHub
+       installation suspend, gateway token revoke) happen ONLY when named with --revoke (or `all` on retire). A retired employee's handle,
+       email and subject stay tombstoned: never reassigned, never re-enrolled.
+    2. Adapters and their honest semantics. Every credential row has: provider, kind, ref/id (never a value), static (bool), status in
+       {revoked, suspended-reversible, residual-expiry(expires_at), static-usable, manual-action-required, unverified, unresolved(provider error code), not-issued},
+       evidence ({provider|fixture}), and the exact next action. `complete_revocation` is true ONLY if every row is revoked or not-issued; a static key
+       whose rejection was not read back from the provider is NEVER revoked, and the command must say so. Adapters:
+       - mail: KV allowlist key (delete/verify; restore re-puts the same record); routing rule disabled only on retire; stored mail objects kept (history).
+       - cloudflare_access: inventory via service token list (client_id, expires_at); DELETE only with --revoke; otherwise static-usable-until-expiry with the residual date.
+       - github: App private key is static (manual: delete the key in App settings); installation tokens are never retained, so list issued ones from
+         provider-ledger.jsonl with their residual expires_at; the real provider revocation for everything already issued is suspending the installation
+         (PUT /app/installations/{id}/suspended via the App JWT, verified by GET showing suspended_at; restore = DELETE .../suspended). No installation bound => not-issued.
+       - plane: PAT is static; use `px identity verify` (read-only) to report still-usable or credential_rejected; revocation is manual (owner deletes token / admin removes membership).
+       - gateway: `gateway-tokens.py status <consumer>` readback (token id, status, expired_time -1 => no expiry => static-usable), revoke only with --revoke gateway;
+         include the FLUME-39 ticket ref and the location of its evidence; a missing evidence file is reported as unverified, not assumed.
+    3. Convergence (AC2): a lifecycle operation has an operation_id and per-step state persisted secret-free (lifecycle-state + lifecycle-ledger.jsonl under the identity
+       state dir, mode 0600). Offboarding with one provider failing records the succeeded providers separately from unresolved ones; a retry re-attempts only unresolved
+       steps, treats an already-gone resource (404) as converged, and never issues a second DELETE for a step recorded done. Test with a fault-injecting fake provider that
+       counts calls.
+    4. Mail read at the facade: add an employee-authenticated `POST /v1/mail/authorize` route to `flume access serve` (same Access JWT + run assertion pipeline, status read
+       fresh per request, handle derived ONLY from the verified machine identity). Body {operation: list|read, message_id?: 64-hex}; 200 returns {status: authorized, handle,
+       subject, run_id, harness, mailbox_prefix: "mail/<handle>/"}; suspended/retired => 403 denied employee-<status>; every request audited secret-free (no mail content, no codes).
+       The supervisor adds the Worker (agents-facade) R2 read that consumes this contract and deploys it; do not edit agents-facade. Add a plain client `flume mail list|read <id>`
+       that calls `${FLUME_ACCESS_URL}/v1/mail/messages` with the launcher env (like `flume access request`), never taking identity from a flag. Receive-only: no send path.
+    5. Cross-harness (AC4): Hermes (`flume launch`) and plain (`flume access run`) requests must be correlatable: audit lines already carry run_id and harness; add a read-only
+       `flume access receipts --run <id>|--employee <e> [--since]` that prints secret-free audit rows so one receipt can join request, mail authorization, denial and lifecycle operation
+       by correlation fields. The gateway attribution link points at FLUME-39 evidence plus a gateway-proof.py receipt reference, never a generated config.
+    6. Tests: new suites registered in scripts/run-tests.mjs, names containing employee-access or company-identity (e.g. employee-access-lifecycle, company-identity-lifecycle):
+       suspend/restore round trip; denial of grants and mail authorize immediately after suspend, restoration afterwards; every adapter status incl. static-usable; provider outage
+       (one adapter fails) + retry convergence without duplicate DELETE; retire tombstone (handle/email/subject not re-enrollable); rotation keeps subject/native_actor_id and
+       refuses a different principal; person moved to another post keeps one subject; secret scan of every ledger/receipt/stdout (no PEM, token, JWT, key). Fixtures must not touch
+       real homes, vaults, Cloudflare, GitHub, Plane or the gateway.
+    7. Docs: docs/employee-access.md gets a "Suspension, rotation and retirement (FLUME-53)" section including what each provider can and cannot revoke and the residual windows.
+       The live canary proof (Rererere, sandbox scope) is run by the supervisor after the build lands, not by this dev session.
