@@ -1,0 +1,1143 @@
+{
+  "ok": true,
+  "blockers": [],
+  "employee": "rererere",
+  "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+  "handle": "rererere",
+  "subjects": [
+    "1dca27f5-06e8-47a3-86c9-49bc3ed5331c"
+  ],
+  "run_ids": [
+    "4c627ffd-6dda-4c41-83e9-0e97eb8ed1a9",
+    "3d381681-b7db-41c2-b88a-4cfd27708e7f",
+    "dcb94343-67da-4394-9c69-2be1111f9f45",
+    "37463928-6d18-461d-a8a5-a93cb3fa6cf5",
+    "6a48d61e-3120-4566-acb8-076325845fc0",
+    "ae0399e3-e5be-445a-ba5c-c382a7a8baaa",
+    "9fcfc3ff-a92b-45de-9676-0aa75d20ed53",
+    "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+    "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+    "1d252e15-ec47-4608-bff4-4ae7868b3345",
+    "7ecce456-6c57-40de-be70-4fa29db3d320",
+    "52d9665f-dc6f-4bbb-994d-4e1aaf9fda34"
+  ],
+  "runs": [
+    {
+      "run_id": "4c627ffd-6dda-4c41-83e9-0e97eb8ed1a9",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:20:21.835Z",
+      "last_at": "2026-10-15T05:20:21.835Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 0,
+      "denials": 0
+    },
+    {
+      "run_id": "3d381681-b7db-41c2-b88a-4cfd27708e7f",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:20:37.195Z",
+      "last_at": "2026-10-15T05:20:37.195Z",
+      "requests": 0,
+      "grants": 0,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "dcb94343-67da-4394-9c69-2be1111f9f45",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:20:41.740Z",
+      "last_at": "2026-10-15T05:20:41.740Z",
+      "requests": 0,
+      "grants": 0,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "37463928-6d18-461d-a8a5-a93cb3fa6cf5",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:20:42.559Z",
+      "last_at": "2026-10-15T05:20:42.559Z",
+      "requests": 0,
+      "grants": 0,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:21:28.210Z",
+      "last_at": "2026-10-15T05:24:59.869Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 2
+    },
+    {
+      "run_id": "ae0399e3-e5be-445a-ba5c-c382a7a8baaa",
+      "harness": "hermes",
+      "first_at": "2026-10-15T05:24:10.427Z",
+      "last_at": "2026-10-15T05:24:12.647Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "9fcfc3ff-a92b-45de-9676-0aa75d20ed53",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:26:21.345Z",
+      "last_at": "2026-10-15T05:26:21.715Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:26:32.233Z",
+      "last_at": "2026-10-15T05:27:05.360Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 2
+    },
+    {
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "harness": "hermes",
+      "first_at": "2026-10-15T05:26:44.285Z",
+      "last_at": "2026-10-15T05:27:16.805Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 2
+    },
+    {
+      "run_id": "1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "harness": "plain",
+      "first_at": "2026-10-15T05:27:49.910Z",
+      "last_at": "2026-10-15T05:27:50.269Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 0
+    },
+    {
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "harness": "plain",
+      "first_at": "2026-10-15T06:26:51.622Z",
+      "last_at": "2026-10-15T06:26:57.356Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 2
+    },
+    {
+      "run_id": "52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "harness": "plain",
+      "first_at": "2026-10-15T06:27:09.800Z",
+      "last_at": "2026-10-15T06:27:10.134Z",
+      "requests": 1,
+      "grants": 1,
+      "mail_authorizations": 1,
+      "denials": 0
+    }
+  ],
+  "operations": [
+    {
+      "operation_id": "48ebf50a-a748-4635-b0ec-582182cd0336",
+      "command": "suspend",
+      "started_at": "2026-10-15T05:24:52.173Z",
+      "finished_at": "2026-10-15T05:24:54.782Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "local-status:suspended",
+          "outcome": "done"
+        },
+        {
+          "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        }
+      ]
+    },
+    {
+      "operation_id": "c98a3e65-ec55-4422-a781-f6638ea43b01",
+      "command": "restore",
+      "started_at": "2026-10-15T05:26:17.759Z",
+      "finished_at": "2026-10-15T05:26:20.470Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        },
+        {
+          "step": "local-status:active",
+          "outcome": "done"
+        }
+      ]
+    },
+    {
+      "operation_id": "57562e66-a545-4e8d-a0bd-0bd47024b3aa",
+      "command": "suspend",
+      "started_at": "2026-10-15T05:27:01.684Z",
+      "finished_at": "2026-10-15T05:27:04.530Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "local-status:suspended",
+          "outcome": "done"
+        },
+        {
+          "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        }
+      ]
+    },
+    {
+      "operation_id": "1d02e71b-88ab-4580-b300-a844a99b394b",
+      "command": "restore",
+      "started_at": "2026-10-15T05:27:46.352Z",
+      "finished_at": "2026-10-15T05:27:49.083Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        },
+        {
+          "step": "local-status:active",
+          "outcome": "done"
+        }
+      ]
+    },
+    {
+      "operation_id": "cb653709-ee26-44ab-b282-fe0f1eaa0400",
+      "command": "suspend",
+      "started_at": "2026-10-15T06:26:53.557Z",
+      "finished_at": "2026-10-15T06:26:56.355Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "local-status:suspended",
+          "outcome": "done"
+        },
+        {
+          "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        }
+      ]
+    },
+    {
+      "operation_id": "4bdf0032-12a3-4631-a52a-1347a382c3a5",
+      "command": "restore",
+      "started_at": "2026-10-15T06:27:05.832Z",
+      "finished_at": "2026-10-15T06:27:08.603Z",
+      "ok": true,
+      "steps": [
+        {
+          "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+          "adapter": "mail",
+          "outcome": "done"
+        },
+        {
+          "step": "local-status:active",
+          "outcome": "done"
+        }
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:20:21.835Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "4c627ffd-6dda-4c41-83e9-0e97eb8ed1a9",
+      "harness": "plain",
+      "request_id": "31007cc5-9602-4400-a90c-ad688d98cbd0",
+      "grant_id": "f5354ed2-9719-4d0a-824c-851342920089",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:20:21.835Z"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:20:21.835Z",
+      "provider": "fixture",
+      "grant_id": "f5354ed2-9719-4d0a-824c-851342920089",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "4c627ffd-6dda-4c41-83e9-0e97eb8ed1a9",
+      "request_id": "31007cc5-9602-4400-a90c-ad688d98cbd0",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:20:21.835Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:20:37.195Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "3d381681-b7db-41c2-b88a-4cfd27708e7f",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:20:41.740Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "dcb94343-67da-4394-9c69-2be1111f9f45",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:20:42.559Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "37463928-6d18-461d-a8a5-a93cb3fa6cf5",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:21:28.210Z",
+      "provider": "fixture",
+      "grant_id": "f89c47b0-f4aa-4063-b654-31d12ee2182a",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "request_id": "plain-before-6a48d61e-3120-4566-acb8-076325845fc0",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:21:28.210Z"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:21:28.211Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "harness": "plain",
+      "request_id": "plain-before-6a48d61e-3120-4566-acb8-076325845fc0",
+      "grant_id": "f89c47b0-f4aa-4063-b654-31d12ee2182a",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:21:28.210Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:21:28.571Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:21:56.525Z",
+      "event": "lifecycle.continuity",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:24:10.427Z",
+      "provider": "fixture",
+      "grant_id": "21f603ac-8096-45c6-a3ab-8d20b64fa2f9",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "ae0399e3-e5be-445a-ba5c-c382a7a8baaa",
+      "request_id": "hermes-before-ae0399e3",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:24:10.427Z"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:24:10.428Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "ae0399e3-e5be-445a-ba5c-c382a7a8baaa",
+      "harness": "hermes",
+      "request_id": "hermes-before-ae0399e3",
+      "grant_id": "21f603ac-8096-45c6-a3ab-8d20b64fa2f9",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:24:10.427Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:24:12.647Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "ae0399e3-e5be-445a-ba5c-c382a7a8baaa",
+      "harness": "hermes",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:24:52.173Z",
+      "event": "lifecycle.operation",
+      "operation_id": "48ebf50a-a748-4635-b0ec-582182cd0336",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "active",
+      "to": "suspended",
+      "revoke": []
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:24:52.326Z",
+      "event": "lifecycle.step",
+      "operation_id": "48ebf50a-a748-4635-b0ec-582182cd0336",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:suspended",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:24:52.961Z",
+      "event": "lifecycle.step",
+      "operation_id": "48ebf50a-a748-4635-b0ec-582182cd0336",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:24:54.782Z",
+      "event": "lifecycle.operation",
+      "operation_id": "48ebf50a-a748-4635-b0ec-582182cd0336",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true,
+      "complete_revocation": false
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:24:59.481Z",
+      "event": "access.request",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "harness": "plain",
+      "request_id": "plain-after-6a48d61e-3120-4566-acb8-076325845fc0",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ]
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:24:59.869Z",
+      "event": "mail.authorize",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "6a48d61e-3120-4566-acb8-076325845fc0",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:26:17.759Z",
+      "event": "lifecycle.operation",
+      "operation_id": "c98a3e65-ec55-4422-a781-f6638ea43b01",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "suspended",
+      "to": "active"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:26:18.418Z",
+      "event": "lifecycle.step",
+      "operation_id": "c98a3e65-ec55-4422-a781-f6638ea43b01",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:26:18.571Z",
+      "event": "lifecycle.step",
+      "operation_id": "c98a3e65-ec55-4422-a781-f6638ea43b01",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:active",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:26:20.470Z",
+      "event": "lifecycle.operation",
+      "operation_id": "c98a3e65-ec55-4422-a781-f6638ea43b01",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:26:21.345Z",
+      "provider": "fixture",
+      "grant_id": "6d7e4bb6-4fc0-4875-b34a-446c58a434b0",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "9fcfc3ff-a92b-45de-9676-0aa75d20ed53",
+      "request_id": "a8e23fa7-215f-4907-941c-755dc4cb5dc9",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:26:21.345Z"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:26:21.346Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "9fcfc3ff-a92b-45de-9676-0aa75d20ed53",
+      "harness": "plain",
+      "request_id": "a8e23fa7-215f-4907-941c-755dc4cb5dc9",
+      "grant_id": "6d7e4bb6-4fc0-4875-b34a-446c58a434b0",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:26:21.345Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:26:21.715Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "9fcfc3ff-a92b-45de-9676-0aa75d20ed53",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:26:32.233Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "harness": "plain",
+      "request_id": "plain-before-be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "grant_id": "e6583aff-9efb-4a0e-a117-0d84cb9ec6e5",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:26:32.233Z"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:26:32.233Z",
+      "provider": "fixture",
+      "grant_id": "e6583aff-9efb-4a0e-a117-0d84cb9ec6e5",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "request_id": "plain-before-be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:26:32.233Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:26:32.577Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:26:44.285Z",
+      "provider": "fixture",
+      "grant_id": "3ccbbf81-f056-4600-8772-9b0e19fc6901",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "request_id": "hermes-before-41b173ea",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:26:44.285Z"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:26:44.286Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "harness": "hermes",
+      "request_id": "hermes-before-41b173ea",
+      "grant_id": "3ccbbf81-f056-4600-8772-9b0e19fc6901",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:26:44.285Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:26:46.431Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "harness": "hermes",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:01.684Z",
+      "event": "lifecycle.operation",
+      "operation_id": "57562e66-a545-4e8d-a0bd-0bd47024b3aa",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "active",
+      "to": "suspended",
+      "revoke": []
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:01.839Z",
+      "event": "lifecycle.step",
+      "operation_id": "57562e66-a545-4e8d-a0bd-0bd47024b3aa",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:suspended",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:02.451Z",
+      "event": "lifecycle.step",
+      "operation_id": "57562e66-a545-4e8d-a0bd-0bd47024b3aa",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:04.530Z",
+      "event": "lifecycle.operation",
+      "operation_id": "57562e66-a545-4e8d-a0bd-0bd47024b3aa",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true,
+      "complete_revocation": false
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:27:04.997Z",
+      "event": "access.request",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "harness": "plain",
+      "request_id": "plain-after-be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ]
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:27:05.360Z",
+      "event": "mail.authorize",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "be4e1517-b84a-4e96-b5f6-dffb4e8d1ce5",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:27:16.098Z",
+      "event": "access.request",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "harness": "hermes",
+      "request_id": "hermes-after-41b173ea",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ]
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T05:27:16.805Z",
+      "event": "mail.authorize",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "41b173ea-460b-4ebc-bd57-cec5a6f60281",
+      "harness": "hermes",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:46.352Z",
+      "event": "lifecycle.operation",
+      "operation_id": "1d02e71b-88ab-4580-b300-a844a99b394b",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "suspended",
+      "to": "active"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:47.006Z",
+      "event": "lifecycle.step",
+      "operation_id": "1d02e71b-88ab-4580-b300-a844a99b394b",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:47.160Z",
+      "event": "lifecycle.step",
+      "operation_id": "1d02e71b-88ab-4580-b300-a844a99b394b",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:active",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T05:27:49.083Z",
+      "event": "lifecycle.operation",
+      "operation_id": "1d02e71b-88ab-4580-b300-a844a99b394b",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T05:27:49.910Z",
+      "provider": "fixture",
+      "grant_id": "0d6d4609-7890-4211-8ae1-3b80937377de",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "request_id": "restored-1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T06:27:49.910Z"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T05:27:49.911Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "harness": "plain",
+      "request_id": "restored-1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "grant_id": "0d6d4609-7890-4211-8ae1-3b80937377de",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T06:27:49.910Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T05:27:50.269Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "1d252e15-ec47-4608-bff4-4ae7868b3345",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T06:26:51.622Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "harness": "plain",
+      "request_id": "plain-before-7ecce456-6c57-40de-be70-4fa29db3d320",
+      "grant_id": "f0f66eb6-d19c-439f-a7f4-3a67a5f848b7",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T07:26:51.621Z"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T06:26:51.622Z",
+      "provider": "fixture",
+      "grant_id": "f0f66eb6-d19c-439f-a7f4-3a67a5f848b7",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "request_id": "plain-before-7ecce456-6c57-40de-be70-4fa29db3d320",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T07:26:51.621Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T06:26:51.954Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:26:53.557Z",
+      "event": "lifecycle.operation",
+      "operation_id": "cb653709-ee26-44ab-b282-fe0f1eaa0400",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "active",
+      "to": "suspended",
+      "revoke": []
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:26:53.715Z",
+      "event": "lifecycle.step",
+      "operation_id": "cb653709-ee26-44ab-b282-fe0f1eaa0400",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:suspended",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:26:54.291Z",
+      "event": "lifecycle.step",
+      "operation_id": "cb653709-ee26-44ab-b282-fe0f1eaa0400",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-delete:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:26:56.355Z",
+      "event": "lifecycle.operation",
+      "operation_id": "cb653709-ee26-44ab-b282-fe0f1eaa0400",
+      "command": "suspend",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true,
+      "complete_revocation": false
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T06:26:56.921Z",
+      "event": "access.request",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "harness": "plain",
+      "request_id": "plain-after-7ecce456-6c57-40de-be70-4fa29db3d320",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ]
+    },
+    {
+      "kind": "denial",
+      "at": "2026-10-15T06:26:57.356Z",
+      "event": "mail.authorize",
+      "outcome": "employee-suspended",
+      "http_status": 403,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "7ecce456-6c57-40de-be70-4fa29db3d320",
+      "harness": "plain",
+      "operation": "list"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:27:05.832Z",
+      "event": "lifecycle.operation",
+      "operation_id": "4bdf0032-12a3-4631-a52a-1347a382c3a5",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "started",
+      "from": "suspended",
+      "to": "active"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:27:06.325Z",
+      "event": "lifecycle.step",
+      "operation_id": "4bdf0032-12a3-4631-a52a-1347a382c3a5",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "mail:allowlist-restore:rererere@agents.delo.sh",
+      "adapter": "mail",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:27:06.483Z",
+      "event": "lifecycle.step",
+      "operation_id": "4bdf0032-12a3-4631-a52a-1347a382c3a5",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "step": "local-status:active",
+      "outcome": "done"
+    },
+    {
+      "kind": "lifecycle",
+      "at": "2026-10-15T06:27:08.603Z",
+      "event": "lifecycle.operation",
+      "operation_id": "4bdf0032-12a3-4631-a52a-1347a382c3a5",
+      "command": "restore",
+      "employee": "rererere",
+      "handle": "rererere",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "phase": "finished",
+      "ok": true
+    },
+    {
+      "kind": "request",
+      "at": "2026-10-15T06:27:09.800Z",
+      "event": "access.request",
+      "outcome": "granted",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "harness": "plain",
+      "request_id": "final-52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "grant_id": "20ee1d7e-7e7e-4350-b400-a36366c06d2b",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "lifetime_seconds": 3600,
+      "expires_at": "2026-10-15T07:27:09.800Z"
+    },
+    {
+      "kind": "grant",
+      "at": "2026-10-15T06:27:09.800Z",
+      "provider": "fixture",
+      "grant_id": "20ee1d7e-7e7e-4350-b400-a36366c06d2b",
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "run_id": "52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "request_id": "final-52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "service": "fixture",
+      "resource": "repo:alpha",
+      "permissions": [
+        "read"
+      ],
+      "expires_at": "2026-10-15T07:27:09.800Z"
+    },
+    {
+      "kind": "mail",
+      "at": "2026-10-15T06:27:10.134Z",
+      "event": "mail.authorize",
+      "outcome": "authorized",
+      "http_status": 200,
+      "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+      "handle": "rererere",
+      "run_id": "52d9665f-dc6f-4bbb-994d-4e1aaf9fda34",
+      "harness": "plain",
+      "operation": "list"
+    }
+  ],
+  "gateway": {
+    "owner_ticket": "FLUME-39",
+    "evidence_path": "/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-39",
+    "evidence_status": "unverified",
+    "consumer": "hermes-rererere",
+    "attribution": "unverified"
+  },
+  "writes": []
+}

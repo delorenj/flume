@@ -619,3 +619,21 @@ that consumes the launcher environment, and a negative live matrix for the Acces
 (unknown/revoked token, wrong audience). `github_sandbox_installation` stays `unproven` in readiness by
 design (it is a static list); the GitHub sandbox proof for Grolf is recorded in the FLUME-50 receipt.
 The test suite's fake edge mints assertions the way Cloudflare does; only the issuer differs in production.
+
+## Live canary (FLUME-53, 2026-10-15)
+
+The suspension, restore, retirement and mail-read path ran live on Rererere and a disposable employee, through Access, the
+`agents-facade` Worker (`POST /v1/mail/messages`, which asks the origin's `POST /v1/mail/authorize` who is asking and whether they are
+active, then reads only `mail/<handle>/`) and `flume-access.service`. Receipt:
+`_bmad-output/implementation-artifacts/FLUME-53/live-canary-2026-10-15.md`; raw provider output in `.../evidence/`.
+
+What it showed, and what it did not:
+
+- A suspended employee is denied at the facade on the next request, in both access and mail, with the **same** run assertion (plain and Hermes harness). The
+  mailbox allowlist key is deleted, inbound mail bounces, and restore re-puts the identical record.
+- Real revocation was proven on a throwaway employee (Access service token deleted, routing rule disabled, allowlist key deleted, tombstone refusing a re-used handle). On
+  Rererere the Access token, gateway token and Plane PAT stayed valid on purpose and are reported `static-usable`, never `revoked`.
+- `flume launch` for a specialist whose gateway key came from FLUME-39 is refused by the specialist projector (it owns a different reference). The Hermes leg used the same
+  launcher primitive through `canary/hermes-harness.ts`; gateway attribution was read from the gateway's usage log with `gateway-proof.py`.
+- Not proven live: Rererere's GitHub leg (the App has no installation yet), a live provider outage, rotation. `employee_lifecycle_canary` stays `unproven` in
+  `flume identity readiness`; the receipt is the proof.

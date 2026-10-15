@@ -1,0 +1,111 @@
+{
+  "ok": true,
+  "command": "continuity",
+  "employee": "rererere",
+  "apply": false,
+  "kind": "specialist",
+  "definition": "/home/delorenj/.agents/workforce/rererere/agent.yaml",
+  "person": "rererere",
+  "status": "stable",
+  "baseline_at": "2026-10-15T05:21:56.521Z",
+  "identity": {
+    "recorded_at": "2026-10-15T05:27:58.650Z",
+    "subject": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c",
+    "handle": "rererere",
+    "email": "rererere@agents.delo.sh",
+    "mailbox_prefix": "mail/rererere/",
+    "bindings": {
+      "cloudflare_access": {
+        "principal": "bfb08e3f094e26eba7f2dcf9cd42812a.access",
+        "instance": "https://delonet.cloudflareaccess.com",
+        "credential_ref": "op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/xjmauwm2iv7roeqpuah252nvuy"
+      },
+      "plane": {
+        "principal": "ba82e3bd-9b21-4066-9737-bd6279cf00f7",
+        "instance": "https://plane.delo.sh/33god",
+        "native_actor_id": "ba82e3bd-9b21-4066-9737-bd6279cf00f7",
+        "credential_ref": "op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/gwxsutraup26mm4h7vkqj64ivu"
+      }
+    },
+    "definition": "/home/delorenj/.agents/workforce/rererere/agent.yaml",
+    "posts": [
+      "rererere"
+    ]
+  },
+  "checks": [
+    {
+      "field": "subject",
+      "status": "stable",
+      "value": "1dca27f5-06e8-47a3-86c9-49bc3ed5331c"
+    },
+    {
+      "field": "handle",
+      "status": "stable",
+      "value": "rererere"
+    },
+    {
+      "field": "email",
+      "status": "stable",
+      "value": "rererere@agents.delo.sh"
+    },
+    {
+      "field": "mailbox_prefix",
+      "status": "stable",
+      "value": "mail/rererere/"
+    },
+    {
+      "field": "cloudflare_access.principal",
+      "status": "stable",
+      "value": "bfb08e3f094e26eba7f2dcf9cd42812a.access"
+    },
+    {
+      "field": "cloudflare_access.instance",
+      "status": "stable",
+      "value": "https://delonet.cloudflareaccess.com"
+    },
+    {
+      "field": "cloudflare_access.native_actor_id",
+      "status": "stable",
+      "value": null
+    },
+    {
+      "field": "cloudflare_access.credential_ref",
+      "status": "stable",
+      "value": "op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/xjmauwm2iv7roeqpuah252nvuy"
+    },
+    {
+      "field": "plane.principal",
+      "status": "stable",
+      "value": "ba82e3bd-9b21-4066-9737-bd6279cf00f7"
+    },
+    {
+      "field": "plane.instance",
+      "status": "stable",
+      "value": "https://plane.delo.sh/33god"
+    },
+    {
+      "field": "plane.native_actor_id",
+      "status": "stable",
+      "value": "ba82e3bd-9b21-4066-9737-bd6279cf00f7"
+    },
+    {
+      "field": "plane.credential_ref",
+      "status": "stable",
+      "value": "op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/gwxsutraup26mm4h7vkqj64ivu"
+    },
+    {
+      "field": "post",
+      "status": "stable"
+    }
+  ],
+  "comments": [
+    {
+      "comment": "rererere:2d4fe4fa-c167-4aac-a25b-7cb5c18c72e8",
+      "status": "stable",
+      "native_actor_id": "ba82e3bd-9b21-4066-9737-bd6279cf00f7",
+      "actor_id": "ba82e3bd-9b21-4066-9737-bd6279cf00f7"
+    }
+  ],
+  "blockers": [],
+  "writes": []
+}

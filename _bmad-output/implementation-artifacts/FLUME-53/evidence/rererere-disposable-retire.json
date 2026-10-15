@@ -1,0 +1,151 @@
+{
+  "ok": true,
+  "command": "retire",
+  "employee": "f53canary",
+  "apply": true,
+  "kind": "specialist",
+  "definition": "/home/delorenj/.agents/workforce/f53canary/agent.yaml",
+  "person": "f53canary",
+  "from": "active",
+  "to": "retired",
+  "revoke": [
+    "cloudflare_access",
+    "github",
+    "gateway"
+  ],
+  "history": {
+    "mailbox_prefix": "mail/f53canary/",
+    "stored_mail": "kept"
+  },
+  "operation_id": "14fe6344-1ee2-4688-bdff-dd455bb88463",
+  "blockers": [],
+  "steps": [
+    {
+      "key": "local-status:retired",
+      "adapter": "local",
+      "action": "set-status",
+      "resource": "f53canary",
+      "outcome": "done",
+      "detail": "active -> retired"
+    },
+    {
+      "key": "tombstone",
+      "adapter": "local",
+      "action": "tombstone",
+      "resource": "53d67284-3651-4cf1-8317-3d24e7e94555",
+      "outcome": "done",
+      "detail": "handle f53canary, subject and 1 binding key(s) recorded"
+    },
+    {
+      "key": "mail:allowlist-delete:f53canary@agents.delo.sh",
+      "adapter": "mail",
+      "action": "allowlist-delete",
+      "resource": "allowlist/f53canary@agents.delo.sh",
+      "outcome": "done",
+      "operation_id": "14fe6344-1ee2-4688-bdff-dd455bb88463",
+      "detail": "allowlist key absent (GET 404)"
+    },
+    {
+      "key": "mail:routing-disable:f53canary@agents.delo.sh",
+      "adapter": "mail",
+      "action": "routing-disable",
+      "resource": "f53canary@agents.delo.sh",
+      "outcome": "done",
+      "operation_id": "14fe6344-1ee2-4688-bdff-dd455bb88463",
+      "detail": "routing rule 9b89e1bb1ebe49929f7140f9cb0f8ba6 disabled (GET enabled:false)"
+    },
+    {
+      "key": "cloudflare_access:token-delete:05a89b5d7637c42b6e056f8d3816ba1e.access",
+      "adapter": "cloudflare_access",
+      "action": "token-delete",
+      "resource": "05a89b5d7637c42b6e056f8d3816ba1e.access",
+      "outcome": "done",
+      "operation_id": "14fe6344-1ee2-4688-bdff-dd455bb88463",
+      "detail": "the service token is absent from the provider's listing"
+    }
+  ],
+  "succeeded": [
+    "local-status:retired",
+    "tombstone",
+    "mail:allowlist-delete:f53canary@agents.delo.sh",
+    "mail:routing-disable:f53canary@agents.delo.sh",
+    "cloudflare_access:token-delete:05a89b5d7637c42b6e056f8d3816ba1e.access"
+  ],
+  "unresolved": [],
+  "credentials": [
+    {
+      "provider": "mail",
+      "kind": "mailbox-allowlist+routing",
+      "id": "allowlist/f53canary@agents.delo.sh",
+      "static": false,
+      "evidence": "provider",
+      "status": "revoked",
+      "read_back": "absent",
+      "next_action": "none: the mailbox is closed and its stored mail is kept",
+      "detail": "stored mail under mail/f53canary/ is kept; Flume has no R2 client and never deletes mail"
+    },
+    {
+      "provider": "cloudflare_access",
+      "kind": "access-service-token",
+      "static": true,
+      "evidence": "provider",
+      "id": "05a89b5d7637c42b6e056f8d3816ba1e.access",
+      "ref": "op://DeLoSecrets/6s4ga5pfo6ytamkjfs4tqhcwo4/gonrlp7372ermkfxstigtt7jxi",
+      "next_action": "none: the token no longer exists at Cloudflare",
+      "detail": "absent from the provider's complete service-token listing",
+      "status": "revoked",
+      "read_back": "absent"
+    },
+    {
+      "provider": "github",
+      "evidence": "provider",
+      "kind": "app-private-key",
+      "static": true,
+      "status": "not-issued",
+      "next_action": "flume identity bind f53canary github ... binds the employee's own App"
+    },
+    {
+      "provider": "plane",
+      "kind": "plane-personal-access-token",
+      "static": true,
+      "evidence": "provider",
+      "status": "not-issued",
+      "next_action": "flume identity bind f53canary plane ... (the employee enrolls by hand first)"
+    },
+    {
+      "provider": "gateway",
+      "kind": "gateway-token",
+      "static": true,
+      "evidence": "provider",
+      "owner_ticket": "FLUME-39",
+      "evidence_path": "/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-39",
+      "evidence_status": "unverified",
+      "ref": "op://DeLoSecrets/hermes-f53canary/credential",
+      "ref_source": "launcher",
+      "status": "unverified",
+      "provider_code": "gateway-ref-shape",
+      "next_action": "FLUME-39 owns the gateway reference shape (op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/<consumer>)",
+      "detail": "a portable specialist's launcher injects this reference, which is not the FLUME-39 shape: no consumer can be named or revoked, and the key may be live"
+    }
+  ],
+  "complete_revocation": false,
+  "incomplete": [
+    {
+      "provider": "gateway",
+      "kind": "gateway-token",
+      "ref": "op://DeLoSecrets/hermes-f53canary/credential",
+      "status": "unverified",
+      "provider_code": "gateway-ref-shape"
+    }
+  ],
+  "gateway_link": {
+    "owner_ticket": "FLUME-39",
+    "evidence_path": "/home/delorenj/code/33GOD/flume/_bmad-output/implementation-artifacts/FLUME-39",
+    "evidence_status": "unverified"
+  },
+  "writes": [
+    "/home/delorenj/.local/state/flume/identity/lifecycle-ledger.jsonl",
+    "/home/delorenj/.local/state/flume/identity/lifecycle-state.json"
+  ],
+  "note": "Retired: terminal. Stored mail is kept. Provider credentials above are what remains usable or needs a person."
+}
