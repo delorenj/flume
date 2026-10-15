@@ -26,6 +26,7 @@ import YAML from "yaml";
 import { SignJWT, createRemoteJWKSet, importSPKI, jwtVerify, type CryptoKey, type JWTVerifyGetKey, type KeyObject } from "jose";
 import { identityCensus, resolveEmployee } from "./company";
 import { githubBindingOf, githubEvidence, githubRequestShape, inspectGithubApp, issueGithubToken, type GithubInspection, type GithubRequestShape } from "./github";
+import { readTombstones, tombstoneFor } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS } from "./plane";
 import { accessConfigProblems, accessRequestProblems, mailRequestProblems } from "./validator";
 import type { CompanyIdentity, CompanyIdentityBinding } from "./types";
@@ -286,22 +287,47 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
     return finish({ http_status: 200, body: { ...body, credential: { kind: "github-installation-token", value: outcome.token } } }, { ...ctx.who, grant_id: grantId });
   }
 
+  type Client = { issuer: string; clientId: string };
+
+  /** The one enrolled employee a signed client maps to, from a census read NOW (every request, and again before issuing). */
+  function employeeOf(client: Client): { failure: AccessResult } | { block: NonNullable<IdentityDefinitionBlock> } {
+    const matches = identityCensus().definitions.filter(definition => {
+      const binding = definition.block?.bindings?.cloudflare_access;
+      return binding && binding.instance === client.issuer && binding.principal === client.clientId;
+    });
+    if (matches.length !== 1) return { failure: matches.length ? refusal(403, "ambiguous-client", "the signed client is bound to more than one employee") : refusal(403, "unknown-client", "the signed client is not bound to any employee") };
+    return { block: matches[0]!.block! };
+  }
+
+  /**
+   * Is this employee in service right now? The definition's status, unless a retirement tombstone names its subject or its
+   * handle: a retired role.yaml reverted to `active` by a checkout, or a hand-written block around a retired handle, is still
+   * retired here. Tombstones that cannot be read fail CLOSED: nothing is granted or authorized on a guess.
+   */
+  function standing(block: NonNullable<IdentityDefinitionBlock>, deniedDetail: string, tag: Tag = FIXTURE): AccessResult | undefined {
+    let retired;
+    try { retired = tombstoneFor(readTombstones(), block); } catch (error) {
+      logFailure("retirement tombstones unreadable; refusing", error);
+      return refusal(503, "lifecycle-state-unavailable", "the retirement tombstones could not be read; nothing is granted or authorized until they can (fail closed)", "error", tag);
+    }
+    const status = retired ? "retired" : block.status;
+    if (status !== "active") return refusal(403, `employee-${status}`, `the employee is ${status}${retired ? ` (retired ${retired.by} tombstone, ${retired.tombstone.retired_at})` : ""}; ${deniedDetail}`, "denied", tag);
+    return undefined;
+  }
+
   /** Steps 1-3, shared by access and mail: the signed client, the one enrolled employee it maps to, and the launched run. */
-  async function identify(headers: IncomingMessage["headers"], event?: string): Promise<{ failure: AccessResult } | { block: NonNullable<IdentityDefinitionBlock>; run: { runId: string; harness: string }; who: Record<string, unknown> }> {
+  async function identify(headers: IncomingMessage["headers"], event?: string): Promise<{ failure: AccessResult } | { block: NonNullable<IdentityDefinitionBlock>; client: Client; run: { runId: string; harness: string }; who: Record<string, unknown> }> {
     // 1. authenticate the assertion
     const authenticated = await authenticate(headers);
     if ("failure" in authenticated) return { failure: finish(authenticated.failure, {}, event) };
     // 2. map the signed client to exactly one enrolled employee. The census is read on EVERY request.
-    const matches = identityCensus().definitions.filter(definition => {
-      const binding = definition.block?.bindings?.cloudflare_access;
-      return binding && binding.instance === authenticated.issuer && binding.principal === authenticated.clientId;
-    });
-    if (matches.length !== 1) return { failure: finish(matches.length ? refusal(403, "ambiguous-client", "the signed client is bound to more than one employee") : refusal(403, "unknown-client", "the signed client is not bound to any employee"), {}, event) };
-    const block = matches[0]!.block!;
+    const mapped = employeeOf(authenticated);
+    if ("failure" in mapped) return { failure: finish(mapped.failure, {}, event) };
+    const block = mapped.block;
     // 3. verify the run
     const run = await verifyRun(headers, block.subject);
     if ("failure" in run) return { failure: finish(run.failure, { subject: block.subject, handle: block.handle }, event) };
-    return { block, run, who: { subject: block.subject, handle: block.handle, run_id: run.runId, harness: run.harness } };
+    return { block, client: authenticated, run, who: { subject: block.subject, handle: block.handle, run_id: run.runId, harness: run.harness } };
   }
 
   return {
@@ -318,19 +344,27 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
         const problems = accessRequestProblems(body);
         if (problems.length) return finish({ http_status: 400, body: { ok: false, status: "error", code: "invalid-request", detail: problems.join("; ").slice(0, 400), ...FIXTURE } }, who);
         const request = body as AccessRequest;
+        const scoped = { ...who, request_id: request.request_id, ...scopeOf(request) };
         // 5. employee and status checks
         if (request.employee !== undefined && request.employee !== handle && request.employee !== subject) {
-          return finish(refusal(403, "employee-mismatch", "the request names a different employee than the one Access authenticated", "denied", tagFor(request.service)), { ...who, request_id: request.request_id, ...scopeOf(request) });
+          return finish(refusal(403, "employee-mismatch", "the request names a different employee than the one Access authenticated", "denied", tagFor(request.service)), scoped);
         }
-        if (block.status !== "active") return finish(refusal(403, `employee-${block.status}`, `the employee is ${block.status}; no new access is issued`, "denied", tagFor(request.service)), { ...who, request_id: request.request_id, ...scopeOf(request) });
+        const out = standing(block, "no new access is issued", tagFor(request.service));
+        if (out) return finish(out, scoped);
         // 6-8. idempotency, policy, fixture issue
         return await serialized(async () => {
+          // Re-checked INSIDE the queue: a request that waited behind a slow GitHub mint must not be issued after a
+          // `suspend` or `retire` wrote its status while it waited.
+          const now = employeeOf(identified.client);
+          if ("failure" in now) return finish(now.failure, scoped);
+          const late = now.block.subject !== subject ? refusal(403, "unknown-client", "the signed client no longer maps to the employee that was authenticated") : standing(now.block, "no new access is issued", tagFor(request.service));
+          if (late) return finish(late, scoped);
           if (options.configPath) {
             // The operator approves by editing the file; the facade only ever reads it. A file that cannot be read
             // fails closed: a revoked grant must not stay live behind a YAML or schema error.
             try { grants = loadAccessConfig(options.configPath).grants; } catch (error) { grants = []; logFailure(`grants reload failed for ${options.configPath}; every request needs approval`, error); }
           }
-          return await decide(subject, handle, block.bindings?.github, run, request);
+          return await decide(subject, handle, now.block.bindings?.github, run, request);
         });
       } catch (error) {
         logFailure("internal error", error);
@@ -355,7 +389,8 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
         if (problems.length) return finish(refusal(400, "invalid-request", problems.join("; ").slice(0, 400)), who, event);
         const request = body as MailRequest;
         const named = { ...who, operation: request.operation, ...(request.message_id ? { message_id: request.message_id } : {}) };
-        if (block.status !== "active") return finish(refusal(403, `employee-${block.status}`, `the employee is ${block.status}; the mailbox is closed to reads`, "denied"), named, event);
+        const out = standing(block, "the mailbox is closed to reads");
+        if (out) return finish(out, named, event);
         return finish({ http_status: 200, body: { ok: true, status: "authorized", handle: block.handle, subject: block.subject, run_id: identified.run.runId, harness: identified.run.harness, mailbox_prefix: `mail/${block.handle}/`, operation: request.operation } }, named, event);
       } catch (error) {
         logFailure("internal error", error);

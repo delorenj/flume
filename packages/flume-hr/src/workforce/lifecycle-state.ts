@@ -104,5 +104,17 @@ export async function withLifecycleLock<T>(action: () => Promise<T>, env: NodeJS
   });
 }
 
-/** Every tombstone, keyed by subject. Empty when there is no state file. */
+/** Every tombstone, keyed by subject. Empty when there is no state file; THROWS when the file cannot be trusted (fail closed). */
 export const readTombstones = (env: NodeJS.ProcessEnv = process.env): Tombstone[] => Object.values(readLifecycleState(env).tombstones);
+
+/**
+ * The tombstone an identity collides with: one carrying its subject, or -- for any other subject -- its handle. A definition
+ * reverted to `active` (a `git checkout` of role.yaml) or hand-written with a fresh subject around a retired handle is still
+ * that retired person to the mailbox and the facade.
+ */
+export function tombstoneFor(tombstones: Tombstone[], block: { subject: string; handle: string }): { tombstone: Tombstone; by: "subject" | "handle" } | undefined {
+  const own = tombstones.find(tombstone => tombstone.subject === block.subject);
+  if (own) return { tombstone: own, by: "subject" };
+  const handle = tombstones.find(tombstone => tombstone.handle === block.handle);
+  return handle ? { tombstone: handle, by: "handle" } : undefined;
+}

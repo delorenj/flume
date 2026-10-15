@@ -21,7 +21,7 @@ import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
-import { appendLifecycleLedger, readTombstones, type Tombstone } from "./lifecycle-state";
+import { appendLifecycleLedger, readTombstones, tombstoneFor, type Tombstone } from "./lifecycle-state";
 import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, githubEvidence, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
 import { appendPlaneReceipt, isBoardArgument, planeBindingOf, planeBindingProblems, planeCredentialReport, planeEnrollmentPrerequisites, planeEvidence, verifyBoardViaPx, type PlaneBoardProof } from "./plane";
@@ -354,9 +354,11 @@ export async function setEmployeeStatus(employee: string, status: string, option
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
     if (target.block && target.block.status !== "retired" && status !== "retired") {
-      // The registry row may be gone and the block hand-edited back to active: the tombstone still answers.
-      const tombstone = readTombstones().find(t => t.subject === target.block!.subject);
-      if (tombstone) blockers.push({ code: "retired-terminal", detail: `subject ${tombstone.subject} was retired ${tombstone.retired_at}; it never returns to service` });
+      // The registry row may be gone and the block hand-edited back to active (or hand-written around a retired handle): the tombstone still answers.
+      const retired = tombstoneFor(readTombstones(), target.block);
+      if (retired) blockers.push(retired.by === "subject"
+        ? { code: "retired-terminal", detail: `subject ${retired.tombstone.subject} was retired ${retired.tombstone.retired_at}; it never returns to service` }
+        : { code: "handle-tombstoned", detail: `handle "${target.block.handle}" belonged to a retired employee (subject ${retired.tombstone.subject}, retired ${retired.tombstone.retired_at}); a retired handle never returns to service` });
     }
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider_revocation: "not_performed" as const, note: PROVIDER_REVOCATION_NOTE };
     if (blockers.length || !target.block) return { ok: false, changed: false, from: target.block?.status ?? null, to: status, identity: target.block, blockers, writes: [] as string[], ...base };
@@ -386,6 +388,9 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     const tombstones = readTombstones();
     const ownTombstone = target.block ? tombstones.find(t => t.subject === target.block!.subject) : undefined;
     if (ownTombstone && target.block && target.block.status !== "retired") blockers.push({ code: "subject-tombstoned", detail: `subject ${ownTombstone.subject} was retired ${ownTombstone.retired_at}; it never gains bindings` });
+    // A fresh subject hand-written around a retired handle would let the facade authorize reads of the retired mailbox.
+    const handleTombstone = target.block && !ownTombstone ? tombstones.find(t => t.handle === target.block!.handle) : undefined;
+    if (handleTombstone) blockers.push({ code: "handle-tombstoned", detail: `handle "${handleTombstone.handle}" belonged to a retired employee (subject ${handleTombstone.subject}, retired ${handleTombstone.retired_at}); it never gains bindings` });
     const requestedKey = `${provider}\u0000${binding.instance ?? ""}\u0000${binding.principal}`;
     for (const tombstone of tombstones) {
       if (tombstone.subject === target.block?.subject) continue;
@@ -627,8 +632,9 @@ export async function rotateEmployeeCredential(employee: string, provider: strin
     else if (!target.block) problem("not-enrolled", `${employee} has no company identity; enroll first`);
     else if (target.block.status === "retired") problem("retired-terminal", "a retired identity never rotates a credential");
     else {
-      const tombstone = readTombstones().find(t => t.subject === target.block!.subject);
-      if (tombstone) problem("subject-tombstoned", `subject ${tombstone.subject} was retired ${tombstone.retired_at}; it never rotates a credential`);
+      const retired = tombstoneFor(readTombstones(), target.block);
+      if (retired?.by === "subject") problem("subject-tombstoned", `subject ${retired.tombstone.subject} was retired ${retired.tombstone.retired_at}; it never rotates a credential`);
+      else if (retired) problem("handle-tombstoned", `handle "${retired.tombstone.handle}" belonged to a retired employee (subject ${retired.tombstone.subject}); it never rotates a credential`);
     }
     const existing = target.block?.bindings?.[provider];
     if (target.block && target.block.status !== "retired" && !blockers.length && !existing) problem("no-provider-binding", `${employee} has no ${provider} binding to rotate`);

@@ -123,8 +123,8 @@ export function accessReceipts(options: ReceiptsOptions) {
   // -- gateway attribution: the FLUME-39 evidence, never a generated config ---------------------------------------
   const link = gatewayLink(env);
   const consumer = target ? gatewayConsumerOf(census, target, env) : undefined;
-  const gateway: Line = { ...link, consumer: consumer?.consumer ?? null, attribution: link.evidence_status === "present" ? "linked" : "unverified" };
-  if (options.gatewayProof) gateway.proof = gatewayProof(options.gatewayProof, consumer?.consumer);
+  const gateway: Line = { ...link, consumer: consumer?.consumer ?? null, ...(consumer?.shared ? { shared_consumer: true } : {}), attribution: link.evidence_status === "present" ? "linked" : "unverified" };
+  if (options.gatewayProof) gateway.proof = gatewayProof(options.gatewayProof, consumer?.consumer, consumer?.shared ?? false);
 
   return {
     ok: true, blockers, employee: employee ?? null, subject: subject ?? null, handle: handle ?? null,
@@ -133,8 +133,11 @@ export function accessReceipts(options: ReceiptsOptions) {
   };
 }
 
-/** `verified` only for `verified: true` AND every receipt's token_name starting `aai:<consumer>:`; anything else is named. */
-function gatewayProof(path: string, consumer: string | undefined): Line {
+/**
+ * `verified` only for `verified: true` AND every receipt's token_name starting `aai:<consumer>:` of a consumer that is the
+ * employee's ALONE: a shared consumer's tokens (the fleet base key) say nothing about which employee spent them.
+ */
+function gatewayProof(path: string, consumer: string | undefined, shared: boolean): Line {
   const base = { path };
   try {
     const info = lstatSync(path);
@@ -143,6 +146,7 @@ function gatewayProof(path: string, consumer: string | undefined): Line {
     const receipts = Array.isArray(parsed.receipts) ? parsed.receipts as Line[] : [];
     const shown = receipts.map(receipt => pick(receipt, ["token_name", "request_id", "session_id", "created_at"] as const));
     if (!consumer) return { ...base, status: "unverified", reason: "no-consumer", receipts: shown };
+    if (shared) return { ...base, status: "unverified", reason: "shared-consumer", consumer, receipts: shown };
     if (parsed.verified !== true) return { ...base, status: "unverified", reason: "proof-not-verified", proof_status: typeof parsed.status === "string" ? parsed.status : null, consumer, receipts: shown };
     if (!receipts.length) return { ...base, status: "unverified", reason: "no-receipts", consumer, receipts: shown };
     const prefix = `aai:${consumer}:`;

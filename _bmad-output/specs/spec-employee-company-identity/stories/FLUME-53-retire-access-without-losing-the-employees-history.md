@@ -510,3 +510,28 @@ The unverified risk is the new-episode reset in `suspendOrRetire` assess. It dro
 - Two pre-existing commands do not consult tombstones: `adopt-actor` and `provision`. Only a hand-edited definition would reach them.
 - `provision.ts` `planMailbox` still lists routing rules unpaged. This is pre-existing and not in this story's diff.
 - Suspension bounces inbound mail to the address until restore. This is documented.
+
+### 2026-10-15 — Independent adversarial review fixes (verdict was BLOCKING)
+
+Status: done (fixture build). AC5 is still the supervisor's live canary and has not been run. No live provider, `~/.hermes`,
+`~/.config/flume`, `flume-access.service` or agents-facade was touched.
+
+All eight findings fixed, each strengthening (never loosening) the AC it touches:
+1. **Gateway inheritance (AC2).** The gateway row resolves the reference the desk runs with: delta, then generated `config.yaml`, then the fleet base. An inherited or shared key is `shared_consumer: true`, `static-usable` (retire: `manual-action-required`), never `not-issued`, and `--revoke gateway`/`--revoke all` stays the blocker `shared-consumer`. A specialist with no FLUME-39 desk reference reports the launcher's `hermes-<e>` reference `unverified` (`gateway-ref-shape`). A shared consumer's gateway proof is `unverified`.
+2. **Rotated-away credentials (AC2).** Each `identity.rotate` previous ref is a `previous-credential-reference` row, `manual-action-required` until a probe of that exact ref reads back a rejection (px `credential_rejected`, `GET /app` 401, or the Access token absent from the complete listing).
+3. **No episode reset (AC2).** Records and captures are dropped only by restore. Irreversible steps (Access delete, gateway revoke) are scoped to the live resources they acted on (`data.resources`, checked by `priorDone`): a re-minted token is revoked again, a done DELETE never repeats, an unreadable provider keeps the record.
+4. **Tombstones at the facade and launcher.** `identify()`/`standing()` and `employeeAccessEnv` refuse `employee-retired` by subject OR handle, failing closed (503 `lifecycle-state-unavailable`, launch refused) when tombstones are unreadable. Bind, status, rotate, suspend and restore also check the handle (`handle-tombstoned`).
+5. **GitHub ownership.** `github_suspend:<inst>` is captured before the PUT; a retry over a suspended installation with the capture is `done`; restore un-suspends on a `done` record or the capture.
+6. **Deleted App key.** Documented. An apply that reads the installation 404 remembers it (`github_installation_absent:<id>`), so `revocation COMPLETE` is reachable when the App is uninstalled before the key is deleted.
+7. **Paging.** One `listAll`: `total_pages` when stated, else until a page shorter than the served `per_page`, or empty. A repeated page or over 100 pages is `listing-incomplete`, never absence.
+8. **Queue race.** The facade re-reads the employee's standing inside the single-flight queue before issuing.
+
+Tests (`company-identity-lifecycle` 30 → 38 scenarios; `employee-access-lifecycle` 6 → 8):
+- The vacuous assertions are now real: the state-dir tree is compared; app JWTs are scanned in every state and ledger file; the planted `CLIENT_SECRET` (Cloudflare listing), PAT (Pilot's answer) and gateway key are shown to reach the CLI's inputs; the run-count regex is exact; and the retry asserts exactly `already-done` with the first `operation_id`.
+- New scenarios: out-of-band `status active` then suspend and restore; out-of-band `status suspended` after a re-mint, then `retire --revoke all`; a SIGKILL between the status write and the first persist; a PUT committed behind a 5xx; a read-back 500; rotated refs (`COMPLETE` only after the old PAT is rejected); a deleted App key with and without the remembered 404; clamped paging with and without `result_info`; a symlinked or unreadable definition; base, generated and specialist gateway refs; a reverted retired definition and a fresh subject around a retired handle at the facade, mail and launcher; unreadable tombstones; a queued request behind a held GitHub mint.
+- Run against the pre-fix source in a throwaway worktree, every fix-targeted scenario failed for its finding's reason.
+- Mutation checks, each restored byte-identical afterwards: removing the done-step guard fails `company-identity-lifecycle` (the tightened retry section fails on its own too); removing the facade mail status check fails `employee-access-lifecycle`; removing the static-key `revoked` rule fails `company-identity-lifecycle`.
+
+Verification: `git diff --check` is clean; `node scripts/run-tests.mjs named-agent role-contract registry-comments company-identity employee-access employee-access-lifecycle company-identity-lifecycle identity-provision` passed 14/14 after typecheck and build; `employee_lifecycle_canary` is still `unproven`. The canary procedure now expects the rotated-away key's own row, and notes that `--revoke all` is refused on a desk that inherits the base key.
+
+Behavior change to flag: `retire --revoke all` is now refused `shared-consumer` on every desk without its own FLUME-39 key (10 live desks inherit the base). Name `--revoke cloudflare_access --revoke github` there until FLUME-39 mints dedicated tokens.

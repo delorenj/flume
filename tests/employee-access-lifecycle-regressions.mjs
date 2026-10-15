@@ -14,7 +14,7 @@ import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { addSetSkills, createSet } from "@delorenj/skillex";
-import { fakeCloudflare, writeFakeGateway, writeFakeOp } from "./lifecycle-fixtures.mjs";
+import { fakeCloudflare, fakeGithub, rsa, writeFakeGateway, writeFakeOp } from "./lifecycle-fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages/flume-hr/dist/index.js");
@@ -34,7 +34,10 @@ const SIGNING_REF = "op://DeLoSecrets/flume-launcher/signing-key";
 const HERMES_REF = "op://DeLoSecrets/hermes-ada/credential";
 const ACCOUNT = "a".repeat(32), ZONE = "b".repeat(32), KVNS = "c".repeat(32);
 const MAIL_CODE = "mail-body-one-time-code-424242";
-const secrets = new Set([VAULT, GATEWAY, CF_TOKEN, MAIL_CODE, ...Object.values(SECRET)]);
+// bob's own GitHub App: its token mint is what a queued request waits behind (FLUME-53 review #8).
+const BOB_GITHUB_REF = `op://DeLoSecrets/${"bobgithub".padEnd(26, "0")}/privatekeyfield`;
+const bobApp = rsa();
+const secrets = new Set([VAULT, GATEWAY, CF_TOKEN, MAIL_CODE, bobApp.privateKey.split("\n")[1], ...Object.values(SECRET)]);
 
 const launcher = generateKeyPairSync("ed25519");
 const launcherPrivate = launcher.privateKey.export({ type: "pkcs8", format: "pem" });
@@ -160,11 +163,12 @@ fs.writeFileSync(process.env.PLAIN_RECEIPT, JSON.stringify({ creds: { id: proces
 
 const edge = await fakeEdge();
 const cf = await fakeCloudflare({ account: ACCOUNT, zone: ZONE, kvns: KVNS, token: CF_TOKEN, issuer: ISSUER_CF });
+const gh = await fakeGithub([{ id: "3001", slug: "bob-app", installation: "3002", publicKey: bobApp.publicKey }]);
 const worker = await fakeWorker(cf.url);
 edge.origin = worker.url;
 const issuer = edge.url;
 writeFileSync(join(dir, "op.json"), JSON.stringify({
-  [SIGNING_REF]: launcherPrivate, [HERMES_REF]: GATEWAY, [TOKEN_REF]: CF_TOKEN,
+  [SIGNING_REF]: launcherPrivate, [HERMES_REF]: GATEWAY, [TOKEN_REF]: CF_TOKEN, [BOB_GITHUB_REF]: bobApp.privateKey,
   "op://DeLoSecrets/ada-access/credential": SECRET.ada, "op://DeLoSecrets/bob-access/credential": SECRET.bob,
 }));
 const provisioning = join(dir, "identity-provisioning.yaml");
@@ -175,6 +179,7 @@ const baseEnv = {
   XDG_STATE_HOME: join(home, ".local/state"), PJ_SKILLS_REGISTRY_ROOT: catalog, PYTHONDONTWRITEBYTECODE: "1",
   PATH: `${bin}:${process.env.PATH}`, FLUME_ACCESS_CONFIG: configPath, FLUME_ACCESS_STATE: state, FLUME_IDENTITY_STATE: idState,
   FLUME_PROVISION_CONFIG: provisioning, FLUME_CLOUDFLARE_API_BASE: cf.url, FLUME_GATEWAY_TOKENS_BIN: join(bin, "gateway-tokens.py"), FLUME_GATEWAY_EVIDENCE: join(dir, "no-flume-39-evidence"),
+  FLUME_GITHUB_API_BASE: gh.url, FLUME_GITHUB_TIMEOUT_MS: "10000",
   GW_STATE: join(dir, "gw-state.json"), GW_LOG: join(dir, "gw-log.jsonl"), FLUME_PX_BIN: join(dir, "no-such-px"),
   OP_SERVICE_ACCOUNT_TOKEN: VAULT, OP_FIXTURE: join(dir, "op.json"), FIXTURE_CLI: cli, LAUNCH_RECEIPT: join(dir, "launch.json"), PLAIN_RECEIPT: join(dir, "plain.json"),
   CLOUDFLARE_API_TOKEN: "",
@@ -212,14 +217,17 @@ writeFileSync(bobRole, "repo: bob-pm\nrole: pm\nagent_id: bob-pm\nprofile: bob-p
 const subject = {};
 for (const [name, id] of [["ada", "ada"], ["bob", "bob-pm"]]) subject[name] = json(run(["identity", "enroll", id, "--apply", "--json"])).identity.subject;
 setBinding(adaDesk, binding("ada"));
-setBinding(bobRole, binding("bob"));
+setBinding(bobRole, { ...binding("bob"), github: { principal: "3001", instance: "3002", credential_ref: BOB_GITHUB_REF, attribution_mode: "native" } });
 json(run(["onboard", "--employee", "ada", "--json"]));
 assert.ok(json(run(["audit", "--employee", "ada", "--json"])).ok);
 
 const writeConfig = () => writeFileSync(configPath, YAML.stringify({
   version: 1, url: edge.url, listen: { host: "127.0.0.1", port: 0 }, cloudflare_access: { issuer, audience: AUD },
   launcher: { signing_key_ref: SIGNING_REF, public_key: launcherPublic },
-  grants: [{ subject: subject.ada, service: "fixture", resource: "repo:alpha", permissions: ["read"], max_lifetime_seconds: 3600 }],
+  grants: [
+    { subject: subject.ada, service: "fixture", resource: "repo:alpha", permissions: ["read"], max_lifetime_seconds: 3600 },
+    { subject: subject.bob, service: "github", resource: "o/sandbox", permissions: ["issues:write"], max_lifetime_seconds: 3600 },
+  ],
 }));
 writeConfig();
 
@@ -261,6 +269,9 @@ const direct = async (clientId, payload, runAssertion, path = "/v1/mail/authoriz
 /** Through the edge and the Worker double, as a launched employee process would. */
 const viaEdge = (name, path, payload, runAssertion) => post(edge.url, path, { "cf-access-client-id": CLIENT[name], "cf-access-client-secret": SECRET[name], ...(runAssertion ? { "x-flume-run-assertion": runAssertion } : {}) }, payload);
 const accessBody = (id) => ({ version: 1, request_id: id, service: "fixture", resource: "repo:alpha", permissions: ["read"] });
+const fixtureGrants = () => (existsSync(join(state, "fixture-ledger.jsonl")) ? readFileSync(join(state, "fixture-ledger.jsonl"), "utf8").split("\n").filter(Boolean).length : 0);
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+const until = async (check, ms = 20000) => { const end = Date.now() + ms; while (!check()) { if (Date.now() > end) throw new Error("timed out waiting for the condition"); await sleep(25); } };
 
 try {
   const adaRun = await runJwt({ sub: subject.ada }), bobRun = await runJwt({ sub: subject.bob });
@@ -345,6 +356,10 @@ try {
     const suspended = json(await runAsync(["identity", "suspend", "ada", "--apply", "--json"]));
     assert.equal(suspended.ok, true, JSON.stringify(suspended));
     assert.equal(suspended.complete_revocation, false);
+    // ada is a portable specialist whose desk maps no FLUME-39 reference: the launcher's own reference is what runs, and it
+    // can be neither named nor revoked, so the row is unverified (never not-issued).
+    const gatewayRow = suspended.credentials.find((r) => r.provider === "gateway");
+    assert.deepEqual([gatewayRow.status, gatewayRow.provider_code, gatewayRow.ref, gatewayRow.ref_source], ["unverified", "gateway-ref-shape", HERMES_REF, "launcher"], JSON.stringify(gatewayRow));
     assert.equal(cf.kv.has("allowlist/ada@agents.delo.sh"), false);
     const grantsBefore = readFileSync(join(state, "fixture-ledger.jsonl"), "utf8").split("\n").filter(Boolean).length;
     const accessAfter = await viaEdge("ada", "/v1/access/requests", accessBody("ac1-after"), adaRun);
@@ -434,8 +449,9 @@ try {
     // The FLUME-39 evidence branch: an existing evidence path links the attribution.
     const present = json(await runAsync(["access", "receipts", "--employee", "ada", "--json"], { FLUME_GATEWAY_EVIDENCE: dir }));
     assert.equal(present.gateway.evidence_status, "present"); assert.equal(present.gateway.attribution, "linked");
-    const human = await runAsync(["access", "receipts", "--employee", "ada"]);
-    assert.match(human.stdout, /2 run\(s\)|run\(s\)/u);
+    const human = await runAsync(["access", "receipts", "--employee", "ada", "--since", sinceMark]);
+    const escaped = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    assert.match(human.stdout, new RegExp(`^ada: subject ${escaped(subject.ada)}, 2 run\\(s\\), ${recent.operations.length} lifecycle operation\\(s\\), ${recent.rows.length} record\\(s\\)$`, "mu"), human.stdout);
 
     // gateway proof: verified only when verified:true and every token_name is the employee's own consumer
     const base = { status: "ok", receipts: [{ token_name: "aai:ada:1700000001", request_id: "r1", session_id: "s1", created_at: "2026-10-14T00:00:00Z" }] };
@@ -457,6 +473,80 @@ try {
     pass("access receipts joins a hermes run, a plain run, grants, mail authorizations, denials and the lifecycle operation by subject, run_id and operation_id; --run windows; the gateway link is unverified and a proof matches only the employee's own consumer");
   }
 
+  // -- 5b. a request queued behind a slow mint is re-checked INSIDE the queue -----------------------------------------------
+  {
+    // bob's GitHub mint enters the facade's single-flight queue and waits on GitHub; ada's request passes the status check and
+    // queues behind it; ada is suspended meanwhile. The queued request must be refused, not granted on the stale check.
+    gh.mode.installationGet = "hold";
+    const slow = viaEdge("bob", "/v1/access/requests", { version: 1, request_id: "bob-slow-github", service: "github", resource: "o/sandbox", permissions: ["issues:write"] }, bobRun);
+    await until(() => gh.held.length > 0);
+    const grantsBefore = fixtureGrants();
+    const queued = viaEdge("ada", "/v1/access/requests", accessBody("ada-queued-behind-mint"), adaRun);
+    await sleep(1500);
+    const suspended = json(await runAsync(["identity", "suspend", "ada", "--apply", "--json"]));
+    assert.equal(suspended.ok, true, JSON.stringify(suspended.steps));
+    gh.release(404);
+    const [slowResult, queuedResult] = await Promise.all([slow, queued]);
+    assert.equal(slowResult.status, 403, JSON.stringify(slowResult.body)); assert.equal(slowResult.body.code, "installation-mismatch");
+    assert.equal(queuedResult.status, 403, `the queued request was issued after the suspend: ${JSON.stringify(queuedResult.body)}`);
+    assert.equal(queuedResult.body.code, "employee-suspended");
+    assert.equal(fixtureGrants(), grantsBefore, "a grant was written for a request that waited out the suspension");
+    assert.ok(audit().some((l) => l.request_id === "ada-queued-behind-mint" && l.outcome === "employee-suspended"));
+    json(await runAsync(["identity", "restore", "ada", "--apply", "--json"]));
+    pass("a request that passed the status check and then waited behind a slow GitHub mint is re-checked inside the queue and refused after a suspend");
+  }
+
+  // -- 5c. tombstones at the facade and the launcher ------------------------------------------------------------------------
+  {
+    // Retire bob WITHOUT --revoke: Access still authenticates the client. Then a `git checkout` of role.yaml reverts the status.
+    const retired = json(await runAsync(["identity", "retire", "bob-pm", "--apply", "--json"]));
+    assert.equal(retired.ok, true, JSON.stringify(retired.steps));
+    const reverted = YAML.parseDocument(readFileSync(bobRole, "utf8"));
+    assert.equal(reverted.getIn(["company_identity", "status"]), "retired");
+    reverted.setIn(["company_identity", "status"], "active");
+    writeFileSync(bobRole, String(reverted));
+    const grantsBefore = fixtureGrants(), readsBefore = worker.storageReads;
+    const access = await viaEdge("bob", "/v1/access/requests", accessBody("bob-reverted"), bobRun);
+    assert.equal(access.status, 403, JSON.stringify(access.body)); assert.equal(access.body.code, "employee-retired"); assert.match(access.body.detail, /subject tombstone/u); assert.equal(access.body.credential, undefined);
+    const authorize = await direct(CLIENT.bob, { operation: "list" }, bobRun);
+    assert.equal(authorize.status, 403, "mail authorize answered a retired employee whose definition was reverted"); assert.equal(authorize.body.code, "employee-retired");
+    const throughWorker = await viaEdge("bob", "/v1/mail/messages", { operation: "list" }, bobRun);
+    assert.equal(throughWorker.status, 403); assert.equal(throughWorker.body.code, "employee-retired");
+    const launch = await runAsync(["access", "run", "bob-pm", "--", process.execPath, "-e", "0"]);
+    assert.notEqual(launch.status, 0); assert.match(launch.stderr, /Launch refused: bob-pm is retired \(subject tombstone/u);
+
+    // A FRESH subject hand-written around the retired handle is still the retired mailbox.
+    const freshSubject = randomUUID();
+    reverted.setIn(["company_identity", "subject"], freshSubject);
+    writeFileSync(bobRole, String(reverted));
+    const freshRun = await runJwt({ sub: freshSubject });
+    const freshAccess = await viaEdge("bob", "/v1/access/requests", accessBody("bob-fresh-subject"), freshRun);
+    assert.equal(freshAccess.status, 403, JSON.stringify(freshAccess.body)); assert.equal(freshAccess.body.code, "employee-retired"); assert.match(freshAccess.body.detail, /handle tombstone/u);
+    const freshMail = await direct(CLIENT.bob, { operation: "list" }, freshRun);
+    assert.equal(freshMail.status, 403); assert.equal(freshMail.body.code, "employee-retired");
+    const freshLaunch = await runAsync(["access", "run", "bob-pm", "--", process.execPath, "-e", "0"]);
+    assert.match(freshLaunch.stderr, /Launch refused: bob-pm is retired \(handle tombstone/u);
+    const bind = json(await runAsync(["identity", "bind", "bob-pm", "plane", "--principal", "6c1b1a52-8f3e-4c55-9d7e-0f1e2d3c4b5a", "--instance", "https://plane.delo.sh/33god", "--credential-ref", `op://DeLoSecrets/${"bobplane".padEnd(26, "0")}/planefield`, "--json"]), 1);
+    assert.ok(bind.blockers.some((b) => b.code === "handle-tombstoned"), JSON.stringify(bind.blockers));
+    assert.equal(fixtureGrants(), grantsBefore, "a tombstoned identity was granted access");
+    assert.equal(worker.storageReads, readsBefore, "the Worker read a tombstoned mailbox");
+
+    // Tombstones that cannot be read fail CLOSED, for an employee in good standing too.
+    const statePath = join(idState, "lifecycle-state.json"), saved = readFileSync(statePath);
+    writeFileSync(statePath, "{ not json");
+    try {
+      const blindMail = await direct(CLIENT.ada, { operation: "list" }, adaRun);
+      assert.equal(blindMail.status, 503, JSON.stringify(blindMail.body)); assert.equal(blindMail.body.code, "lifecycle-state-unavailable");
+      const blindAccess = await viaEdge("ada", "/v1/access/requests", accessBody("ada-blind"), adaRun);
+      assert.equal(blindAccess.status, 503); assert.equal(blindAccess.body.code, "lifecycle-state-unavailable"); assert.equal(blindAccess.body.credential, undefined);
+      const blindLaunch = await runAsync(["access", "run", "ada", "--", process.execPath, "-e", "0"]);
+      assert.notEqual(blindLaunch.status, 0); assert.match(blindLaunch.stderr, /Launch refused: the retirement tombstones cannot be read/u);
+      assert.equal(fixtureGrants(), grantsBefore);
+    } finally { writeFileSync(statePath, saved); }
+    assert.equal((await direct(CLIENT.ada, { operation: "list" }, adaRun)).status, 200, "ada is authorized again once the tombstones are readable");
+    pass("the facade and the launcher refuse employee-retired when the subject OR handle is tombstoned (a reverted retired definition, a fresh subject around a retired handle), bind refuses the retired handle, and unreadable tombstones fail closed");
+  }
+
   // -- 6. secrets ---------------------------------------------------------------------------------------------------------
   {
     const files = [];
@@ -475,6 +565,6 @@ try {
   }
 } finally {
   for (const out of facadeOutputs) out.child.kill("SIGTERM");
-  await edge.close(); await worker.close(); await cf.close();
+  await edge.close(); await worker.close(); await cf.close(); await gh.close();
 }
 console.log(`\n${count} facade, mail and receipts scenarios passed`);

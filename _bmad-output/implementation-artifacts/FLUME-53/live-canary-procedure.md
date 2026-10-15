@@ -117,7 +117,7 @@ flume access github-inspect --employee rere-pm
 flume identity continuity rere-pm --json                                                                           # github.credential_ref rotated, everything else stable
 ```
 
-Delete the old key in the GitHub App settings by hand (the old ref is reported `manual-action-required`), then `flume identity credentials rere-pm` must show the old probe unaffected and the new key `static-usable`.
+Delete the old key in the GitHub App settings by hand (the old ref is reported `manual-action-required`), then `flume identity credentials rere-pm` must show the old ref's `previous-credential-reference` row `revoked` (`read_back: rejected`, GitHub's 401 to that exact key) and the new key `static-usable`.
 No spare credential: record "rotation not canaried: no spare credential" and do not claim it.
 
 ## 6. Retire (disposable employee only)
@@ -130,10 +130,14 @@ flume identity provision <disposable> --apply                 # Access service t
 flume identity bind <disposable> github --principal <throwaway-app-id> --instance <throwaway-installation-id> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
 flume identity bind <disposable> plane --principal <throwaway-plane-user-uuid> --instance https://<host>/<workspace> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
 flume identity credentials <disposable> --json                # every row except gateway must be a real provider row, not not-issued
-flume identity retire <disposable> --revoke all --apply --json
+flume identity retire <disposable> --revoke all --apply --json   # refused `shared-consumer` if the desk only inherits the fleet base key: then run
+                                                                 #   --revoke cloudflare_access --revoke github instead; the gateway row stays shared_consumer manual-action-required
 flume offboard <disposable> --apply
 flume identity enroll <another-post> --handle <disposable-handle>          # must answer handle-tombstoned
 ```
+
+To see `revocation COMPLETE` for a GitHub-bound disposable, uninstall its App BEFORE the retire (the retire records GitHub's 404),
+then delete the App key: after the key is gone GitHub answers 401 to the installation read, and only that recorded 404 still speaks.
 
 Skip, and record "retire not canaried: no disposable employee", if none exists.
 

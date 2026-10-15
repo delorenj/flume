@@ -6,9 +6,12 @@
 //   * Local status is written FIRST on suspend/retire and LAST on restore. The facade reads status on every request, so a
 //     crash or a provider outage in between fails closed: the employee is denied, never half-restored.
 //   * Each provider-mutating step has a resource-scoped key (`cloudflare_access:token-delete:<client_id>`). A step recorded
-//     `done` or `converged` is never executed again, by this operation or a later one in the same suspension episode; it is
-//     reported `already-done` with its original `operation_id`. An `unresolved` step is simply tried again next run. A 404
-//     on a DELETE, an already-suspended installation or `revoked 0 tokens` is `converged`, not a failure.
+//     `done` or `converged` is never executed again, by this operation or a later one; it is reported `already-done` with
+//     its original `operation_id`. Only restore clears a record (of the steps it reverses), and only restore drops a
+//     capture. An irreversible step (an Access token delete, a gateway revoke) is further scoped to the LIVE resources it
+//     acted on: a token minted since is new work, a token already deleted is never deleted twice. An `unresolved` step is
+//     simply tried again next run. A 404 on a DELETE, an already-suspended installation or `revoked 0 tokens` is
+//     `converged`, not a failure.
 //   * The result never says "complete" while a static credential is usable or unverified: `complete_revocation` is true only
 //     when every row is `revoked` or `not-issued`, and the text output says `revocation INCOMPLETE` otherwise.
 //
@@ -22,7 +25,7 @@ import {
   type AdapterName, type CredentialRow, type EmploymentStatus, type LifecycleAdapter, type LifecycleContext, type PlannedStep, type StepOutcome,
 } from "./lifecycle-adapters";
 import {
-  appendLifecycleLedger, lifecycleLedgerPath, lifecycleStatePath, readLifecycleState, withLifecycleLock, writeLifecycleState,
+  appendLifecycleLedger, lifecycleLedgerPath, lifecycleStatePath, readLifecycleState, tombstoneFor, withLifecycleLock, writeLifecycleState,
   type ContinuityBaseline, type LifecycleState, type StepRecord, type Tombstone,
 } from "./lifecycle-state";
 import { readPlaneReceipts } from "./plane";
@@ -142,6 +145,33 @@ function summarize(reports: StepReport[]) {
   };
 }
 
+/**
+ * Is this step already done? Its record must say `done` or `converged`, and a step scoped to live provider resources must
+ * find nothing at the provider NOW that the record did not already act on. A token minted since (a FLUME-39 re-mint) makes
+ * the step new work; a provider that cannot be read keeps the record, so a done DELETE is never repeated on a guess.
+ */
+async function priorDone(step: PlannedStep, ctx: LifecycleContext): Promise<{ done: true; record: StepRecord } | { done: false; fresh?: string[]; record?: StepRecord }> {
+  const record = ctx.steps[step.key];
+  if (!record || !DONE.has(record.status)) return { done: false };
+  if (!step.live) return { done: true, record };
+  let live: string[] | null;
+  try { live = await step.live(ctx); } catch { live = null; }
+  if (live === null) return { done: true, record };
+  const acted = Array.isArray(record.data?.resources) ? (record.data!.resources as unknown[]).map(String) : [];
+  const fresh = live.filter(id => !acted.includes(id));
+  return fresh.length ? { done: false, fresh, record } : { done: true, record };
+}
+
+/** A non-retired definition carrying a retired subject or handle: a hand-copy, a hand-edit or a reverted checkout. */
+function tombstoneBlocker(state: LifecycleState, block: CompanyIdentity | null): IdentityBlocker | undefined {
+  if (!block || block.status === "retired") return undefined;
+  const retired = tombstoneFor(Object.values(state.tombstones), block);
+  if (!retired) return undefined;
+  return retired.by === "subject"
+    ? { code: "retired-terminal", detail: `subject ${block.subject} was retired ${retired.tombstone.retired_at}; it never returns to service` }
+    : { code: "handle-tombstoned", detail: `handle "${block.handle}" belonged to a retired employee (subject ${retired.tombstone.subject}, retired ${retired.tombstone.retired_at}); it never returns to service` };
+}
+
 // ---------------------------------------------------------------------------
 // suspend / retire
 // ---------------------------------------------------------------------------
@@ -158,15 +188,15 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const prepared = prepare(employee);
     const blockers = [...revokeBlockers, ...prepared.blockers];
     if (prepared.block?.status === "retired" && command === "suspend") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone; it cannot be suspended" });
-    // A definition carrying a retired subject without being retired is a hand-copy (or a hand-edit): refused before anything is written.
-    if (prepared.block && prepared.block.status !== "retired" && state.tombstones[prepared.block.subject]) blockers.push({ code: "retired-terminal", detail: `subject ${prepared.block.subject} was retired ${state.tombstones[prepared.block.subject]!.retired_at}; it never returns to service` });
+    // A definition carrying a retired subject or handle without being retired is refused before anything is written.
+    const tombstoned = tombstoneBlocker(state, prepared.block);
+    if (tombstoned) blockers.push(tombstoned);
     let ctx: LifecycleContext | undefined;
     if (prepared.block) {
+      // No episode reset: records and captures persist until restore reverses them. An out-of-band status change
+      // (`flume identity status`) therefore can neither lose a capture restore needs nor hide a re-minted token, which
+      // the irreversible steps' live-resource scope (`priorDone`) catches instead.
       ctx = contextOf(employee, prepared, state, env);
-      // An active employee starts a NEW episode. Records of steps restore cannot reverse (an Access token, a gateway token) or
-      // left by an out-of-band reactivation must not make the next suspension report already-done. Suspended -> retired and
-      // retries keep theirs.
-      if (prepared.block.status === "active") { for (const key of Object.keys(ctx.steps)) delete ctx.steps[key]; for (const key of Object.keys(ctx.captures)) delete ctx.captures[key]; }
       for (const name of revoke) blockers.push(...adapters[name].blockers(ctx, { command, revoke: true }));
     }
     return { prepared, blockers, ctx };
@@ -188,8 +218,9 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const reports: StepReport[] = [{ ...localStep(employee, to), detail: ctx.block.status === to ? `already ${to}` : `${ctx.block.status} -> ${to}` }];
     if (command === "retire") reports.push({ key: "tombstone", adapter: "local", action: "tombstone", resource: ctx.block.subject, outcome: "planned" });
     for (const step of planOf(ctx)) {
-      const prior = ctx.steps[step.key];
-      reports.push(prior && DONE.has(prior.status) ? stepReport(step, "already-done", { operation_id: prior.operation_id, detail: step.description }) : stepReport(step, "planned", { detail: step.description }));
+      const prior = await priorDone(step, ctx);
+      reports.push(prior.done ? stepReport(step, "already-done", { operation_id: prior.record.operation_id, detail: step.description })
+        : stepReport(step, "planned", { detail: prior.fresh ? `${step.description}; new since operation ${prior.record!.operation_id}: ${prior.fresh.join(", ")}` : step.description }));
     }
     // The preview shows what is usable NOW: status is still the old one.
     const rows = await inventoryAll(ctx, adapters);
@@ -207,6 +238,7 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const writes = new Set<string>();
     const persist = () => { writes.add(writeLifecycleState(state, env)); };
     const ledger = (line: Record<string, unknown>) => { writes.add(appendLifecycleLedger({ ...who, ...line }, env)); };
+    ctx.remember = (name, value) => { ctx.captures[name] = value; persist(); };
     const reports: StepReport[] = [];
     ledger({ event: "lifecycle.operation", phase: "started", revoke, from: block.status, to });
 
@@ -236,17 +268,18 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     }
 
     // 3. Provider steps: the allowlist/routing first, then only the adapters named, in the fixed order.
-    const hooks = { capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
+    const hooks = { operation_id: operationId, capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
     for (const step of planOf(ctx)) {
-      const prior = ctx.steps[step.key];
-      if (prior && DONE.has(prior.status)) {
-        reports.push(stepReport(step, "already-done", { operation_id: prior.operation_id, detail: `${prior.status} by operation ${prior.operation_id}` }));
-        ledger({ event: "lifecycle.step", step: step.key, outcome: "already-done", original_operation_id: prior.operation_id });
+      const prior = await priorDone(step, ctx);
+      if (prior.done) {
+        reports.push(stepReport(step, "already-done", { operation_id: prior.record.operation_id, detail: `${prior.record.status} by operation ${prior.record.operation_id}` }));
+        ledger({ event: "lifecycle.step", step: step.key, outcome: "already-done", original_operation_id: prior.record.operation_id });
         continue;
       }
       let outcome: StepOutcome;
       try { outcome = await step.run(ctx, hooks); }
       catch (error) { outcome = { result: "unresolved", provider_code: "internal-error", detail: firstLine(error) }; }
+      if (prior.fresh) outcome = { ...outcome, detail: `${outcome.detail ? `${outcome.detail}; ` : ""}new since operation ${prior.record!.operation_id}: ${prior.fresh.join(", ")}` };
       const record: StepRecord = { status: outcome.result, operation_id: operationId, at: new Date().toISOString(), ...(outcome.provider_code ? { provider_code: outcome.provider_code } : {}), ...(outcome.data ? { data: outcome.data } : {}) };
       ctx.steps[step.key] = record;
       persist();
@@ -278,7 +311,9 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const prepared = prepare(employee);
     const blockers = [...prepared.blockers];
     if (prepared.block) {
-      if (prepared.block.status === "retired" || state.tombstones[prepared.block.subject]) blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
+      const tombstoned = tombstoneBlocker(state, prepared.block);
+      if (prepared.block.status === "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
+      else if (tombstoned) blockers.push(tombstoned);
       else if (prepared.block.status === "active") blockers.push({ code: "not-suspended", detail: `${employee} is active; restore returns a suspended employee to service` });
     }
     return { prepared, blockers, ctx: prepared.block ? contextOf(employee, prepared, state, env) : undefined };
@@ -310,17 +345,19 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const writes = new Set<string>();
     const persist = () => { writes.add(writeLifecycleState(state, env)); };
     const ledger = (line: Record<string, unknown>) => { writes.add(appendLifecycleLedger({ ...who, ...line }, env)); };
+    ctx.remember = (name, value) => { ctx.captures[name] = value; persist(); };
     const reports: StepReport[] = [];
     ledger({ event: "lifecycle.operation", phase: "started", from: block.status, to: "active" });
-    const hooks = { capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
+    const hooks = { operation_id: operationId, capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
     for (const step of planOf(ctx)) {
       let outcome: StepOutcome;
       try { outcome = await step.run(ctx, hooks); }
       catch (error) { outcome = { result: "unresolved", provider_code: "internal-error", detail: firstLine(error) }; }
       if (outcome.result !== "unresolved") {
-        // Reversed: the suspension step is no longer done, so a later suspend runs it again.
+        // Reversed: the suspension step is no longer done (a later suspend runs it again), and what it captured is consumed.
+        // This is the ONLY place a step record or a capture is ever dropped.
         if (step.reverses) delete ctx.steps[step.reverses];
-        if (step.adapter === "mail") delete ctx.captures.mail_allowlist;
+        for (const name of step.releases ?? []) delete ctx.captures[name];
         persist();
       }
       reports.push(stepReport(step, outcome.result, { operation_id: operationId, ...(outcome.provider_code ? { provider_code: outcome.provider_code } : {}), ...(outcome.detail ? { detail: outcome.detail } : {}) }));
@@ -478,7 +515,7 @@ export function formatLifecycleResult(result: Record<string, any>): string {
   for (const step of result.steps ?? []) lines.push(`  ${String(step.outcome).padEnd(12)} ${step.key}${step.provider_code ? ` [${step.provider_code}]` : ""}${step.detail ? ` — ${step.detail}` : ""}`);
   for (const check of result.checks ?? []) lines.push(`  ${String(check.status).padEnd(8)} ${check.field}${check.status === "stable" || check.value !== undefined ? "" : ` ${JSON.stringify(check.from ?? null)} -> ${JSON.stringify(check.to ?? null)}`}`);
   for (const comment of result.comments ?? []) lines.push(`  comment ${comment.comment}: ${comment.status}${comment.next_action ? ` (${comment.next_action})` : ""}`);
-  for (const row of result.credentials ?? []) lines.push(`  ${String(row.status).padEnd(22)} ${row.provider}/${row.kind}${row.id ? ` ${row.id}` : ""}${row.expires_at ? ` expires ${row.expires_at}` : ""}${row.provider_code ? ` [${row.provider_code}]` : ""} (${row.evidence}) — ${row.next_action}`);
+  for (const row of result.credentials ?? []) lines.push(`  ${String(row.status).padEnd(22)} ${row.provider}/${row.kind}${row.id ? ` ${row.id}` : row.ref ? ` ${row.ref}` : ""}${row.shared_consumer ? " (shared consumer)" : ""}${row.expires_at ? ` expires ${row.expires_at}` : ""}${row.provider_code ? ` [${row.provider_code}]` : ""} (${row.evidence}) — ${row.next_action}`);
   for (const item of result.not_reversed ?? []) lines.push(`  not reversed: ${item.key} — ${item.note}`);
   if (Array.isArray(result.credentials) && result.credentials.length) {
     if (result.complete_revocation) lines.push("revocation COMPLETE: every credential is revoked or was never issued");

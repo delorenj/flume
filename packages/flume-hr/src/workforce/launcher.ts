@@ -11,6 +11,7 @@ import { resolve } from "node:path";
 import { importPKCS8 } from "jose";
 import { loadAccessConfig, signRunAssertion } from "./access";
 import { identityCensus, resolveEmployee } from "./company";
+import { readTombstones, tombstoneFor } from "./lifecycle-state";
 import { readVaultSecret } from "./vault";
 
 /**
@@ -51,6 +52,12 @@ export async function employeeAccessEnv(employee: string, harness: string): Prom
   const block = target.block;
   if (!block) throw new Error(`Launch refused: ${employee} is not enrolled (flume identity enroll ${employee} --apply)`);
   if (block.status !== "active") throw new Error(`Launch refused: ${employee} is ${block.status}`);
+  // A retired role.yaml reverted to active, or a hand-written block around a retired handle, is still retired. Tombstones
+  // that cannot be read refuse the launch: no run assertion is minted on a guess.
+  let retired: ReturnType<typeof tombstoneFor>;
+  try { retired = tombstoneFor(readTombstones(), block); }
+  catch (error) { throw new Error(`Launch refused: the retirement tombstones cannot be read (${(error as Error).message.split("\n")[0]})`); }
+  if (retired) throw new Error(`Launch refused: ${employee} is retired (${retired.by} tombstone, ${retired.tombstone.retired_at})`);
   const binding = block.bindings?.cloudflare_access;
   if (!binding?.instance || !binding.credential_ref) throw new Error(`Launch refused: ${employee} has no cloudflare_access binding with an issuer instance and credential_ref`);
   const config = loadAccessConfig();

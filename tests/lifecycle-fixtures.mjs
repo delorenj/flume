@@ -23,17 +23,31 @@ export function tree(path) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+/**
+ * Cloudflare. Fault modes (cf.mode): tokenList|tokenDelete|kvGet|kvPut|kvDelete|rulePut = "500"; tokenDelete|kvDelete =
+ * "500-after-delete" (commits, then fails) or "noop" (claims success, changes nothing); kvGet = "hang" (never answers: the
+ * crash test kills the CLI while it waits); perPageClamp = N (serves at most N per page whatever was asked, as a provider
+ * clamp would); noResultInfo (no result_info at all, so the client cannot read total_pages or the served page size).
+ */
 export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
-  const cf = { calls: [], mode: {}, tokens: [], rules: [], kv: new Map(), url: "", server: undefined };
+  const cf = { calls: [], mode: {}, tokens: [], rules: [], kv: new Map(), held: [], url: "", server: undefined };
   cf.reset = () => {
     cf.calls.length = 0; cf.mode = {}; cf.kv = new Map();
     cf.tokens = [];
     cf.rules = [];
+    cf.held.length = 0;
   };
   cf.count = (method, pattern) => cf.calls.filter((c) => c.method === method && (!pattern || pattern.test(c.path))).length;
   cf.mutations = () => cf.calls.filter((c) => c.method !== "GET");
   const send = (res, status, payload) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(payload)); };
   const ok = (res, result, extra = {}) => send(res, 200, { success: true, result, ...extra });
+  /** One page of `all`, honoring the clamp and the no-result_info mode. */
+  const paged = (res, url, all, fallback) => {
+    const asked = Number(url.searchParams.get("per_page") ?? fallback), page = Number(url.searchParams.get("page") ?? 1);
+    const perPage = cf.mode.perPageClamp ? Math.min(asked, cf.mode.perPageClamp) : asked;
+    const slice = all.slice((page - 1) * perPage, page * perPage);
+    return ok(res, slice, cf.mode.noResultInfo ? {} : { result_info: { page, per_page: perPage, total_pages: Math.max(1, Math.ceil(all.length / perPage)), total_count: all.length } });
+  };
   cf.server = createServer((req, res) => {
     let body = "";
     req.on("data", (c) => body += c);
@@ -42,9 +56,8 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
       cf.calls.push({ method: req.method, path: url.pathname, query: url.search });
       if (req.headers.authorization !== `Bearer ${token}`) return send(res, 403, { success: false, errors: [{ message: "bad token" }] });
       if (req.method === "GET" && url.pathname === `/accounts/${account}/access/service_tokens`) {
-        const perPage = Number(url.searchParams.get("per_page") ?? 50), page = Number(url.searchParams.get("page") ?? 1);
         if (cf.mode.tokenList === "500") return send(res, 500, { success: false, errors: [{ message: "boom" }] });
-        return ok(res, cf.tokens.slice((page - 1) * perPage, page * perPage), { result_info: { page, per_page: perPage, total_pages: Math.max(1, Math.ceil(cf.tokens.length / perPage)), total_count: cf.tokens.length } });
+        return paged(res, url, cf.tokens, 50);
       }
       const del = url.pathname.match(new RegExp(`^/accounts/${account}/access/service_tokens/([^/]+)$`));
       if (req.method === "DELETE" && del) {
@@ -56,10 +69,7 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
         if (cf.mode.tokenDelete === "500-after-delete") return send(res, 500, { success: false, errors: [{ message: "boom after commit" }] });
         return ok(res, {});
       }
-      if (req.method === "GET" && url.pathname === `/zones/${zone}/email/routing/rules`) {
-        const perPage = Number(url.searchParams.get("per_page") ?? 20), page = Number(url.searchParams.get("page") ?? 1);
-        return ok(res, cf.rules.slice((page - 1) * perPage, page * perPage), { result_info: { page, per_page: perPage, total_pages: Math.max(1, Math.ceil(cf.rules.length / perPage)), total_count: cf.rules.length } });
-      }
+      if (req.method === "GET" && url.pathname === `/zones/${zone}/email/routing/rules`) return paged(res, url, cf.rules, 20);
       const rule = url.pathname.match(new RegExp(`^/zones/${zone}/email/routing/rules/([^/]+)$`));
       if (rule) {
         const index = cf.rules.findIndex((r) => r.id === rule[1]);
@@ -76,6 +86,7 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
         const key = decodeURIComponent(kv[1]);
         if (req.method === "GET") {
           if (cf.mode.kvGet === "500") return send(res, 500, { success: false, errors: [{ message: "boom" }] });
+          if (cf.mode.kvGet === "hang") { cf.held.push(res); return; }
           return cf.kv.has(key) ? send(res, 200, cf.kv.get(key)) : send(res, 404, { success: false, errors: [{ code: 10009, message: "key not found" }] });
         }
         if (req.method === "PUT") {
@@ -96,7 +107,7 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
   });
   await new Promise((done) => cf.server.listen(0, "127.0.0.1", done));
   cf.url = `http://127.0.0.1:${cf.server.address().port}`;
-  cf.close = () => new Promise((done) => cf.server.close(done));
+  cf.close = () => new Promise((done) => { cf.server.closeAllConnections(); cf.server.close(done); });
   void issuer;
   return cf;
 }
@@ -104,19 +115,30 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
 // ---------------------------------------------------------------------------------------------------------------------
 export const rsa = () => generateKeyPairSync("rsa", { modulusLength: 2048, privateKeyEncoding: { type: "pkcs8", format: "pem" }, publicKeyEncoding: { type: "spki", format: "pem" } });
 
-/** One App per entry of `apps`: { id, slug, installation, publicKey }. */
+/**
+ * One App per entry of `apps`: { id, slug, installation, publicKey | publicKeys }. An App may hold several keys (a rotation);
+ * `gh.rejectedKeys` holds the public PEMs whose private key was deleted at GitHub, and `mode.keyRejected` rejects them all.
+ * Fault modes: put = "500" | "500-after-commit" (suspends, then fails) | "noop"; delete = "500" | "noop";
+ * installationGet = "500" | "500-when-suspended" (the read-back after a committed PUT fails) | "hold" (never answers until
+ * `gh.release(status)`, which also clears the mode).
+ */
 export async function fakeGithub(apps) {
-  const gh = { calls: [], mode: {}, url: "", apps: new Map(), jwts: new Set(), allJwts: new Set() };
+  const gh = { calls: [], mode: {}, url: "", apps: new Map(), jwts: new Set(), allJwts: new Set(), rejectedKeys: new Set(), held: [] };
   for (const app of apps) {
-    gh.apps.set(app.id, { ...app, key: await importSPKI(app.publicKey, "RS256"), installations: new Map([[app.installation, { id: Number(app.installation), account: { login: "o", type: "Organization" }, suspended_at: null }]]) });
+    const pems = app.publicKeys ?? [app.publicKey];
+    gh.apps.set(app.id, { ...app, keys: await Promise.all(pems.map(async (pem) => ({ pem, key: await importSPKI(pem, "RS256") }))), installations: new Map([[app.installation, { id: Number(app.installation), account: { login: "o", type: "Organization" }, suspended_at: null }]]) });
   }
   gh.reset = () => {
-    gh.calls.length = 0; gh.mode = {}; gh.jwts.clear();
-    for (const app of gh.apps.values()) for (const installation of app.installations.values()) installation.suspended_at = null;
+    gh.calls.length = 0; gh.mode = {}; gh.jwts.clear(); gh.rejectedKeys.clear(); gh.held.length = 0;
+    for (const app of gh.apps.values()) {
+      if (!app.installations.has(app.installation)) app.installations.set(app.installation, { id: Number(app.installation), account: { login: "o", type: "Organization" }, suspended_at: null });
+      for (const installation of app.installations.values()) installation.suspended_at = null;
+    }
   };
   gh.count = (method, pattern) => gh.calls.filter((c) => c.method === method && (!pattern || pattern.test(c.path))).length;
   gh.mutations = () => gh.calls.filter((c) => c.method !== "GET");
   const send = (res, status, body, extra = {}) => { res.writeHead(status, { "content-type": "application/json", ...extra }); res.end(body === undefined ? undefined : JSON.stringify(body)); };
+  gh.release = (status = 404) => { gh.mode.installationGet = undefined; for (const res of gh.held.splice(0)) send(res, status, { message: status === 404 ? "Not Found" : "boom" }); };
   const server = createServer(async (req, res) => {
     for await (const _chunk of req) { /* drain */ }
     const url = new URL(req.url, "http://gh");
@@ -126,26 +148,29 @@ export async function fakeGithub(apps) {
     const jwt = authorization.replace(/^bearer /iu, "");
     gh.jwts.add(jwt);
     gh.allJwts.add(jwt);
-    let app;
+    let app, signer;
     try {
       app = gh.apps.get(String(decodeJwt(jwt).iss));
       if (!app) throw new Error("unknown app");
-      await jwtVerify(jwt, app.key, { algorithms: ["RS256"] });
+      for (const candidate of app.keys) { try { await jwtVerify(jwt, candidate.key, { algorithms: ["RS256"] }); signer = candidate; break; } catch { /* next key */ } }
+      if (!signer) throw new Error("no key verifies");
     } catch { return send(res, 401, { message: "A JSON web token could not be decoded" }); }
-    // The App's key was deleted at GitHub: every JWT it signs is now refused.
-    if (gh.mode.keyRejected) return send(res, 401, { message: "A JSON web token could not be decoded" });
+    // The App's key was deleted at GitHub: every JWT it signs is now refused, for every route.
+    if (gh.mode.keyRejected || gh.rejectedKeys.has(signer.pem)) return send(res, 401, { message: "A JSON web token could not be decoded" });
     if (req.method === "GET" && url.pathname === "/app") return send(res, 200, { id: Number(app.id), slug: app.slug, name: app.slug, client_id: `Iv1.${app.slug}`, owner: { login: "o", type: "Organization" } });
     const m = url.pathname.match(/^\/app\/installations\/(\d+)(\/suspended)?$/u);
     if (m) {
       const installation = app.installations.get(m[1]);
       if (!installation) return send(res, 404, { message: "Not Found" });
       if (!m[2] && req.method === "GET") {
-        if (gh.mode.installationGet === "500") return send(res, 500, { message: "boom" });
+        if (gh.mode.installationGet === "hold") { gh.held.push(res); return; }
+        if (gh.mode.installationGet === "500" || (gh.mode.installationGet === "500-when-suspended" && installation.suspended_at)) return send(res, 500, { message: "boom" });
         return send(res, 200, { ...installation, repository_selection: "selected", permissions: { issues: "write", metadata: "read" } });
       }
       if (m[2] && req.method === "PUT") {
         if (gh.mode.put === "500") return send(res, 500, { message: "boom" });
         if (gh.mode.put !== "noop") installation.suspended_at = new Date().toISOString();
+        if (gh.mode.put === "500-after-commit") return send(res, 500, { message: "boom after commit" });
         return send(res, 204);
       }
       if (m[2] && req.method === "DELETE") {
@@ -158,7 +183,7 @@ export async function fakeGithub(apps) {
   });
   await new Promise((done) => server.listen(0, "127.0.0.1", done));
   gh.url = `http://127.0.0.1:${server.address().port}`;
-  gh.close = () => new Promise((done) => server.close(done));
+  gh.close = () => new Promise((done) => { server.closeAllConnections(); server.close(done); });
   gh.installationOf = (appId) => [...gh.apps.get(appId).installations.values()][0];
   return gh;
 }
@@ -176,7 +201,10 @@ process.stdout.write(map[ref]);
 `, { mode: 0o755 });
 }
 
-/** Pilot, reduced to the two verbs Flume may call. State in PX_FAKE_STATE; every argv logged to PX_FAKE_LOG. */
+/**
+ * Pilot, reduced to the two verbs Flume may call. State in PX_FAKE_STATE; every argv logged to PX_FAKE_LOG. Its verify answer
+ * carries the PAT VALUE itself (`credential.value`), a field Flume must never copy: that is what makes the PAT scan bite.
+ */
 export function writeFakePx(path) {
   writeFileSync(path, `#!/usr/bin/env node
 const fs = require("fs");
@@ -199,7 +227,7 @@ if (args[0] === "identity" && args[1] === "verify") {
   if (!found.members.includes(me.id)) refuse("not_project_member", me.id + " is not listed on board " + found.identifier);
   out(0, { ok: true, verified: true, employee: flag("employee"), native_user_id: me.id, email: me.email, display_name: me.name, workspace: { slug: flag("workspace"), role: 15 },
     board: { id: found.id, identifier: found.identifier, name: found.name, member: true }, plane: { observable: true, version: "1.3.1", edition: "PLANE_COMMUNITY" },
-    credential: { ref, type: "plane_personal_access_token", header: "X-API-Key", expiry: { observable: false, reason: "Plane exposes a token's expiry only to its owner" },
+    credential: { ref, value: key.pat, type: "plane_personal_access_token", header: "X-API-Key", expiry: { observable: false, reason: "Plane exposes a token's expiry only to its owner" },
       revocation: { native: "the owner deletes the token under Profile > Personal Access Tokens", board_access: "an admin removes the project membership", px_verb: null } },
     shared_key_fallback: false, verified_at: "2026-10-14T20:00:00.000Z" });
 }
