@@ -841,7 +841,8 @@ function launcherItem(ctx: Pick<LifecycleContext, "cache">, ref: string): "prese
     if (!vault || !title) return "unreadable";
     const got = op(["item", "get", title, "--vault", vault, "--format", "json"]);
     if (got.ok) return "present";
-    if (/isn't an item/iu.test(got.stderr)) return "absent";
+    // Two live spellings: an interactive session says "isn't an item"; the DeLoSecrets service account says "Found 0 item(s) in vault ... with title ..." (seen live by the FLUME-53 canary).
+    if (/isn't an item|found 0 item\(s\)/iu.test(got.stderr)) return "absent";
     if (/more than one item/iu.test(got.stderr)) return "ambiguous";
     return "unreadable";
   });

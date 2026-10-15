@@ -207,7 +207,7 @@ const [verb, ref] = args;
 if (verb === "item" && ref === "get") {
   const title = args[2], vault = args[args.indexOf("--vault") + 1];
   if (args.includes("--reveal")) { process.stderr.write("[ERROR] the lifecycle must never ask op to reveal a field\\n"); process.exit(3); }
-  if (!Object.keys(map).some((key) => key.startsWith("op://" + vault + "/" + title + "/"))) { process.stderr.write("[ERROR] 2026/10/15 00:00:00 \\"" + title + "\\" isn't an item in the \\"" + vault + "\\" vault. Specify the item with its UUID, name, or domain.\\n"); process.exit(1); }
+  if (!Object.keys(map).some((key) => key.startsWith("op://" + vault + "/" + title + "/"))) { process.stderr.write("[ERROR] 2026/10/15 00:00:00 could not retrieve item '" + vault + "/" + title + "': Found 0 item(s) in vault \\"" + vault + "\\" with title \\"" + title + "\\"\\n"); process.exit(1); }
   process.stdout.write(JSON.stringify({ id: "fixtureitem" + title.length, title, vault: { name: vault }, category: "API_CREDENTIAL", fields: [{ id: "credential", type: "CONCEALED", label: "credential" }] }));
   process.exit(0);
 }
