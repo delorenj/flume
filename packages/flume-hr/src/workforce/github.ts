@@ -79,8 +79,10 @@ export function githubCredentialRefProblem(reference: string): string | undefine
 }
 
 /** Problems with a github binding's principal/instance, or an empty list. */
-export function githubBindingProblems(binding: { principal?: string; instance?: string; credential_ref?: string }): string[] {
+export function githubBindingProblems(binding: { principal?: string; instance?: string; credential_ref?: string; native_actor_id?: string }): string[] {
   const problems: string[] = [];
+  // The schema admits a Plane UUID actor on any binding; a github actor is the bot user's numeric ID, always.
+  if (binding.native_actor_id !== undefined && !/^\d+$/u.test(binding.native_actor_id)) problems.push("native_actor_id must be the numeric GitHub bot user ID");
   if (!binding.principal || !/^\d+$/u.test(binding.principal)) problems.push("principal must be the numeric GitHub App ID");
   if (!binding.instance || !/^\d+$/u.test(binding.instance)) problems.push("instance must be the numeric installation ID");
   if (!binding.credential_ref) problems.push("credential_ref must be an op:// reference to the App private key");

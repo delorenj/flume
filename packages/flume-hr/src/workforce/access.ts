@@ -26,6 +26,7 @@ import YAML from "yaml";
 import { SignJWT, createRemoteJWKSet, importSPKI, jwtVerify, type CryptoKey, type JWTVerifyGetKey, type KeyObject } from "jose";
 import { identityCensus, resolveEmployee } from "./company";
 import { githubBindingOf, githubEvidence, githubRequestShape, inspectGithubApp, issueGithubToken, type GithubInspection, type GithubRequestShape } from "./github";
+import { PLANE_CREDENTIAL_SEMANTICS } from "./plane";
 import { accessConfigProblems, accessRequestProblems } from "./validator";
 import type { CompanyIdentityBinding } from "./types";
 
@@ -210,6 +211,11 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
 
   const decide = async (subject: string, handle: string, binding: CompanyIdentityBinding | undefined, run: { runId: string; harness: string }, request: AccessRequest): Promise<AccessResult> => {
     const who = { subject, handle, run_id: run.runId, harness: run.harness, request_id: request.request_id, ...scopeOf(request) };
+    // Plane credentials are employee-owned static PATs: no grant here can carry, shorten or extend one, and a local grant TTL
+    // must never be readable as the token's expiry. Refused before any policy match, never persisted, audit line only.
+    if (request.service === "plane") {
+      return finish({ http_status: 403, body: { ok: false, status: "denied", code: "static-provider-credential", detail: "a Plane personal access token is static and owned by the employee; it is not issued, scoped or expired by an access grant. Pilot (`px identity verify`) verifies it by reference", evidence: "none", provider: "plane", credential_semantics: PLANE_CREDENTIAL_SEMANTICS } }, who);
+    }
     const key = `${subject}/${request.request_id}`;
     const hash = createHash("sha256").update(canonical(request)).digest("hex");
     const records = state.idempotency();

@@ -282,6 +282,75 @@ an operator bind, a sandbox grant and adoption; (3) `comment verify` over every
 comment ID. `github_native_authorship` stays `unproven` in readiness by design. Receipt:
 `_bmad-output/implementation-artifacts/FLUME-51/`.
 
+## Plane identities, verified by Pilot (FLUME-52)
+
+An employee's Flume record can name its **own native Plane user**, and Flume can prove it.
+Pilot (`px`) owns every Plane read and write: Flume runs `px` as a subprocess
+(`FLUME_PX_BIN`, default `px`; `FLUME_PX_TIMEOUT_MS`, default 60000; no shell, parent
+environment passed through) and records what it says. Flume has no Plane HTTP client, no SQL, no
+bot/OAuth endpoint and does not mint tokens. Only `px identity verify` and `px show` are ever
+invoked; posting stays with the operator or the employee through Pilot.
+
+**Binding** (`bindings.plane`, mirroring the GitHub one):
+
+```yaml
+plane:
+  principal: 292ac356-3640-474e-ac01-8b0611ed6a91        # lowercase native Plane user UUID
+  instance: https://plane.delo.sh/33god                  # https://<host>/<workspace-slug>, exactly
+  credential_ref: op://DeLoSecrets/<26-char item uuid>/<field-id>   # the employee's own PAT, by reference
+  # attribution_mode: absent or native
+  # native_actor_id: written ONLY by adopt-actor; equals principal
+```
+
+**Flow: bind, adopt, verify-plane.**
+
+```bash
+flume identity bind grolf plane --principal 292ac356-... --instance https://plane.delo.sh/33god --credential-ref op://... --apply
+flume identity adopt-actor grolf plane --board TEST --board FLUME --apply     # px identity verify, once per board
+flume comment verify-plane TEST-14 --comment grolf:<comment-id> --comment rererere:<comment-id> --apply
+```
+
+- `bind` validates the shape and refuses the four stale candidates in
+  `contracts/company-identity-candidates.yaml` (`adoptable: false`, `stale-candidate`).
+- `adopt-actor` runs only for an enrolled, **active** employee (any other status is refused before any px
+  call). Every `--board` must verify or nothing is written. Board membership is not stored on the binding;
+  the verified boards go in the receipt. Px refusals surface as `provider-refused` with px's code
+  (`wrong_employee`, `not_employee_identity`, `shared_identity`, `shared_credential`, `not_project_member`,
+  `credential_rejected`, `unknown_board`); a px answer that disagrees with the binding is
+  `provider-result-mismatch`; a missing binary, a timeout or non-JSON is `provider-unavailable`. There is
+  no fallback to a shared or operator key and no choosing among candidates.
+- `comment verify-plane` reads the ticket once with `px show` (the operator-key, third-party read) and
+  compares each comment's `actor_id` with the adopted `native_actor_id`. Text, markers and display names
+  are never evidence. It also verifies the historical comments of a retired or suspended employee.
+  Verdicts: `native-verified` per comment; `native-distinct-verified` overall, else `not-native-distinct`
+  (`native-actor-not-adopted`, `author-mismatch`, `comment-not-found`, `shared-actor`, ...).
+- Previews are the default. Receipts (`plane-verifications.jsonl` under
+  `${FLUME_IDENTITY_STATE:-$XDG_STATE_HOME/flume/identity}`, mode 0600) are appended only with `--apply`
+  and hold IDs, `op://` references, board IDs, px codes, the Plane version and `evidence` (`fixture`
+  whenever `FLUME_PX_BIN` is set, else `provider`). They never change a definition.
+- The agent registry's `plane.member_id` / `key_ref` are not written; a mismatch is reported as a
+  `legacy-registry-principal` warning.
+
+**Manual enrollment prerequisites** (Flume cannot create a Plane user or token; `bind` without a
+`--credential-ref`, or `adopt-actor` without a binding, answers `manual-enrollment-required` /
+`no-provider-binding` with this list): invite `<handle>@agents.delo.sh` (or let it self-sign-up); sign in
+once; the employee creates **its own** PAT in the browser and records the expiry it chose; vault it and
+reference it by item UUID and field ID; a workspace admin adds board membership; then bind and adopt.
+
+**A Plane PAT is static.** Plane shows its expiry and revocation only to the owner's browser session, never to
+the key. Every result reports `type: plane_personal_access_token`, `static: true`, px's `expiry`
+(`observable: false`) and `revocation`, and never an `expires_at` or lifetime. `flume identity show` carries
+this under `credentials.plane` (from the latest adoption receipt, else `verified: false`). The access facade
+therefore **denies** `service: plane` with `static-provider-credential` even when a grant matches: a local
+grant TTL must never be read as the token's expiry.
+
+**Deploy first.** The `native_actor_id` schema pattern is widened to digits or a lowercase UUID. A facade
+built before this change cannot read a definition holding a Plane actor and answers `unknown-client`
+for that employee. Rebuild and restart `flume-access.service` before running `adopt-actor` on a live
+employee. `plane_native_identity` stays `unproven` in `flume identity readiness`: only Pilot verification
+receipts prove it, and a PAT's expiry is not observable. The live proof is run by the supervising
+session after the build lands (`_bmad-output/implementation-artifacts/FLUME-52/`).
+
 ## The trusted launcher
 
 `flume launch <employee>` (Hermes) and `flume access run <employee> -- <command>`

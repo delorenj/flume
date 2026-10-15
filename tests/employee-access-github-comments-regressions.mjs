@@ -428,7 +428,7 @@ try {
     assert.ok((await flume(["identity", "adopt-actor", "gus-pm", "github", "--apply", "--json"], 1)).blockers.some((b) => b.code === "no-provider-binding"));
     assert.ok((await flume(["identity", "adopt-actor", "hal-pm", "github", "--apply", "--json"], 1)).blockers.some((b) => b.code === "retired-terminal"));
     assert.ok((await flume(["identity", "adopt-actor", "ivy-pm", "github", "--apply", "--json"], 1)).blockers.some((b) => b.code === "not-enrolled"));
-    assert.ok((await flume(["identity", "adopt-actor", "ada-pm", "plane", "--json"], 1)).blockers.some((b) => b.code === "unsupported-provider"));
+    assert.ok((await flume(["identity", "adopt-actor", "ada-pm", "gitlab", "--json"], 1)).blockers.some((b) => b.code === "unsupported-provider"));
     assert.equal((await flume(["identity", "adopt-actor", "nobody-pm", "github", "--json"], 1)).ok, false);
     assert.equal(gh.since(mark2).length, 0, "no refusal reached GitHub");
     assert.equal(definitionText("fay").includes("native_actor_id"), false, "fay stays un-adopted for the not-adopted scenarios");

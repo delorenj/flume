@@ -40,8 +40,9 @@ flume identity enroll <employee>           # company subject + <handle>@agents.d
 flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)
 flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
-flume identity bind <employee> <provider> --principal --instance --credential-ref  # bind a provider by reference only (preview unless --apply); github: App ID, installation ID, op://<vault>/<item-uuid>/<field-id>
+flume identity bind <employee> <provider> --principal --instance --credential-ref  # bind a provider by reference only (preview unless --apply); github: App ID, installation ID, op://<vault>/<item-uuid>/<field-id>; plane: native user UUID, https://<host>/<workspace>, op:// ref to the employee's own PAT
 flume identity adopt-actor <employee> github  # record the bot user ID GitHub reports for the employee's own App as native_actor_id (preview unless --apply; never mints)
+flume identity adopt-actor <employee> plane --board <b...>  # plane: Pilot (`px identity verify`) verifies the bound native user on every board, then native_actor_id = that UUID (preview unless --apply; Flume has no Plane client)
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
 flume identity recent <employee> [--touch p] # the recall compass: last 5 projects, MRU-first (preview unless --apply)
 flume identity recall <employee> [--narrow]  # write bank + declared banks most-recently-interacted first
@@ -53,6 +54,7 @@ flume access request --service github --resource owner/repo --permission issues:
 flume access github-inspect (--employee e | --app-id id --key-ref op://...)   # read-only: the App and its installations (app-JWT GETs only)
 flume comment post <owner/repo> <n> --body <text> [--marker k] [--review --commit sha --path f --line n]   # --exec consumer: one marked comment, reconciled before and after, read back from GitHub
 flume comment verify <owner/repo> --comment <employee>:<issue|review>:<id> ...   # --exec consumer, read-only: native-distinct-verified only for distinct native Apps, by GitHub's author ID alone
+flume comment verify-plane <REF> --comment <employee>:<comment-id> ... [--apply]   # reads the ticket via `px show`; native-distinct-verified only for distinct adopted Plane users, by actor_id alone (docs/employee-access.md)
 flume launch <employee> -- <args>          # the Hermes launcher uses the same contract (see docs/employee-access.md)
 
 flume org                     # the org chart
