@@ -27,11 +27,13 @@ import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
-import { adoptNativeActor, bindProvider, enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { employeeContinuity, employeeCredentials, formatLifecycleResult, restoreEmployee, retireEmployee, suspendEmployee } from "./workforce/lifecycle";
+import { accessReceipts } from "./workforce/receipts";
 import { provisionEmployee } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
-import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, startAccessServer } from "./workforce/access";
+import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, requestMail, startAccessServer } from "./workforce/access";
 import { githubApiBase, githubEvidence } from "./workforce/github";
 import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
 import { formatPlaneCommentResult, verifyPlaneComments } from "./workforce/plane";
@@ -316,6 +318,91 @@ identityCmd
     await identityResult(() => adoptNativeActor(employee, provider, { apply: Boolean(options.apply), boards: options.board }), options.json);
   });
 
+// ----------------------------------------------------------------------------
+// LIFECYCLE (FLUME-53): suspend, restore, retire, rotate; prove the person is still the person
+// ----------------------------------------------------------------------------
+//
+// Every one is a preview unless `--apply`; a preview reads providers and writes nothing. A blocker exits 1 before any
+// provider call. `--apply` exits 1 while a step is unresolved; re-run the same command and it converges.
+
+async function lifecycleResult(action: () => Promise<{ ok: boolean }>, json: boolean): Promise<void> {
+  guardBrokenPipe();
+  let result: { ok: boolean };
+  try { result = await action(); }
+  catch (error) { result = { ok: false, error: (error as Error).message } as { ok: boolean }; }
+  await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : formatLifecycleResult(result as Record<string, any>));
+  await exitAfterFlush(result.ok ? 0 : 1);
+}
+
+const REVOKE_HELP = "Also revoke at this provider: cloudflare_access | github | gateway (repeatable)";
+
+identityCmd
+  .command("suspend")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-53: suspend an employee. Status first, then the mailbox allowlist (captured, deleted, verified), then only the --revoke adapters. Reports what is still usable (preview unless --apply)")
+  .option("--revoke <adapter>", REVOKE_HELP, collect)
+  .option("--apply", "Perform it (default is a preview that writes nothing)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await lifecycleResult(() => suspendEmployee(employee, { apply: Boolean(options.apply), revoke: options.revoke }), options.json);
+  });
+
+identityCmd
+  .command("restore")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-53: return a suspended employee to service. Re-puts the captured allowlist record, un-suspends a GitHub installation only if this lifecycle suspended it, and writes status active LAST (preview unless --apply)")
+  .option("--apply", "Perform it (default is a preview that writes nothing)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await lifecycleResult(() => restoreEmployee(employee, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
+  .command("retire")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-53: retire an employee (terminal). Suspend plus the routing rule disabled and a tombstone that outlives `flume offboard`; --revoke all names every revocable adapter. Stored mail is kept (preview unless --apply)")
+  .option("--revoke <adapter>", `${REVOKE_HELP}, or all`, collect)
+  .option("--apply", "Perform it (default is a preview that writes nothing)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await lifecycleResult(() => retireEmployee(employee, { apply: Boolean(options.apply), revoke: options.revoke }), options.json);
+  });
+
+identityCmd
+  .command("credentials")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-53: read-only. Every credential the employee holds, what each provider says about it, and complete_revocation (true only if all are revoked or never issued)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await lifecycleResult(() => employeeCredentials(employee), options.json);
+  });
+
+identityCmd
+  .command("rotate")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .argument("<provider>", "cloudflare_access | github | plane (gateway rotation is FLUME-39)")
+  .description("FLUME-53: change a binding's credential_ref and nothing else; the principal, instance and native actor stay. The old key is reported manual-action-required, never assumed revoked (preview unless --apply)")
+  .requiredOption("--credential-ref <ref>", "op:// reference to the new credential; never a value")
+  .option("--principal <id>", "Must equal the current principal; a different one is a different identity")
+  .option("--instance <id>", "Must equal the current instance")
+  .option("--apply", "Write the new reference (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, provider: string, options) => {
+    await lifecycleResult(() => rotateEmployeeCredential(employee, provider, { credentialRef: options.credentialRef, principal: options.principal, instance: options.instance }, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
+  .command("continuity")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-53: is history still pointing at the same person? Compares subject, handle, email, principal, native actor and mailbox prefix with the recorded baseline; rotation and a post move are reported, not broken")
+  .option("--record", "Record the baseline (preview unless --apply)")
+  .option("--comment <spec>", "Check provenance: <employee>:<uuid> (Plane receipts) or <employee>:<issue|review>:<id> (GitHub); repeatable", collect)
+  .option("--apply", "With --record: write the baseline")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await lifecycleResult(() => employeeContinuity(employee, { record: Boolean(options.record), apply: Boolean(options.apply), comments: options.comment }), options.json);
+  });
+
 identityCmd
   .command("readiness")
   .description("What is unproven about the accounts company identity needs; never ready, never free")
@@ -367,7 +454,7 @@ const accessCmd = program
 
 accessCmd
   .command("serve")
-  .description("Run the access facade (fixture grants; GitHub App installation tokens for service github); put Cloudflare Access in front of it")
+  .description("Run the access facade (fixture grants; GitHub App installation tokens for service github; POST /v1/mail/authorize for the agents-facade Worker's mailbox reads); put Cloudflare Access in front of it")
   .option("--config <path>", "Access configuration (default: FLUME_ACCESS_CONFIG or ~/.config/flume/employee-access.yaml)")
   .option("--host <host>", "Listen host (default: config listen.host or 127.0.0.1)")
   .option("--port <port>", "Listen port (default: config listen.port or 8787)", (value: string) => Number(value))
@@ -431,6 +518,29 @@ accessCmd
   });
 
 accessCmd
+  .command("receipts")
+  .description("FLUME-53: read-only. Join the facade's request, mail, denial and lifecycle records for one employee or run by subject, run_id and operation_id; whitelisted fields only")
+  .option("--employee <employee>", "The employee (registry id, desk name or person)")
+  .option("--run <run id>", "One run; adds that subject's lifecycle operations inside the run window")
+  .option("--since <iso8601>", "Only records at or after this time")
+  .option("--gateway-proof <file>", "Output of gateway-proof.py check; verified only if verified:true and every token_name is the employee's own consumer")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    guardBrokenPipe();
+    let report: Record<string, any>;
+    try { report = accessReceipts({ employee: options.employee, run: options.run, since: options.since, gatewayProof: options.gatewayProof }); }
+    catch (error) { report = { ok: false, blockers: [{ code: "receipts-failed", detail: (error as Error).message.split("\n")[0] }] }; }
+    const lines = report.ok
+      ? [`${report.employee ?? report.handle}: subject ${report.subject}, ${report.run_ids.length} run(s), ${report.operations.length} lifecycle operation(s), ${report.rows.length} record(s)`,
+        ...report.runs.map((run: any) => `  run ${run.run_id} ${run.harness ?? "?"}: ${run.requests} request(s), ${run.grants} grant(s), ${run.mail_authorizations} mail, ${run.denials} denied`),
+        ...report.operations.map((op: any) => `  operation ${op.operation_id} ${op.command}: ${op.steps.map((step: any) => `${step.step}=${step.outcome}`).join(", ")}`),
+        `  gateway ${report.gateway.owner_ticket} evidence ${report.gateway.evidence_status}${report.gateway.proof ? `; proof ${report.gateway.proof.status}` : ""}`]
+      : (report.blockers ?? []).map((blocker: any) => `✗ ${blocker.code}: ${blocker.detail}`);
+    await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join("\n")}\n`);
+    await exitAfterFlush(report.ok ? 0 : 1);
+  });
+
+accessCmd
   .command("github-inspect")
   .description("Read-only discovery of a GitHub App and its installations (app-JWT GETs only; never mints, writes or adopts)")
   .option("--employee <employee>", "Inspect the App in this employee's github binding")
@@ -448,6 +558,40 @@ accessCmd
     await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join("\n")}\n`);
     await exitAfterFlush(report.ok ? 0 : 1);
   });
+
+// ============================================================================
+// EMPLOYEE MAIL (FLUME-53)
+// ============================================================================
+//
+// A plain client, like `access request`: it reads only what the launcher put in the environment, so it has no identity
+// flag, and there is no send path. Run it as `flume access run <employee> -- flume mail list`.
+
+const mailCmd = program
+  .command("mail")
+  .description("Read the launched employee's own mailbox through the agents-facade Worker; no identity flag, no send");
+
+async function mailResult(action: () => Promise<{ http_status: number; body: Record<string, unknown> }>): Promise<void> {
+  guardBrokenPipe();
+  try {
+    const result = await action();
+    await writeStdout(`${JSON.stringify(result.body, null, 2)}\n`);
+    await exitAfterFlush(result.body.ok === true ? 0 : 1);
+  } catch (error) {
+    await writeStdout(`${JSON.stringify({ ok: false, status: "error", error: (error as Error).message }, null, 2)}\n`);
+    await exitAfterFlush(1);
+  }
+}
+
+mailCmd
+  .command("list")
+  .description("List the launched employee's messages (id, size, received, from, subject)")
+  .action(async () => { await mailResult(() => requestMail({ operation: "list" })); });
+
+mailCmd
+  .command("read")
+  .argument("<id>", "Message id: the 64-hex content hash from `mail list`")
+  .description("Read one of the launched employee's messages (raw)")
+  .action(async (id: string) => { await mailResult(() => requestMail({ operation: "read", message_id: id })); });
 
 // ============================================================================
 // REVIEW COMMENTS WITH VERIFIED AUTHORSHIP (FLUME-51)

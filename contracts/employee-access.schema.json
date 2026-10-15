@@ -20,6 +20,20 @@
         "employee": {"type": "string", "minLength": 1, "maxLength": 64}
       }
     },
+    "mail_request": {
+      "title": "Mail authorize request (FLUME-53)",
+      "description": "Closed: `list` takes no message_id and `read` requires a 64-hex content hash. The mailbox is never selected by the request; the handle comes only from the verified machine identity.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation"],
+      "properties": {
+        "operation": {"enum": ["list", "read"]},
+        "message_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "if": {"properties": {"operation": {"const": "read"}}},
+      "then": {"required": ["message_id"]},
+      "else": {"not": {"required": ["message_id"]}}
+    },
     "grant": {
       "title": "Pre-approved grant",
       "description": "Keyed by subject + service + resource. A request is granted only when its permissions are a subset and its lifetime is within max_lifetime_seconds.",

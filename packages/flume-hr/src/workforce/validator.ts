@@ -26,6 +26,7 @@ const validateNamed = ajv.getSchema(namedSchema.$id)!;
 const validateRole = ajv.compile(roleSchema);
 const validateCompany = ajv.getSchema(companyIdentitySchema.$id)!;
 const validateAccessRequestSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/request`)!;
+const validateMailRequestSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/mail_request`)!;
 const validateAccessConfigSchema = ajv.getSchema(`${employeeAccessSchema.$id}#/$defs/config`)!;
 const validateProvisioningConfigSchema = ajv.getSchema(identityProvisioningSchema.$id)!;
 
@@ -39,6 +40,10 @@ function schemaProblems(validate: { errors?: Array<{ instancePath: string; keywo
 /** Problems with an access request body, or an empty list. */
 export function accessRequestProblems(input: unknown): string[] {
   return validateAccessRequestSchema(input) ? [] : schemaProblems(validateAccessRequestSchema);
+}
+/** Problems with a FLUME-53 mail-authorize body: closed `{operation: list|read, message_id?}`, or an empty list. */
+export function mailRequestProblems(input: unknown): string[] {
+  return validateMailRequestSchema(input) ? [] : schemaProblems(validateMailRequestSchema);
 }
 /** Problems with the operator-authored access configuration, or an empty list. */
 export function accessConfigProblems(input: unknown): string[] {

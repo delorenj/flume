@@ -55,8 +55,10 @@ they are never written to receipts, logs, stdout or definitions.
   (FLUME-49's successor story 1.6 found the installed edition cannot), no
   sending mail, no GPG (deferred: story 1.5 proves authorship via the provider
   API, not commit signing).
-- Revocation belongs to FLUME-53. A rebinding attempt to a *different*
-  principal is `binding-conflict`: rotation is deliberate, not a hire
-  side-effect.
+- Revocation, suspension, rotation and retirement belong to FLUME-53
+  (`flume identity suspend|restore|retire|credentials|rotate|continuity`; see
+  "Suspension, rotation and retirement (FLUME-53)" in `docs/employee-access.md`).
+  A rebinding attempt to a *different* principal is `binding-conflict`:
+  rotation is deliberate (`flume identity rotate`), not a hire side-effect.
 - The facade worker reads the allowlist from KV (`allowlist/<address>` keys),
   so hiring never redeploys it.

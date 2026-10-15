@@ -27,8 +27,10 @@ import { SignJWT, createRemoteJWKSet, importSPKI, jwtVerify, type CryptoKey, typ
 import { identityCensus, resolveEmployee } from "./company";
 import { githubBindingOf, githubEvidence, githubRequestShape, inspectGithubApp, issueGithubToken, type GithubInspection, type GithubRequestShape } from "./github";
 import { PLANE_CREDENTIAL_SEMANTICS } from "./plane";
-import { accessConfigProblems, accessRequestProblems } from "./validator";
-import type { CompanyIdentityBinding } from "./types";
+import { accessConfigProblems, accessRequestProblems, mailRequestProblems } from "./validator";
+import type { CompanyIdentity, CompanyIdentityBinding } from "./types";
+
+type IdentityDefinitionBlock = CompanyIdentity | null;
 
 export const RUN_ISSUER = "flume-launcher";
 export const RUN_AUDIENCE = "flume-access";
@@ -36,6 +38,10 @@ export const RUN_TTL_SECONDS = 12 * 60 * 60;
 export const ACCESS_ASSERTION_HEADER = "cf-access-jwt-assertion";
 export const RUN_ASSERTION_HEADER = "x-flume-run-assertion";
 export const ACCESS_REQUEST_PATH = "/v1/access/requests";
+/** FLUME-53: the origin route the agents-facade Worker calls before it reads a mailbox. */
+export const MAIL_AUTHORIZE_PATH = "/v1/mail/authorize";
+/** The Worker route an employee process posts to; the Worker authorizes it here, then reads only `mail/<handle>/`. */
+export const MAIL_MESSAGES_PATH = "/v1/mail/messages";
 const MAX_BODY_BYTES = 64 * 1024;
 
 export interface AccessGrant { subject: string; service: string; resource: string; permissions: string[]; max_lifetime_seconds: number }
@@ -49,6 +55,7 @@ export interface AccessConfig {
 }
 export interface AccessRequest { version: 1; request_id: string; service: string; resource: string; permissions: string[]; lifetime_seconds?: number; employee?: string }
 export interface AccessResult { http_status: number; body: Record<string, unknown> }
+export interface MailRequest { operation: "list" | "read"; message_id?: string }
 
 /** Where the operator keeps the access configuration. */
 export function accessConfigPath(): string {
@@ -149,6 +156,8 @@ function header(headers: IncomingMessage["headers"], name: string): string | und
 
 export interface AccessFacade {
   handle(headers: IncomingMessage["headers"], readBody: () => Promise<string>): Promise<AccessResult>;
+  /** FLUME-53: who is this, and are they active? The Worker owns the mailbox; this only decides. */
+  handleMail(headers: IncomingMessage["headers"], readBody: () => Promise<string>): Promise<AccessResult>;
 }
 
 export async function createAccessFacade(initial: AccessConfig, options: { state?: string; configPath?: string } = {}): Promise<AccessFacade> {
@@ -166,9 +175,9 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
     return next;
   };
 
-  const finish = (result: AccessResult, who: Record<string, unknown> = {}): AccessResult => {
+  const finish = (result: AccessResult, who: Record<string, unknown> = {}, event?: string): AccessResult => {
     const body = result.body;
-    state.audit({ outcome: body.code ?? body.status, http_status: result.http_status, ...who, ...(body.grant_id ? { grant_id: body.grant_id } : {}), ...(typeof body.lifetime_seconds === "number" ? { lifetime_seconds: body.lifetime_seconds } : {}), ...(typeof body.expires_at === "string" ? { expires_at: body.expires_at } : {}), ...(body.replayed ? { replayed: true } : {}) });
+    state.audit({ ...(event ? { event } : {}), outcome: body.code ?? body.status, http_status: result.http_status, ...who, ...(body.grant_id ? { grant_id: body.grant_id } : {}), ...(typeof body.lifetime_seconds === "number" ? { lifetime_seconds: body.lifetime_seconds } : {}), ...(typeof body.expires_at === "string" ? { expires_at: body.expires_at } : {}), ...(body.replayed ? { replayed: true } : {}) });
     return result;
   };
 
@@ -277,24 +286,32 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
     return finish({ http_status: 200, body: { ...body, credential: { kind: "github-installation-token", value: outcome.token } } }, { ...ctx.who, grant_id: grantId });
   }
 
+  /** Steps 1-3, shared by access and mail: the signed client, the one enrolled employee it maps to, and the launched run. */
+  async function identify(headers: IncomingMessage["headers"], event?: string): Promise<{ failure: AccessResult } | { block: NonNullable<IdentityDefinitionBlock>; run: { runId: string; harness: string }; who: Record<string, unknown> }> {
+    // 1. authenticate the assertion
+    const authenticated = await authenticate(headers);
+    if ("failure" in authenticated) return { failure: finish(authenticated.failure, {}, event) };
+    // 2. map the signed client to exactly one enrolled employee. The census is read on EVERY request.
+    const matches = identityCensus().definitions.filter(definition => {
+      const binding = definition.block?.bindings?.cloudflare_access;
+      return binding && binding.instance === authenticated.issuer && binding.principal === authenticated.clientId;
+    });
+    if (matches.length !== 1) return { failure: finish(matches.length ? refusal(403, "ambiguous-client", "the signed client is bound to more than one employee") : refusal(403, "unknown-client", "the signed client is not bound to any employee"), {}, event) };
+    const block = matches[0]!.block!;
+    // 3. verify the run
+    const run = await verifyRun(headers, block.subject);
+    if ("failure" in run) return { failure: finish(run.failure, { subject: block.subject, handle: block.handle }, event) };
+    return { block, run, who: { subject: block.subject, handle: block.handle, run_id: run.runId, harness: run.harness } };
+  }
+
   return {
     async handle(headers, readBody) {
       try {
-        // 1. authenticate the assertion
-        const authenticated = await authenticate(headers);
-        if ("failure" in authenticated) return finish(authenticated.failure);
-        // 2. map the signed client to exactly one enrolled employee
-        const matches = identityCensus().definitions.filter(definition => {
-          const binding = definition.block?.bindings?.cloudflare_access;
-          return binding && binding.instance === authenticated.issuer && binding.principal === authenticated.clientId;
-        });
-        if (matches.length !== 1) return finish(matches.length ? refusal(403, "ambiguous-client", "the signed client is bound to more than one employee") : refusal(403, "unknown-client", "the signed client is not bound to any employee"));
-        const block = matches[0]!.block!;
+        const identified = await identify(headers);
+        if ("failure" in identified) return identified.failure;
+        const { block, who } = identified;
+        const run = identified.run;
         const subject = block.subject, handle = block.handle;
-        // 3. verify the run
-        const run = await verifyRun(headers, subject);
-        if ("failure" in run) return finish(run.failure, { subject, handle });
-        const who = { subject, handle, run_id: run.runId, harness: run.harness };
         // 4. validate the body
         let body: unknown;
         try { body = JSON.parse(await readBody()); } catch { return finish(refusal(400, "invalid-request", "the request body is not valid JSON"), who); }
@@ -318,6 +335,31 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
       } catch (error) {
         logFailure("internal error", error);
         return { http_status: 500, body: { ok: false, status: "error", code: "internal-error", detail: "the access facade failed; nothing was issued", ...FIXTURE } };
+      }
+    },
+
+    /**
+     * FLUME-53 mail authorize: the same assertion, client mapping, run, body and FRESH status pipeline as an access request.
+     * It decides identity and employment and nothing else; the Worker reads storage only after an `authorized` answer.
+     * The handle comes only from the verified machine identity. The audit line never holds mail content or codes.
+     */
+    async handleMail(headers, readBody) {
+      const event = "mail.authorize";
+      try {
+        const identified = await identify(headers, event);
+        if ("failure" in identified) return identified.failure;
+        const { block, who } = identified;
+        let body: unknown;
+        try { body = JSON.parse(await readBody()); } catch { return finish(refusal(400, "invalid-request", "the request body is not valid JSON"), who, event); }
+        const problems = mailRequestProblems(body);
+        if (problems.length) return finish(refusal(400, "invalid-request", problems.join("; ").slice(0, 400)), who, event);
+        const request = body as MailRequest;
+        const named = { ...who, operation: request.operation, ...(request.message_id ? { message_id: request.message_id } : {}) };
+        if (block.status !== "active") return finish(refusal(403, `employee-${block.status}`, `the employee is ${block.status}; the mailbox is closed to reads`, "denied"), named, event);
+        return finish({ http_status: 200, body: { ok: true, status: "authorized", handle: block.handle, subject: block.subject, run_id: identified.run.runId, harness: identified.run.harness, mailbox_prefix: `mail/${block.handle}/`, operation: request.operation } }, named, event);
+      } catch (error) {
+        logFailure("internal error", error);
+        return { http_status: 500, body: { ok: false, status: "error", code: "internal-error", detail: "the mail authorization failed; nothing was read", ...FIXTURE } };
       }
     },
   };
@@ -349,9 +391,9 @@ export async function startAccessServer(config: AccessConfig, options: { host?: 
     try {
       let path: string;
       try { path = new URL(request.url ?? "/", "http://facade").pathname; } catch { return send(refusal(400, "invalid-request", "unparseable request target")); }
-      if (path !== ACCESS_REQUEST_PATH) return send(refusal(404, "not-found", "unknown path"));
+      if (path !== ACCESS_REQUEST_PATH && path !== MAIL_AUTHORIZE_PATH) return send(refusal(404, "not-found", "unknown path"));
       if (request.method !== "POST") return send(refusal(405, "method-not-allowed", "POST only"));
-      send(await facade.handle(request.headers, () => readLimited(request)));
+      send(await (path === MAIL_AUTHORIZE_PATH ? facade.handleMail : facade.handle)(request.headers, () => readLimited(request)));
     } catch (error) {
       logFailure("request handler failed", error);
       if (response.headersSent) response.destroy();
@@ -372,14 +414,23 @@ export interface AccessClientInput { service: string; resource: string; permissi
 
 /** `flume access request`: reads only what the launcher put in the environment. Identity is never an argument. */
 export async function requestAccess(input: AccessClientInput, env: NodeJS.ProcessEnv = process.env): Promise<AccessResult> {
-  const missing = ["FLUME_ACCESS_URL", "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "FLUME_RUN_ASSERTION"].filter(name => !env[name]);
-  if (missing.length) throw new Error(`Not launched by Flume: missing ${missing.join(", ")} (start this process with \`flume launch\` or \`flume access run\`)`);
   const body: AccessRequest = {
     version: 1, request_id: input.requestId ?? randomUUID(), service: input.service, resource: input.resource, permissions: input.permissions,
     ...(input.lifetimeSeconds !== undefined ? { lifetime_seconds: input.lifetimeSeconds } : {}),
     ...(input.employee !== undefined ? { employee: input.employee } : {}),
   };
-  const response = await fetch(`${env.FLUME_ACCESS_URL!.replace(/\/$/u, "")}${ACCESS_REQUEST_PATH}`, {
+  return postAsLaunched(ACCESS_REQUEST_PATH, body, env);
+}
+
+/** The launcher's environment or an error naming what is missing: identity is never an argument. */
+function launchedEnv(env: NodeJS.ProcessEnv): void {
+  const missing = ["FLUME_ACCESS_URL", "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "FLUME_RUN_ASSERTION"].filter(name => !env[name]);
+  if (missing.length) throw new Error(`Not launched by Flume: missing ${missing.join(", ")} (start this process with \`flume launch\` or \`flume access run\`)`);
+}
+
+async function postAsLaunched(path: string, body: unknown, env: NodeJS.ProcessEnv): Promise<AccessResult> {
+  launchedEnv(env);
+  const response = await fetch(`${env.FLUME_ACCESS_URL!.replace(/\/$/u, "")}${path}`, {
     method: "POST",
     // Never follow a redirect: it would re-send the client secret and run assertion to whatever origin it names.
     redirect: "manual",
@@ -391,6 +442,15 @@ export async function requestAccess(input: AccessClientInput, env: NodeJS.Proces
   let parsed: Record<string, unknown>;
   try { parsed = JSON.parse(text); } catch { parsed = { ok: false, status: "error", code: "bad-response", detail: `HTTP ${response.status} without a JSON body` }; }
   return { http_status: response.status, body: parsed };
+}
+
+/**
+ * `flume mail list|read <id>` (FLUME-53): ask the agents-facade Worker for this employee's mail. Plain client: the Worker
+ * learns who is asking from the Access assertion and the run assertion the launcher set, never from an argument, and there
+ * is no send path. Only the authenticated employee's `mail/<handle>/` prefix is ever read, and only while they are active.
+ */
+export async function requestMail(input: MailRequest, env: NodeJS.ProcessEnv = process.env): Promise<AccessResult> {
+  return postAsLaunched(MAIL_MESSAGES_PATH, { operation: input.operation, ...(input.message_id !== undefined ? { message_id: input.message_id } : {}) }, env);
 }
 
 /** The result with any non-fixture credential value removed: a GitHub token is delivered to a child, never printed. */

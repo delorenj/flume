@@ -23,6 +23,7 @@ const UNPROVEN: Record<string, string> = {
   github_sandbox_installation: "No operator-designated sandbox repository and installation is verified for the employee GitHub Apps, so no real installation token has been minted; only fixture evidence exists",
   github_native_authorship: "Native GitHub authorship (a PR or issue comment whose author ID equals the employee's adopted bot) is proven only against the operator sandbox by hand; this command does not measure it",
   plane_native_identity: "Employee-native Plane identity (the PAT's user, board membership, comment authorship) is proven only by Pilot `px identity verify` receipts in plane-verifications.jsonl under FLUME_IDENTITY_STATE; this command measures none. A Plane PAT's expiry is not observable through the key, so no expiry is claimed",
+  employee_lifecycle_canary: "Suspend, restore, retire and rotation (`flume identity suspend|restore|retire|credentials|rotate|continuity`) are proven only against fixtures. No live sandbox canary (Rererere) has shown the facade, the mailbox, Cloudflare Access, GitHub, Plane and the gateway answering a real suspension with provider evidence; see _bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md",
   provider_account_rights: "GitHub App, Plane membership and AutomaticAI rights are provider facts this command does not measure",
 };
 

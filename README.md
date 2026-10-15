@@ -39,6 +39,11 @@ flume offboard <employee>     # remove the org-chart row; dry run unless --apply
 flume identity enroll <employee>           # one subject + <handle>@agents.delo.sh on the employee's own definition; preview unless --apply
 flume identity show <employee>             # read it back; legacy definitions stay readable
 flume identity status <employee> <status>  # active | suspended | retired (local only; revokes nothing); preview unless --apply
+flume identity suspend|retire <employee> [--revoke cloudflare_access|github|gateway ...]  # FLUME-53: status first, then the mailbox allowlist (captured, deleted, verified), then only the adapters named; retire adds the routing rule, a tombstone and --revoke all. Preview unless --apply; reports every credential honestly (complete_revocation, `revocation INCOMPLETE`)
+flume identity restore <employee>          # FLUME-53: a suspended employee back: re-puts the captured allowlist record, un-suspends only what the lifecycle suspended, status active LAST (preview unless --apply)
+flume identity credentials <employee>      # FLUME-53: read-only inventory of every credential and what each provider says about it
+flume identity rotate <employee> <provider> --credential-ref <op://...>  # FLUME-53: change credential_ref only (cloudflare_access|github|plane); the old key is manual-action-required (preview unless --apply)
+flume identity continuity <employee> [--record] [--comment e:<id>]  # FLUME-53: is history still the same person? baseline vs now; rotation/post move reported, drift is broken
 flume identity bind <employee> <provider> ...  # bind a provider principal by reference only; github: App ID, installation ID, op:// key ref; plane: native user UUID, https://<host>/<workspace>, op:// PAT ref (preview unless --apply)
 flume identity adopt-actor <employee> github  # record the employee's GitHub bot user ID as GitHub reports it (preview unless --apply)
 flume identity adopt-actor <employee> plane --board <b>  # Pilot (px identity verify) verifies the employee's own Plane user on every board; static PAT, expiry not observable (docs/employee-access.md)
@@ -49,6 +54,8 @@ flume access run <employee> -- <cmd>       # trusted launcher for any command; `
 flume access request --service s --resource r --permission p   # plain client; the employee comes from the launcher, never a flag
 flume access request --service github --resource owner/repo --permission issues:write --exec -- <cmd>   # a one-repository GitHub token, delivered only to <cmd>
 flume access github-inspect --employee <e>  # read-only look at the employee's GitHub App and installations
+flume access receipts --employee <e>       # read-only join of request, mail, denial and lifecycle records (docs/employee-access.md)
+flume mail list | read <id>                # the launched employee's own mailbox; no identity flag, no send
 flume comment verify-plane <REF> --comment <e>:<id>  # prove who wrote Plane comments from px show's actor ids (read-only; docs/employee-access.md)
 flume comment post|verify ...              # --exec consumers: leave a marked PR/issue comment as the employee and prove its author from GitHub's readback (docs/employee-access.md)
 

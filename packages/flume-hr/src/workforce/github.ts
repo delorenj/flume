@@ -299,6 +299,85 @@ export async function inspectGithubApp(input: { appId: string; keyRef: string; e
 }
 
 // ---------------------------------------------------------------------------
+// FLUME-53: lifecycle calls (the same transport, the same app JWT, no new client)
+// ---------------------------------------------------------------------------
+
+/** Why a provider call produced no answer: `http-<status>` when GitHub answered, else `provider-unavailable`. */
+const failureCode = (error: unknown): string => (statusOf(error) !== undefined ? `http-${statusOf(error)}` : "provider-unavailable");
+
+type AppSession = { api: Transport; headers: { authorization: string } } | { code: "credential-unavailable" | "app-key-invalid" };
+
+/** The App's private key from the vault, and an app JWT signed locally by @octokit/auth-app. No network. */
+async function appSession(facts: { appId: string; keyRef: string }, env: NodeJS.ProcessEnv): Promise<AppSession> {
+  let privateKey: string;
+  try { privateKey = readVaultSecret(facts.keyRef, "GitHub App private key"); }
+  catch { return { code: "credential-unavailable" }; }
+  const api = transport(githubApiBase(env), githubTimeoutMs(env));
+  try {
+    const jwt = (await createAppAuth({ appId: facts.appId, privateKey, request: api.request })({ type: "app" })).token;
+    return { api, headers: { authorization: `bearer ${jwt}` } };
+  } catch { return { code: "app-key-invalid" }; }
+}
+
+/**
+ * What GitHub says about the App's private key: `GET /app` with an app JWT it signs. A 401 is GitHub rejecting the key
+ * (deleted or rotated away); a 200 for the bound App is the key still being accepted. Read-only.
+ */
+export type GithubKeyProbe =
+  | { state: "accepted" }
+  | { state: "rejected"; http_status: number }
+  | { state: "unverified"; code: string }
+  | { state: "unresolved"; code: string };
+
+export async function probeGithubAppKey(facts: { appId: string; keyRef: string }, env: NodeJS.ProcessEnv = process.env): Promise<GithubKeyProbe> {
+  const session = await appSession(facts, env);
+  if ("code" in session) return { state: "unverified", code: session.code };
+  try {
+    const app = (await session.api.request("GET /app", { headers: session.headers })).data as Record<string, any>;
+    if (String(app.id) !== facts.appId) return { state: "unverified", code: "app-mismatch" };
+    return { state: "accepted" };
+  } catch (error) {
+    const status = statusOf(error);
+    if (status === 401) return { state: "rejected", http_status: 401 };
+    if (status !== undefined && status < 500) return { state: "unverified", code: `http-${status}` };
+    return { state: "unresolved", code: failureCode(error) };
+  }
+}
+
+export type GithubInstallationState =
+  | { state: "present"; suspended_at: string | null; account: string | null }
+  | { state: "absent" }
+  | { state: "error"; code: string; unresolved: boolean };
+
+/** `GET /app/installations/{id}` with the App's JWT. Read-only. */
+export async function readGithubInstallation(facts: { appId: string; keyRef: string; installationId: string }, env: NodeJS.ProcessEnv = process.env): Promise<GithubInstallationState> {
+  const session = await appSession(facts, env);
+  if ("code" in session) return { state: "error", code: session.code, unresolved: false };
+  try {
+    const data = (await session.api.request("GET /app/installations/{installation_id}", { installation_id: Number(facts.installationId), headers: session.headers })).data as Record<string, any>;
+    return { state: "present", suspended_at: typeof data.suspended_at === "string" && data.suspended_at ? data.suspended_at : null, account: data.account?.login ?? null };
+  } catch (error) {
+    const status = statusOf(error);
+    if (status === 404) return { state: "absent" };
+    return { state: "error", code: failureCode(error), unresolved: status === undefined || status >= 500 };
+  }
+}
+
+export type GithubInstallationWrite = { ok: true } | { ok: false; absent: boolean; code: string };
+
+/** `PUT /app/installations/{id}/suspended` (suspend) or `DELETE` (un-suspend), both authenticated as the App. */
+export async function writeGithubInstallationSuspension(facts: { appId: string; keyRef: string; installationId: string }, suspend: boolean, env: NodeJS.ProcessEnv = process.env): Promise<GithubInstallationWrite> {
+  const session = await appSession(facts, env);
+  if ("code" in session) return { ok: false, absent: false, code: session.code };
+  try {
+    await session.api.request(suspend ? "PUT /app/installations/{installation_id}/suspended" : "DELETE /app/installations/{installation_id}/suspended", { installation_id: Number(facts.installationId), headers: session.headers });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, absent: statusOf(error) === 404, code: failureCode(error) };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // FLUME-51: the bot user behind an App (the actor an operator adopts)
 // ---------------------------------------------------------------------------
 

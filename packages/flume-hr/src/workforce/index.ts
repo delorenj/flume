@@ -11,5 +11,7 @@ export * from "./access.js";
 export * from "./github.js";
 export * from "./comment.js";
 export * from "./plane.js";
+export * from "./lifecycle.js";
+export * from "./receipts.js";
 export * from "./launcher.js";
 export { buildOrgChart } from "../org/tree";

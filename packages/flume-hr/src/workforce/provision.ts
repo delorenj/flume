@@ -69,13 +69,13 @@ function receipt(line: Record<string, unknown>): void {
 // 1Password: op CLI. Secrets pass through argv to `op` only; nothing is logged.
 // ---------------------------------------------------------------------------
 
-function op(args: string[], input?: string): { ok: boolean; stdout: string; stderr: string } {
+export function op(args: string[], input?: string): { ok: boolean; stdout: string; stderr: string } {
   const run = spawnSync("op", args, { encoding: "utf8", input, timeout: 30_000, maxBuffer: 4 * 1024 * 1024 });
   if (run.error) return { ok: false, stdout: "", stderr: run.error.message };
   return { ok: run.status === 0, stdout: run.stdout ?? "", stderr: (run.stderr ?? "").trim() };
 }
 
-function opRead(reference: string): string {
+export function opRead(reference: string): string {
   const read = op(["read", reference]);
   if (!read.ok || !read.stdout.trim()) throw new Error(`op read failed for ${reference.split("/").slice(0, 3).join("/")}/…: ${read.stderr || "empty"}`);
   return read.stdout.trim();
@@ -134,10 +134,20 @@ function opItemFieldSet(item: OpItem, section: string, label: string, type: "tex
 // Cloudflare API. The token is resolved once, never logged, never receipted.
 // ---------------------------------------------------------------------------
 
-interface CfResponse { http_status: number; body: any }
+export const CLOUDFLARE_OFFICIAL_API_BASE = "https://api.cloudflare.com/client/v4";
+export interface CfResponse { http_status: number; body: any }
 
-function cfRequest(token: string, method: string, path: string, payload?: unknown): Promise<CfResponse> {
-  const base = (process.env.FLUME_CLOUDFLARE_API_BASE || "https://api.cloudflare.com/client/v4").replace(/\/$/u, "");
+/** `FLUME_CLOUDFLARE_API_BASE`, default the official API, without a trailing slash. */
+export function cloudflareApiBase(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.FLUME_CLOUDFLARE_API_BASE || CLOUDFLARE_OFFICIAL_API_BASE).replace(/\/$/u, "");
+}
+/** `provider` evidence only against the real API; anything else is a double. */
+export function cloudflareEvidence(env: NodeJS.ProcessEnv = process.env): "provider" | "fixture" {
+  return cloudflareApiBase(env) === CLOUDFLARE_OFFICIAL_API_BASE ? "provider" : "fixture";
+}
+
+export function cfRequest(token: string, method: string, path: string, payload?: unknown): Promise<CfResponse> {
+  const base = cloudflareApiBase();
   return fetch(`${base}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, "content-type": "application/json" },
@@ -150,17 +160,17 @@ function cfRequest(token: string, method: string, path: string, payload?: unknow
   }).catch(error => ({ http_status: 0, body: { errors: [{ message: (error as Error).message }] } }));
 }
 
-function cfOk(response: CfResponse): boolean {
+export function cfOk(response: CfResponse): boolean {
   return response.http_status >= 200 && response.http_status < 300 && response.body?.success !== false;
 }
 
-function cfError(response: CfResponse): string {
+export function cfError(response: CfResponse): string {
   const errors = Array.isArray(response.body?.errors) ? response.body.errors.map((e: any) => e.message ?? e.code ?? "?").join("; ") : "";
   return errors || `HTTP ${response.http_status || "no response"}`;
 }
 
-interface CfServiceToken { id: string; name: string; client_id?: string; expires_at?: string }
-interface CfRoutingRule { id: string; name?: string; enabled: boolean; matchers: Array<{ type: string; field?: string; value?: string }>; actions: Array<{ type: string; value?: string[] }> }
+export interface CfServiceToken { id: string; name: string; client_id?: string; expires_at?: string }
+export interface CfRoutingRule { id: string; name?: string; enabled: boolean; matchers: Array<{ type: string; field?: string; value?: string }>; actions: Array<{ type: string; value?: string[] }> }
 
 // ---------------------------------------------------------------------------
 // The capabilities

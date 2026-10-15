@@ -9,8 +9,9 @@
 // recomputed under the registry lock before any write.
 //
 // Status here is LOCAL employment state. Recording a suspension or retirement
-// revokes nothing at any provider; FLUME-53 owns revocation, and every status
-// answer says so.
+// revokes nothing at any provider; `flume identity suspend|retire` (lifecycle.ts,
+// FLUME-53) is what closes or reports provider access, and every status answer
+// says so.
 import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
@@ -20,7 +21,8 @@ import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
-import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, resolveGithubBotActor } from "./github";
+import { appendLifecycleLedger, readTombstones, type Tombstone } from "./lifecycle-state";
+import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, githubEvidence, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
 import { appendPlaneReceipt, isBoardArgument, planeBindingOf, planeBindingProblems, planeCredentialReport, planeEnrollmentPrerequisites, planeEvidence, verifyBoardViaPx, type PlaneBoardProof } from "./plane";
 import { withRegistryLock } from "./role";
@@ -30,7 +32,7 @@ import type { CompanyIdentity, CompanyIdentityBinding, CompanyIdentityStatus } f
 const HANDLE = /^[a-z0-9][a-z0-9_-]{0,57}$/u;
 const EMPLOYEE = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 const STATUSES: readonly CompanyIdentityStatus[] = ["active", "suspended", "retired"];
-export const PROVIDER_REVOCATION_NOTE = "Local employment state only: provider access was not revoked (FLUME-53 owns provider revocation).";
+export const PROVIDER_REVOCATION_NOTE = "Local employment state only: provider access was not revoked. `flume identity suspend|retire <employee> --apply` (FLUME-53) closes the mailbox and revokes or reports each provider credential.";
 
 export interface IdentityBlocker { code: string; detail: string; path?: string; provider_code?: string; board?: string }
 export interface ReconcileCandidate { provider: string; principal: string; person?: string; post?: string; description?: string; adoptable?: boolean; disposition?: string; source?: string; state: "unadopted" | "bound"; bound_at?: string }
@@ -74,6 +76,23 @@ function registryRows(path: string): Record<string, Record<string, unknown>> {
   const agents = (doc.toJS() as { agents?: unknown } | null)?.agents ?? {};
   if (!agents || typeof agents !== "object" || Array.isArray(agents)) throw new Error("Registry agents must be a mapping");
   return agents as Record<string, Record<string, unknown>>;
+}
+
+/**
+ * The Hermes profile (the employee's desk) a definition runs under: a post's registry `profile_name`, falling back to the
+ * post id; a portable specialist's desk directory name. Null for a post-less definition that is not a specialist.
+ */
+export function deskProfileOf(census: IdentityCensus, target: IdentityDefinition): string | null {
+  if (target.kind === "specialist") return target.posts.length ? (profileOfPost(census, target.posts[0]!) ?? target.posts[0]!) : basename(dirname(target.path));
+  const post = target.posts[0];
+  return post ? (profileOfPost(census, post) ?? post) : null;
+}
+
+function profileOfPost(census: IdentityCensus, post: string): string | undefined {
+  let rows: Record<string, Record<string, unknown>>;
+  try { rows = registryRows(census.registryPath); } catch { return undefined; }
+  const name = rows[post]?.profile_name;
+  return typeof name === "string" && name ? name : undefined;
 }
 
 function readDefinition(path: string, kind: IdentityDefinition["kind"], posts: string[], profile: string): IdentityDefinition {
@@ -147,7 +166,9 @@ function bindingKeys(block: CompanyIdentity | null): string[] {
   return Object.entries(block?.bindings ?? {}).map(([provider, b]) => `${provider}\u0000${b.instance ?? ""}\u0000${b.principal}`);
 }
 
-/** Every reason this definition may not hold this handle. Pure: reads the census only. */
+const tombstoneBindingKeys = (tombstone: Tombstone): string[] => tombstone.bindings.map(b => `${b.provider}\u0000${b.instance ?? ""}\u0000${b.principal}`);
+
+/** Every reason this definition may not hold this handle. Reads the census and the retirement tombstones only. */
 function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: string): IdentityBlocker[] {
   const blockers: IdentityBlocker[] = [];
   if (!HANDLE.test(handle)) blockers.push({ code: "invalid-handle", detail: `handle "${handle}" must match ${HANDLE.source}` });
@@ -155,6 +176,15 @@ function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: s
   const ownPost = target.kind === "specialist" && target.posts.includes(handle);
   if (census.postIds.includes(handle) && !ownPost) blockers.push({ code: "handle-reserved", detail: `"${handle}" is a registry post id; a person's handle never names a post` });
   const bindings = bindingKeys(target.block);
+  // FLUME-53: a retired identity's handle, subject and bindings outlive its registry row (`flume offboard`).
+  const tombstones = readTombstones();
+  for (const tombstone of tombstones) {
+    if (tombstone.subject === target.block?.subject) continue;
+    if (tombstone.handle === handle) blockers.push({ code: "handle-tombstoned", detail: `"${handle}" belonged to a retired employee (subject ${tombstone.subject}, retired ${tombstone.retired_at}); a retired handle is never reissued` });
+    for (const key of tombstoneBindingKeys(tombstone).filter(key => bindings.includes(key))) blockers.push({ code: "binding-tombstoned", detail: `binding ${key.split("\u0000").filter(Boolean).join("/")} belonged to a retired employee (subject ${tombstone.subject})` });
+  }
+  const own = target.block ? tombstones.find(tombstone => tombstone.subject === target.block!.subject) : undefined;
+  if (own && target.block!.status !== "retired") blockers.push({ code: "subject-tombstoned", detail: `subject ${own.subject} was retired ${own.retired_at}; a definition carrying it is not a new employee` });
   for (const other of census.definitions) {
     if (other === target || other.missing) continue;
     if (other.problem) { blockers.push({ code: "invalid-definition", detail: `census cannot read ${other.path}: ${other.problem}`, path: other.path }); continue; }
@@ -323,6 +353,11 @@ export async function setEmployeeStatus(employee: string, status: string, option
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
+    if (target.block && target.block.status !== "retired" && status !== "retired") {
+      // The registry row may be gone and the block hand-edited back to active: the tombstone still answers.
+      const tombstone = readTombstones().find(t => t.subject === target.block!.subject);
+      if (tombstone) blockers.push({ code: "retired-terminal", detail: `subject ${tombstone.subject} was retired ${tombstone.retired_at}; it never returns to service` });
+    }
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider_revocation: "not_performed" as const, note: PROVIDER_REVOCATION_NOTE };
     if (blockers.length || !target.block) return { ok: false, changed: false, from: target.block?.status ?? null, to: status, identity: target.block, blockers, writes: [] as string[], ...base };
     if (target.block.status === status) return { ok: true, changed: false, from: status, to: status, identity: target.block, blockers, writes: [] as string[], ...base };
@@ -348,6 +383,14 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity never gains bindings" });
+    const tombstones = readTombstones();
+    const ownTombstone = target.block ? tombstones.find(t => t.subject === target.block!.subject) : undefined;
+    if (ownTombstone && target.block && target.block.status !== "retired") blockers.push({ code: "subject-tombstoned", detail: `subject ${ownTombstone.subject} was retired ${ownTombstone.retired_at}; it never gains bindings` });
+    const requestedKey = `${provider}\u0000${binding.instance ?? ""}\u0000${binding.principal}`;
+    for (const tombstone of tombstones) {
+      if (tombstone.subject === target.block?.subject) continue;
+      if (tombstoneBindingKeys(tombstone).includes(requestedKey)) blockers.push({ code: "binding-tombstoned", detail: `${provider} principal ${binding.principal} belonged to a retired employee (subject ${tombstone.subject}); it is never rebound` });
+    }
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider };
     if (blockers.length || !target.block) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], ...base };
     const block = target.block;
@@ -554,4 +597,71 @@ export function showEmployeeIdentity(employee: string) {
   // A static Plane PAT: what Pilot last verified, else the honest "not verified, expiry not observable".
   const credentials = plane && target.block ? { plane: planeCredentialReport(target.block.subject, plane) } : undefined;
   return { ok: blockers.length === 0, employee, ...summary(target), enrolled: Boolean(target.block), identity: target.block, fields: target.fields, ...(credentials ? { credentials } : {}), blockers };
+}
+
+export interface RotateInput { credentialRef?: string; principal?: string; instance?: string }
+const ROTATABLE = ["cloudflare_access", "github", "plane"] as const;
+/** Where a rotate result's provider facts would come from: `provider` only against the official endpoint. */
+const providerEvidence = (provider: string): "provider" | "fixture" =>
+  provider === "github" ? githubEvidence() : provider === "plane" ? planeEvidence() : (process.env.FLUME_CLOUDFLARE_API_BASE || "https://api.cloudflare.com/client/v4").replace(/\/$/u, "") === "https://api.cloudflare.com/client/v4" ? "provider" : "fixture";
+
+/**
+ * `flume identity rotate <employee> <provider> --credential-ref <new>` (FLUME-53): change the binding's `credential_ref` and
+ * nothing else. The principal, instance, `native_actor_id` and attribution are the person's identity at that provider and are
+ * unchanged; a `--principal` or `--instance` that differs is refused. The old key is NOT revoked here (Flume never holds a
+ * provider's revocation for a key it did not mint): it is reported `manual-action-required`. The new reference is checked
+ * for shape and for being held nowhere else; it is not read. Gateway rotation is `gateway-tokens.py rotate` (FLUME-39).
+ * Preview unless `--apply`; an apply appends one `identity.rotate` ledger line.
+ */
+export async function rotateEmployeeCredential(employee: string, provider: string, input: RotateInput, options: IdentityOptions = {}) {
+  const run = async () => {
+    const census = identityCensus();
+    const target = resolveEmployee(census, employee);
+    const blockers: IdentityBlocker[] = [];
+    const problem = (code: string, detail: string) => blockers.push({ code, detail });
+    if (provider === "gateway") problem("rotation-owned-elsewhere", "the gateway token is minted and rotated by gateway-tokens.py (FLUME-39), not here");
+    else if (!(ROTATABLE as readonly string[]).includes(provider)) problem("invalid-request", `rotate supports ${ROTATABLE.join(", ")}, not "${provider}"`);
+    if (target.missing) problem("invalid-definition", `definition not found: ${target.path}`);
+    else if (target.problem) problem("invalid-definition", target.problem);
+    else if (stat(target.path)?.isSymbolicLink()) problem("invalid-definition", `refusing symlinked definition ${target.path}`);
+    else if (!target.block) problem("not-enrolled", `${employee} has no company identity; enroll first`);
+    else if (target.block.status === "retired") problem("retired-terminal", "a retired identity never rotates a credential");
+    const existing = target.block?.bindings?.[provider];
+    if (target.block && target.block.status !== "retired" && !blockers.length && !existing) problem("no-provider-binding", `${employee} has no ${provider} binding to rotate`);
+    const ref = input.credentialRef;
+    if (!ref) problem("invalid-credential-ref", "--credential-ref is required");
+    else {
+      const detail = provider === "cloudflare_access" ? (ref.startsWith("op://") ? undefined : "credential_ref must be an op:// reference") : githubCredentialRefProblem(ref);
+      if (detail) problem("invalid-credential-ref", detail);
+    }
+    if (existing && input.principal !== undefined && input.principal !== existing.principal) problem("rotation-changes-principal", `rotation keeps the principal (${existing.principal}); a different principal is a different identity at the provider`);
+    if (existing && input.instance !== undefined && input.instance !== existing.instance) problem("rotation-changes-principal", `rotation keeps the instance${existing.instance ? ` (${existing.instance})` : ""}; a different instance is a different identity at the provider`);
+    if (ref && target.block) {
+      for (const other of census.definitions) {
+        if (other.missing || other.problem) continue;
+        for (const [name, held] of Object.entries(other.block?.bindings ?? {})) {
+          if (held.credential_ref !== ref || (other.path === target.path && name === provider)) continue;
+          problem("credential-ref-duplicate", `${ref} is already the ${name} credential_ref at ${other.path}`);
+        }
+      }
+    }
+    const base = { command: "rotate" as const, employee, ...summary(target), apply: Boolean(options.apply), provider };
+    if (blockers.length || !target.block || !existing || !ref) return { ok: false, changed: false, binding: existing ?? null, blockers, writes: [] as string[], ...base };
+    const previous = existing.credential_ref ?? null;
+    const next = { ok: true, ...base, previous_ref: previous, credential_ref: ref, blockers };
+    if (previous === ref) return { ...next, changed: false, binding: existing, writes: [] as string[], credentials: [] as unknown[], note: "The binding already holds this credential_ref; nothing changed." };
+    const binding: CompanyIdentityBinding = { ...existing, credential_ref: ref };
+    const identity: CompanyIdentity = { ...target.block, bindings: { ...(target.block.bindings ?? {}), [provider]: binding } };
+    const writes = options.apply ? await writeDefinition(target, identity) : [];
+    if (options.apply) writes.push(appendLifecycleLedger({ event: "identity.rotate", employee, handle: target.block.handle, subject: target.block.subject, provider, principal: existing.principal, ...(existing.instance ? { instance: existing.instance } : {}), previous_ref: previous, credential_ref: ref }));
+    const nextAction = provider === "github" ? `flume access github-inspect --employee ${employee}`
+      : provider === "plane" ? `flume identity adopt-actor ${employee} plane --board <board> --apply`
+        : `flume access run ${employee} -- flume mail list`;
+    return {
+      ...next, changed: true, binding, writes,
+      credentials: previous ? [{ provider, kind: "previous-credential-reference", ref: previous, static: true, status: "manual-action-required", evidence: providerEvidence(provider), next_action: `revoke the old ${provider} key at the provider; Flume never held its revocation (${provider === "plane" ? "Plane: the owner deletes the token under Profile > Personal Access Tokens" : provider === "github" ? "GitHub: delete the old private key in the App settings" : "Cloudflare: Access service tokens are not rotated in place; delete the old token in Zero Trust"})` }] : [],
+      verification: { next_action: nextAction, identity_unchanged: { subject: target.block.subject, handle: target.block.handle, principal: existing.principal, native_actor_id: existing.native_actor_id ?? null } },
+    };
+  };
+  return options.apply ? withRegistryLock(environment().registryPath, run) : run();
 }

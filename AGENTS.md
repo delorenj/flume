@@ -39,7 +39,12 @@ flume offboard <employee>     # retire an employee
 flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
 flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)
 flume identity show <employee>             # read an employee's company identity
-flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access
+flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access (use suspend|retire below)
+flume identity suspend|retire <employee> [--revoke cloudflare_access|github|gateway ...]  # FLUME-53: status first, then the mailbox allowlist (captured, deleted, verified), then only the adapters named; retire adds the routing rule, a tombstone and --revoke all. Preview unless --apply; reports every credential honestly (complete_revocation, `revocation INCOMPLETE`)
+flume identity restore <employee>          # FLUME-53: a suspended employee back: re-puts the captured allowlist record, un-suspends only what the lifecycle suspended, status active LAST (preview unless --apply)
+flume identity credentials <employee>      # FLUME-53: read-only inventory of every credential and what each provider says about it
+flume identity rotate <employee> <provider> --credential-ref <op://...>  # FLUME-53: change credential_ref only (cloudflare_access|github|plane); the old key is manual-action-required (preview unless --apply)
+flume identity continuity <employee> [--record] [--comment e:<id>]  # FLUME-53: is history still the same person? baseline vs now; rotation/post move reported, drift is broken
 flume identity bind <employee> <provider> --principal --instance --credential-ref  # bind a provider by reference only (preview unless --apply); github: App ID, installation ID, op://<vault>/<item-uuid>/<field-id>; plane: native user UUID, https://<host>/<workspace>, op:// ref to the employee's own PAT
 flume identity adopt-actor <employee> github  # record the bot user ID GitHub reports for the employee's own App as native_actor_id (preview unless --apply; never mints)
 flume identity adopt-actor <employee> plane --board <b...>  # plane: Pilot (`px identity verify`) verifies the bound native user on every board, then native_actor_id = that UUID (preview unless --apply; Flume has no Plane client)
@@ -52,6 +57,8 @@ flume access run <employee> -- <cmd>       # trusted launcher for any plain comm
 flume access request --service s --resource r --permission p   # plain client; identity comes from the launcher, never a flag
 flume access request --service github --resource owner/repo --permission issues:write --exec -- <cmd>   # the GitHub token reaches only <cmd>'s env (GH_TOKEN/GITHUB_TOKEN), never output
 flume access github-inspect (--employee e | --app-id id --key-ref op://...)   # read-only: the App and its installations (app-JWT GETs only)
+flume access receipts (--employee e | --run id) [--gateway-proof f]   # FLUME-53: read-only join of request, mail, denial and lifecycle records by subject, run_id and operation_id
+flume mail list | read <id>                 # FLUME-53: plain client for the launched employee's own mailbox (no identity flag, no send); run as `flume access run <e> -- flume mail list`
 flume comment post <owner/repo> <n> --body <text> [--marker k] [--review --commit sha --path f --line n]   # --exec consumer: one marked comment, reconciled before and after, read back from GitHub
 flume comment verify <owner/repo> --comment <employee>:<issue|review>:<id> ...   # --exec consumer, read-only: native-distinct-verified only for distinct native Apps, by GitHub's author ID alone
 flume comment verify-plane <REF> --comment <employee>:<comment-id> ... [--apply]   # reads the ticket via `px show`; native-distinct-verified only for distinct adopted Plane users, by actor_id alone (docs/employee-access.md)

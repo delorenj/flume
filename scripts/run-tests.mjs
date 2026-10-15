@@ -81,6 +81,8 @@ const SUITES = [
   "tests/company-identity-registry-plane-regressions.mjs",
   "tests/company-identity-plane-regressions.mjs",
   "tests/identity-provision-regressions.mjs",
+  "tests/company-identity-lifecycle-regressions.mjs",
+  "tests/employee-access-lifecycle-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);
