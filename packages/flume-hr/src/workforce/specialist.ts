@@ -234,7 +234,22 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
       accessSync(runtime, constants.X_OK);
     } catch { throw new Error(`Deployment dependency: declared Hermes runtime unavailable: ${runtime}`); }
   }
-  const reference = `op://DeLoSecrets/hermes-${employee}/credential`;
+  let reference = `op://DeLoSecrets/hermes-${employee}/credential`;
+  try {
+    const deltaPath = join(audited.profile, "config.delta.yaml");
+    const configPath = join(audited.profile, "config.yaml");
+    if (existsSync(deltaPath)) {
+      const doc = YAML.parse(readFileSync(deltaPath, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, string> } } };
+      const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
+      if (typeof ref === "string" && ref.trim()) reference = ref.trim();
+    } else if (existsSync(configPath)) {
+      const doc = YAML.parse(readFileSync(configPath, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, string> } } };
+      const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
+      if (typeof ref === "string" && ref.trim()) reference = ref.trim();
+    }
+  } catch {
+    // fallback to reference
+  }
   const gateway = spawnSync("op", ["read", reference], { encoding: "utf8", timeout: 30_000, maxBuffer: 64 * 1024 });
   if (gateway.error || gateway.status !== 0 || !gateway.stdout.trim()) throw new Error(`Deployment dependency: employee member token unavailable at ${reference} (FLUME-39)`);
   // Who this run is comes from enrolled configuration; unenrolled, inactive or unbound employees are refused here.
