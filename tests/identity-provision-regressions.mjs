@@ -67,6 +67,9 @@ if (args[0] === "item" && args[1] === "create") {
       item.fields.push({ id: fid(m[1]), label: lbl, type: m[2], value: m[3], section: sec ? { label: sec } : undefined }); }
   }
   const list = items(); list.push(item); save(list);
+  // The installed op prints a human table unless --format json is given (found live, FLUME-53 canary): a caller that
+  // forgets the flag would parse "ID: ..." and strand an orphan item after it was created.
+  if (!(args.includes("--format") && args[args.indexOf("--format") + 1] === "json")) { process.stdout.write("ID:       " + item.id + "\\nTitle:    " + title + "\\n"); process.exit(0); }
   process.stdout.write(JSON.stringify(item));
   process.exit(0);
 }

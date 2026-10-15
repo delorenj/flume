@@ -105,7 +105,9 @@ function opFindIdentityItem(handle: string, vault: string): OpItem | null {
 function opItemCreate(handle: string, email: string, vault: string): OpItem {
   const title = handle.charAt(0).toUpperCase() + handle.slice(1);
   const created = op([
-    "item", "create", "--category", "identity", "--title", title, "--vault", vault,
+    // `--format json` is required: without it the installed op prints a human "ID: ..." table and the parse below throws
+    // AFTER the item exists, which strands an orphan vault item (found live by the FLUME-53 canary).
+    "item", "create", "--format", "json", "--category", "identity", "--title", title, "--vault", vault,
     `email[email]=${email}`, `username[text]=${handle}`,
   ]);
   if (!created.ok) throw new Error(`op item create failed: ${created.stderr}`);
