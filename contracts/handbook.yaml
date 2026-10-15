@@ -134,6 +134,16 @@ authorities:
       # first). The SOUL composer lists them; the memory provider does not.
       - agents.{agent_id}.hindsight.recall_banks
       - agents.{agent_id}.provisioned_at
+      # An employee's PROVIDER-VERIFIED native Plane identity (FLUME-52). The
+      # SOURCE is the owning definition's company_identity.bindings.plane
+      # (role.yaml of a post; a portable specialist's agent.yaml), and only once
+      # `flume identity adopt-actor <e> plane` has had Pilot verify it
+      # (native_actor_id == principal). `flume remediate hermes.registry-parity`
+      # projects principal -> member_id and credential_ref -> key_ref. Neither
+      # field is ever hand-written, and a row with no verified binding is left
+      # exactly as it is: the registry does not guess a principal.
+      - agents.{agent_id}.plane.member_id
+      - agents.{agent_id}.plane.key_ref
       - agents.{agent_id}.runtime_repo
       - agents.{agent_id}.telegram.provisioning_status
       - agents.{agent_id}.slack.provisioning_status

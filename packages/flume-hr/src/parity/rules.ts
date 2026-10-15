@@ -93,6 +93,8 @@ interface RoleMeta {
   botHandle: string;
   /** The named-agent declaration in role.yaml `identity:`; `none` for an unnamed post. */
   identity: RoleIdentity;
+  /** FLUME-52: the employee's provider-verified native Plane user, or null until `adopt-actor ... plane` has verified one. */
+  planeIdentity: RolePlaneIdentity | null;
   runtimeRepo: string;
   runtimeOwner: string;
   planeWorkspace: string;
@@ -325,6 +327,7 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
         purpose: yamlGet(text, "purpose"),
         botHandle: yamlGet(text, "telegram.bot_username"),
         identity: readRoleIdentity(text, yamlGet(text, "agent_id"), yamlGet(text, "profile") || yamlGet(text, "agent_id")),
+        planeIdentity: readRolePlaneIdentity(text),
         runtimeRepo: runtimeRepoRaw.includes("/") ? runtimeRepoRaw.split("/").slice(-1)[0] ?? runtimeRepoRaw : runtimeRepoRaw,
         runtimeOwner: yamlGet(text, "runtime.github_owner"),
         planeWorkspace: yamlGet(text, "ticket_provider.workspace") || yamlGet(text, "plane.workspace"),
@@ -357,6 +360,59 @@ function registryPath(homeDir: string): string {
 // tests/fleet-shared-bloodbank-regressions.mjs enforces that scoping so the
 // legacy contract can be detected and cleaned but never provisioned again.
 const LEGACY_SYSTEMD_KEYS = ["consumer_unit", "checkpoint_timer"] as const;
+
+
+/** A provider-verified native Plane user, as the employee's definition records it. */
+export interface RolePlaneIdentity { nativeUserId: string; credentialRef: string }
+
+/**
+ * FLUME-52: the native Plane identity an ACTIVE employee's role.yaml carries in
+ * `company_identity.bindings.plane`. Only an ADOPTED binding (`native_actor_id`
+ * set, equal to the requested `principal`, i.e. verified by Pilot) is projected; a bare
+ * request, a suspended or retired employee, or a malformed block projects nothing,
+ * so the registry never gains an unverified principal.
+ */
+export function readRolePlaneIdentity(text: string): RolePlaneIdentity | null {
+  let root: unknown;
+  try {
+    const doc = YAML.parseDocument(text, { uniqueKeys: true });
+    if (doc.errors.length > 0) return null;
+    root = doc.toJS();
+  } catch {
+    return null;
+  }
+  const block = (root as Record<string, unknown> | null)?.company_identity;
+  if (!block || typeof block !== "object" || Array.isArray(block)) return null;
+  const identity = block as Record<string, unknown>;
+  if (identity.status !== "active") return null;
+  const bindings = identity.bindings;
+  const plane = bindings && typeof bindings === "object" ? (bindings as Record<string, unknown>).plane : undefined;
+  if (!plane || typeof plane !== "object" || Array.isArray(plane)) return null;
+  const binding = plane as Record<string, unknown>;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+  if (typeof binding.principal !== "string" || !uuid.test(binding.principal)) return null;
+  if (binding.native_actor_id !== binding.principal) return null;
+  if (typeof binding.credential_ref !== "string" || !/^op:\/\/[^/\s]+\/[A-Za-z0-9]{26}\/[A-Za-z0-9]+$/u.test(binding.credential_ref)) return null;
+  return { nativeUserId: binding.principal, credentialRef: binding.credential_ref };
+}
+
+
+/**
+ * How a registry row's native Plane identity (`plane.member_id`, `plane.key_ref`)
+ * disagrees with the verified binding in role.yaml. role.yaml is the SSOT; the
+ * registry carries a projection only. Absent a verified binding nothing is claimed,
+ * so legacy rows are left alone rather than guessed at.
+ */
+function registryPlaneIdentityDrift(role: RoleMeta, entry: Record<string, unknown>): string[] {
+  const bound = role.planeIdentity;
+  if (!bound) return [];
+  const plane = (typeof entry.plane === "object" && entry.plane !== null && !Array.isArray(entry.plane)) ? entry.plane as Record<string, unknown> : {};
+  const out: string[] = [];
+  const show = (value: unknown) => (typeof value === "string" && value !== "" ? `"${value}"` : "absent");
+  if (plane.member_id !== bound.nativeUserId) out.push(`registry plane.member_id for ${role.agentId} is ${show(plane.member_id)} (role.yaml's verified native Plane user is "${bound.nativeUserId}")`);
+  if (plane.key_ref !== bound.credentialRef) out.push(`registry plane.key_ref for ${role.agentId} is ${show(plane.key_ref)} (role.yaml's verified credential reference is "${bound.credentialRef}")`);
+  return out;
+}
 
 
 /**
@@ -4318,6 +4374,7 @@ return [
           details.push(`registry entry for ${role.agentId} must advertise bloodbank { gateway_scope: fleet, target_agent_id: ${role.agentId} }`);
         }
         details.push(...registryIdentityDrift(role, entry));
+        details.push(...registryPlaneIdentityDrift(role, entry));
         const systemd = (entry.systemd ?? {}) as Record<string, unknown>;
         for (const key of LEGACY_SYSTEMD_KEYS) {
           if (systemd[key] !== undefined) {
@@ -4469,6 +4526,15 @@ return [
             if (hindsight.write_bank === `agent-${prior}`) delete entry.hindsight;
             dirty = true;
           }
+        }
+        // FLUME-52: project the verified native Plane identity exactly as role.yaml records it.
+        if (role.planeIdentity && registryPlaneIdentityDrift(role, entry).length > 0) {
+          const plane = (typeof entry.plane === "object" && entry.plane !== null && !Array.isArray(entry.plane))
+            ? { ...(entry.plane as Record<string, unknown>) }
+            : {};
+          details.push(`project verified native Plane identity ${role.planeIdentity.nativeUserId} (key ${role.planeIdentity.credentialRef}) onto ${role.agentId}`);
+          entry.plane = { ...plane, member_id: role.planeIdentity.nativeUserId, key_ref: role.planeIdentity.credentialRef };
+          dirty = true;
         }
         const systemd = entry.systemd as Record<string, unknown> | undefined;
         if (systemd) {
