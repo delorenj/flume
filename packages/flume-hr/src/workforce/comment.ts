@@ -384,7 +384,8 @@ export async function verifyComments(input: VerifyCommentsInput, env: NodeJS.Pro
       verdicts.push({ employee: entry.employee, subject: who.subject, kind: entry.kind, id: entry.id, authorship, authorId });
       comments.push({ ...base, authorship, ...(reason ? { reason } : {}), ...extra });
     };
-    if (!who.binding || "code" in githubBindingOf(who.binding)) { note("not-native-verified", "no-provider-binding"); continue; }
+    const bound = githubBindingOf(who.binding);
+    if ("code" in bound || !who.binding) { note("not-native-verified", "code" in bound ? bound.code : "no-provider-binding"); continue; }
     if (!who.binding.native_actor_id) { note("not-native-verified", "native-actor-not-adopted"); continue; }
     const response = await call(readRoute(entry.kind), { owner, repo, comment_id: Number(entry.id) });
     if (!response.ok) { note("not-native-verified", "comment-unreadable", { http_status: response.status ?? null }); continue; }

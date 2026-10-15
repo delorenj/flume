@@ -186,8 +186,10 @@ async function fakeGithub() {
         const { commit_id, path, line, side } = call.body;
         if (!commit_id || path !== "proof.txt" || !(line >= 1 && line <= 3) || !["RIGHT", "LEFT"].includes(side)) return sendJson(res, 422, { message: "Unprocessable Entity\npull_request_review_thread.line must be part of the diff" });
       }
-      const comment = { id: gh.nextComment++, kind: review ? "review" : "issue", number, user: botLogin(live.name), body: call.body.body, app: live.app,
-        ...(review ? { path: call.body.path, line: gh.mode.locationDrift ? call.body.line + 1 : call.body.line, side: call.body.side, commit_id: call.body.commit_id } : {}) };
+      const drift = gh.mode.locationDrift === true ? "line" : gh.mode.locationDrift; // GitHub stores the comment somewhere other than asked
+      const comment = { id: gh.nextComment++, kind: review ? "review" : "issue", number: drift === "number" ? String(Number(number) + 1) : number, user: botLogin(live.name), body: call.body.body, app: live.app,
+        ...(review ? { path: drift === "path" ? "other.txt" : call.body.path, line: drift === "line" ? call.body.line + 1 : call.body.line,
+          side: drift === "side" ? (call.body.side === "LEFT" ? "RIGHT" : "LEFT") : call.body.side, commit_id: drift === "commit" ? OLD_HEAD : call.body.commit_id } : {}) };
       gh.comments.push(comment);
       if (gh.mode.commentPost === "hang-after-store") { gh.sockets.add(res.socket); return; }
       if (gh.mode.commentPost === "500-after-store") return sendJson(res, 500, { message: "Server Error" });
@@ -594,17 +596,20 @@ try {
       assert.equal(tokenCalls(mark).length, 0);
     }
     assert.equal((await posted("ada", 7, "x", ["--commit", HEAD], 1)).code, "invalid-arguments", "review flags without --review");
-    gh.mode.locationDrift = true;
-    mark = gh.mark();
-    const drift = await posted("ada", 7, "x", [...reviewArgs(), "--marker", "drifted-line-1"], 1);
-    gh.reset();
-    assert.equal(drift.status, "unverified");
-    assert.equal(drift.code, "location-mismatch");
-    assert.equal(drift.ok, false);
-    assert.equal(commentPosts(mark).length, 1);
+    // every location field is checked: path, line, side, commit and the PR/issue number, for both comment kinds
+    for (const [where, args] of [["line", reviewArgs()], ["path", reviewArgs()], ["side", reviewArgs()], ["commit", reviewArgs()], ["number", reviewArgs()], ["number", []]]) {
+      gh.mode.locationDrift = where;
+      mark = gh.mark();
+      const drift = await posted("ada", 7, "x", [...args, "--marker", `drifted-${where}-${args.length ? "review" : "issue"}`], 1);
+      gh.reset();
+      assert.equal(drift.status, "unverified", where);
+      assert.equal(drift.code, "location-mismatch", `${where} drift: ${JSON.stringify(drift)}`);
+      assert.equal(drift.ok, false, where);
+      assert.equal(commentPosts(mark).length, 1, where);
+    }
     assert.equal((await posted("ada", 999, "x", [...reviewArgs(), "--marker", "missing-target-1"], 1)).code, "target-not-found");
     assert.equal((await posted("ada", 999, "x", [], 1)).code, "target-not-found");
-    pass("stale head, a line outside the diff, missing pull_requests:write, a drifted location, a missing target and every unsupported review mode fail with their explicit code");
+    pass("stale head, a line outside the diff, missing pull_requests:write, a drifted location, a missing target and every unsupported review mode fail with their explicit code; a drifted path, line, side, commit or number is location-mismatch for both kinds");
   }
 
   // -- timeouts and ambiguity ----------------------------------------------------------------------------------------
@@ -695,6 +700,11 @@ try {
     assert.deepEqual(sameApp.reasons, ["shared-app"]);
     // one employee is not a distinct pair
     assert.deepEqual((await verify("ada", [`ada:issue:${first.ada}`], 1)).reasons, ["fewer-than-two-employees"]);
+    // a named comment GitHub cannot return (no such id, or an issue comment named as review) is never verified
+    const unreadable = await verify("ada", [`ada:issue:${first.ada}`, `bob:issue:${first.bob}`, "bob:issue:4999", `bob:review:${first.bob}`], 1);
+    assert.equal(unreadable.verdict, "not-native-distinct");
+    assert.deepEqual(unreadable.comments.slice(2).map((c) => c.reason), ["comment-unreadable", "comment-unreadable"]);
+    assert.deepEqual(unreadable.reasons, ["not-native-verified:bob:issue:4999", `not-native-verified:bob:review:${first.bob}`]);
     // an unadopted employee has nothing to compare against
     setBindings(roles.fay, { cloudflare_access: cfBinding("fay"), github: ghBinding("fay") });
     const mark = gh.mark();

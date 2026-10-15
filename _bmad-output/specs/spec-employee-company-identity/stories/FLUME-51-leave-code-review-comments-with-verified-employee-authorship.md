@@ -200,6 +200,50 @@ deferred: []
   - `[false]` `[reject]` Intent: no sandbox pin in code — the Never clause constrains the run; the sole sandbox grant enforces it, and only the sandbox was posted to.
   - `[false]` `[reject]` Intent: the facade mints a token before a not-adopted refusal — "0 network calls" applies to `flume comment`; the suite asserts zero token-authenticated calls.
 
+### 2026-10-14 — Review pass (follow-up)
+- verdicts: 40 findings — high 0, medium 0, low 24, false 16, maybe-false 0
+- findings:
+  - `[low]` `[reject]` Blind: a wrong-author readback is not reconciled, so a same-marker re-run posts again — carried: reachable only with a token `--exec` did not deliver for that binding; the fix adds new branches.
+  - `[low]` `[reject]` Blind: plain output hides the id/URL of a comment that exists after a non-ok result — carried: `--json` carries every field; the plain gaps are rare-path only.
+  - `[low]` `[reject]` Blind: reusing a marker with new text returns the old comment — carried: the spec defines the marker as the idempotency key.
+  - `[low]` `[reject]` Blind: an outdated review comment (line null after a push) reconciles to `location-mismatch` — carried: fail-closed, only on a re-run after the PR moved; the fix adds original-line branches.
+  - `[low]` `[reject]` Blind: reconcile stops at 1,000 comments — carried: spec mandates `per_page=100`, at most 10 pages, then `reconcile-incomplete`.
+  - `[false]` `[reject]` Blind: missing grant fields export the literal `undefined` — carried: the granted github body always carries the four facts (`access.ts`).
+  - `[low]` `[reject]` Blind: `adopt-actor --apply` holds the registry lock across network I/O — carried: bounded by `FLUME_GITHUB_TIMEOUT_MS`, rare operator action.
+  - `[low]` `[reject]` Blind: the adopted actor is not tied to the App, and `performed_via_github_app.id` is never compared to the principal — a stale actor needs a hand-edited principal (a real rebind to another App is `binding-conflict`, tested); comparing `performed_via_github_app` adds a branch for an unreachable everyday state.
+  - `[low]` `[reject]` Blind: the facade-drop hazard is documented but not mitigated in code — the older builds that misread the field are already deployed and cannot be changed retroactively; deploy-first ordering is documented, and the live facade runs the new build.
+  - `[false]` `[reject]` Blind: the rebind fix has no regression test — `tests/employee-access-github-comments-regressions.mjs:433-440` asserts the identical rebind is `changed: false` keeping `native_actor_id`, and a different principal is `binding-conflict`.
+  - `[low]` `[reject]` Blind: further untested validation paths (`--side LEFT`, both body flags, oversized body, >50 comments, duplicate `--comment`) and `employee-not-enrolled` reported for a missing/problem definition — fail-closed rare paths; the code name is accurate enough (no block means not enrolled) and new cases are beyond a direct correction.
+  - `[false]` `[reject]` Blind: 17–18-digit comment ids lose precision — carried: GitHub comment ids are ~10^10; unreachable.
+  - `[low]` `[reject]` Blind: `^\d+$` admits leading zeros — carried: the spec fixes the pattern, and only `adopt-actor` writes the value from GitHub's integer.
+  - `[low]` `[reject]` Blind: the live-proof receipt has no commit/build identifier, and lists Rererere's actor id ahead of adoption — the spec's receipt contents are IDs/marker/URL/author/location/status, all present; the Rererere id is the observed public bot user (Code Map); build provenance cannot be reconstructed reliably after the fact.
+  - `[false]` `[reject]` Edge: a 200 readback with null data throws — carried: GitHub never answers a comment GET 200 with null.
+  - `[false]` `[reject]` Edge: a non-array 200 list is treated as "no earlier copy" — GitHub's issue/PR comment list endpoints always return an array on 200; not shown reachable.
+  - `[low]` `[reject]` Edge: outdated comment with `line: null` cannot be reconciled — carried, same as the Blind row above.
+  - `[low]` `[reject]` Edge: reused marker with a different body returns the old comment — carried, same as the Blind marker row.
+  - `[low]` `[reject]` Edge: `FLUME_GITHUB_INSTALLATION_ID` never compared to `binding.instance` — carried: the facade mints from the binding's own instance.
+  - `[false]` `[reject]` Edge: missing grant fields export `undefined` — carried, same as the Blind row.
+  - `[false]` `[reject]` Edge: a 422 on a review POST for another reason is labeled `invalid-position` — the spec mandates "A 422 on a review comment is `invalid-position`", and the detail carries GitHub's message.
+  - `[low]` `[patch]` Edge: `verify` reports a malformed binding as `no-provider-binding`, hiding `provider-binding-invalid` — `comment.ts` `verifyComments` now notes `githubBindingOf`'s own code.
+  - `[false]` `[reject]` Edge: `verifyAuthorship` is named `verifyComments` — carried: cosmetic; nothing references the spec name.
+  - `[low]` `[patch]` Verification gap: `locationProblem` is tested only for line drift — the fake's `locationDrift` mode now drifts path, line, side, commit or number, and the suite asserts `location-mismatch` for each review field and for a conversation comment's issue number; a mutation removing the path check was confirmed to fail the suite.
+  - `[low]` `[patch]` Verification gap: `verify`'s `comment-unreadable` branch is untested — added a verify of a nonexistent id and an issue comment named as `review`, asserting `not-native-distinct`, `comment-unreadable` and both `not-native-verified:` reasons.
+  - `[low]` `[reject]` Verification gap: provider-failure branches (`readback-failed`, reconcile/preflight failures, `adopt-actor` failure codes) are untested — carried: fail-closed branches; adding cases is beyond a direct correction.
+  - `[false]` `[reject]` Intent: the two-native proof exists only against the fake — carried: AC5 expects live AC1 reported blocked by the Rererere gate.
+  - `[low]` `[reject]` Intent: `GH_TOKEN` is never tied to the grant, so a hand-built env with a PAT passes pre-network checks — carried: the readback author check still refuses it; binding env to the grant needs new signed surface.
+  - `[false]` `[reject]` Intent: no sandbox pin in code — carried: the sole sandbox grant enforces it.
+  - `[low]` `[patch]` Intent: the additive field broke the deployed facade (C2) — carried: the deploy-first doc fix was applied in the prior pass; not patched again.
+  - `[false]` `[reject]` Intent: "0 network calls" is not held across the whole launcher chain — carried: it applies to `flume comment`; the suite asserts zero token-authenticated calls.
+  - `[low]` `[reject]` Intent: a POST 404 and `provider-refused` are never asserted, and a rate-limit 403 maps to `provider-refused` — carried for the rate-limit mapping; the unasserted branches are fail-closed rare paths.
+  - `[false]` `[reject]` Intent: "two distinct `user.id`" is asserted on the binding projection, not the readback — `native-verified` requires readback `user.id` to equal the binding's `native_actor_id`, so the two are equal for every passing comment.
+  - `[false]` `[reject]` Intent: the shared-bot row is reached via an adopt override — carried: ada/fay are also hand-bound to one actor and assert `shared-actor`.
+  - `[false]` `[reject]` Intent: the whole result and the receipt file carry more than the per-comment receipt fields — the spec's "receipt" is the per-comment object; the extra fields are IDs, handles and `op://` references, and the secret scan passes.
+  - `[false]` `[reject]` Intent: behavior beyond the intent (extra codes, limits, rebind no-op) — carried: additive, fail-closed codes; no harm.
+  - `[low]` `[reject]` Intent: parser refusals (no `--comment`, a flag without a value) print usage without an `evidence` JSON — usage errors before any action; fixing them adds a JSON path to the arg parser for a non-result.
+  - `[low]` `[reject]` Intent: `--side LEFT`, a non-timeout network error and the `adopt-actor` failure codes are never exercised — carried: fail-closed branches.
+  - `[low]` `[patch]` Intent: the adopt docs say a login is "never compared", but `adopt-actor` compares it exactly — `docs/employee-access.md` now says the login is checked only to find the bot user and is never used for comment authorship.
+  - `[false]` `[reject]` Intent: the live run merged to main, restarted `flume-access.service`, and authenticated through Cloudflare Access — merging is the operator's standing git policy, the restart deployed the new build, and authenticating through Access does not modify Cloudflare.
+
 ## Design Notes
 
 Why the native actor is stored. An installation token cannot read `GET /app`. PR review comments do not reliably carry `performed_via_github_app`. So the only stable, provider-issued author identity is the bot's user ID, which is adopted once by an operator who holds the App key, matching the architecture's `native_actor_id`. A login is mutable, so it is recorded but never compared.
@@ -215,49 +259,26 @@ Why each invocation POSTs at most once. GitHub comment creation has no idempoten
 
 ## Auto Run Result
 
-Status: implemented; verification passed; live AC1 blocked on Rererere (the exact gate below); live AC2 and Grolf-only readbacks done.
+Status: done (follow-up review pass, 2026-10-14). Live AC1 remains blocked by the Rererere gate.
 
-What changed:
-- `native_actor_id` (`^\d+$`, optional) on the binding schema and type; block stays `version: 1`.
-- `flume identity adopt-actor <employee> github [--apply]` (`adoptNativeActor`, `resolveGithubBotActor`).
-- `execWithGithubToken` also exports `FLUME_EMPLOYEE_SUBJECT`, `FLUME_GITHUB_REPOSITORY`, `FLUME_GITHUB_APP_ID`, `FLUME_GITHUB_INSTALLATION_ID`.
-- `packages/flume-hr/src/workforce/comment.ts`: `flume comment post|verify`, the one authorship rule, reconcile-before-POST.
-- Readiness `github_native_authorship` (unproven); `github.ts` exports `transport`, `statusOf`, `requestIdOf`, `firstLine`, `isTimeout`.
-- `tests/employee-access-github-comments-regressions.mjs` (15 groups), registered in `SUITES`; `docs/employee-access.md`, `AGENTS.md` (CLAUDE.md and GEMINI.md link to it), `README.md`.
+Summary: FLUME-51 adds `flume identity adopt-actor`, `flume comment post|verify`, the optional `native_actor_id` binding field, four `FLUME_*` exec env vars and readiness `github_native_authorship`. Authorship is decided only by GitHub's readback `user.id` against the adopted actor. The first pass (commits `17e6b30`..`bf770ab`) implemented, live-proved Grolf on the sandbox and fixed an idempotent-rebind regression. This follow-up pass re-reviewed the cumulative diff from `feee85c` and tightened tests and one diagnostic.
 
-Verified: `git diff --check` clean; `node scripts/run-tests.mjs employee-access-github-comments` PASS; the seven-suite regression list PASS (11 suites, including company-identity with the extended readiness key list).
+Files changed in this pass:
+- `tests/employee-access-github-comments-regressions.mjs` — the fake's `locationDrift` mode now drifts path, line, side, commit or number; `location-mismatch` asserted for each review field and for a conversation comment's issue number; `verify` of a nonexistent id and of a wrong-kind id asserted `comment-unreadable` / `not-native-distinct`.
+- `packages/flume-hr/src/workforce/comment.ts` — `verifyComments` reports `githubBindingOf`'s own code (`provider-binding-invalid`) instead of always `no-provider-binding`.
+- `docs/employee-access.md` — the adopt section says the login is checked only to find the bot user and never used for comment authorship.
 
-Live (sandbox `delorenj/flume-identity-sandbox` PR #1 only), receipt `_bmad-output/implementation-artifacts/FLUME-51/live-proof-2026-10-14.md`:
-- Grolf adopted actor `341820121` (`gr0lfbot[bot]`), committed in the 33GOD repo.
-- Conversation comment `6181426777` and inline comment `4277681258` (proof.txt line 2, PR head) read back `native-verified`; a re-run reconciled to the same comment; `verify` of Grolf alone is `not-native-distinct` (`fewer-than-two-employees`); commit evidence is `unsupported-evidence`.
+Review findings (40: high 0, medium 0, low 24, false 16, maybe-false 0):
+- Patches applied (4, all low): location-drift coverage for every field; `comment-unreadable` coverage; the verify binding-code diagnostic; the login doc sentence. One more row was a carried low patch (the prior pass's deploy-first doc) and was not patched again.
+- Deferred: none. The existing `deferred` ledger was not touched.
+- Rejected: 35. Each reason is in the Review Triage Log. They are carried rows from the first pass, spec-mandated behavior (marker idempotency, 10-page reconcile cap, 422 mapping, the id pattern), fail-closed rare paths whose fix adds branches, unreachable inputs (null or non-array 200 bodies, ids above 2^53), and claims refuted (the rebind test exists at `:433-440`; distinct `user.id` equals the binding by construction).
 
-Blocking condition for live AC1, still open: the Rererere App (5296560) has no installation on the sandbox (`installations: []`, 2026-10-15T00:20Z). Gate, in order: the operator passkey install of App 5296560 on the sandbox; `identity bind rererere github ... --apply`; a sandbox grant for subject `1dca27f5-06e8-47a3-86c9-49bc3ed5331c`; `adopt-actor`.
+Follow-up review recommended: false. This is a follow-up pass, and no high was patched (patched: high 0, medium 0, low 4).
 
-Risk: a facade running a build without `native_actor_id` reads an adopted definition as invalid and answers that employee `unknown-client`. This happened live after adopting Grolf and was fixed by landing, rebuilding and restarting `flume-access.service`. Deploy the new build before adopting on any other host.
+Verification: `git diff --check` clean after this write-back. `node scripts/run-tests.mjs employee-access-github-comments` PASS. `node scripts/run-tests.mjs employee-access-github-comments named-agent role-contract registry-comments company-identity employee-access identity-provision specialist-hire`: 11/11 suites PASS after all patches. Mutation check: removing the path comparison from `locationProblem` makes the comments suite FAIL; the source was restored.
 
-### Review pass (2026-10-14)
-
-Final status: done (implementation and review); live AC1 remains blocked by the Rererere gate above.
-
-Files changed:
-- `contracts/company-identity.schema.json`, `packages/flume-hr/src/workforce/types.ts` — optional `native_actor_id` on the binding.
-- `packages/flume-hr/src/workforce/github.ts` — exported transport/error helpers; `resolveGithubBotActor`.
-- `packages/flume-hr/src/workforce/company.ts` — `adoptNativeActor`; identical rebind of an adopted binding stays a no-op.
-- `packages/flume-hr/src/workforce/comment.ts` (new) — `postComment`, `verifyComments`, the authorship rule, reconcile.
-- `packages/flume-hr/src/workforce/access.ts` — four `FLUME_*` exec env vars from the granted body.
-- `packages/flume-hr/src/workforce/readiness.ts`, `workforce/index.ts` — `github_native_authorship`; exports.
-- `packages/flume-hr/src/index.ts` — `identity adopt-actor`, `comment post|verify`.
-- `tests/employee-access-github-comments-regressions.mjs` (new), `scripts/run-tests.mjs`, `tests/company-identity-regressions.mjs` — suite and registration; readiness key list.
-- `docs/employee-access.md`, `AGENTS.md`, `README.md` — flow, rule, reconcile semantics, live-proof gate, deploy-first warning.
-- `_bmad-output/implementation-artifacts/FLUME-51/live-proof-2026-10-14.md` — Grolf live receipt and AC1 gate.
-
-Review findings: 50 (high 0, medium 2, low 32, false 15, maybe-false 1).
-- Patches applied (2 entries): medium — re-running an identical `identity bind` after `adopt-actor` failed `binding-conflict` (fixed in `bindEmployeeProvider`, tests added); low — deploy-order hazard documented in `docs/employee-access.md`.
-- Deferred: none.
-- Rejected: 46, each with its reason in the Review Triage Log (spec-mandated behavior, fail-closed rare paths, unreachable inputs, or claims refuted).
-
-Follow-up review recommended: false (patched: high 0, medium 1, low 1).
-
-Verification: `git diff --check` clean; `node scripts/run-tests.mjs employee-access-github-comments` PASS; `node scripts/run-tests.mjs named-agent role-contract registry-comments company-identity employee-access identity-provision specialist-hire` — 11/11 suites PASS after the patch. Matrix audit: every I/O matrix row has an asserting test in the comments suite that ran and passed.
-
-Residual risks: live `native-distinct-verified` with `evidence: provider` is unproven until Rererere's gate clears; `comment` consumers trust the `--exec` environment and rely on the readback author check if run with a foreign token; concurrent same-marker invocations are not serialized.
+Residual risks:
+- Live `native-distinct-verified` with `evidence: provider` is unproven until the Rererere gate clears, in order: the operator passkey install of App 5296560 on the sandbox; `identity bind rererere github ... --apply`; a sandbox grant for subject `1dca27f5-06e8-47a3-86c9-49bc3ed5331c`; `adopt-actor`. Grolf-only live readbacks (`_bmad-output/implementation-artifacts/FLUME-51/live-proof-2026-10-14.md`) are partial evidence.
+- `comment` consumers trust the `--exec` environment, and fall back on the readback author check if they are run with a foreign token.
+- Concurrent same-marker invocations are not serialized.
+- Facades running a pre-`native_actor_id` build misread adopted definitions. Deploy first.

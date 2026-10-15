@@ -199,8 +199,9 @@ an optional field of the binding; the block stays `version: 1`) under the regist
 and nothing else. Re-adopting the same ID is a no-op; a different stored ID is
 `native-actor-conflict`; an ID already adopted by another employee is
 `native-actor-duplicate` unless both bindings are `shared_bot_attributed`. An unbound,
-unenrolled or retired employee is refused. A login is recorded in the report but never
-compared: it is mutable.
+unenrolled or retired employee is refused. The login is checked only here, to find the
+bot user; it is recorded in the report but never used for comment authorship, because it
+is mutable. Comments are matched on the user ID alone.
 
 **Deploy first.** The binding schema is closed, so a facade running a build without
 `native_actor_id` reads an adopted definition as invalid and answers that employee
