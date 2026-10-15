@@ -30,7 +30,8 @@
         "principal": {"type": "string", "minLength": 1},
         "instance": {"type": "string", "minLength": 1},
         "credential_ref": {"type": "string", "pattern": "^op://"},
-        "attribution_mode": {"enum": ["native", "shared_bot_attributed"]}
+        "attribution_mode": {"enum": ["native", "shared_bot_attributed"]},
+        "native_actor_id": {"type": "string", "pattern": "^\\d+$"}
       }
     }
   }

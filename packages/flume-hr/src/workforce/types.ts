@@ -45,6 +45,8 @@ export interface CompanyIdentityBinding {
   instance?: string;
   credential_ref?: string;
   attribution_mode?: "native" | "shared_bot_attributed";
+  /** FLUME-51: the provider-issued actor ID (github: the bot user's numeric ID), adopted by `flume identity adopt-actor`. */
+  native_actor_id?: string;
 }
 
 /** Who an employee is to the company. The subject never changes once enrolled. */

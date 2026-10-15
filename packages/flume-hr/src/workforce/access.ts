@@ -396,15 +396,16 @@ export function printableResult(body: Record<string, unknown>): Record<string, u
 
 /**
  * `flume access request --exec -- <consumer>`: the only way a GitHub token leaves the client. The consumer gets the
- * parent environment minus the Access client secret and run assertion, plus GH_TOKEN, GITHUB_TOKEN and the grant's id
- * and expiry. The token reaches no stdout, stderr or file of ours. Resolves to the consumer's exit code.
+ * parent environment minus the Access client secret and run assertion, plus GH_TOKEN, GITHUB_TOKEN, the grant's id
+ * and expiry, and the granted subject, repository, App ID and installation ID (FLUME_EMPLOYEE_SUBJECT, FLUME_GITHUB_*). The token reaches no stdout, stderr or file of ours. Resolves to the consumer's exit code.
  */
 export function execWithGithubToken(body: Record<string, unknown>, command: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   const credential = body.credential as { kind?: string; value?: string } | undefined;
   if (body.status === "granted" && body.replayed === true) throw new Error("This request_id was already granted: the token is delivered only on the first response, so pass a fresh --request-id (or omit it)");
   if (body.status !== "granted" || credential?.kind !== "github-installation-token" || !credential.value) throw new Error("No GitHub installation token was granted; the consumer was not started");
   const { CF_ACCESS_CLIENT_SECRET: _secret, FLUME_RUN_ASSERTION: _assertion, ...rest } = env;
-  const childEnv: NodeJS.ProcessEnv = { ...rest, GH_TOKEN: credential.value, GITHUB_TOKEN: credential.value, FLUME_GRANT_ID: String(body.grant_id), FLUME_GRANT_EXPIRES_AT: String(body.expires_at) };
+  // The four FLUME_ identity facts come from the granted body, never from the caller: they are what `flume comment` checks the employee's binding against.
+  const childEnv: NodeJS.ProcessEnv = { ...rest, GH_TOKEN: credential.value, GITHUB_TOKEN: credential.value, FLUME_GRANT_ID: String(body.grant_id), FLUME_GRANT_EXPIRES_AT: String(body.expires_at), FLUME_EMPLOYEE_SUBJECT: String(body.subject), FLUME_GITHUB_REPOSITORY: String(body.repository), FLUME_GITHUB_APP_ID: String(body.app_id), FLUME_GITHUB_INSTALLATION_ID: String(body.installation_id) };
   return new Promise<number>((resolveExit, reject) => {
     const child = spawn(command[0]!, command.slice(1), { env: childEnv, stdio: "inherit" });
     child.once("error", error => reject(new Error(`Cannot run ${command[0]}: ${error.message}`)));

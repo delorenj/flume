@@ -27,12 +27,13 @@ import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
-import { bindProvider, enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { adoptNativeActor, bindProvider, enrollEmployee, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
 import { provisionEmployee } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, startAccessServer } from "./workforce/access";
 import { githubApiBase, githubEvidence } from "./workforce/github";
+import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -296,6 +297,17 @@ identityCmd
   });
 
 identityCmd
+  .command("adopt-actor")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .argument("<provider>", "Provider key; github")
+  .description("FLUME-51: record the native bot user ID of the employee's own GitHub App on their github binding, as GitHub reports it (preview unless --apply). Never mints a token")
+  .option("--apply", "Write native_actor_id (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, provider: string, options) => {
+    await identityResult(() => adoptNativeActor(employee, provider, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
   .command("readiness")
   .description("What is unproven about the accounts company identity needs; never ready, never free")
   .option("--probe <provider>", "Measure with read-only GET requests (cloudflare; token from CLOUDFLARE_API_TOKEN)", (value: string, previous: string[] = []) => [...previous, value])
@@ -426,6 +438,59 @@ accessCmd
       : [`✗ ${report.error}`];
     await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${lines.join("\n")}\n`);
     await exitAfterFlush(report.ok ? 0 : 1);
+  });
+
+// ============================================================================
+// REVIEW COMMENTS WITH VERIFIED AUTHORSHIP (FLUME-51)
+// ============================================================================
+//
+// Consumers of the FLUME-50 installation token: run them as
+//   flume access run <e> -- flume access request --service github --resource o/r --permission ... --exec -- flume comment post ...
+// They need the GH_TOKEN and FLUME_* environment `--exec` sets, and nothing else.
+
+const commentCmd = program
+  .command("comment")
+  .description("Leave and verify GitHub comments as the launched employee; authorship is whatever GitHub reads back, never text");
+
+const collect = (value: string, previous: string[] = []) => [...previous, value];
+
+commentCmd
+  .command("post")
+  .argument("<repository>", "owner/repo (must be the repository the token was granted for)")
+  .argument("<number>", "Pull request or issue number")
+  .description("Post one marked comment (conversation, or a single-line inline review comment with --review) and read it back from GitHub; at most one POST per invocation")
+  .option("--body <text>", "Comment text")
+  .option("--body-file <path>", "Read the comment text from a file")
+  .option("--marker <key>", "Idempotency marker, 8-128 of [A-Za-z0-9._-] (default: a fresh UUID); re-run with the same one after comment-ambiguous")
+  .option("--review", "Post an inline review comment on the PR head instead of a conversation comment")
+  .option("--commit <sha>", "With --review: the full head SHA being reviewed")
+  .option("--path <file>", "With --review: the file path")
+  .option("--line <n>", "With --review: the single line")
+  .option("--side <side>", "With --review: RIGHT (default) or LEFT")
+  .option("--start-line <n>", "Refused: multi-line ranges are unsupported")
+  .option("--position <n>", "Refused: diff positions are unsupported")
+  .option("--subject-type <type>", "Refused: file-level comments are unsupported")
+  .option("--event <event>", "Refused: review events are unsupported")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (repository: string, number: string, options) => {
+    guardBrokenPipe();
+    const unsupported = [["startLine", "--start-line"], ["position", "--position"], ["subjectType", "--subject-type"], ["event", "--event"]].filter(([key]) => options[key!] !== undefined).map(([, flag]) => flag!);
+    const result = await postComment({ repository, number, body: options.body, bodyFile: options.bodyFile, marker: options.marker, review: Boolean(options.review), commit: options.commit, path: options.path, line: options.line, side: options.side, unsupported });
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatCommentResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+commentCmd
+  .command("verify")
+  .argument("<repository>", "owner/repo (must be the repository the token was granted for)")
+  .description("Read each comment from GitHub and report whether the named employees' own distinct bots wrote them (read-only; native-distinct-verified or not-native-distinct)")
+  .requiredOption("--comment <employee:kind:id>", "<employee>:<issue|review>:<comment id>, repeatable; any other kind (commit, ...) is unsupported-evidence", collect)
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (repository: string, options) => {
+    guardBrokenPipe();
+    const result = await verifyComments({ repository, comments: options.comment });
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatCommentResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
   });
 
 // ============================================================================

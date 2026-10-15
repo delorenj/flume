@@ -40,6 +40,7 @@ flume identity enroll <employee>           # one subject + <handle>@agents.delo.
 flume identity show <employee>             # read it back; legacy definitions stay readable
 flume identity status <employee> <status>  # active | suspended | retired (local only; revokes nothing); preview unless --apply
 flume identity bind <employee> <provider> ...  # bind a provider principal by reference only; github: App ID, installation ID, op:// key ref (preview unless --apply)
+flume identity adopt-actor <employee> github  # record the employee's GitHub bot user ID as GitHub reports it (preview unless --apply)
 flume identity readiness                   # what is unproven about the accounts; --probe cloudflare measures with GETs only
 
 flume access serve                         # employee access facade: Access assertion + launcher-signed run; fixture grants, plus GitHub App installation tokens for service github (docs/employee-access.md)
@@ -47,6 +48,7 @@ flume access run <employee> -- <cmd>       # trusted launcher for any command; `
 flume access request --service s --resource r --permission p   # plain client; the employee comes from the launcher, never a flag
 flume access request --service github --resource owner/repo --permission issues:write --exec -- <cmd>   # a one-repository GitHub token, delivered only to <cmd>
 flume access github-inspect --employee <e>  # read-only look at the employee's GitHub App and installations
+flume comment post|verify ...              # --exec consumers: leave a marked PR/issue comment as the employee and prove its author from GitHub's readback (docs/employee-access.md)
 
 flume roster                  # the org chart, and where the two registries disagree
 flume review [--agent <id>]   # performance review across nine observation domains

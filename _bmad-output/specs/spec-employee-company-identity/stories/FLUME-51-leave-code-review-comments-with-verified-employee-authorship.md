@@ -2,8 +2,8 @@
 title: 'FLUME-51 — Leave code-review comments with verified employee authorship'
 type: 'feature'
 created: '2026-10-14'
-status: 'ready-for-dev'
-baseline_revision: '301b0572b0beb033a846117e10a783bc9a110bcf'
+status: 'in-progress'
+baseline_revision: 'feee85c5050a4fcc48f1af75b33accd789c09914'
 review_loop_iteration: 0
 followup_review_recommended: false
 context:

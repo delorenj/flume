@@ -157,8 +157,10 @@ flume access run <employee> -- flume access request --service github \
 ```
 
 The consumer gets the parent environment minus `CF_ACCESS_CLIENT_SECRET` and
-`FLUME_RUN_ASSERTION`, plus `GH_TOKEN`, `GITHUB_TOKEN`, `FLUME_GRANT_ID` and
-`FLUME_GRANT_EXPIRES_AT`; the receipt (without the token) goes to stderr and the
+`FLUME_RUN_ASSERTION`, plus `GH_TOKEN`, `GITHUB_TOKEN`, `FLUME_GRANT_ID`,
+`FLUME_GRANT_EXPIRES_AT` and (FLUME-51) `FLUME_EMPLOYEE_SUBJECT`,
+`FLUME_GITHUB_REPOSITORY`, `FLUME_GITHUB_APP_ID` and `FLUME_GITHUB_INSTALLATION_ID`,
+all taken from the granted body, never from the caller; the receipt (without the token) goes to stderr and the
 command exits with the consumer's code. `provider-ledger.jsonl` records
 attempt/issued/refused/ambiguous/revoked/revoke-failed lines (IDs, scopes, expiry,
 HTTP status, `x-github-request-id`).
@@ -172,8 +174,107 @@ in the App's installation settings in GitHub, that the selected repositories are
 the sandbox repository (`github-inspect` cannot list repositories), then
 `flume identity bind ... --apply`, add the
 one grant, run the `--exec` command above with a read-only consumer, and compare the
-receipt's `expires_at` with GitHub's. Do not infer a sandbox from a repo name, widen an
-installation, or post comments (FLUME-51).
+receipt's `expires_at` with GitHub's. Do not infer a sandbox from a repo name or widen an
+installation. Comments are FLUME-51, below.
+
+## Review comments with verified authorship (FLUME-51)
+
+An installation token lets an employee comment; nothing in it says who GitHub will
+record as the author, and two employees can silently be one shared bot. FLUME-51 adds
+three steps, each checked against what GitHub reports and nothing else.
+
+**1. Adopt the actor (operator).** An installation token cannot read `GET /app`, and a
+review comment does not reliably carry `performed_via_github_app`. The one stable,
+provider-issued author identity is the bot user's numeric ID.
+
+```sh
+flume identity adopt-actor <employee> github            # preview: the slug and the ID GitHub reports
+flume identity adopt-actor <employee> github --apply    # writes native_actor_id on that one binding
+```
+
+It signs an App JWT (through `@octokit/auth-app`) for `GET /app` to get the slug, then
+makes the public, credential-free `GET /users/<slug>[bot]`. The user must be
+`type: Bot` with exactly that login. `--apply` writes `native_actor_id` (a `^\d+$` string,
+an optional field of the binding; the block stays `version: 1`) under the registry lock,
+and nothing else. Re-adopting the same ID is a no-op; a different stored ID is
+`native-actor-conflict`; an ID already adopted by another employee is
+`native-actor-duplicate` unless both bindings are `shared_bot_attributed`. An unbound,
+unenrolled or retired employee is refused. A login is recorded in the report but never
+compared: it is mutable.
+
+**2. Post.** `flume comment post <owner/repo> <number> (--body | --body-file) [--marker k]`
+is an `--exec` consumer, so the token it uses is the one just granted:
+
+```sh
+flume access run <employee> -- flume access request --service github \
+  --resource owner/repo --permission issues:write --permission pull_requests:write \
+  --exec -- flume comment post owner/repo 1 --body "..." --json
+# inline: add  --review --commit <40-char head sha> --path <file> --line <n> [--side RIGHT|LEFT]
+```
+
+Before any network call it checks, in order: the review flags (`--start-line`,
+`--position`, `--subject-type`, `--event` and an incomplete `--review` are
+`unsupported-review-mode`); the environment `--exec` sets; the target repository equals
+`FLUME_GITHUB_REPOSITORY` (case-insensitive, else `repository-not-granted`); the
+subject's binding is found in the census and its `principal` equals
+`FLUME_GITHUB_APP_ID` (else `binding-mismatch`); `native_actor_id` is adopted (else
+`native-actor-not-adopted`).
+
+GitHub comment creation has no idempotency key, so the invisible marker
+`<!-- flume-comment:<marker> -->` (default a fresh UUID; `[A-Za-z0-9._-]{8,128}`) stands in
+for one, and **each invocation POSTs at most once**:
+
+1. *Reconcile first.* List the target's comments (`per_page=100`, at most 10 pages) and
+   keep those that carry the marker **and** whose author is the adopted actor. One:
+   returned with `reconciled: true`, nothing posted. More than one: `duplicate-comments`
+   (with the IDs). More than 10 pages: `reconcile-incomplete`. None: continue.
+2. *Review mode:* `GET` the PR; a head SHA other than `--commit` is `stale-commit`.
+3. *One POST,* then a `GET` of the comment by ID. 403 `insufficient-permissions`, 404
+   `target-not-found`, a 422 on a review comment `invalid-position`, any other 4xx
+   `provider-refused`.
+4. *A timeout, network error or 5xx* reconciles once more. Found: `reconciled: true`.
+   Not found: `unverified` / `comment-ambiguous` with the marker; re-run with the same
+   `--marker` (the re-run reconciles first). Never a second POST in one invocation.
+
+Every call refuses redirects and aborts after `FLUME_GITHUB_TIMEOUT_MS`. The readback
+must match the PR (or issue), and for a review comment the path, line, side and
+`commit_id`; otherwise `unverified` / `location-mismatch`.
+
+**The authorship rule (one rule, everywhere).** A comment is by an employee when
+GitHub's readback says `user.id` (as a string) equals the binding's `native_actor_id`
+**and** `user.type` is `Bot`. Then `native-verified` (binding `attribution_mode: native`)
+or `shared-bot-attributed` (binding `shared_bot_attributed`); anything else is
+`not-native-verified` with a reason (`author-mismatch`, `author-not-bot`,
+`attribution-mode-unset`, `native-actor-not-adopted`). Body text, the marker, display
+names, logins, email and git commit author/committer/signature are never evidence; a
+stranger who copies a marker neither stops a post nor makes a comment ours.
+
+**3. Verify.** `flume comment verify <owner/repo> --comment <employee>:<issue|review>:<id> ...`
+is a read-only `--exec` consumer (request the same granted permission strings; the
+policy matches them as exact strings, so `*:read` needs its own grant). It reads each
+comment by ID and applies the rule to the named employee's binding. `commit` or any
+other kind is `unsupported-evidence`. The verdict is `native-distinct-verified` only if
+there are at least two distinct subjects, every comment is `native-verified`, their
+`native_actor_id`s are pairwise distinct and their App principals are pairwise
+distinct. Otherwise `not-native-distinct` with reasons (`fewer-than-two-employees`,
+`not-native-verified:...`, `shared-actor`, `shared-app`, `shared-bot-attributed`); a
+shared bot is never reported as two native actors. The report lists the comment
+classes (`issue`, `review`) covered per employee. Every `post`/`verify` result carries
+`evidence`: `provider` only against `https://api.github.com`, otherwise `fixture`. The
+token appears in no output, file or receipt; receipts hold IDs, the marker, URL, author
+ID/login/type, `performed_via_github_app.id` when returned, the location and HTTP
+status.
+
+**Live-proof procedure and gate.** Only against the operator-designated sandbox
+`delorenj/flume-identity-sandbox` (PR #1, `proof.txt` lines 1-3 on the RIGHT side), never
+a production repository, and only after the fixture suite
+(`node scripts/run-tests.mjs employee-access-github-comments`) passes: (1) per
+employee, `identity adopt-actor --apply`, then through `flume access run` post one
+conversation comment and one inline comment on `proof.txt` line 2 at the PR head;
+(2) a second employee only once `github-inspect` shows its sandbox installation, then
+an operator bind, a sandbox grant and adoption; (3) `comment verify` over every
+comment ID. `github_native_authorship` stays `unproven` in readiness by design. Receipt:
+`_bmad-output/implementation-artifacts/FLUME-51/`.
 
 ## The trusted launcher
 

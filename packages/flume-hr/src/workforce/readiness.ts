@@ -21,6 +21,7 @@ const UNPROVEN: Record<string, string> = {
   service_token_capacity: "Access service-token count against the documented 50-per-account default is not measured",
   access_assertion_policy: "The Cloudflare Access application, its service-token policy, audience and issuer for the employee access facade are not proven live; only fixture evidence exists",
   github_sandbox_installation: "No operator-designated sandbox repository and installation is verified for the employee GitHub Apps, so no real installation token has been minted; only fixture evidence exists",
+  github_native_authorship: "Native GitHub authorship (a PR or issue comment whose author ID equals the employee's adopted bot) is proven only against the operator sandbox by hand; this command does not measure it",
   provider_account_rights: "GitHub App, Plane membership and AutomaticAI rights are provider facts this command does not measure",
 };
 

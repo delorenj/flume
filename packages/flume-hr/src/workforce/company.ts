@@ -20,7 +20,7 @@ import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
-import { githubBindingProblems, githubCredentialRefProblem } from "./github";
+import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
 import { withRegistryLock } from "./role";
 import { COMPANY_MAIL_DOMAIN, RESERVED_HANDLES, parseNamedAgentYaml, validateCompanyIdentity, validateNamedAgent, validateNamedAgentSchema } from "./validator";
@@ -377,6 +377,53 @@ export async function bindProvider(employee: string, provider: string, input: Bi
     ...(input.attributionMode ? { attribution_mode: input.attributionMode as CompanyIdentityBinding["attribution_mode"] } : {}),
   };
   return bindEmployeeProvider(employee, provider, binding, options);
+}
+
+/**
+ * `flume identity adopt-actor <employee> github` (FLUME-51): record the numeric user ID of the employee's own App bot on
+ * their github binding. The ID comes from GitHub (`GET /app` with the App's JWT for the slug, then the public
+ * `GET /users/<slug>[bot]`), never from the operator's typing. It never mints a token and writes nothing but
+ * `native_actor_id` on that one binding. Preview unless `--apply`.
+ */
+export async function adoptNativeActor(employee: string, provider: string, options: IdentityOptions = {}) {
+  const run = async () => {
+    const census = identityCensus();
+    const target = resolveEmployee(census, employee);
+    const blockers: IdentityBlocker[] = [];
+    if (provider !== "github") blockers.push({ code: "unsupported-provider", detail: `adopt-actor supports github only, not "${provider}"` });
+    if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
+    else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+    else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
+    else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
+    else if (target.block.status === "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity never adopts an actor" });
+    const base = { employee, ...summary(target), apply: Boolean(options.apply), provider };
+    const none = { ok: false, changed: false, actor: null, binding: null, writes: [] as string[], ...base };
+    if (blockers.length || !target.block) return { ...none, blockers };
+    const block = target.block, existing = block.bindings?.github;
+    const bound = githubBindingOf(existing);
+    if ("code" in bound || !existing) return { ...none, blockers: [{ code: "code" in bound ? bound.code : "no-provider-binding", detail: "code" in bound ? bound.detail : "no github binding" }] };
+    const actor = await resolveGithubBotActor({ appId: bound.facts.appId, keyRef: bound.facts.keyRef });
+    if (!actor.ok) return { ...none, evidence: actor.evidence, blockers: [{ code: actor.code, detail: actor.detail }] };
+    const facts = { id: actor.id, login: actor.login, type: actor.type, app_id: actor.app_id };
+    const common = { actor: facts, evidence: actor.evidence, ...base };
+    if (existing.native_actor_id !== undefined && existing.native_actor_id !== actor.id) {
+      return { ok: false, changed: false, binding: existing, blockers: [{ code: "native-actor-conflict", detail: `${employee} already adopted actor ${existing.native_actor_id}; GitHub says ${actor.login} is ${actor.id}. Rotation is deliberate — remove native_actor_id by hand first` }], writes: [] as string[], ...common };
+    }
+    if (existing.native_actor_id === actor.id) return { ok: true, changed: false, binding: existing, blockers, writes: [] as string[], ...common };
+    for (const other of census.definitions) {
+      if (other.path === target.path || other.missing || other.problem) continue;
+      const theirs = other.block?.bindings?.github;
+      if (theirs?.native_actor_id !== actor.id) continue;
+      if (existing.attribution_mode === "shared_bot_attributed" && theirs.attribution_mode === "shared_bot_attributed") continue;
+      blockers.push({ code: "native-actor-duplicate", detail: `actor ${actor.id} (${actor.login}) is already adopted at ${other.path}; two employees are never one native actor unless both bindings are shared_bot_attributed`, path: other.path });
+    }
+    if (blockers.length) return { ok: false, changed: false, binding: existing, blockers, writes: [] as string[], ...common };
+    const binding: CompanyIdentityBinding = { ...existing, native_actor_id: actor.id };
+    const next: CompanyIdentity = { ...block, bindings: { ...(block.bindings ?? {}), github: binding } };
+    const writes = options.apply ? await writeDefinition(target, next) : [];
+    return { ok: true, changed: true, binding, blockers, writes, ...common };
+  };
+  return options.apply ? withRegistryLock(environment().registryPath, run) : run();
 }
 
 /** Read-only: legacy (unenrolled) definitions stay readable. */

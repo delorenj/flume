@@ -104,12 +104,13 @@ export function githubBindingOf(binding: CompanyIdentityBinding | undefined): { 
 // Transport: octokit request, a per-call timeout, and the last response's ids
 // ---------------------------------------------------------------------------
 
-interface Transport {
+export interface Transport {
   request: typeof baseRequest;
   last: { status?: number; requestId?: string };
 }
 
-function transport(base: string, timeoutMs: number): Transport {
+/** The one provider transport: no redirects, every call aborted after `timeoutMs`, the last response's ids recorded. */
+export function transport(base: string, timeoutMs: number): Transport {
   const last: Transport["last"] = {};
   const timedFetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     last.status = undefined;
@@ -124,15 +125,15 @@ function transport(base: string, timeoutMs: number): Transport {
 }
 
 /** GitHub's status, only when GitHub answered: octokit wraps a network error or timeout as status 500 with no `response`. */
-const statusOf = (error: unknown): number | undefined => (typeof (error as { status?: unknown })?.status === "number" && (error as { response?: unknown }).response ? (error as { status: number }).status : undefined);
-const requestIdOf = (error: unknown): string | undefined => {
+export const statusOf = (error: unknown): number | undefined => (typeof (error as { status?: unknown })?.status === "number" && (error as { response?: unknown }).response ? (error as { status: number }).status : undefined);
+export const requestIdOf = (error: unknown): string | undefined => {
   const value = (error as { response?: { headers?: Record<string, string> } })?.response?.headers?.["x-github-request-id"];
   return typeof value === "string" ? value : undefined;
 };
 /** The provider's message, first line only, capped. Never the request (which carries the Authorization header). */
-const firstLine = (error: unknown): string => (error instanceof Error ? error.message : String(error)).split("\n")[0]!.slice(0, 200);
+export const firstLine = (error: unknown): string => (error instanceof Error ? error.message : String(error)).split("\n")[0]!.slice(0, 200);
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-const isTimeout = (error: unknown): boolean => [(error as { name?: string })?.name, ((error as { cause?: { name?: string } })?.cause)?.name].some(name => name === "TimeoutError" || name === "AbortError");
+export const isTimeout = (error: unknown): boolean => [(error as { name?: string })?.name, ((error as { cause?: { name?: string } })?.cause)?.name].some(name => name === "TimeoutError" || name === "AbortError");
 
 function covers(granted: Record<string, string> | undefined, wanted: Record<string, GithubLevel>): boolean {
   return Object.entries(wanted).every(([name, level]) => (RANK[granted?.[name] ?? ""] ?? 0) >= RANK[level]!);
@@ -292,5 +293,46 @@ export async function inspectGithubApp(input: { appId: string; keyRef: string; e
     return { ...result, ok: true, observed_at: new Date().toISOString(), app: { id: app.id, slug: app.slug, name: app.name ?? null, client_id: app.client_id ?? null, owner: { login: app.owner?.login ?? null, type: app.owner?.type ?? null } }, bot_login: `${app.slug}[bot]`, installations, ...(truncated ? { truncated } : {}) };
   } catch (error) {
     return { ...result, error: statusOf(error) !== undefined ? `GitHub answered HTTP ${statusOf(error)}: ${firstLine(error)}` : "the GitHub App JWT could not be signed or GitHub did not answer" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FLUME-51: the bot user behind an App (the actor an operator adopts)
+// ---------------------------------------------------------------------------
+
+export type GithubBotActor =
+  | { ok: true; evidence: "provider" | "fixture"; app_id: string; slug: string; login: string; id: string; type: "Bot" }
+  | { ok: false; evidence: "provider" | "fixture"; code: string; detail: string };
+
+/**
+ * The native actor of an App: the slug from an app-JWT `GET /app`, then the public `GET /users/<slug>[bot]` with NO
+ * credential. The user must be `type: Bot` with exactly that login. Read-only: never mints, never writes.
+ */
+export async function resolveGithubBotActor(input: { appId: string; keyRef: string; env?: NodeJS.ProcessEnv }): Promise<GithubBotActor> {
+  const env = input.env ?? process.env, base = githubApiBase(env), evidence = githubEvidence(base);
+  const fail = (code: string, detail: string): GithubBotActor => ({ ok: false, evidence, code, detail });
+  let privateKey: string;
+  try { privateKey = readVaultSecret(input.keyRef, "GitHub App private key"); }
+  catch { return fail("credential-unavailable", "the GitHub App private key could not be read from the vault"); }
+  const api = transport(base, githubTimeoutMs(env));
+  let slug: string;
+  try {
+    const jwt = (await createAppAuth({ appId: input.appId, privateKey, request: api.request })({ type: "app" })).token;
+    const app = (await api.request("GET /app", { headers: { authorization: `bearer ${jwt}` } })).data as Record<string, any>;
+    if (String(app.id) !== input.appId) return fail("app-mismatch", `GitHub answered for App ${String(app.id)}, not the bound App ${input.appId}`);
+    if (typeof app.slug !== "string" || !app.slug) return fail("app-slug-missing", "GitHub returned no slug for the App");
+    slug = app.slug;
+  } catch (error) {
+    return fail("provider-unavailable", statusOf(error) !== undefined ? `GitHub answered HTTP ${statusOf(error)} for the App: ${firstLine(error)}` : "the GitHub App JWT could not be signed or GitHub did not answer");
+  }
+  const login = `${slug}[bot]`;
+  try {
+    const user = (await transport(base, githubTimeoutMs(env)).request("GET /users/{username}", { username: login })).data as Record<string, any>;
+    if (user.type !== "Bot") return fail("actor-not-bot", `${login} is a ${String(user.type)} account, not a Bot`);
+    if (user.login !== login) return fail("actor-login-mismatch", `GitHub returned user ${String(user.login)} for ${login}`);
+    if (!Number.isSafeInteger(user.id) || user.id <= 0) return fail("actor-id-missing", `GitHub returned no numeric ID for ${login}`);
+    return { ok: true, evidence, app_id: input.appId, slug, login, id: String(user.id), type: "Bot" };
+  } catch (error) {
+    return fail("provider-unavailable", statusOf(error) !== undefined ? `GitHub answered HTTP ${statusOf(error)} for ${login}: ${firstLine(error)}` : `GitHub did not answer for ${login}`);
   }
 }
