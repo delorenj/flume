@@ -62,3 +62,23 @@ op://DeLoSecrets/hizgz76ree7zcwklorn5qtd4tu/sxskdgqeniqpfjftucu6rz7u2i`). To fin
 - `native_actor_id` on Grolf's binding (`33GOD/agents/hermes/pm/role.yaml`, committed in the 33GOD repo).
 - `flume-access.service` restarted on the merged build. Installation tokens (about 6 minted, 1 hour each, sandbox
   only) expire on their own.
+
+## Addendum — failure modes and ambiguous POST, live (2026-10-15 ~00:50Z, supervising session)
+
+Same path as above (`flume access run grolf -- flume access request --service github ... --exec -- flume comment post ...`),
+sandbox PR #1 only, Grolf's own App. Before and after these steps the sandbox held exactly the expected comments
+(1 review comment, conversation comments only by `gr0lfbot[bot]`); no negative case created a comment.
+
+| Case | Command shape | Result (live, `evidence: provider`) |
+|---|---|---|
+| Stale diff head | `--review --commit 0000...0000 --path proof.txt --line 2` | `denied` `stale-commit`, `head_sha` 8dfa472c..., 0 POSTs |
+| Unsupported review mode | `--review ... --start-line 1` | `denied` `unsupported-review-mode`, refused before any call |
+| Position outside the diff | `--review --commit <head> --path proof.txt --line 99` | `error` `invalid-position`, HTTP 422 from GitHub ("pull_request_review_thread.line could not be resolved") |
+| Insufficient permission | request only `issues:write`, then `--review ...` | `error` `insufficient-permissions`, HTTP 403 from GitHub at the reconcile listing (a token without `pull_requests` rights cannot even list PR comments) |
+| Timed-out POST (comment committed) | consumer base URL = a local forwarding proxy that lets GitHub commit the POST and withholds the response; `FLUME_GITHUB_TIMEOUT_MS=4000` | exactly 1 POST (proxy log), the post-timeout reconcile found marker `flume51-live-timeout-grolf`; result `reconciled: true`, `native-verified`, comment `6181905742` by `gr0lfbot[bot]` (341820121). `evidence` reads `fixture` because the base was not `https://api.github.com`; the comment itself was created and read back on the real GitHub |
+
+State added: sandbox conversation comment `6181905742` (Grolf). Installation tokens minted for these steps are sandbox-only
+and expire within the hour. The proxy logged method, path and status only (never headers or bodies) and was killed.
+
+Rererere (`colrerererebot`, App 5296560) still reported `installations: []` at 2026-10-15T00:58Z, about an hour after the
+install was clicked; GitHub's "Confirm access" (sudo/passkey) tab is still waiting on the operator. AC1 stays blocked on the gate above.
