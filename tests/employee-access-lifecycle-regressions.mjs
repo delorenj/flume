@@ -181,7 +181,7 @@ const baseEnv = {
   FLUME_PROVISION_CONFIG: provisioning, FLUME_CLOUDFLARE_API_BASE: cf.url, FLUME_GATEWAY_TOKENS_BIN: join(bin, "gateway-tokens.py"), FLUME_GATEWAY_EVIDENCE: join(dir, "no-flume-39-evidence"),
   FLUME_GITHUB_API_BASE: gh.url, FLUME_GITHUB_TIMEOUT_MS: "10000",
   GW_STATE: join(dir, "gw-state.json"), GW_LOG: join(dir, "gw-log.jsonl"), FLUME_PX_BIN: join(dir, "no-such-px"),
-  OP_SERVICE_ACCOUNT_TOKEN: VAULT, OP_FIXTURE: join(dir, "op.json"), FIXTURE_CLI: cli, LAUNCH_RECEIPT: join(dir, "launch.json"), PLAIN_RECEIPT: join(dir, "plain.json"),
+  OP_SERVICE_ACCOUNT_TOKEN: VAULT, OP_FIXTURE: join(dir, "op.json"), OP_FAKE_LOG: join(dir, "op-log.jsonl"), FIXTURE_CLI: cli, LAUNCH_RECEIPT: join(dir, "launch.json"), PLAIN_RECEIPT: join(dir, "plain.json"),
   CLOUDFLARE_API_TOKEN: "",
 };
 delete baseEnv.CF_ACCESS_CLIENT_ID; delete baseEnv.CF_ACCESS_CLIENT_SECRET; delete baseEnv.FLUME_RUN_ASSERTION; delete baseEnv.FLUME_ACCESS_URL;
@@ -272,6 +272,19 @@ const accessBody = (id) => ({ version: 1, request_id: id, service: "fixture", re
 const fixtureGrants = () => (existsSync(join(state, "fixture-ledger.jsonl")) ? readFileSync(join(state, "fixture-ledger.jsonl"), "utf8").split("\n").filter(Boolean).length : 0);
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 const until = async (check, ms = 20000) => { const end = Date.now() + ms; while (!check()) { if (Date.now() > end) throw new Error("timed out waiting for the condition"); await sleep(25); } };
+const opCalls = () => (existsSync(baseEnv.OP_FAKE_LOG) ? readFileSync(baseEnv.OP_FAKE_LOG, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).argv) : []);
+/**
+ * Map ada's desk to a gateway reference the way FLUME-39's `gateway-member-tokens.py` does: `--apply` edits the delta (comments
+ * kept), and only `--render` also writes it into the generated config.yaml Hermes runs.
+ */
+const mapAdaGateway = (ref, { render }) => {
+  for (const name of render ? ["config.delta.yaml", "config.yaml"] : ["config.delta.yaml"]) {
+    const path = join(fleet, "profiles/ada", name);
+    const doc = YAML.parseDocument(existsSync(path) ? readFileSync(path, "utf8") : "{}\n");
+    doc.setIn(["secrets", "onepassword", "env", "AUTOMATICAI_GATEWAY_KEY"], ref);
+    writeFileSync(path, String(doc));
+  }
+};
 
 try {
   const adaRun = await runJwt({ sub: subject.ada }), bobRun = await runJwt({ sub: subject.bob });
@@ -356,10 +369,11 @@ try {
     const suspended = json(await runAsync(["identity", "suspend", "ada", "--apply", "--json"]));
     assert.equal(suspended.ok, true, JSON.stringify(suspended));
     assert.equal(suspended.complete_revocation, false);
-    // ada is a portable specialist whose desk maps no FLUME-39 reference: the launcher's own reference is what runs, and it
-    // can be neither named nor revoked, so the row is unverified (never not-issued).
-    const gatewayRow = suspended.credentials.find((r) => r.provider === "gateway");
-    assert.deepEqual([gatewayRow.status, gatewayRow.provider_code, gatewayRow.ref, gatewayRow.ref_source], ["unverified", "gateway-ref-shape", HERMES_REF, "launcher"], JSON.stringify(gatewayRow));
+    // ada is a portable specialist whose desk maps no gateway reference: the launcher's own reference is what runs. Its vault item
+    // exists, nothing proves which consumer it is, and it can be neither named nor revoked, so the row is unverified (never
+    // not-issued) -- probed for existence only, never read.
+    const gatewayRows = suspended.credentials.filter((r) => r.provider === "gateway");
+    assert.deepEqual(gatewayRows.map((r) => [r.status, r.provider_code, r.ref, r.ref_source]), [["unverified", "launcher-ref-unproven", HERMES_REF, "launcher"]], JSON.stringify(gatewayRows));
     assert.equal(cf.kv.has("allowlist/ada@agents.delo.sh"), false);
     const grantsBefore = readFileSync(join(state, "fixture-ledger.jsonl"), "utf8").split("\n").filter(Boolean).length;
     const accessAfter = await viaEdge("ada", "/v1/access/requests", accessBody("ac1-after"), adaRun);
@@ -459,8 +473,13 @@ try {
     // The fixture desk maps no gateway reference, so no consumer exists: unverified even for a matching-looking proof.
     const noConsumer = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-none.json", { ...base, verified: true }), "--json"]));
     assert.equal(noConsumer.gateway.proof.status, "unverified"); assert.equal(noConsumer.gateway.proof.reason, "no-consumer");
-    mkdirSync(join(fleet, "profiles/ada"), { recursive: true });
-    writeFileSync(join(fleet, "profiles/ada/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/ada" } } } }));
+    // `gateway-member-tokens.py --apply` alone edits only the delta: the generated config Hermes runs has drifted from it, so
+    // there is still no consumer to attribute a proof to...
+    mapAdaGateway("op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/ada", { render: false });
+    const drifted = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-drift.json", { ...base, verified: true }), "--json"]));
+    assert.equal(drifted.gateway.proof.status, "unverified", "a proof was attributed to a delta the desk does not run");
+    // ...until `--render` writes it into the generated config.yaml too.
+    mapAdaGateway("op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/ada", { render: true });
     const match = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-ok.json", { ...base, verified: true }), "--json"]));
     assert.equal(match.gateway.proof.status, "verified"); assert.equal(match.gateway.consumer, "ada"); assert.equal(match.gateway.evidence_status, "unverified");
     const mismatch = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-bad.json", { ...base, verified: true, receipts: [...base.receipts, { token_name: "aai:bob:1700000002", request_id: "r2", session_id: "s2", created_at: "2026-10-14T00:00:01Z" }] }), "--json"]));
@@ -482,7 +501,11 @@ try {
     await until(() => gh.held.length > 0);
     const grantsBefore = fixtureGrants();
     const queued = viaEdge("ada", "/v1/access/requests", accessBody("ada-queued-behind-mint"), adaRun);
-    await sleep(1500);
+    // Deterministic, not a sleep: the facade names a request only once it has PASSED the first status check and is waiting in
+    // the queue, so this is the window the re-check must close.
+    await until(() => facade.stderr.includes('flume access: queued request "ada-queued-behind-mint" behind 1 in-flight request(s)'));
+    assert.equal(audit().some((l) => l.request_id === "ada-queued-behind-mint"), false, "ada's request was decided before it queued: it never passed the pre-queue check");
+    assert.equal(gh.held.length, 1, "bob's mint is no longer holding the queue");
     const suspended = json(await runAsync(["identity", "suspend", "ada", "--apply", "--json"]));
     assert.equal(suspended.ok, true, JSON.stringify(suspended.steps));
     gh.release(404);
@@ -544,7 +567,70 @@ try {
       assert.equal(fixtureGrants(), grantsBefore);
     } finally { writeFileSync(statePath, saved); }
     assert.equal((await direct(CLIENT.ada, { operation: "list" }, adaRun)).status, 200, "ada is authorized again once the tombstones are readable");
-    pass("the facade and the launcher refuse employee-retired when the subject OR handle is tombstoned (a reverted retired definition, a fresh subject around a retired handle), bind refuses the retired handle, and unreadable tombstones fail closed");
+    // A state path nobody may look at is not "no tombstones" either: `existsSync` answers false for a file behind a directory
+    // it cannot search, which used to read as an empty state and GRANT. The directory, then the file itself, made unreadable.
+    if (process.getuid?.() !== 0) {
+      for (const [label, path, mode, restore] of [["the state directory", idState, 0o000, 0o700], ["the state file", statePath, 0o000, 0o600]]) {
+        chmodSync(path, mode);
+        try {
+          const blindMail = await direct(CLIENT.ada, { operation: "list" }, adaRun);
+          assert.equal(blindMail.status, 503, `${label}: ${JSON.stringify(blindMail.body)}`); assert.equal(blindMail.body.code, "lifecycle-state-unavailable");
+          const blindAccess = await viaEdge("ada", "/v1/access/requests", accessBody(`ada-blind-${mode}-${label.length}`), adaRun);
+          assert.equal(blindAccess.status, 503, `${label}: ${JSON.stringify(blindAccess.body)}`); assert.equal(blindAccess.body.code, "lifecycle-state-unavailable"); assert.equal(blindAccess.body.credential, undefined);
+          const blindLaunch = await runAsync(["access", "run", "ada", "--", process.execPath, "-e", "0"]);
+          assert.notEqual(blindLaunch.status, 0, label); assert.match(blindLaunch.stderr, /Launch refused: the retirement tombstones cannot be read \(.*EACCES/u, label);
+          assert.equal(fixtureGrants(), grantsBefore, `${label}: a grant was written while the tombstones could not be read`);
+        } finally { chmodSync(path, restore); }
+      }
+      assert.equal((await direct(CLIENT.ada, { operation: "list" }, adaRun)).status, 200, "ada is authorized again once the state path is readable");
+    }
+    pass("the facade and the launcher refuse employee-retired when the subject OR handle is tombstoned (a reverted retired definition, a fresh subject around a retired handle), bind refuses the retired handle, and tombstones that cannot be read (bad JSON, an unsearchable directory, an unreadable file) fail closed");
+  }
+
+  // -- 5d. a specialist with a FLUME-39 desk key still runs the key its LAUNCHER injects (review2 N2) -------------------------------
+  {
+    // ada's desk now maps its own FLUME-39 consumer (section 5), and that consumer holds a live token. launchSpecialist still
+    // injects op://DeLoSecrets/hermes-ada/credential whatever the desk maps: two keys, and only one of them is provably ada's.
+    writeFileSync(baseEnv.GW_STATE, JSON.stringify({ mode: "ok", consumers: { ada: [{ id: 51, name: "aai:ada:1700000051", status: 1, expired_time: -1 }] } }));
+    const calls0 = opCalls().length;
+    const read = json(await runAsync(["identity", "credentials", "ada", "--json"]));
+    const gateway = read.credentials.filter((r) => r.provider === "gateway");
+    assert.deepEqual(gateway.map((r) => [r.ref_source, r.consumer ?? null, r.status, r.provider_code ?? null]), [["generated", "ada", "static-usable", null], ["launcher", null, "unverified", "launcher-ref-unproven"]], JSON.stringify(gateway));
+    assert.equal(gateway[1].ref, HERMES_REF);
+    // The vault was asked whether the launcher's item EXISTS, never for its value.
+    const asked = opCalls().slice(calls0);
+    assert.ok(asked.some((argv) => argv.join(" ") === "item get hermes-ada --vault DeLoSecrets --format json"), JSON.stringify(asked));
+    assert.equal(asked.some((argv) => argv[0] === "read" && argv[1] === HERMES_REF), false, "the lifecycle read the launcher's key");
+    assert.equal(asked.some((argv) => argv.includes("--reveal")), false);
+    // Revoking the desk's own consumer does not make the gateway complete: the launcher's key is still unproven, and the step
+    // list says it was not revoked.
+    const revoked = json(await runAsync(["identity", "suspend", "ada", "--revoke", "gateway", "--apply", "--json"]));
+    assert.equal(revoked.ok, true, JSON.stringify(revoked.steps));
+    assert.deepEqual(revoked.steps.filter((s) => s.adapter === "gateway").map((s) => `${s.key}:${s.outcome}${s.provider_code ? `:${s.provider_code}` : ""}`), ["gateway:token-revoke:ada:done", `gateway:launcher-key:${HERMES_REF}:skipped:launcher-ref-unproven`]);
+    const after = revoked.credentials.filter((r) => r.provider === "gateway");
+    assert.deepEqual(after.map((r) => `${r.ref_source}:${r.status}`), ["generated:revoked", "launcher:unverified"]);
+    assert.equal(revoked.complete_revocation, false);
+    assert.ok(revoked.incomplete.some((r) => r.provider === "gateway" && r.ref === HERMES_REF && r.provider_code === "launcher-ref-unproven"), JSON.stringify(revoked.incomplete));
+    assert.ok(revoked.incomplete.some((r) => r.kind === "skipped-step" && r.provider_code === "launcher-ref-unproven"));
+    assert.deepEqual(JSON.parse(readFileSync(baseEnv.GW_STATE, "utf8")).consumers.ada, []);
+    json(await runAsync(["identity", "restore", "ada", "--apply", "--json"]));
+
+    // No vault item behind the launcher's reference: the launcher is dead (it refuses to start), so that row is not-issued and
+    // no launcher step is reported.
+    const opFixture = join(dir, "op.json"), withItem = readFileSync(opFixture, "utf8");
+    const withoutItem = JSON.parse(withItem); delete withoutItem[HERMES_REF];
+    writeFileSync(opFixture, JSON.stringify(withoutItem));
+    try {
+      const dead = json(await runAsync(["identity", "credentials", "ada", "--json"]));
+      const launcherRow = dead.credentials.find((r) => r.provider === "gateway" && r.ref_source === "launcher");
+      assert.deepEqual([launcherRow.status, launcherRow.ref], ["not-issued", HERMES_REF], JSON.stringify(launcherRow));
+      assert.match(launcherRow.detail, /launcher reference is dead/u);
+      assert.equal(dead.incomplete.some((r) => r.ref === HERMES_REF), false);
+      const plan = json(await runAsync(["identity", "suspend", "ada", "--revoke", "gateway", "--json"]));
+      assert.equal(plan.steps.some((s) => s.key.startsWith("gateway:launcher-key:")), false, "a dead launcher reference was reported as a skipped revocation");
+      assert.ok(plan.steps.some((s) => s.key === "gateway:token-revoke:ada"));
+    } finally { writeFileSync(opFixture, withItem); }
+    pass("a specialist with a FLUME-39 desk key inventories the launcher's own key as a separate row (vault item probed for existence only): unverified launcher-ref-unproven while it exists, so revoking the desk consumer never completes the gateway; not-issued once the item is gone");
   }
 
   // -- 6. secrets ---------------------------------------------------------------------------------------------------------

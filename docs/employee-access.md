@@ -372,17 +372,24 @@ flume mail list | read <id>                         # plain client; run as `flum
 ```
 
 **Every command is a preview unless `--apply`.** A preview reads (Cloudflare and GitHub GETs, `px identity verify`,
-`gateway-tokens status`) and writes nothing: no definition, no state or ledger file, no provider mutation. A blocker
-(`not-enrolled`, `invalid-request`, `shared-consumer`, `retired-terminal`, `not-suspended`, an unreadable or symlinked
-definition) exits 1 with `blockers[]` before any provider call.
+`gateway-tokens status`, and for a specialist `op item get` of the launcher's vault item, existence only) and writes nothing:
+no definition, no state or ledger file, no provider mutation. A blocker (`not-enrolled`, `invalid-request`, `shared-consumer`,
+`gateway-ref-drift`, `retired-terminal`, `not-suspended`, an unreadable or symlinked definition) exits 1 with `blockers[]`
+before any provider call.
 
 **Order.** Suspend writes local status FIRST (`setEmployeeStatus`), then deletes the mailbox allowlist key
 (`allowlist/<address>`: the record is read, captured into the lifecycle state, deleted, and verified absent by a GET that
 answers 404), then runs only the adapters named with `--revoke`, always in the order `cloudflare_access`, `github`, `gateway`.
 Retire is the same plus the employee's own literal routing rule disabled (PUT `enabled:false`, verified by GET; a foreign rule
-for the address is never touched), a tombstone, and `--revoke all`. Restore runs only from `suspended`: it re-PUTs the exact
-captured record (verified by GET), un-suspends a GitHub installation only if THIS lifecycle suspended it, and writes status
-`active` LAST. The facade reads status on every request, so a crash or outage in between fails closed.
+for the address is never touched), a tombstone, and `--revoke all`. A NAMED adapter this lifecycle must not run (a shared
+gateway consumer, a drifted desk) refuses the command before any call; under `--revoke all` the same adapter is a `skipped`
+step with its code instead (`shared-consumer`, `gateway-ref-drift`, `gateway-ref-shape`, `launcher-ref-unproven`), so an
+emergency `retire --revoke all` still writes status, the tombstone and every other revocation. A skipped step is never run or
+recorded, does not make the result fail, keeps `complete_revocation` false and is listed in `skipped[]` and `incomplete[]`
+(`kind: skipped-step`); the text output says `N revocation(s) skipped`. Restore runs only from `suspended`: it re-PUTs the exact
+captured record (verified by GET) unless the key is present with a newer record (re-provisioned since the suspension: that
+record is never overwritten), un-suspends a GitHub installation only if THIS lifecycle's suspension is still the one in place,
+and writes status `active` LAST. The facade reads status on every request, so a crash or outage in between fails closed.
 
 While the allowlist key is absent the agents-facade Worker bounces new inbound mail to the address: inbound mail is refused while the employee is suspended or retired, stored mail is kept, and restore re-opens delivery.
 
@@ -390,18 +397,25 @@ While the allowlist key is absent the agents-facade Worker bounces new inbound m
 `<identity state dir>/lifecycle-state.json` and `lifecycle-ledger.jsonl` (directory 0700, files 0600, secret-free), held under
 its own lock for the whole apply; the registry lock is never nested. Each provider-mutating step has a resource-scoped key such as
 `cloudflare_access:token-delete:<client_id>`. A key recorded `done` or `converged` is never executed again by any later
-operation: it reports `already-done` with the original `operation_id`. There are no "episodes": a step record or a capture is
-dropped ONLY by restore, for the steps it reversed, so an out-of-band `flume identity status` flip between two suspensions loses
-nothing restore needs. The two irreversible steps are further scoped to the LIVE resources they acted on (`data.resources`): the
-Access delete by the token's ID, the gateway revoke by the consumer's token IDs. A token minted since (a FLUME-39 re-mint) is new
-work and is revoked again; a token already deleted is never deleted twice, and a provider that cannot be read keeps the record. An
+operation while the provider shows nothing new: it reports `already-done` with the original `operation_id`. There are no
+"episodes": a step record is dropped ONLY by restore, for the steps it reversed, so an out-of-band `flume identity status` flip
+between two suspensions loses nothing restore needs. Every step is scoped to the LIVE resources at the provider
+(`data.resources`, re-read by the next run). The irreversible ones record what they acted on: the Access delete by the token's ID,
+the gateway revoke by the consumer's token IDs, so a token minted since (a FLUME-39 re-mint) is revoked again and a token already
+deleted is never deleted twice. The reversible ones record that nothing was left open: an allowlist key re-provisioned, a routing
+rule re-enabled or an installation un-suspended by hand since is new work for the next suspend or retire (never `already-done`
+over a live resource), and the new allowlist record replaces the older capture. A provider that cannot be read keeps the record. An
 `unresolved` step is re-attempted by the next run. A 404 on a DELETE, an installation that was already suspended (by someone else),
 and `revoked 0 tokens` are `converged`. After an outage or a crash, re-run the same command.
 
 **GitHub suspension ownership.** Before the `PUT …/suspended` the lifecycle captures `github_suspend:<installation>` with its
-`operation_id`. A PUT that committed behind a 5xx, or whose read-back failed, is therefore still this lifecycle's: the retry finds
-the installation suspended WITH the capture and reports `done` (not `converged`), and restore un-suspends on a `done` record or the
-capture alone. An installation found suspended without the capture is someone else's and is never un-suspended.
+`operation_id` and time. The capture is dropped at once when the PUT definitely did not commit: never sent (no App session), refused
+with a 4xx, or a 5xx/timeout after which GitHub reads the installation back unsuspended (the PUT is synchronous). A PUT that committed
+behind a 5xx, or whose read-back failed, keeps it, so it is still this lifecycle's: the retry finds the installation suspended WITH
+the capture and a `suspended_at` no older than it (to GitHub's whole second) and reports `done` (not `converged`). Restore
+un-suspends only this lifecycle's suspension: a `done` record whose read-back `suspended_at` is still the one in place, or a capture
+no older than that `suspended_at`. Anything else (an installation found suspended without the capture, or suspended earlier than
+it, or re-suspended by someone since) is someone else's and is never un-suspended.
 
 **What each provider can and cannot revoke.**
 
@@ -411,7 +425,7 @@ capture alone. An installation found suspended without the capture is someone el
 | cloudflare_access | `--revoke` DELETEs the service token and verifies by listing again | without `--revoke`: the token authenticates at Access until its `expires_at` (the facade still denies by status) | `static-usable` + `expires_at`; `revoked` only when the COMPLETE listing no longer has it |
 | github | `--revoke` suspends the installation (PUT `/app/installations/{id}/suspended`, verified by `suspended_at`) | the App private key (probed by app-JWT `GET /app`); unexpired installation tokens until `expires_at` (at most 1 hour). Anyone holding the key can un-suspend | installation and tokens `suspended-reversible`; key `static-usable`, `revoked` only when GitHub answers 401 |
 | plane | nothing: Flume has no Plane client or revoke verb | the employee's PAT; its expiry is not observable. The employee deletes it (Profile > Personal Access Tokens) or an admin removes the board membership | `static-usable`; `revoked` only on Pilot's `credential_rejected` |
-| gateway | `--revoke` runs `gateway-tokens.py revoke <consumer>` and verifies `status` lists no tokens | an `expired_time` of `-1` means the token never expires; a key the desk inherits from the fleet base is usable and never revocable here | `static-usable` or `residual-expiry`; `revoked` only when `tokens: []`; a shared consumer is `static-usable` (retire: `manual-action-required`), never `not-issued` |
+| gateway | `--revoke` runs `gateway-tokens.py revoke <consumer>` and verifies `status` lists no tokens | an `expired_time` of `-1` means the token never expires; a key the desk inherits from the fleet base, a drifted desk's keys and a specialist launcher's key are usable and never revocable here | `static-usable` or `residual-expiry`; `revoked` only when `tokens: []` and the desk has not drifted; a shared consumer is `static-usable` (retire: `manual-action-required`), never `not-issued`; drift is `unverified` `gateway-ref-drift`; the launcher key is `unverified` `launcher-ref-unproven` (`not-issued` once its vault item is gone) |
 
 Row statuses: `revoked`, `suspended-reversible`, `residual-expiry`, `static-usable`, `manual-action-required`, `unverified`,
 `unresolved`, `not-issued`. A static credential becomes `revoked` ONLY when the provider has read back its rejection or absence
@@ -436,29 +450,53 @@ inventory as a `previous-credential-reference` row, `manual-action-required` wit
 old reference reads back a rejection: Pilot's `credential_rejected` for a Plane PAT, `GET /app` 401 for a GitHub App key, or (an old
 Access client secret cannot be probed) the service token absent from the complete listing. Rotation alone never makes a row `revoked`.
 
-**Gateway and FLUME-39.** The desk's reference is the one it actually RUNS with, resolved in Hermes' order: the desk's own
-`profiles/<p>/config.delta.yaml`, then its generated `profiles/<p>/config.yaml`, then (a post's desk) the fleet base `config.yaml`
-it inherits (`ref_source` says which). The consumer is its last segment, and only for the FLUME-39 shape
-`op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/<consumer>`; any other shape is `unverified` (`gateway-ref-shape`). A reference equal to
-the fleet base, or a consumer another desk also maps, is a SHARED consumer: its row is `shared_consumer: true` and `static-usable`
-(`manual-action-required` on retire) while its token is live -- never `not-issued`, so `complete_revocation` stays false -- and
-`--revoke gateway` (or `--revoke all`, which names it) is the blocker `shared-consumer` before any provider call; name the other
-adapters instead. Only a desk with no key anywhere is `not-issued`. A portable specialist whose desk maps no FLUME-39 reference
-reports the reference `launchSpecialist` injects, `op://DeLoSecrets/hermes-<employee>/credential`, as `unverified`
-(`gateway-ref-shape`, `ref_source: launcher`). Flume never mints or rotates gateway tokens (FLUME-39,
-`gateway-tokens.py`). Every gateway row and result carries `owner_ticket: FLUME-39`, `evidence_path`
-(`FLUME_GATEWAY_EVIDENCE`, default `_bmad-output/implementation-artifacts/FLUME-39`) and `evidence_status`, which is `unverified`
-until that evidence exists. Residual risk: `launchSpecialist`'s hard-coded reference is not the FLUME-39 shape; the lifecycle reports
-it and does not change it.
+**Gateway and FLUME-39.** The desk's reference is the one it actually RUNS with. Hermes runs a profile's GENERATED
+`profiles/<p>/config.yaml` (`deep_merge(<fleet>/config.yaml, <p>/config.delta.yaml)`, for a post's desk and a specialist's alike), so
+when that file exists its reference is the running one (`ref_source: generated`); only without it is the desk read as a render would
+produce it: its own delta, then the fleet base (`delta`, `base`). The consumer is the reference's last segment, and only for the
+FLUME-39 shape `op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/<consumer>`; any other shape is `unverified` (`gateway-ref-shape`).
+
+*Drift.* `gateway-member-tokens.py --apply` edits the delta and re-renders only with `--render`, and a running gateway keeps the old
+key until restarted. A generated config that disagrees with what its delta (or the base it inherits) would render, or that cannot be
+read, is DRIFT: the running key's rows stay (sharing is judged on the running key) plus an `unverified` `gateway-ref-drift` row for
+the key the next render would run. A drifted desk never reports a `revoked` gateway row, a named `--revoke gateway` is the blocker
+`gateway-ref-drift`, and `--revoke all` skips it. Re-render the desk and restart its gateway, then re-run.
+
+*Shared.* A running reference equal to the fleet base, or a consumer another desk maps (in the config it runs or the one its next
+render produces), is a SHARED consumer: its row is `shared_consumer: true` and `static-usable` (`manual-action-required` on retire)
+while its token is live -- never `not-issued`, so `complete_revocation` stays false. A named `--revoke gateway` is the blocker
+`shared-consumer` before any provider call; `--revoke all` reports it as a `skipped` step and revokes everything else. Only a desk with
+no key anywhere is `not-issued`.
+
+*Specialists.* `launchSpecialist` always injects `op://DeLoSecrets/hermes-<employee>/credential` as `AUTOMATICAI_GATEWAY_KEY`, whatever
+the desk maps, and the child it starts has no `OP_*` token to resolve the desk's own mapping. A specialist therefore always gets a
+SEPARATE `ref_source: launcher` row besides its desk's: while the vault item exists it is `unverified` (`launcher-ref-unproven`;
+`launcher-ref-ambiguous` when several items share the title), because nothing proves which consumer that key belongs to without
+reading it, so revoking the desk's own FLUME-39 consumer never completes the gateway on its own; once the item is gone the launcher
+reference is dead (the launcher refuses to start) and the row is `not-issued`. The item is probed with
+`op item get hermes-<employee> --vault DeLoSecrets --format json` WITHOUT `--reveal`: existence only, the output discarded unread; the
+key itself is never read. A `--revoke gateway` on a specialist also reports a `skipped` `gateway:launcher-key:<ref>` step while the
+item exists. FLUME-39 owns the fix (point the launcher at the employee's own consumer); this story changes neither the launcher nor
+its reference.
+
+Flume never mints or rotates gateway tokens (FLUME-39, `gateway-tokens.py`). Every gateway row and result carries
+`owner_ticket: FLUME-39`, `evidence_path` (`FLUME_GATEWAY_EVIDENCE`, default `_bmad-output/implementation-artifacts/FLUME-39`) and
+`evidence_status`, which is `unverified` until that evidence exists.
 
 **Tombstones.** Retire records the subject, handle, email and binding keys in the lifecycle state. `flume offboard` removes only the
 registry row, but enroll, bind, status, suspend, restore and rotate consult the tombstone: `handle-tombstoned`, `subject-tombstoned`,
 `binding-tombstoned` and `retired-terminal`. A tombstone matches a definition by its subject OR its handle, so a retired
 `role.yaml` reverted to `active` (a `git checkout`) and a fresh subject hand-written around a retired handle are both still retired.
 The facade (`/v1/access/requests` and `/v1/mail/authorize`) and the launcher (`flume launch`, `flume access run`) refuse them
-`employee-retired`; tombstones that cannot be read fail CLOSED (facade 503 `lifecycle-state-unavailable`, launch refused). The
-facade re-reads the employee's standing again INSIDE its single-flight queue, so a request that waited behind a slow GitHub mint is
-not issued after a `suspend` or `retire` wrote its status.
+`employee-retired`; tombstones that cannot be read fail CLOSED (facade 503 `lifecycle-state-unavailable`, launch refused). Only a
+state file that does not EXIST reads as "no tombstones": one behind a directory that cannot be searched, or that cannot be read
+(EACCES, ENOTDIR, bad JSON, a symlink), fails closed. The facade re-reads the employee's standing again INSIDE its single-flight
+queue, so a request that waited behind a slow GitHub mint is not issued after a `suspend` or `retire` wrote its status; a request
+that has to wait is named on the facade's stderr (`flume access: queued request "<request_id>" behind N in-flight request(s)`).
+
+**Not reversed.** Restore lists the revocations it cannot undo in `not_reversed[]`: each entry is a dated fact of one operation
+(`operation_id`, `at`, the token IDs it revoked), and it is dropped once it no longer describes the employee -- a FLUME-39 re-mint or
+a re-provisioned Access token since, or a binding or desk that has moved on.
 
 **Rotation.** `rotate` changes `credential_ref` only; the principal, instance, `native_actor_id` and attribution are unchanged. A
 differing `--principal` or `--instance` is `rotation-changes-principal`; a ref held elsewhere is `credential-ref-duplicate`; gateway is

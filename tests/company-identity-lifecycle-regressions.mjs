@@ -67,9 +67,11 @@ async function world(label, o = {}) {
   writeFileSync(join(fleet, "config.yaml"), YAML.stringify(o.baseRef === false ? { model: { provider: "automaticai" } } : { secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf("fleet") } } } }));
   // ada's desk: its own FLUME-39 consumer in the delta (default), a bad shape, the base ref copied into the delta, nothing at
   // all (it inherits the base), or only a GENERATED config.yaml carrying the base ref or its own.
-  const deltaRef = o.gatewayRef === undefined ? gwRefOf("ada") : o.gatewayRef === "bad" ? "op://DeLoSecrets/some-title/credential" : o.gatewayRef === "shared" ? gwRefOf("fleet") : undefined;
+  const deltaRef = o.deltaConsumer ? gwRefOf(o.deltaConsumer) : o.gatewayRef === undefined ? gwRefOf("ada") : o.gatewayRef === "bad" ? "op://DeLoSecrets/some-title/credential" : o.gatewayRef === "shared" ? gwRefOf("fleet") : undefined;
   if (deltaRef) writeFileSync(join(fleet, "profiles/ada-pm/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: deltaRef } } } }));
   if (o.gatewayRef === "generated-base" || o.gatewayRef === "generated-own") writeFileSync(join(fleet, "profiles/ada-pm/config.yaml"), YAML.stringify({ model: { provider: "automaticai" }, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf(o.gatewayRef === "generated-base" ? "fleet" : "ada") } } } }));
+  // A generated config.yaml (what Hermes RUNS) that a render of the delta has not caught up with: `o.generated` names its consumer.
+  if (o.generated) writeFileSync(join(fleet, "profiles/ada-pm/config.yaml"), YAML.stringify({ model: { provider: "automaticai" }, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf(o.generated) } } } }));
   writeFileSync(join(fleet, "profiles/bob-pm/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf("bob") } } } }));
   const configPath = join(dir, "identity-provisioning.yaml");
   writeFileSync(configPath, YAML.stringify({ version: 1, cloudflare: { api_token_ref: TOKEN_REF, account_id: ACCOUNT, zone_id: ZONE, access_issuer: ISSUER }, mailbox: { worker: "agents-facade", kv_namespace_id: KVNS }, onepassword: { vault: "DeLoSecrets" } }));
@@ -168,6 +170,7 @@ const stateOf = (w) => JSON.parse(readFileSync(join(w.idState, "lifecycle-state.
 const KV_ADA = "allowlist/ada@agents.delo.sh";
 const providerMutations = () => ({ cf: cf.mutations().length, gh: gh.mutations().length });
 const DEFINITIONS = (w) => ({ bob: readFileSync(w.bobRole, "utf8"), registry: readFileSync(w.registry, "utf8") });
+const reprovisioned = (w) => ({ handle: "ada", subject: w.ada.subject, provisioned_at: "2026-10-15T00:00:00.000Z" });
 const until = async (check, ms = 20000) => { const end = Date.now() + ms; while (!check()) { if (Date.now() > end) throw new Error("timed out waiting for the condition"); await new Promise((done) => setTimeout(done, 25)); } };
 
 try {
@@ -397,36 +400,60 @@ try {
     assert.equal(cf.calls.length + gh.calls.length + shared.gw.calls().length, 0, "a blocker was found after a provider call");
     assert.equal(shared.block(shared.adaRole).status, "active");
     assert.equal(existsSync(join(shared.idState, "lifecycle-state.json")), false);
-    // Another desk mapping the same consumer is shared too.
+    // Another desk mapping the same consumer is shared too: a NAMED --revoke gateway is refused before any call...
     const twin = await world("shared-twin");
     writeFileSync(join(twin.fleet, "profiles/bob-pm/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: twin.gwRefOf("ada") } } } }));
-    blockedWith(twin.json(await twin.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--json"]), 1), "shared-consumer");
+    blockedWith(twin.json(await twin.runAsync(["identity", "retire", "ada-pm", "--revoke", "gateway", "--json"]), 1), "shared-consumer");
+    blockedWith(twin.json(await twin.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--revoke", "gateway", "--json"]), 1), "shared-consumer");
+    // ...while `--revoke all` previews the gateway as a skipped step (never planned) and the retire as incomplete.
+    const twinAll = twin.json(await twin.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--json"]));
+    assert.equal(twinAll.ok, true, JSON.stringify(twinAll.blockers));
+    assert.deepEqual([stepOf(twinAll, "gateway:token-revoke:ada").outcome, stepOf(twinAll, "gateway:token-revoke:ada").provider_code], ["skipped", "shared-consumer"]);
+    assert.equal(twinAll.complete_revocation, false);
+    assert.ok(twinAll.incomplete.some((r) => r.kind === "skipped-step" && r.id === "gateway:token-revoke:ada" && r.provider_code === "shared-consumer"), JSON.stringify(twinAll.incomplete));
+    pass("a shared gateway consumer (fleet base or another desk) blocks a NAMED --revoke gateway before any call and is a skipped step under --revoke all");
+  }
+  {
     const badShape = await world("bad-shape", { gatewayRef: "bad" });
-    // A bad shape is a row, not a blocker: no consumer is inferred, no gateway step is planned.
+    // A bad shape is a row and a skipped step, not a blocker: no consumer is inferred and nothing is revoked.
     const shape = badShape.json(await badShape.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--json"]));
     assert.equal(shape.ok, true, JSON.stringify(shape.blockers));
     assert.equal(rowOf(shape, "gateway").provider_code, "gateway-ref-shape");
-    assert.equal(shape.steps.some((s) => s.key.startsWith("gateway:")), false);
-    pass("a shared gateway consumer (fleet base or another desk) blocks --revoke gateway before any call; a non-FLUME-39 reference is an unverified row with no gateway step");
+    assert.deepEqual(shape.steps.filter((s) => s.key.startsWith("gateway:")).map((s) => `${s.outcome}:${s.provider_code}`), ["skipped:gateway-ref-shape"]);
+    const shapeApplied = badShape.json(await badShape.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--apply", "--json"]));
+    assert.equal(shapeApplied.ok, true, "a skipped revocation is not a failure");
+    assert.deepEqual(shapeApplied.skipped, [{ key: "gateway:token-revoke:unnamed", adapter: "gateway", provider_code: "gateway-ref-shape" }]);
+    assert.equal(badShape.gw.calls().filter((c) => c[0] === "revoke").length, 0);
+    assert.equal(stateOf(badShape).steps[badShape.ada.subject]["gateway:token-revoke:unnamed"], undefined, "a skipped step was recorded");
+    assert.ok(ledgerOf(badShape).some((l) => l.step === "gateway:token-revoke:unnamed" && l.outcome === "skipped" && l.provider_code === "gateway-ref-shape"));
+    assert.match((await badShape.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway"])).stdout, /revocation INCOMPLETE: \d+ credential\(s\) still usable, expiring or unverified; 1 revocation\(s\) skipped/u);
+    pass("a non-FLUME-39 gateway reference is an unverified row and a skipped step, never recorded and never a blocker");
+  }
+  {
 
-    // A desk with no reference of its own runs on the fleet base key: that is a shared consumer, never `not-issued`, and
-    // `--revoke all` (which names the gateway) is refused before any call rather than cut off the whole fleet.
+    // A desk with no reference of its own runs on the fleet base key: that is a shared consumer, never `not-issued`. An
+    // emergency `retire --revoke all` still retires: status, tombstone and every revocation it may run, with the gateway skipped.
     const inherits = await world("retire-inherits-base", { gatewayRef: "none" });
     cf.calls.length = 0; gh.calls.length = 0;
-    const inheritsBefore = { home: tree(inherits.home), state: tree(join(inherits.dir, "state")) };
-    blockedWith(inherits.json(await inherits.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]), 1), "shared-consumer");
+    blockedWith(inherits.json(await inherits.runAsync(["identity", "retire", "ada-pm", "--revoke", "gateway", "--apply", "--json"]), 1), "shared-consumer");
     assert.equal(cf.calls.length + gh.calls.length + inherits.gw.calls().length, 0, "the shared-consumer blocker came after a provider call");
-    assert.deepEqual(tree(inherits.home), inheritsBefore.home); assert.deepEqual(tree(join(inherits.dir, "state")), inheritsBefore.state);
-    const named = inherits.json(await inherits.runAsync(["identity", "retire", "ada-pm", "--revoke", "cloudflare_access", "--revoke", "github", "--apply", "--json"]));
-    assert.equal(named.ok, true, JSON.stringify(named.blockers));
+    assert.equal(inherits.block(inherits.adaRole).status, "active");
+    const all = inherits.json(await inherits.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]));
+    assert.equal(all.ok, true, JSON.stringify(all.steps));
+    assert.equal(inherits.block(inherits.adaRole).status, "retired");
     assert.ok(stateOf(inherits).tombstones[inherits.ada.subject]);
-    const inheritedRow = rowOf(named, "gateway");
+    assert.deepEqual(all.steps.map((s) => `${s.key}:${s.outcome}`), ["local-status:retired:done", "tombstone:done", "mail:allowlist-delete:ada@agents.delo.sh:done", "mail:routing-disable:ada@agents.delo.sh:done", `cloudflare_access:token-delete:${CLIENT.ada}:done`, "github:installation-suspend:2001:done", "gateway:token-revoke:fleet:skipped"]);
+    assert.equal(stepOf(all, "gateway:token-revoke:fleet").provider_code, "shared-consumer");
+    assert.deepEqual(all.skipped, [{ key: "gateway:token-revoke:fleet", adapter: "gateway", provider_code: "shared-consumer" }]);
+    assert.equal(cf.tokens.some((t) => t.id === "tok-ada"), false); assert.ok(gh.installationOf("1001").suspended_at);
+    assert.equal(inherits.gw.revokes().length, 0, "a shared consumer was revoked");
+    assert.equal(inherits.gw.read().consumers.fleet.length, 1, "the fleet token was touched");
+    const inheritedRow = rowOf(all, "gateway");
     assert.equal(inheritedRow.status, "manual-action-required", JSON.stringify(inheritedRow));
     assert.equal(inheritedRow.shared_consumer, true); assert.equal(inheritedRow.consumer, "fleet"); assert.equal(inheritedRow.ref_source, "base"); assert.equal(inheritedRow.id, "13");
-    assert.equal(named.complete_revocation, false, "complete while the inherited fleet key is live");
-    assert.ok(named.incomplete.some((r) => r.provider === "gateway" && r.status === "manual-action-required"));
-    assert.equal(named.steps.some((s) => s.key.startsWith("gateway:")), false);
-    assert.equal(inherits.gw.revokes().length, 0, "a shared consumer was revoked");
+    assert.equal(all.complete_revocation, false, "complete while the inherited fleet key is live");
+    assert.ok(all.incomplete.some((r) => r.provider === "gateway" && r.status === "manual-action-required"));
+    assert.ok(all.incomplete.some((r) => r.kind === "skipped-step" && r.status === "skipped" && r.provider_code === "shared-consumer"));
 
     // Only a desk with no reference ANYWHERE (no delta, no generated config, no base key) has no gateway token.
     const noRef = await world("retire-no-ref", { gatewayRef: "none", baseRef: false });
@@ -437,7 +464,7 @@ try {
     assert.equal(rowOf(retired, "gateway").status, "not-issued");
     assert.equal(retired.steps.some((s) => s.key.startsWith("gateway:")), false);
     assert.equal(noRef.gw.revokes().length, 0);
-    pass("a desk inheriting the fleet base key is a shared consumer (manual-action-required on retire, never not-issued) and blocks --revoke all before any call; only a desk with no key anywhere is not-issued");
+    pass("a desk inheriting the fleet base key is a shared consumer (manual-action-required on retire, never not-issued): a named --revoke gateway is refused before any call, while retire --revoke all retires and revokes everything else with the gateway skipped; only a desk with no key anywhere is not-issued");
   }
 
   // -- 6. outage and retry -----------------------------------------------------------------------------------------------
@@ -532,11 +559,17 @@ try {
     const inherited = rowOf(noRef.json(await noRef.runAsync(["identity", "credentials", "ada-pm", "--json"])), "gateway");
     assert.deepEqual([inherited.status, inherited.shared_consumer, inherited.consumer, inherited.ref_source], ["static-usable", true, "fleet", "base"], JSON.stringify(inherited));
     const generatedBase = await world("generated-base", { gatewayRef: "generated-base" });
-    const viaGenerated = rowOf(generatedBase.json(await generatedBase.runAsync(["identity", "credentials", "ada-pm", "--json"])), "gateway");
+    const generatedBaseResult = generatedBase.json(await generatedBase.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    const viaGenerated = rowOf(generatedBaseResult, "gateway");
     assert.deepEqual([viaGenerated.status, viaGenerated.shared_consumer, viaGenerated.consumer, viaGenerated.ref_source], ["static-usable", true, "fleet", "generated"], JSON.stringify(viaGenerated));
+    assert.equal(generatedBaseResult.credentials.some((r) => r.kind === "gateway-ref-drift"), false, "a generated config that matches its render is not drift");
     const generatedOwn = await world("generated-own", { gatewayRef: "generated-own" });
-    const own = rowOf(generatedOwn.json(await generatedOwn.runAsync(["identity", "credentials", "ada-pm", "--json"])), "gateway");
+    const ownResult = generatedOwn.json(await generatedOwn.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    const own = rowOf(ownResult, "gateway");
     assert.deepEqual([own.status, own.shared_consumer, own.consumer, own.ref_source, own.id], ["static-usable", undefined, "ada", "generated", "11"], JSON.stringify(own));
+    // No delta maps a key, so a render would inherit the fleet base: the generated config has drifted from it.
+    const ownDrift = rowOf(ownResult, "gateway", "gateway-ref-drift");
+    assert.deepEqual([ownDrift.status, ownDrift.provider_code, ownDrift.consumer, ownDrift.ref_source], ["unverified", "gateway-ref-drift", "fleet", "base"], JSON.stringify(ownDrift));
     const baseless = await world("no-ref-anywhere", { gatewayRef: "none", baseRef: false });
     assert.equal(rowOf(baseless.json(await baseless.runAsync(["identity", "credentials", "ada-pm", "--json"])), "gateway").status, "not-issued");
     // Plane without a verified board.
@@ -551,7 +584,7 @@ try {
     assert.equal(rowOf(r6, "gateway").status, "unresolved");
     const failed = down.json(await down.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--apply", "--json"]), 1);
     assert.equal(stepOf(failed, "gateway:token-revoke:ada").outcome, "unresolved");
-    pass("degraded providers report not-issued, unverified or unresolved with their code, and exit 1 only when an apply step stays unresolved; the gateway row follows the reference the desk RUNS with (delta, then generated config, then the fleet base)");
+    pass("degraded providers report not-issued, unverified or unresolved with their code, and exit 1 only when an apply step stays unresolved; the gateway row follows the reference the desk RUNS with (its generated config.yaml when one exists, else its delta, else the fleet base)");
   }
 
   // -- 9. credentials is read-only and needs an enrolled employee -------------------------------------------------------
@@ -1052,6 +1085,244 @@ try {
       try { await refusedAll("unreadable"); } finally { chmodSync(w.adaRole, 0o644); }
     }
     pass("suspend, retire, restore, credentials and continuity refuse a symlinked or unreadable definition before any provider call, writing nothing");
+  }
+
+  // -- 12n. the desk RUNS its generated config.yaml, whatever the delta says now (review2 N1, repro R3) ----------------------------
+  {
+    // `gateway-member-tokens.py --apply` without `--render`: the delta maps ada's own consumer, the config Hermes runs still the fleet key.
+    const w = await world("drift-fleet", { generated: "fleet" });
+    const read = w.json(await w.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    const running = rowOf(read, "gateway", "gateway-token");
+    assert.deepEqual([running.consumer, running.ref_source, running.shared_consumer, running.status, running.id], ["fleet", "generated", true, "static-usable", "13"], JSON.stringify(running));
+    const drift = rowOf(read, "gateway", "gateway-ref-drift");
+    assert.deepEqual([drift.status, drift.provider_code, drift.consumer, drift.ref_source, drift.ref], ["unverified", "gateway-ref-drift", "ada", "delta", w.gwRefOf("ada")], JSON.stringify(drift));
+    // A named --revoke gateway is refused for both reasons before any provider call.
+    cf.calls.length = 0; gh.calls.length = 0;
+    const gw0 = w.gw.calls().length;
+    blockedWith(w.json(await w.runAsync(["identity", "retire", "ada-pm", "--revoke", "gateway", "--apply", "--json"]), 1), "shared-consumer", "gateway-ref-drift");
+    assert.equal(cf.calls.length + gh.calls.length + (w.gw.calls().length - gw0), 0, "a drift blocker was found after a provider call");
+    assert.equal(w.block(w.adaRole).status, "active");
+    // retire --revoke all retires and revokes everything else; neither the fleet token nor ada's delta token is touched.
+    const retired = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]));
+    assert.equal(retired.ok, true, JSON.stringify(retired.steps));
+    const skip = stepOf(retired, "gateway:token-revoke:fleet");
+    assert.deepEqual([skip.outcome, skip.provider_code], ["skipped", "shared-consumer"]);
+    assert.match(skip.detail, /gateway-member-tokens\.py --render/u, "the skipped step does not name the drift");
+    assert.equal(w.gw.revokes().length, 0);
+    assert.deepEqual([w.gw.read().consumers.fleet.length, w.gw.read().consumers.ada.length], [1, 1]);
+    assert.equal(retired.credentials.some((r) => r.provider === "gateway" && r.status === "revoked"), false, "a drifted desk produced a revoked gateway row");
+    assert.equal(retired.complete_revocation, false);
+    assert.ok(retired.incomplete.some((r) => r.kind === "gateway-ref-drift"));
+
+    pass("R3: a delta mapping a dedicated consumer while the generated config still runs the fleet key is drift: both blockers for a named --revoke gateway, a skipped step under --revoke all, the fleet token untouched");
+  }
+  {
+    // Not shared: the desk runs `ada` (token 11 live) while its delta maps `ada-new` (no token). Before this fix the delta
+    // won, `ada-new` read back empty, and the retire said COMPLETE while token 11 was live in the config Hermes runs.
+    const v = await world("drift-own", { deltaConsumer: "ada-new", generated: "ada", plane: false, github: false });
+    blockedWith(v.json(await v.runAsync(["identity", "retire", "ada-pm", "--revoke", "gateway", "--json"]), 1), "gateway-ref-drift");
+    const own = v.json(await v.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]));
+    assert.equal(own.ok, true, JSON.stringify(own.steps));
+    assert.deepEqual([stepOf(own, "gateway:token-revoke:ada").outcome, stepOf(own, "gateway:token-revoke:ada").provider_code], ["skipped", "gateway-ref-drift"]);
+    assert.equal(v.gw.revokes().length, 0);
+    assert.equal(v.gw.read().consumers.ada.length, 1);
+    assert.deepEqual([rowOf(own, "gateway", "gateway-token").consumer, rowOf(own, "gateway", "gateway-token").status], ["ada", "manual-action-required"]);
+    assert.equal(own.complete_revocation, false);
+    // Mail, Access, GitHub and Plane are all revoked or never issued here: only the drifted gateway keeps the retire incomplete.
+    assert.deepEqual([...new Set(own.incomplete.map((r) => r.provider))], ["gateway"], JSON.stringify(own.incomplete));
+    // The running consumer emptied out of band reads back absent, but a drifted desk still never reports a revoked gateway row.
+    v.gw.state.consumers.ada = []; v.gw.save();
+    const emptied = v.json(await v.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    const absent = rowOf(emptied, "gateway", "gateway-token");
+    assert.deepEqual([absent.status, absent.provider_code, absent.read_back], ["unverified", "gateway-ref-drift", undefined], JSON.stringify(absent));
+    assert.equal(emptied.complete_revocation, false);
+    // Re-rendered (config.yaml now carries the delta's key): no drift, and the empty `ada-new` consumer is revoked by read-back.
+    writeFileSync(join(v.fleet, "profiles/ada-pm/config.yaml"), YAML.stringify({ model: { provider: "automaticai" }, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: v.gwRefOf("ada-new") } } } }));
+    const rendered = v.json(await v.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    assert.equal(rendered.credentials.some((r) => r.kind === "gateway-ref-drift"), false);
+    assert.deepEqual([rowOf(rendered, "gateway").consumer, rowOf(rendered, "gateway").status], ["ada-new", "revoked"]);
+    assert.equal(rendered.complete_revocation, true, JSON.stringify(rendered.incomplete));
+
+    pass("a drifted desk whose running key is its own consumer never reads as COMPLETE: no revoked gateway row until the desk is re-rendered");
+  }
+  {
+    // A generated config that cannot be read is drift too: the key it runs is unknown.
+    const u = await world("drift-unreadable");
+    symlinkSync(join(u.fleet, "profiles/bob-pm/config.delta.yaml"), join(u.fleet, "profiles/ada-pm/config.yaml"));
+    const unknown = u.json(await u.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    const unreadable = rowOf(unknown, "gateway", "gateway-ref-drift");
+    assert.equal(unreadable.status, "unverified"); assert.match(unreadable.detail, /cannot be read/u);
+    assert.equal(unknown.credentials.some((r) => r.provider === "gateway" && r.kind === "gateway-token"), false, "a key was inferred from an unreadable generated config");
+    blockedWith(u.json(await u.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--json"]), 1), "gateway-ref-drift");
+    pass("a generated config.yaml that cannot be read is drift too: no key is inferred, and a named --revoke gateway is refused gateway-ref-drift");
+  }
+
+  // -- 12o. a resource re-opened by hand is new work, never already-done (review2 N3, repros R1/R2) --------------------------------
+  {
+    // mail: suspend -> out-of-band `status active` -> the mailbox is re-provisioned -> suspend again must delete again.
+    const w = await world("reopened-mail");
+    const first = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    w.json(await w.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]));
+    cf.kv.set(KV_ADA, reprovisioned(w));
+    const preview = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--json"]));
+    assert.equal(stepOf(preview, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "planned");
+    assert.match(stepOf(preview, "mail:allowlist-delete:ada@agents.delo.sh").detail, new RegExp(`new since operation ${first.operation_id}: allowlist/ada@agents\\.delo\\.sh$`, "u"));
+    const second = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    assert.equal(stepOf(second, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "done", "a re-provisioned allowlist key was reported already-done");
+    assert.equal(cf.kv.has(KV_ADA), false, "the re-provisioned allowlist key is still live");
+    assert.equal(cf.count("DELETE", /\/kv\//u), 2);
+    assert.deepEqual(stateOf(w).captures[w.ada.subject].mail_allowlist.record, reprovisioned(w), "the capture was not replaced by the re-provisioned record");
+    assert.equal(rowOf(second, "mail").status, "suspended-reversible");
+    const back = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(back.ok, true, JSON.stringify(back.steps));
+    assert.deepEqual(cf.kv.get(KV_ADA), reprovisioned(w), "restore did not put back the record this suspension deleted");
+
+    pass("R1: a mailbox re-provisioned by hand is deleted again by the next suspend (the capture is replaced) and restore puts back what that delete removed");
+  }
+  {
+    // retire straight after a re-provision deletes the key; a routing rule re-enabled by hand is disabled by the next retire.
+    const r = await world("reopened-mail-retire");
+    r.json(await r.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    r.json(await r.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]));
+    cf.kv.set(KV_ADA, reprovisioned(r));
+    const retired = r.json(await r.runAsync(["identity", "retire", "ada-pm", "--revoke", "cloudflare_access", "--revoke", "github", "--apply", "--json"]));
+    assert.equal(stepOf(retired, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "done");
+    assert.equal(cf.kv.has(KV_ADA), false, "retire reported already-done over a live allowlist key");
+    assert.equal(rowOf(retired, "mail").status, "revoked");
+    cf.rules.find((x) => x.id === "rule-ada").enabled = true;
+    const puts = cf.count("PUT", /email\/routing\/rules\/rule-ada/u);
+    const again = r.json(await r.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(stepOf(again, "mail:routing-disable:ada@agents.delo.sh").outcome, "done", "a re-enabled routing rule was reported already-done");
+    assert.equal(stepOf(again, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "already-done");
+    assert.equal(cf.count("PUT", /email\/routing\/rules\/rule-ada/u) - puts, 1);
+    assert.equal(cf.rules.find((x) => x.id === "rule-ada").enabled, false);
+    assert.equal(rowOf(again, "mail").status, "revoked");
+
+    pass("a retire after a re-provision deletes the live allowlist key, and a routing rule re-enabled by hand is disabled by the next retire");
+  }
+  {
+    // restore never writes a stale capture over a re-provisioned key: suspend -> active -> re-provision -> suspended by hand -> restore.
+    const s = await world("reopened-mail-restore");
+    const original = cf.kv.get(KV_ADA);
+    s.json(await s.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    s.json(await s.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]));
+    cf.kv.set(KV_ADA, reprovisioned(s));
+    s.json(await s.runAsync(["identity", "status", "ada-pm", "suspended", "--apply", "--json"]));
+    assert.notDeepEqual(original, reprovisioned(s));
+    const kvPuts = cf.count("PUT", /\/kv\//u);
+    const restored = s.json(await s.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(restored.ok, true, JSON.stringify(restored.steps));
+    assert.equal(stepOf(restored, "mail:allowlist-restore:ada@agents.delo.sh").outcome, "converged");
+    assert.equal(cf.count("PUT", /\/kv\//u), kvPuts, "restore wrote the stale capture over a re-provisioned key");
+    assert.deepEqual(cf.kv.get(KV_ADA), reprovisioned(s));
+    assert.equal(stateOf(s).captures[s.ada.subject].mail_allowlist, undefined);
+    pass("restore never writes a stale capture over a re-provisioned allowlist key");
+  }
+  {
+
+    // GitHub: suspend --revoke github -> out-of-band active -> installation un-suspended by hand -> suspend again must PUT again.
+    const g = await world("reopened-github");
+    g.json(await g.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]));
+    g.json(await g.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]));
+    gh.installationOf("1001").suspended_at = null;
+    const resuspended = g.json(await g.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]));
+    assert.equal(stepOf(resuspended, "github:installation-suspend:2001").outcome, "done", "an un-suspended installation was reported already-done");
+    assert.ok(gh.installationOf("1001").suspended_at);
+    assert.equal(gh.count("PUT", /suspended$/u), 2);
+    assert.equal(stateOf(g).captures[g.ada.subject]["github_suspend:2001"].operation_id, resuspended.operation_id, "the ownership capture was not replaced");
+    assert.equal(rowOf(resuspended, "github", "installation").status, "suspended-reversible");
+    gh.installationOf("1001").suspended_at = null;
+    const gone = g.json(await g.runAsync(["identity", "retire", "ada-pm", "--revoke", "cloudflare_access", "--revoke", "github", "--apply", "--json"]));
+    assert.equal(stepOf(gone, "github:installation-suspend:2001").outcome, "done");
+    assert.ok(gh.installationOf("1001").suspended_at, "retire reported a live installation already-done");
+    assert.equal(gh.count("PUT", /suspended$/u), 3);
+    assert.equal(rowOf(gone, "github", "installation").status, "suspended-reversible");
+    pass("R2: an installation un-suspended by hand is suspended again by the next suspend or retire, never reported already-done over a live installation");
+  }
+
+  // -- 12p. GitHub ownership is never claimed for a suspension this lifecycle did not make (review2 N4, repro R4) ---------------------
+  {
+    // R4: the PUT fails with a 500 that committed nothing; an admin then suspends the installation for their own reasons.
+    const w = await world("gh-put-uncommitted");
+    gh.mode.put = "500";
+    const failed = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]), 1);
+    assert.equal(stepOf(failed, "github:installation-suspend:2001").provider_code, "http-500");
+    assert.match(stepOf(failed, "github:installation-suspend:2001").detail, /did not commit/u);
+    assert.equal(gh.installationOf("1001").suspended_at, null);
+    assert.equal(stateOf(w).captures[w.ada.subject]["github_suspend:2001"], undefined, "a capture survived a PUT GitHub reads back as never committed");
+    gh.mode = {};
+    gh.installationOf("1001").suspended_at = new Date(Date.now() + 2000).toISOString().replace(/\.\d+Z$/u, "Z");
+    const restored = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(restored.ok, true, JSON.stringify(restored.steps));
+    assert.equal(restored.steps.some((s) => s.key.startsWith("github:")), false, "restore planned to un-suspend an installation it never suspended");
+    assert.equal(gh.count("DELETE", /suspended$/u), 0);
+    assert.ok(gh.installationOf("1001").suspended_at, "restore undid the admin's suspension");
+    pass("R4: a PUT that read back unsuspended keeps no capture, so restore never un-suspends an admin's later suspension");
+  }
+  {
+    // ...and a retry instead calls it someone else's, with no second PUT.
+    const x = await world("gh-put-uncommitted-retry");
+    gh.mode.put = "500";
+    x.json(await x.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]), 1);
+    gh.mode = {};
+    gh.installationOf("1001").suspended_at = new Date(Date.now() + 2000).toISOString();
+    const retry = x.json(await x.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]));
+    assert.equal(stepOf(retry, "github:installation-suspend:2001").outcome, "converged", "a retry claimed a suspension this lifecycle never made");
+    assert.equal(gh.count("PUT", /suspended$/u), 1);
+    x.json(await x.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(gh.count("DELETE", /suspended$/u), 0);
+
+    pass("R4: a retry after a PUT that never committed calls an admin's later suspension someone else's, with no second PUT");
+  }
+  {
+    // A 4xx is a definite refusal: nothing committed, so nothing is captured to claim later.
+    const y = await world("gh-put-403");
+    gh.mode.put = "403";
+    const refused = y.json(await y.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]), 1);
+    assert.equal(stepOf(refused, "github:installation-suspend:2001").provider_code, "http-403");
+    assert.match(stepOf(refused, "github:installation-suspend:2001").detail, /refused the suspension; it did not commit/u);
+    assert.equal(stateOf(y).captures[y.ada.subject]["github_suspend:2001"], undefined);
+    gh.mode = {};
+
+    pass("a 4xx PUT is a definite refusal: no capture is kept");
+  }
+  {
+    // A capture kept for a genuinely ambiguous PUT (committed behind a 500, and the read-back failed too) still never claims a
+    // suspension OLDER than itself.
+    const z = await world("gh-capture-older");
+    Object.assign(gh.mode, { put: "500-after-commit", installationGet: "500-when-suspended" });
+    z.json(await z.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]), 1);
+    gh.mode = {};
+    const kept = stateOf(z).captures[z.ada.subject]["github_suspend:2001"];
+    assert.ok(kept, "an ambiguous PUT must keep its capture");
+    gh.installationOf("1001").suspended_at = "2026-01-01T00:00:00Z";
+    const older = z.json(await z.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(older.ok, true, JSON.stringify(older.steps));
+    assert.equal(stepOf(older, "github:installation-unsuspend:2001").outcome, "converged");
+    assert.match(stepOf(older, "github:installation-unsuspend:2001").detail, /not by this lifecycle's suspension/u);
+    assert.equal(gh.count("DELETE", /suspended$/u), 0);
+    assert.equal(gh.installationOf("1001").suspended_at, "2026-01-01T00:00:00Z");
+    pass("a capture kept for an ambiguous PUT never claims a suspension older than itself");
+  }
+
+  // -- 12q. not_reversed never goes stale (review2 N7) -------------------------------------------------------------------------------
+  {
+    const w = await world("not-reversed");
+    const suspended = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "cloudflare_access", "--revoke", "gateway", "--apply", "--json"]));
+    const preview = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--json"]));
+    assert.deepEqual(preview.not_reversed.map((n) => n.key).sort(), [`cloudflare_access:token-delete:${CLIENT.ada}`, "gateway:token-revoke:ada"].sort());
+    for (const entry of preview.not_reversed) { assert.equal(entry.operation_id, suspended.operation_id); assert.ok(entry.note.includes(`operation ${suspended.operation_id}`)); }
+    assert.deepEqual(preview.not_reversed.find((n) => n.key === "gateway:token-revoke:ada").resources, ["11"]);
+    // FLUME-39 re-mints the gateway token while ada is suspended: that entry no longer describes ada.
+    w.gw.state.consumers.ada = [{ id: 41, name: "aai:ada:1700000041", status: 1, expired_time: -1, planted_key: GATEWAY_KEY }]; w.gw.save();
+    const reminted = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--json"]));
+    assert.deepEqual(reminted.not_reversed.map((n) => n.key), [`cloudflare_access:token-delete:${CLIENT.ada}`], "a revocation a re-mint superseded is still reported");
+    // ...and an Access token re-provisioned under the same client: nothing is left to report.
+    cf.tokens.push({ id: "tok-ada-2", name: "employee-ada", client_id: CLIENT.ada, expires_at: "2027-12-01T00:00:00Z" });
+    const restored = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(restored.ok, true, JSON.stringify(restored.steps));
+    assert.deepEqual(restored.not_reversed, []);
+    pass("not_reversed entries are dated facts of one operation, dropped once a re-mint or re-provision superseded them");
   }
 
   // -- 13. unrelated definitions stay byte-identical ----------------------------------------------------------------------

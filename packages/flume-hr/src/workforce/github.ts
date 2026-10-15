@@ -369,17 +369,22 @@ export async function readGithubInstallation(facts: { appId: string; keyRef: str
   }
 }
 
-export type GithubInstallationWrite = { ok: true } | { ok: false; absent: boolean; code: string };
+/**
+ * `sent: false` means the request never left (no App session); `http_status` is GitHub's answer when it gave one. Together they
+ * say whether a failed write DEFINITELY did not commit (never sent, or a 4xx) or might have (a 5xx, a timeout, a dropped answer).
+ */
+export type GithubInstallationWrite = { ok: true } | { ok: false; absent: boolean; code: string; sent: boolean; http_status?: number };
 
 /** `PUT /app/installations/{id}/suspended` (suspend) or `DELETE` (un-suspend), both authenticated as the App. */
 export async function writeGithubInstallationSuspension(facts: { appId: string; keyRef: string; installationId: string }, suspend: boolean, env: NodeJS.ProcessEnv = process.env): Promise<GithubInstallationWrite> {
   const session = await appSession(facts, env);
-  if ("code" in session) return { ok: false, absent: false, code: session.code };
+  if ("code" in session) return { ok: false, absent: false, code: session.code, sent: false };
   try {
     await session.api.request(suspend ? "PUT /app/installations/{installation_id}/suspended" : "DELETE /app/installations/{installation_id}/suspended", { installation_id: Number(facts.installationId), headers: session.headers });
     return { ok: true };
   } catch (error) {
-    return { ok: false, absent: statusOf(error) === 404, code: failureCode(error) };
+    const status = statusOf(error);
+    return { ok: false, absent: status === 404, code: failureCode(error), sent: true, ...(status !== undefined ? { http_status: status } : {}) };
   }
 }
 

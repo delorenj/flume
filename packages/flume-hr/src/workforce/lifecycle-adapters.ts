@@ -18,6 +18,10 @@
 //     the provider's rejection.
 //   * A gateway key the desk merely INHERITS from the fleet base is still a key the desk can use: it is a `shared_consumer`
 //     row, never `not-issued`, and no employee's lifecycle may revoke it.
+//   * The gateway key a desk RUNS is the one in its generated `config.yaml`. A delta (or base) a render would turn into a
+//     different key is drift: an `unverified` `gateway-ref-drift` row, never a `revoked` gateway row, never a revoke.
+//   * A portable specialist's launcher injects `op://DeLoSecrets/hermes-<id>/credential` whatever its desk maps: that key is
+//     its own row, `unverified` while the vault item exists, because nothing proves it is the desk's consumer.
 // Nothing here ever holds, returns or logs a secret value: rows carry IDs, `op://` references and codes.
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
@@ -29,9 +33,9 @@ import { resolveFlumeRoot } from "../kernel/paths";
 import { accessStateDir } from "./access";
 import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
-import { readLifecycleLedger, type StepRecord } from "./lifecycle-state";
+import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS, planeBindingOf, planeEvidence, readPlaneReceipts, verifyBoardViaPx } from "./plane";
-import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, opRead, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
+import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
 import type { CompanyIdentity } from "./types";
 
 export type AdapterName = "mail" | "cloudflare_access" | "github" | "plane" | "gateway";
@@ -97,6 +101,11 @@ export interface StepHooks {
   operation_id: string;
   /** Persist `value` under `name` in this subject's captures BEFORE the mutation it guards. */
   capture(name: string, value: unknown): void;
+  /**
+   * Drop a capture THIS step wrote, once the provider has shown the mutation it guarded never took effect (GitHub refused the
+   * PUT, or reads the installation back unsuspended). Kept, it would let restore claim a suspension someone else made later.
+   */
+  release(name: string): void;
 }
 
 export interface PlannedStep {
@@ -111,9 +120,17 @@ export interface PlannedStep {
   /** Restore only: the captures this step consumes; the coordinator drops them on success (and nowhere else). */
   releases?: string[];
   /**
-   * Irreversible steps only: the provider resources (IDs) this step would act on NOW. A `done` record covers the step only
-   * while every live resource is one it already acted on (`data.resources`), so a re-minted token is revoked again while a
-   * done DELETE is never repeated. `null` means the provider could not be read; the done record then stands.
+   * A revocation that was asked for (`--revoke all`, or a named adapter whose key has no FLUME-39 consumer) and that this
+   * lifecycle must not or cannot run. Reported `skipped` with this code, never run, never recorded; it keeps
+   * `complete_revocation` false and is listed in `incomplete[]`.
+   */
+  skip?: { code: string; detail: string };
+  /**
+   * The provider resources (IDs) this step would act on NOW. A `done` record covers the step only while every live resource
+   * is one it already acted on (`data.resources`): an irreversible step records what it deleted, so a re-minted token is
+   * revoked again while a done DELETE is never repeated; a reversible step records `[]` (nothing left open), so a KV key
+   * re-provisioned, an installation un-suspended or a routing rule re-enabled since is new work. `null` means the provider
+   * could not be read; the done record then stands.
    */
   live?(ctx: LifecycleContext): Promise<string[] | null>;
   run(ctx: LifecycleContext, hooks: StepHooks): Promise<StepOutcome>;
@@ -123,9 +140,10 @@ export interface SuspendPlanOptions { command: "suspend" | "retire"; revoke: boo
 
 export interface LifecycleAdapter {
   name: AdapterName;
-  /** Refusals knowable without a provider call. */
+  /** Refusals knowable without a provider call, for an adapter the operator NAMED. `--revoke all` gets `plan()`'s `skip` steps instead. */
   blockers(ctx: LifecycleContext, options: SuspendPlanOptions): IdentityBlocker[];
   inventory(ctx: LifecycleContext): Promise<CredentialRow[]>;
+  /** The steps to run; for every condition `blockers()` refuses, a `skip` step, so `--revoke all` reports it and carries on. */
   plan(ctx: LifecycleContext, options: SuspendPlanOptions): PlannedStep[];
   restorePlan(ctx: LifecycleContext): PlannedStep[];
 }
@@ -135,6 +153,15 @@ const memo = async <T>(ctx: LifecycleContext, key: string, make: () => Promise<T
   if (!ctx.cache.has(key)) ctx.cache.set(key, await make());
   return ctx.cache.get(key) as T;
 };
+const memoSync = <T>(ctx: Pick<LifecycleContext, "cache">, key: string, make: () => T): T => {
+  if (!ctx.cache.has(key)) ctx.cache.set(key, make());
+  return ctx.cache.get(key) as T;
+};
+/** A step that is reported `skipped` and never runs (see `PlannedStep.skip`). */
+const skipped = (step: Omit<PlannedStep, "skip" | "run" | "live">, code: string, detail: string): PlannedStep => ({
+  ...step, skip: { code, detail },
+  async run() { return { result: "unresolved", provider_code: code, detail: `a skipped step never runs: ${detail}` }; },
+});
 
 /**
  * The only way a static credential becomes `revoked`: the provider answered with its rejection or absence (`readBack`).
@@ -257,47 +284,64 @@ export const mailAdapter: LifecycleAdapter = {
   },
   plan(ctx, options) {
     const address = ctx.block.email.toLowerCase();
+    // Both steps are reversible by hand (a re-provisioned key, a re-enabled rule), so each records `resources: []` (nothing left
+    // open) and `live()` names what is open NOW: a key or rule open again is new work, never `already-done`.
     const steps: PlannedStep[] = [{
       key: `mail:allowlist-delete:${address}`, adapter: "mail", action: "allowlist-delete", resource: allowlistKey(ctx.block),
       description: `capture then delete KV ${allowlistKey(ctx.block)}, verify by GET 404`,
+      async live(context) {
+        const cf = await cloudflareOf(context);
+        if (!cf.ok) return null;
+        const kv = await cfRequest(cf.token, "GET", kvPath(cf, allowlistKey(context.block)));
+        return kv.http_status === 200 ? [allowlistKey(context.block)] : kv.http_status === 404 ? [] : null;
+      },
       async run(context, hooks) {
         const cf = await cloudflareOf(context);
         if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
         const path = kvPath(cf, allowlistKey(context.block));
         const before = await cfRequest(cf.token, "GET", path);
-        if (before.http_status === 404) return { result: "converged", detail: "the allowlist key was already absent" };
+        if (before.http_status === 404) return { result: "converged", detail: "the allowlist key was already absent", data: { resources: [] } };
         if (before.http_status !== 200) return { result: "unresolved", provider_code: codeOf(before), detail: "could not read the allowlist record before deleting it" };
         if (!before.body || typeof before.body !== "object" || Array.isArray(before.body)) return { result: "unresolved", provider_code: "kv-record-unreadable", detail: "the allowlist record is not a JSON object; it was not deleted because restore could not put it back" };
-        // Captured and persisted BEFORE the delete, so a crash after the delete still leaves restore its record.
+        // Captured and persisted BEFORE the delete, so a crash after the delete still leaves restore its record. A key
+        // re-provisioned since an earlier suspension replaces the older capture: restore puts back what this delete removed.
         hooks.capture("mail_allowlist", { key: allowlistKey(context.block), record: before.body });
         const removed = await cfRequest(cf.token, "DELETE", path);
         const committed = cfOk(removed), absent = removed.http_status === 404;
         if (!committed && !absent) return { result: "unresolved", provider_code: codeOf(removed), detail: "the allowlist delete did not succeed" };
         const after = await cfRequest(cf.token, "GET", path);
         if (after.http_status !== 404) return { result: "unresolved", provider_code: after.http_status === 200 ? "delete-not-effective" : codeOf(after), detail: "the allowlist key was not read back as absent" };
-        return { result: absent && !committed ? "converged" : "done", detail: "allowlist key absent (GET 404)" };
+        return { result: absent && !committed ? "converged" : "done", detail: "allowlist key absent (GET 404)", data: { resources: [] } };
       },
     }];
     if (options.command === "retire") {
       steps.push({
         key: `mail:routing-disable:${address}`, adapter: "mail", action: "routing-disable", resource: ctx.block.email,
         description: `disable the employee's own literal routing rule for ${ctx.block.email}, verify by GET`,
+        async live(context) {
+          const cf = await cloudflareOf(context);
+          if (!cf.ok) return null;
+          const rules = await listRules(cf);
+          if (!rules.ok) return null;
+          const rule = literalRule(rules.items, context.block.email, cf.config.mailbox.worker);
+          return rule && pointsAtWorker(rule, cf.config.mailbox.worker) && rule.enabled !== false ? [rule.id] : [];
+        },
         async run(context) {
           const cf = await cloudflareOf(context);
           if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
           const rules = await listRules(cf);
           if (!rules.ok) return { result: "unresolved", provider_code: rules.code, detail: "could not list routing rules completely" };
           const rule = literalRule(rules.items, context.block.email, cf.config.mailbox.worker);
-          if (!rule) return { result: "converged", detail: "no routing rule exists for this address" };
+          if (!rule) return { result: "converged", detail: "no routing rule exists for this address", data: { resources: [] } };
           // A rule that does not point at our worker is not ours: never touched.
-          if (!pointsAtWorker(rule, cf.config.mailbox.worker)) return { result: "converged", detail: "the address has a rule that does not point at the mailbox worker; it is foreign and was left untouched" };
-          if (rule.enabled === false) return { result: "converged", detail: `rule ${rule.id} was already disabled` };
+          if (!pointsAtWorker(rule, cf.config.mailbox.worker)) return { result: "converged", detail: "the address has a rule that does not point at the mailbox worker; it is foreign and was left untouched", data: { resources: [] } };
+          if (rule.enabled === false) return { result: "converged", detail: `rule ${rule.id} was already disabled`, data: { resources: [] } };
           const path = `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules/${rule.id}`;
           const put = await cfRequest(cf.token, "PUT", path, { name: rule.name, enabled: false, matchers: rule.matchers, actions: rule.actions });
           if (!cfOk(put)) return { result: "unresolved", provider_code: codeOf(put), detail: `routing rule ${rule.id} could not be disabled` };
           const read = await cfRequest(cf.token, "GET", path);
           if (!cfOk(read) || read.body?.result?.enabled !== false) return { result: "unresolved", provider_code: cfOk(read) ? "disable-not-effective" : codeOf(read), detail: `routing rule ${rule.id} was not read back as disabled` };
-          return { result: "done", detail: `routing rule ${rule.id} disabled (GET enabled:false)`, data: { rule_id: rule.id } };
+          return { result: "done", detail: `routing rule ${rule.id} disabled (GET enabled:false)`, data: { rule_id: rule.id, resources: [] } };
         },
       });
     }
@@ -326,6 +370,10 @@ export const mailAdapter: LifecycleAdapter = {
         }
         if (held.key !== allowlistKey(context.block)) return { result: "unresolved", provider_code: "capture-mismatch", detail: "the captured allowlist key is not this employee's" };
         if (current.http_status === 200 && isDeepStrictEqual(current.body, held.record)) return { result: "converged", detail: "the allowlist record is already present and identical" };
+        // Present but different: the mailbox was re-provisioned since the suspension. That record is newer than the capture,
+        // and the mailbox is open, so the capture is never written over it.
+        if (current.http_status === 200) return { result: "converged", detail: "the allowlist key is present with a newer record (re-provisioned since the suspension); the older captured record was not written over it" };
+        if (current.http_status !== 404) return { result: "unresolved", provider_code: codeOf(current), detail: "could not read the allowlist key" };
         const put = await cfRequest(cf.token, "PUT", path, held.record);
         if (!cfOk(put)) return { result: "unresolved", provider_code: codeOf(put), detail: "the captured allowlist record could not be written back" };
         const read = await cfRequest(cf.token, "GET", path);
@@ -417,7 +465,8 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
 
 function readProviderLedger(): Array<Record<string, any>> {
   const path = join(accessStateDir(), "provider-ledger.jsonl");
-  if (!existsSync(path)) return [];
+  // Only a ledger that does not exist is empty: one that cannot be read would hide live installation tokens.
+  if (!lstatIfPresent(path)) return [];
   const lines: Array<Record<string, any>> = [];
   for (const text of readFileSync(path, "utf8").split("\n")) {
     if (!text.trim()) continue;
@@ -430,6 +479,16 @@ function readProviderLedger(): Array<Record<string, any>> {
 const suspensionCapture = (installationId: string): string => `github_suspend:${installationId}`;
 /** A definitive 404 for an installation, kept because a deleted App key makes every later read 401. Installation IDs are never reused. */
 const absenceCapture = (installationId: string): string => `github_installation_absent:${installationId}`;
+interface SuspensionCapture { operation_id?: string; at?: string }
+
+/**
+ * May a suspension GitHub reports be the one this lifecycle's PUT made? Only if it is not OLDER than the capture written just
+ * before that PUT. GitHub states `suspended_at` to the second, so the capture time is compared at that resolution.
+ */
+function suspendedSinceCapture(suspendedAt: string, capture: SuspensionCapture | undefined): boolean {
+  const suspended = Date.parse(suspendedAt), captured = Date.parse(capture?.at ?? "");
+  return Number.isFinite(suspended) && Number.isFinite(captured) && suspended >= Math.floor(captured / 1000) * 1000;
+}
 
 const GITHUB_KEY_ROUTE = "delete the private key in the GitHub App settings (Developer settings > GitHub Apps > Private keys); `flume identity credentials` then re-probes: GET /app answering 401 is the only proof";
 
@@ -505,27 +564,55 @@ export const githubAdapter: LifecycleAdapter = {
     return [{
       key, adapter: "github", action: "installation-suspend", resource: "code" in bound ? "github" : bound.facts.installationId,
       description: "code" in bound ? "suspend the GitHub installation" : `suspend installation ${bound.facts.installationId}, verify by GET suspended_at`,
+      // Reversible by anyone holding the App key: an installation un-suspended since is open again, and new work.
+      async live(context) {
+        if ("code" in bound) return null;
+        const now = await readGithubInstallation({ appId: bound.facts.appId, keyRef: bound.facts.keyRef, installationId: bound.facts.installationId }, context.env);
+        return now.state === "present" ? (now.suspended_at ? [] : [bound.facts.installationId]) : now.state === "absent" ? [] : null;
+      },
       async run(context, hooks) {
         if ("code" in bound) return { result: "unresolved", provider_code: bound.code, detail: bound.detail };
         const facts = { appId: bound.facts.appId, keyRef: bound.facts.keyRef, installationId: bound.facts.installationId };
         const owned = suspensionCapture(facts.installationId);
         const before = await readGithubInstallation(facts, context.env);
-        if (before.state === "absent") return { result: "converged", detail: "GitHub has no such installation" };
+        if (before.state === "absent") {
+          if (owned in context.captures) hooks.release(owned);
+          return { result: "converged", detail: "GitHub has no such installation", data: { resources: [] } };
+        }
         if (before.state === "error") return { result: "unresolved", provider_code: before.code, detail: "could not read the installation" };
         if (before.suspended_at) {
-          // Ours if THIS lifecycle sent the PUT (captured before it) and only lost the answer: a 5xx after commit, a failed read-back.
-          const mine = context.captures[owned] as { operation_id?: string } | undefined;
-          if (mine) return { result: "done", detail: `installation suspended (suspended_at ${before.suspended_at}) by this lifecycle's PUT of operation ${mine.operation_id ?? "unknown"}; its answer had been lost` };
-          return { result: "converged", detail: "the installation was already suspended; this lifecycle did not suspend it" };
+          // Ours only if THIS lifecycle sent the PUT (captured just before it) and lost the answer -- a 5xx after commit, a
+          // failed read-back -- AND the suspension is not older than that capture. Anything else is someone else's.
+          const mine = context.captures[owned] as SuspensionCapture | undefined;
+          if (mine && suspendedSinceCapture(before.suspended_at, mine)) return { result: "done", detail: `installation suspended (suspended_at ${before.suspended_at}) by this lifecycle's PUT of operation ${mine.operation_id ?? "unknown"}; its answer had been lost`, data: { resources: [], suspended_at: before.suspended_at } };
+          if (mine) hooks.release(owned);
+          return { result: "converged", detail: `the installation was already suspended (suspended_at ${before.suspended_at}); this lifecycle did not suspend it`, data: { resources: [] } };
         }
         // Owned BEFORE the PUT, so a PUT that commits behind a 5xx or a lost read-back is still ours to report and to undo.
         hooks.capture(owned, { operation_id: hooks.operation_id, at: new Date().toISOString() });
         const put = await writeGithubInstallationSuspension(facts, true, context.env);
-        if (!put.ok && put.absent) return { result: "converged", detail: "GitHub has no such installation" };
-        if (!put.ok) return { result: "unresolved", provider_code: put.code, detail: "the installation could not be suspended (if the PUT committed anyway, the retry claims it)" };
+        if (!put.ok && put.absent) { hooks.release(owned); return { result: "converged", detail: "GitHub has no such installation", data: { resources: [] } }; }
+        if (!put.ok) {
+          // Never sent, or refused with a 4xx: it definitely did not commit, so there is nothing to own.
+          if (!put.sent || (put.http_status !== undefined && put.http_status < 500)) {
+            hooks.release(owned);
+            return { result: "unresolved", provider_code: put.code, detail: put.sent ? "GitHub refused the suspension; it did not commit" : "the suspension was never sent" };
+          }
+          // A 5xx, a timeout or a dropped answer may have committed. GitHub answers this PUT synchronously, so read what it did.
+          const check = await readGithubInstallation(facts, context.env);
+          if (check.state === "present" && !check.suspended_at) {
+            hooks.release(owned);
+            return { result: "unresolved", provider_code: put.code, detail: "the suspension failed and the installation reads back unsuspended: it did not commit" };
+          }
+          return { result: "unresolved", provider_code: put.code, detail: "the installation could not be suspended (if the PUT committed anyway, the retry claims it)" };
+        }
         const after = await readGithubInstallation(facts, context.env);
-        if (after.state !== "present" || !after.suspended_at) return { result: "unresolved", provider_code: after.state === "error" ? after.code : "suspend-not-effective", detail: "the installation was not read back as suspended" };
-        return { result: "done", detail: `installation suspended (suspended_at ${after.suspended_at})` };
+        if (after.state !== "present" || !after.suspended_at) {
+          // Read back unsuspended: the PUT is not in effect, so nothing is this lifecycle's to undo later.
+          if (after.state === "present") hooks.release(owned);
+          return { result: "unresolved", provider_code: after.state === "error" ? after.code : "suspend-not-effective", detail: "the installation was not read back as suspended" };
+        }
+        return { result: "done", detail: `installation suspended (suspended_at ${after.suspended_at})`, data: { resources: [], suspended_at: after.suspended_at } };
       },
     }];
   },
@@ -546,6 +633,13 @@ export const githubAdapter: LifecycleAdapter = {
         if (before.state === "absent") return { result: "converged", detail: "GitHub has no such installation" };
         if (before.state === "error") return { result: "unresolved", provider_code: before.code, detail: "could not read the installation" };
         if (!before.suspended_at) return { result: "converged", detail: "the installation is not suspended" };
+        // Still THIS lifecycle's suspension? A done record names the suspended_at it read back; a bare capture (the answer was
+        // lost) needs a suspension no older than itself. A suspension someone made since is theirs, and stays.
+        const record = context.steps[key];
+        const recorded = record?.status === "done" && typeof record.data?.suspended_at === "string" ? record.data.suspended_at : undefined;
+        const captured = context.captures[owned] as SuspensionCapture | undefined;
+        const ours = recorded !== undefined ? before.suspended_at === recorded : captured ? suspendedSinceCapture(before.suspended_at, captured) : record?.status === "done";
+        if (!ours) return { result: "converged", detail: `the installation is suspended (suspended_at ${before.suspended_at}), but not by this lifecycle's suspension${recorded ? ` (${recorded})` : ""}; it was left suspended` };
         const del = await writeGithubInstallationSuspension(facts, false, context.env);
         if (!del.ok && !del.absent) return { result: "unresolved", provider_code: del.code, detail: "the installation could not be un-suspended" };
         const after = await readGithubInstallation(facts, context.env);
@@ -636,31 +730,61 @@ function fleetHome(census: IdentityCensus, env: NodeJS.ProcessEnv): string {
   return env.HERMES_FLEET_HOME || join(census.home, ".hermes");
 }
 
-function refIn(path: string): string | undefined {
+/** What one desk config file says about the gateway key. A symlink, a non-file or bad YAML is `unreadable`, never "no key". */
+type RefRead = { exists: false } | { exists: true; ref?: string; unreadable?: true };
+
+function readRef(path: string): RefRead {
+  let info;
+  try { info = lstatSync(path); }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT" ? { exists: false } : { exists: true, unreadable: true }; }
+  if (info.isSymbolicLink() || !info.isFile()) return { exists: true, unreadable: true };
   try {
-    if (!existsSync(path) || lstatSync(path).isSymbolicLink()) return undefined;
     const doc = YAML.parse(readFileSync(path, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, unknown> } } } | null;
     const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
-    return typeof ref === "string" ? ref : undefined;
-  } catch { return undefined; }
+    return { exists: true, ...(typeof ref === "string" ? { ref } : {}) };
+  } catch { return { exists: true, unreadable: true }; }
 }
 
+const refIn = (path: string): string | undefined => { const read = readRef(path); return read.exists ? read.ref : undefined; };
+const consumerOf = (ref: string | undefined): string | undefined => (ref ? GATEWAY_REF.exec(ref)?.[1] : undefined);
+
 export type GatewayRefSource = "delta" | "generated" | "base" | "launcher";
-interface GatewayDesk { profile: string | null; ref?: string; source?: GatewayRefSource; consumer?: string; shape: "ok" | "none" | "bad"; shared: boolean }
+
+interface DeskRefs {
+  /** The reference the desk RUNS with. */
+  running: { ref?: string; source?: GatewayRefSource };
+  /** The reference a render of the desk would produce: its delta's, else the fleet base's. */
+  predicted: { ref?: string; source?: "delta" | "base" };
+  drift: boolean;
+  unreadable: boolean;
+}
 
 /**
- * The reference a desk actually RUNS with, in the order Hermes resolves it: the desk's own `config.delta.yaml`, then its
- * generated `config.yaml`, then (a post's desk only) the fleet base `config.yaml` it inherits from. A portable specialist's
- * launcher injects its own reference, so a specialist never falls back to the base.
+ * Hermes runs a profile's GENERATED `config.yaml`, which is `deep_merge(<fleet>/config.yaml, <profile>/config.delta.yaml)` for a
+ * post's desk and a specialist's alike. When that file exists its reference is the one that runs, whatever the delta says now:
+ * `gateway-member-tokens.py --apply` edits the delta and re-renders only with `--render`, and a running gateway keeps the old
+ * key until restarted. Without a generated config the desk would be rendered from its delta, then the base. A generated config
+ * that disagrees with that render, or cannot be read, is DRIFT: neither key is provably the only one the desk uses.
  */
-function deskRef(fleet: string, profile: string | null, kind: IdentityDefinition["kind"], baseRef: string | undefined): { ref?: string; source?: GatewayRefSource } {
-  if (profile) {
-    const delta = refIn(join(fleet, "profiles", profile, "config.delta.yaml"));
-    if (delta) return { ref: delta, source: "delta" };
-    const generated = refIn(join(fleet, "profiles", profile, "config.yaml"));
-    if (generated) return { ref: generated, source: "generated" };
-  }
-  return kind === "post" && baseRef ? { ref: baseRef, source: "base" } : {};
+function deskRefs(fleet: string, profile: string | null, baseRef: string | undefined): DeskRefs {
+  const delta = profile ? refIn(join(fleet, "profiles", profile, "config.delta.yaml")) : undefined;
+  const predicted: DeskRefs["predicted"] = delta ? { ref: delta, source: "delta" } : baseRef ? { ref: baseRef, source: "base" } : {};
+  const generated: RefRead = profile ? readRef(join(fleet, "profiles", profile, "config.yaml")) : { exists: false };
+  if (!generated.exists) return { running: predicted, predicted, drift: false, unreadable: false };
+  const unreadable = Boolean(generated.unreadable);
+  return { running: generated.ref ? { ref: generated.ref, source: "generated" } : {}, predicted, drift: unreadable || generated.ref !== predicted.ref, unreadable };
+}
+
+interface GatewayDesk {
+  profile: string | null;
+  /** The reference the desk runs with, its source and (FLUME-39 shape only) its consumer. */
+  ref?: string; source?: GatewayRefSource; consumer?: string;
+  shape: "ok" | "none" | "bad";
+  shared: boolean;
+  /** The generated config disagrees with a render of the delta (and base), or cannot be read: what the render would run. */
+  drift?: { ref?: string; source?: "delta" | "base"; consumer?: string; unreadable: boolean };
+  /** A portable specialist only: the reference `launchSpecialist` injects whatever the desk maps. */
+  launcher?: string;
 }
 
 /** `launchSpecialist` reads this reference (not the FLUME-39 shape) and injects it whatever the desk config says. */
@@ -670,27 +794,57 @@ function gatewayDesk(ctx: Pick<LifecycleContext, "census" | "target" | "env">): 
   const fleet = fleetHome(ctx.census, ctx.env);
   const baseRef = refIn(join(fleet, "config.yaml"));
   const profile = deskProfileOf(ctx.census, ctx.target);
-  const own = deskRef(fleet, profile, ctx.target.kind, baseRef);
-  const ownShaped = own.ref ? GATEWAY_REF.exec(own.ref) : null;
-  if (ctx.target.kind === "specialist" && !ownShaped) return { profile, ref: launcherRef(ctx.target, profile), source: "launcher", shape: "bad", shared: false };
-  if (!own.ref) return { profile, shape: "none", shared: false };
+  const refs = deskRefs(fleet, profile, baseRef);
+  const pending = consumerOf(refs.predicted.ref);
+  const extra = {
+    ...(refs.drift ? { drift: { ...refs.predicted, ...(pending ? { consumer: pending } : {}), unreadable: refs.unreadable } } : {}),
+    ...(ctx.target.kind === "specialist" ? { launcher: launcherRef(ctx.target, profile) } : {}),
+  };
+  const ref = refs.running.ref;
+  if (!ref) return { profile, shape: "none", shared: false, ...extra };
+  const consumer = consumerOf(ref);
   // The same reference as the fleet base is the base consumer's key, whichever file carried it.
-  const sharedWithBase = baseRef !== undefined && own.ref === baseRef;
-  if (!ownShaped) return { profile, ref: own.ref, source: own.source, shape: "bad", shared: sharedWithBase };
-  const consumer = ownShaped[1]!;
-  let shared = sharedWithBase;
-  for (const other of ctx.census.definitions) {
-    if (shared || other.path === ctx.target.path || other.missing) continue;
-    const otherRef = deskRef(fleet, deskProfileOf(ctx.census, other), other.kind, baseRef).ref;
-    if (otherRef && GATEWAY_REF.exec(otherRef)?.[1] === consumer) shared = true;
+  let shared = baseRef !== undefined && ref === baseRef;
+  if (consumer && !shared) {
+    // Another desk mapping the same consumer -- in the config it runs now, or in the one its next render produces -- shares it.
+    for (const other of ctx.census.definitions) {
+      if (other.path === ctx.target.path || other.missing) continue;
+      const theirs = deskRefs(fleet, deskProfileOf(ctx.census, other), baseRef);
+      if (consumerOf(theirs.running.ref) === consumer || consumerOf(theirs.predicted.ref) === consumer) { shared = true; break; }
+    }
   }
-  return { profile, ref: own.ref, source: own.source, consumer, shape: "ok", shared };
+  return { profile, ref, ...(refs.running.source ? { source: refs.running.source } : {}), ...(consumer ? { consumer } : {}), shape: consumer ? "ok" : "bad", shared, ...extra };
 }
 
 /** The consumer behind an employee's desk gateway reference, only in the FLUME-39 shape; never inferred from a name. */
-export function gatewayConsumerOf(census: IdentityCensus, target: IdentityDefinition, env: NodeJS.ProcessEnv = process.env): { consumer?: string; shape: "ok" | "none" | "bad"; shared: boolean; source?: GatewayRefSource } {
+export function gatewayConsumerOf(census: IdentityCensus, target: IdentityDefinition, env: NodeJS.ProcessEnv = process.env): { consumer?: string; shape: "ok" | "none" | "bad"; shared: boolean; source?: GatewayRefSource; drift?: true } {
   const desk = gatewayDesk({ census, target, env });
-  return { ...(desk.consumer ? { consumer: desk.consumer } : {}), shape: desk.shape, shared: desk.shared, ...(desk.source ? { source: desk.source } : {}) };
+  return { ...(desk.consumer ? { consumer: desk.consumer } : {}), shape: desk.shape, shared: desk.shared, ...(desk.source ? { source: desk.source } : {}), ...(desk.drift ? { drift: true as const } : {}) };
+}
+
+/** Why this desk's gateway key may not be revoked by this lifecycle: a blocker for a named `--revoke gateway`, a `skip` for `all`. */
+function gatewayRefusals(desk: GatewayDesk): IdentityBlocker[] {
+  const out: IdentityBlocker[] = [];
+  if (desk.shared) out.push({ code: "shared-consumer", detail: `the desk runs on ${desk.consumer ? `consumer ${desk.consumer}` : `reference ${desk.ref}`}${desk.source ? ` (from its ${desk.source === "base" ? "fleet base" : desk.source} config)` : ""}, which is shared with the fleet base or another desk; revoking it would cut them off too. Mint this employee a dedicated token first (FLUME-39), or name only the other adapters (--revoke cloudflare_access --revoke github)` });
+  if (desk.drift) out.push({ code: "gateway-ref-drift", detail: desk.drift.unreadable ? "the desk's generated config.yaml cannot be read, so the gateway key it runs is unknown; repair and re-render it first" : `the desk's generated config.yaml runs ${desk.ref ?? "no gateway reference"}, but a render of its ${desk.drift.source === "delta" ? "config.delta.yaml" : desk.drift.source === "base" ? "fleet base" : "delta and the fleet base"} would run ${desk.drift.ref ?? "none"}; re-render the desk (gateway-member-tokens.py --render, or flume onboard) and restart its gateway so the key revoked is the key it runs` });
+  return out;
+}
+
+/**
+ * Does the vault item behind the specialist launcher's reference exist? `op item get <title> --vault <v> --format json` WITHOUT
+ * `--reveal`, so concealed fields stay concealed; only the exit status and op's own "isn't an item" refusal are used, the
+ * output is discarded unread, and the key itself is never read (`op read` is the launcher's alone).
+ */
+function launcherItem(ctx: Pick<LifecycleContext, "cache">, ref: string): "present" | "absent" | "ambiguous" | "unreadable" {
+  return memoSync(ctx, `launcher-item:${ref}`, () => {
+    const [, vault, title] = /^op:\/\/([^/]+)\/([^/]+)\//u.exec(ref) ?? [];
+    if (!vault || !title) return "unreadable";
+    const got = op(["item", "get", title, "--vault", vault, "--format", "json"]);
+    if (got.ok) return "present";
+    if (/isn't an item/iu.test(got.stderr)) return "absent";
+    if (/more than one item/iu.test(got.stderr)) return "ambiguous";
+    return "unreadable";
+  });
 }
 
 function runGateway(env: NodeJS.ProcessEnv, args: string[]): { ok: true; stdout: string } | { ok: false; code: string } {
@@ -715,70 +869,116 @@ function gatewayStatus(env: NodeJS.ProcessEnv, consumer: string): { ok: true; to
 export const gatewayAdapter: LifecycleAdapter = {
   name: "gateway",
   blockers(ctx, options) {
-    if (!options.revoke) return [];
-    // A desk with no reference, or one that is not the FLUME-39 shape, plans no gateway step; the inventory row says why.
-    const desk = gatewayDesk(ctx);
-    if (desk.shared) return [{ code: "shared-consumer", detail: `the desk runs on ${desk.consumer ? `consumer ${desk.consumer}` : `reference ${desk.ref}`}${desk.source === "base" || desk.source === "generated" ? `, inherited from the fleet base config` : ""}, which is shared with the fleet base or another desk; revoking it would cut them off too. Mint this employee a dedicated token first (FLUME-39), or name only the other adapters (--revoke cloudflare_access --revoke github)` }];
-    return [];
+    // Only a shared consumer or a drifted desk refuses a NAMED `--revoke gateway`. A desk with no key, or a key that is not the
+    // FLUME-39 shape (a specialist's launcher key included), plans a `skipped` step and the row says why.
+    return options.revoke ? gatewayRefusals(gatewayDesk(ctx)) : [];
   },
   async inventory(ctx) {
     const link = gatewayLink(ctx.env);
     const evidence = ctx.env.FLUME_GATEWAY_TOKENS_BIN ? "fixture" as const : "provider" as const;
     const base = { provider: "gateway" as const, kind: "gateway-token", static: true, evidence, ...link };
     const desk = gatewayDesk(ctx);
-    if (desk.shape === "none") return [{ ...base, status: "not-issued", next_action: "FLUME-39 mints a per-employee gateway token; neither this desk nor the fleet base maps one" }];
+    const rows: CredentialRow[] = [];
     const sharedFields = desk.shared ? { shared_consumer: true } : {};
-    if (desk.shape === "bad") {
-      return [{ ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), ...sharedFields, status: "unverified", provider_code: "gateway-ref-shape",
-        next_action: `FLUME-39 owns the gateway reference shape (op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer>)`,
-        ...(desk.source === "launcher" ? { detail: "a portable specialist's launcher injects this reference, which is not the FLUME-39 shape: no consumer can be named or revoked, and the key may be live" } : desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) }];
+    if (desk.shape === "none") {
+      // A post with no key anywhere has no gateway token. A specialist's launcher key is its own row below, and a drifted
+      // desk's pending key is the drift row: neither is `not-issued`.
+      if (!desk.launcher && !desk.drift) rows.push({ ...base, status: "not-issued", next_action: "FLUME-39 mints a per-employee gateway token; neither this desk nor the fleet base maps one" });
+    } else if (desk.shape === "bad") {
+      if (desk.ref !== desk.launcher) {
+        rows.push({ ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), ...sharedFields, status: "unverified", provider_code: "gateway-ref-shape",
+          next_action: `FLUME-39 owns the gateway reference shape (op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer>)`, ...(desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) });
+      }
+    } else {
+      const consumer = desk.consumer!;
+      const row = { ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), id: consumer, consumer, ...sharedFields };
+      const retireCommand = desk.shared
+        ? `shared consumer${desk.source === "base" ? " inherited from the fleet base" : ""}: FLUME-39 mints this employee a dedicated token (gateway-tokens.py mint) and the desk maps it; until then this desk can use the shared key and no lifecycle may revoke it`
+        : desk.drift ? `re-render the desk first (gateway-member-tokens.py --render, or flume onboard); then flume identity retire ${ctx.employee} --revoke gateway --apply runs gateway-tokens.py revoke for the key it runs`
+          : `flume identity retire ${ctx.employee} --revoke gateway --apply runs gateway-tokens.py revoke ${consumer}`;
+      const status = gatewayStatus(ctx.env, consumer);
+      if (!status.ok) rows.push({ ...row, status: "unresolved", provider_code: status.code, next_action: `flume identity credentials ${ctx.employee}` });
+      else if (!status.tokens.length) rows.push(staticRow({ ...row, detail: "gateway-tokens status lists no tokens for this consumer", next_action: "none: no gateway token exists for this consumer" }, "absent", { status: "unverified" }));
+      else {
+        const now = Date.now() / 1000;
+        rows.push(...status.tokens.map((token): CredentialRow => {
+          const tokenRow = { ...row, id: String(token.id), name: String(token.name ?? "") };
+          const expired = typeof token.expired_time === "number" ? token.expired_time : undefined;
+          if (token.status !== 1) return { ...tokenRow, status: "unverified", provider_code: "token-disabled", next_action: retireCommand };
+          if (expired === undefined) return { ...tokenRow, status: "unverified", provider_code: "expiry-unreadable", next_action: retireCommand };
+          if (expired !== -1 && expired <= now) return { ...tokenRow, status: "unverified", provider_code: "token-expired", expires_at: new Date(expired * 1000).toISOString(), next_action: retireCommand };
+          // A shared key the employee's desk can use is usable however long it lives: nothing this lifecycle runs can end it.
+          if (desk.shared) return { ...tokenRow, status: "static-usable", ...(expired !== -1 ? { expires_at: new Date(expired * 1000).toISOString() } : {}), detail: "a live token of a shared consumer this desk runs on", next_action: retireCommand };
+          if (expired === -1) return { ...tokenRow, status: "static-usable", detail: "expired_time -1: the gateway token never expires", next_action: retireCommand };
+          return { ...tokenRow, status: "residual-expiry", expires_at: new Date(expired * 1000).toISOString(), next_action: retireCommand };
+        }));
+      }
     }
-    const consumer = desk.consumer!;
-    const row = { ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), id: consumer, consumer, ...sharedFields };
-    const retireCommand = desk.shared
-      ? `shared consumer${desk.source === "base" || desk.source === "generated" ? " inherited from the fleet base" : ""}: FLUME-39 mints this employee a dedicated token (gateway-tokens.py mint) and the desk maps it; until then this desk can use the shared key and no lifecycle may revoke it`
-      : `flume identity retire ${ctx.employee} --revoke gateway --apply runs gateway-tokens.py revoke ${consumer}`;
-    const status = gatewayStatus(ctx.env, consumer);
-    if (!status.ok) return [{ ...row, status: "unresolved", provider_code: status.code, next_action: `flume identity credentials ${ctx.employee}` }];
-    if (!status.tokens.length) return [staticRow({ ...row, detail: "gateway-tokens status lists no tokens for this consumer", next_action: "none: no gateway token exists for this consumer" }, "absent", { status: "unverified" })];
-    const now = Date.now() / 1000;
-    return status.tokens.map((token): CredentialRow => {
-      const tokenRow = { ...row, id: String(token.id), name: String(token.name ?? "") };
-      const expired = typeof token.expired_time === "number" ? token.expired_time : undefined;
-      if (token.status !== 1) return { ...tokenRow, status: "unverified", provider_code: "token-disabled", next_action: retireCommand };
-      if (expired === undefined) return { ...tokenRow, status: "unverified", provider_code: "expiry-unreadable", next_action: retireCommand };
-      if (expired !== -1 && expired <= now) return { ...tokenRow, status: "unverified", provider_code: "token-expired", expires_at: new Date(expired * 1000).toISOString(), next_action: retireCommand };
-      // A shared key the employee's desk can use is usable however long it lives: nothing this lifecycle runs can end it.
-      if (desk.shared) return { ...tokenRow, status: "static-usable", ...(expired !== -1 ? { expires_at: new Date(expired * 1000).toISOString() } : {}), detail: "a live token of a shared consumer this desk runs on", next_action: retireCommand };
-      if (expired === -1) return { ...tokenRow, status: "static-usable", detail: "expired_time -1: the gateway token never expires", next_action: retireCommand };
-      return { ...tokenRow, status: "residual-expiry", expires_at: new Date(expired * 1000).toISOString(), next_action: retireCommand };
-    });
+    if (desk.drift) {
+      const drift = desk.drift;
+      // A drifted desk never reports a `revoked` gateway row: the key it runs reading back absent says nothing about the key
+      // its next render runs.
+      for (const [index, row] of rows.entries()) {
+        if (row.status !== "revoked") continue;
+        const { read_back: _readBack, ...rest } = row;
+        rows[index] = { ...rest, status: "unverified", provider_code: "gateway-ref-drift", detail: `${row.detail ? `${row.detail}; ` : ""}but the desk's config drifted from its delta, so this is not the only key it may run` };
+      }
+      rows.push({ ...base, kind: "gateway-ref-drift", ...(drift.ref ? { ref: drift.ref } : {}), ...(drift.consumer ? { id: drift.consumer, consumer: drift.consumer } : {}), ...(drift.source ? { ref_source: drift.source } : {}),
+        status: "unverified", provider_code: "gateway-ref-drift", detail: gatewayRefusals({ ...desk, shared: false })[0]!.detail,
+        next_action: `re-render the desk (gateway-member-tokens.py --render, or flume onboard), restart its gateway, then flume identity credentials ${ctx.employee}; until then --revoke gateway is refused (gateway-ref-drift)` });
+    }
+    if (desk.launcher) {
+      const ref = desk.launcher, item = launcherItem(ctx, ref);
+      const row = { ...base, ref, ref_source: "launcher" as const };
+      if (item === "absent") rows.push({ ...row, status: "not-issued", detail: "the vault has no item behind the launcher's reference: the launcher reference is dead (launchSpecialist refuses to start without it), so it injects no key", next_action: "none: no key exists at the launcher's reference" });
+      else if (item === "unreadable") rows.push({ ...row, status: "unresolved", provider_code: "vault-unavailable", detail: "the vault could not say whether the launcher's item exists", next_action: `flume identity credentials ${ctx.employee}` });
+      // Nothing proves the launcher's key is the desk's consumer without reading the key, which the lifecycle never does: it is
+      // usable and unproven while its item exists, so revoking the desk's consumer never makes the gateway complete on its own.
+      else rows.push({ ...row, status: "unverified", provider_code: item === "ambiguous" ? "launcher-ref-ambiguous" : "launcher-ref-unproven",
+        detail: `launchSpecialist injects this reference as AUTOMATICAI_GATEWAY_KEY whatever the desk maps; it is not the FLUME-39 shape, so its consumer cannot be named, proven equal to ${desk.consumer ? `the desk's consumer ${desk.consumer}` : "a desk consumer"} or revoked here${item === "ambiguous" ? " (more than one vault item has this title)" : ""}`,
+        next_action: `FLUME-39 owns the specialist's gateway key: map the launcher to the employee's own consumer, or delete the vault item behind ${ref} (the launcher then refuses to start); flume identity credentials ${ctx.employee} re-probes` });
+    }
+    return rows;
   },
   plan(ctx, options) {
     if (!options.revoke) return [];
     const desk = gatewayDesk(ctx);
-    if (desk.shape !== "ok" || desk.shared) return [];
-    const consumer = desk.consumer!;
-    return [{
-      key: `gateway:token-revoke:${consumer}`, adapter: "gateway", action: "token-revoke", resource: consumer,
-      description: `gateway-tokens.py revoke ${consumer}, verify status lists no tokens`,
-      async live(context) {
-        const status = gatewayStatus(context.env, consumer);
-        return status.ok ? status.tokens.map(token => String(token.id)) : null;
-      },
-      async run(context) {
-        // What this revoke acts on is recorded, so a token minted later (FLUME-39) is new work and these never are again.
-        const before = gatewayStatus(context.env, consumer);
-        const resources = before.ok ? before.tokens.map(token => String(token.id)) : [];
-        const run = runGateway(context.env, ["revoke", consumer]);
-        if (!run.ok) return { result: "unresolved", provider_code: run.code, detail: "gateway-tokens revoke did not succeed", data: { resources } };
-        const count = /revoked (\d+) tokens?/u.exec(run.stdout);
-        const verify = gatewayStatus(context.env, consumer);
-        if (!verify.ok) return { result: "unresolved", provider_code: verify.code, detail: "could not read the gateway status after the revoke", data: { resources } };
-        if (verify.tokens.length) return { result: "unresolved", provider_code: "revoke-not-effective", detail: "the gateway still lists tokens for this consumer", data: { resources } };
-        return { result: count && Number(count[1]) === 0 ? "converged" : "done", detail: "gateway status lists no tokens", data: { resources } };
-      },
-    }];
+    const steps: PlannedStep[] = [];
+    const target = { key: `gateway:token-revoke:${desk.consumer ?? "unnamed"}`, adapter: "gateway" as const, action: "token-revoke", resource: desk.consumer ?? desk.ref ?? "gateway" };
+    const refusals = gatewayRefusals(desk);
+    if (refusals.length) {
+      // Reached only through `--revoke all`: a named `--revoke gateway` was refused by blockers() before any call.
+      steps.push(skipped({ ...target, description: `not revoked: ${refusals.map(r => r.code).join(", ")}` }, refusals[0]!.code, refusals.map(r => r.detail).join("; ")));
+    } else if (desk.shape === "bad" && desk.ref !== desk.launcher) {
+      steps.push(skipped({ ...target, description: `not revoked: ${desk.ref} is not the FLUME-39 shape` }, "gateway-ref-shape", `the desk's reference ${desk.ref} is not op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer>: no consumer can be named, so nothing can be revoked (FLUME-39 owns the shape)`));
+    } else if (desk.shape === "ok") {
+      const consumer = desk.consumer!;
+      steps.push({
+        ...target, description: `gateway-tokens.py revoke ${consumer}, verify status lists no tokens`,
+        async live(context) {
+          const status = gatewayStatus(context.env, consumer);
+          return status.ok ? status.tokens.map(token => String(token.id)) : null;
+        },
+        async run(context) {
+          // What this revoke acts on is recorded, so a token minted later (FLUME-39) is new work and these never are again.
+          const before = gatewayStatus(context.env, consumer);
+          const resources = before.ok ? before.tokens.map(token => String(token.id)) : [];
+          const run = runGateway(context.env, ["revoke", consumer]);
+          if (!run.ok) return { result: "unresolved", provider_code: run.code, detail: "gateway-tokens revoke did not succeed", data: { resources } };
+          const count = /revoked (\d+) tokens?/u.exec(run.stdout);
+          const verify = gatewayStatus(context.env, consumer);
+          if (!verify.ok) return { result: "unresolved", provider_code: verify.code, detail: "could not read the gateway status after the revoke", data: { resources } };
+          if (verify.tokens.length) return { result: "unresolved", provider_code: "revoke-not-effective", detail: "the gateway still lists tokens for this consumer", data: { resources } };
+          return { result: count && Number(count[1]) === 0 ? "converged" : "done", detail: "gateway status lists no tokens", data: { resources } };
+        },
+      });
+    }
+    // A specialist's launcher key is never revoked here: say so in the step list, not only in its row.
+    if (desk.launcher && launcherItem(ctx, desk.launcher) !== "absent") {
+      steps.push(skipped({ key: `gateway:launcher-key:${desk.launcher}`, adapter: "gateway", action: "launcher-key", resource: desk.launcher, description: "not revoked: the specialist launcher's own key" },
+        "launcher-ref-unproven", `launchSpecialist injects ${desk.launcher}, which is not the FLUME-39 shape: its consumer cannot be named or revoked here (FLUME-39 owns it)`));
+    }
+    return steps;
   },
   restorePlan: () => [],
 };

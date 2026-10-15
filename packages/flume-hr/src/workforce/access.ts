@@ -170,8 +170,15 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
   // Single-flight: one request at a time decides idempotency and issues, so two
   // identical concurrent requests cannot both issue.
   let tail: Promise<unknown> = Promise.resolve();
-  const serialized = <T>(work: () => Promise<T>): Promise<T> => {
+  let inFlight = 0;
+  const serialized = <T>(label: string, work: () => Promise<T>): Promise<T> => {
+    // A request that has to wait is visible: one secret-free stderr line naming it (an operator sees why it is slow; a test
+    // sees that it passed the first status check and is now queued behind another request).
+    if (inFlight > 0) process.stderr.write(`flume access: queued request ${JSON.stringify(label)} behind ${inFlight} in-flight request(s)\n`);
+    inFlight++;
+    const settle = () => { inFlight--; };
     const next = tail.then(work, work);
+    next.then(settle, settle);
     tail = next.catch(() => undefined);
     return next;
   };
@@ -352,7 +359,7 @@ export async function createAccessFacade(initial: AccessConfig, options: { state
         const out = standing(block, "no new access is issued", tagFor(request.service));
         if (out) return finish(out, scoped);
         // 6-8. idempotency, policy, fixture issue
-        return await serialized(async () => {
+        return await serialized(request.request_id, async () => {
           // Re-checked INSIDE the queue: a request that waited behind a slow GitHub mint must not be issued after a
           // `suspend` or `retire` wrote its status while it waited.
           const now = employeeOf(identified.client);

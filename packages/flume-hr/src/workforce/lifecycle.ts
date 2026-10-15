@@ -6,14 +6,21 @@
 //   * Local status is written FIRST on suspend/retire and LAST on restore. The facade reads status on every request, so a
 //     crash or a provider outage in between fails closed: the employee is denied, never half-restored.
 //   * Each provider-mutating step has a resource-scoped key (`cloudflare_access:token-delete:<client_id>`). A step recorded
-//     `done` or `converged` is never executed again, by this operation or a later one; it is reported `already-done` with
-//     its original `operation_id`. Only restore clears a record (of the steps it reverses), and only restore drops a
-//     capture. An irreversible step (an Access token delete, a gateway revoke) is further scoped to the LIVE resources it
-//     acted on: a token minted since is new work, a token already deleted is never deleted twice. An `unresolved` step is
-//     simply tried again next run. A 404 on a DELETE, an already-suspended installation or `revoked 0 tokens` is
-//     `converged`, not a failure.
-//   * The result never says "complete" while a static credential is usable or unverified: `complete_revocation` is true only
-//     when every row is `revoked` or `not-issued`, and the text output says `revocation INCOMPLETE` otherwise.
+//     `done` or `converged` is never executed again, by this operation or a later one, while the provider shows nothing new
+//     to act on; it is reported `already-done` with its original `operation_id`. Only restore clears a record (of the steps it
+//     reverses), and a capture is dropped only by restore or by the step that wrote it once the provider proved the guarded
+//     mutation never happened. Every step is scoped to the LIVE resources at the provider (`PlannedStep.live`): an
+//     irreversible one (an Access token delete, a gateway revoke) by the IDs it acted on, so a token minted since is new work
+//     and one already deleted is never deleted twice; a reversible one (the allowlist key, the routing rule, the installation
+//     suspension) by "nothing left open", so a key re-provisioned, a rule re-enabled or an installation un-suspended by hand
+//     since is new work. An `unresolved` step is simply tried again next run. A 404 on a DELETE, an already-suspended
+//     installation or `revoked 0 tokens` is `converged`, not a failure.
+//   * `--revoke all` names every revocable adapter, but one this lifecycle must not run (a shared gateway consumer, a drifted
+//     desk) is a `skipped` step with its code, not a refusal of the whole retire: status, tombstone and every other
+//     revocation still happen. A NAMED adapter that must not run is still a blocker.
+//   * The result never says "complete" while a static credential is usable or unverified, or a revocation was skipped:
+//     `complete_revocation` is true only when every row is `revoked` or `not-issued` and nothing was skipped, and the text
+//     output says `revocation INCOMPLETE` otherwise.
 //
 // State is `<identityStateDir()>/lifecycle-state.json` (0600 in a 0700 directory) held under its own lock for the whole of an
 // apply. The registry lock is never taken here: `setEmployeeStatus` takes it itself and flock is not re-entrant.
@@ -54,20 +61,24 @@ export interface StepReport {
 
 const adaptersOf = (options: LifecycleOptions): Record<AdapterName, LifecycleAdapter> => ({ ...DEFAULT_ADAPTERS, ...(options.adapters ?? {}) });
 
-/** The order is the story's: sorted by REVOCABLE, never by the order the operator typed them. */
-function revokeSet(command: "suspend" | "retire", requested: string[] | undefined): { revoke: AdapterName[]; blockers: IdentityBlocker[] } {
+/**
+ * The order is the story's: sorted by REVOCABLE, never by the order the operator typed them. `named` is what the operator
+ * typed adapter by adapter; an adapter only `all` brought in reports what it must not do as a `skipped` step instead of
+ * refusing the whole command.
+ */
+function revokeSet(command: "suspend" | "retire", requested: string[] | undefined): { revoke: AdapterName[]; named: Set<AdapterName>; blockers: IdentityBlocker[] } {
   const blockers: IdentityBlocker[] = [];
-  const chosen = new Set<AdapterName>();
+  const chosen = new Set<AdapterName>(), named = new Set<AdapterName>();
   for (const name of requested ?? []) {
     if (name === "all") {
       if (command === "retire") for (const adapter of REVOCABLE) chosen.add(adapter);
       else blockers.push({ code: "invalid-request", detail: "--revoke all is for retire; suspend names each adapter (cloudflare_access, github, gateway)" });
-    } else if ((REVOCABLE as readonly string[]).includes(name)) chosen.add(name as AdapterName);
+    } else if ((REVOCABLE as readonly string[]).includes(name)) { chosen.add(name as AdapterName); named.add(name as AdapterName); }
     else if (name === "plane") blockers.push({ code: "invalid-request", detail: "--revoke plane: a Plane PAT is employee-owned and static; Flume has no Plane client or revoke verb (the credentials report names the manual route)" });
     else if (name === "mail") blockers.push({ code: "invalid-request", detail: "--revoke mail: the mailbox is closed by suspend itself; there is nothing to name" });
     else blockers.push({ code: "invalid-request", detail: `--revoke "${name}" is not an adapter; use ${REVOCABLE.join(", ")}${command === "retire" ? " or all" : ""}` });
   }
-  return { revoke: REVOCABLE.filter(name => chosen.has(name)), blockers };
+  return { revoke: REVOCABLE.filter(name => chosen.has(name)), named, blockers };
 }
 
 interface Prepared {
@@ -128,13 +139,19 @@ const historyOf = (block: CompanyIdentity | null) => (block ? { history: { mailb
 const firstLine = (error: unknown): string => (error instanceof Error ? error.message : String(error)).split("\n")[0]!.slice(0, 200);
 const DONE = new Set(["done", "converged"]);
 
-function revocationSummary(rows: CredentialRow[]) {
-  const incomplete = rows.filter(row => row.status !== "revoked" && row.status !== "not-issued")
+/**
+ * Complete only when every row is `revoked` or `not-issued` AND no revocation was skipped. A skipped step is listed in
+ * `incomplete[]` beside the rows, so a retire that could not revoke the gateway never reads as finished.
+ */
+function revocationSummary(rows: CredentialRow[], reports: StepReport[] = []) {
+  const incomplete: Array<Record<string, unknown>> = rows.filter(row => row.status !== "revoked" && row.status !== "not-issued")
     .map(row => ({ provider: row.provider, kind: row.kind, ...(row.id ? { id: row.id } : {}), ...(row.ref ? { ref: row.ref } : {}), status: row.status, ...(row.provider_code ? { provider_code: row.provider_code } : {}) }));
+  for (const report of reports.filter(r => r.outcome === "skipped" && r.adapter !== "local")) incomplete.push({ provider: report.adapter, kind: "skipped-step", id: report.key, status: "skipped", ...(report.provider_code ? { provider_code: report.provider_code } : {}) });
   return { complete_revocation: rows.length > 0 && incomplete.length === 0, incomplete };
 }
 
 const stepReport = (step: PlannedStep, outcome: StepReport["outcome"], extra: Partial<StepReport> = {}): StepReport => ({ key: step.key, adapter: step.adapter, action: step.action, resource: step.resource, outcome, ...extra });
+const skipReport = (step: PlannedStep): StepReport => stepReport(step, "skipped", { provider_code: step.skip!.code, detail: step.skip!.detail });
 
 const localStep = (employee: string, to: string): StepReport => ({ key: `local-status:${to}`, adapter: "local", action: "set-status", resource: employee, outcome: "planned" });
 
@@ -142,13 +159,15 @@ function summarize(reports: StepReport[]) {
   return {
     succeeded: reports.filter(r => ["done", "converged", "already-done"].includes(r.outcome)).map(r => r.key),
     unresolved: reports.filter(r => r.outcome === "unresolved").map(r => ({ key: r.key, adapter: r.adapter, provider_code: r.provider_code ?? "unresolved" })),
+    skipped: reports.filter(r => r.outcome === "skipped" && r.adapter !== "local").map(r => ({ key: r.key, adapter: r.adapter, provider_code: r.provider_code ?? "skipped" })),
   };
 }
 
 /**
  * Is this step already done? Its record must say `done` or `converged`, and a step scoped to live provider resources must
- * find nothing at the provider NOW that the record did not already act on. A token minted since (a FLUME-39 re-mint) makes
- * the step new work; a provider that cannot be read keeps the record, so a done DELETE is never repeated on a guess.
+ * find nothing at the provider NOW that the record did not already act on: a token minted since (a FLUME-39 re-mint), or a
+ * key, rule or installation opened again since (`resources: []`), makes the step new work. A provider that cannot be read
+ * keeps the record, so a done DELETE is never repeated on a guess.
  */
 async function priorDone(step: PlannedStep, ctx: LifecycleContext): Promise<{ done: true; record: StepRecord } | { done: false; fresh?: string[]; record?: StepRecord }> {
   const record = ctx.steps[step.key];
@@ -181,7 +200,7 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
   const adapters = adaptersOf(options);
   const to: "suspended" | "retired" = command === "suspend" ? "suspended" : "retired";
   const apply = Boolean(options.apply);
-  const { revoke, blockers: revokeBlockers } = revokeSet(command, options.revoke);
+  const { revoke, named, blockers: revokeBlockers } = revokeSet(command, options.revoke);
 
   /** Everything knowable without a provider call. */
   const assess = (state: LifecycleState) => {
@@ -194,10 +213,12 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     let ctx: LifecycleContext | undefined;
     if (prepared.block) {
       // No episode reset: records and captures persist until restore reverses them. An out-of-band status change
-      // (`flume identity status`) therefore can neither lose a capture restore needs nor hide a re-minted token, which
-      // the irreversible steps' live-resource scope (`priorDone`) catches instead.
+      // (`flume identity status`) therefore can neither lose a capture restore needs nor hide a re-minted token or a
+      // re-opened resource, which every step's live-resource scope (`priorDone`) catches instead.
       ctx = contextOf(employee, prepared, state, env);
-      for (const name of revoke) blockers.push(...adapters[name].blockers(ctx, { command, revoke: true }));
+      // Only an adapter the operator NAMED can refuse the command; one `all` brought in plans a `skipped` step instead, so
+      // an emergency `retire --revoke all` still writes status, the tombstone and every revocation it may run.
+      for (const name of revoke) if (named.has(name)) blockers.push(...adapters[name].blockers(ctx, { command, revoke: true }));
     }
     return { prepared, blockers, ctx };
   };
@@ -218,13 +239,14 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const reports: StepReport[] = [{ ...localStep(employee, to), detail: ctx.block.status === to ? `already ${to}` : `${ctx.block.status} -> ${to}` }];
     if (command === "retire") reports.push({ key: "tombstone", adapter: "local", action: "tombstone", resource: ctx.block.subject, outcome: "planned" });
     for (const step of planOf(ctx)) {
+      if (step.skip) { reports.push(skipReport(step)); continue; }
       const prior = await priorDone(step, ctx);
       reports.push(prior.done ? stepReport(step, "already-done", { operation_id: prior.record.operation_id, detail: step.description })
         : stepReport(step, "planned", { detail: prior.fresh ? `${step.description}; new since operation ${prior.record!.operation_id}: ${prior.fresh.join(", ")}` : step.description }));
     }
     // The preview shows what is usable NOW: status is still the old one.
     const rows = await inventoryAll(ctx, adapters);
-    return { ok: true, ...base(first.prepared), blockers: first.blockers, steps: reports, credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
+    return { ok: true, ...base(first.prepared), blockers: first.blockers, steps: reports, skipped: summarize(reports).skipped, credentials: rows, ...revocationSummary(rows, reports), gateway_link: gatewayLink(env), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
   }
 
   const operationId = randomUUID();
@@ -268,8 +290,19 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     }
 
     // 3. Provider steps: the allowlist/routing first, then only the adapters named, in the fixed order.
-    const hooks = { operation_id: operationId, capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
+    const hooks = {
+      operation_id: operationId,
+      capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); },
+      release(name: string) { if (name in ctx.captures) { delete ctx.captures[name]; persist(); } },
+    };
     for (const step of planOf(ctx)) {
+      if (step.skip) {
+        // Never run, never recorded: the next run decides afresh (a dedicated FLUME-39 token, a re-rendered desk).
+        const report = skipReport(step);
+        reports.push(report);
+        ledger({ event: "lifecycle.step", step: step.key, adapter: step.adapter, outcome: "skipped", provider_code: step.skip.code });
+        continue;
+      }
       const prior = await priorDone(step, ctx);
       if (prior.done) {
         reports.push(stepReport(step, "already-done", { operation_id: prior.record.operation_id, detail: `${prior.record.status} by operation ${prior.record.operation_id}` }));
@@ -287,9 +320,9 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
       ledger({ event: "lifecycle.step", step: step.key, adapter: step.adapter, outcome: outcome.result, ...(outcome.provider_code ? { provider_code: outcome.provider_code } : {}) });
     }
 
-    // 4. What is still usable, read back from the providers after the steps.
+    // 4. What is still usable, read back from the providers after the steps. A skipped revocation keeps it incomplete.
     const rows = await inventoryAll(ctx, adapters);
-    const summary = revocationSummary(rows);
+    const summary = revocationSummary(rows, reports);
     const unresolved = reports.some(r => r.outcome === "unresolved");
     ledger({ event: "lifecycle.operation", phase: "finished", ok: !unresolved, complete_revocation: summary.complete_revocation });
     return { ok: !unresolved, ...base(now.prepared), operation_id: operationId, blockers: [] as IdentityBlocker[], steps: reports, ...summarize(reports), credentials: rows, ...summary, gateway_link: gatewayLink(env), writes: [...writes], note: command === "suspend" ? "Suspended: the facade denies new access and mail by status. Provider credentials above are what remains usable." : "Retired: terminal. Stored mail is kept. Provider credentials above are what remains usable or needs a person." };
@@ -321,9 +354,31 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
   const planOf = (ctx: LifecycleContext): PlannedStep[] => ADAPTER_ORDER.flatMap(name => adapters[name].restorePlan(ctx));
   const base = (prepared: Prepared) => ({ command: "restore" as const, employee, apply, kind: prepared.target.kind, definition: prepared.target.path, person: prepared.target.person, from: prepared.block?.status ?? null, to: "active", ...historyOf(prepared.block) });
   const refused = (prepared: Prepared, blockers: IdentityBlocker[], extra: Record<string, unknown> = {}) => ({ ok: false, ...base(prepared), blockers, steps: [] as StepReport[], credentials: [] as CredentialRow[], complete_revocation: false, incomplete: [] as unknown[], writes: [] as string[], ...extra });
-  /** Revocations restore cannot undo: a deleted Access token and a revoked gateway token are gone. */
-  const notReversed = (ctx: LifecycleContext) => Object.entries(ctx.steps).filter(([key, record]) => DONE.has(record.status) && (key.startsWith("cloudflare_access:") || key.startsWith("gateway:")))
-    .map(([key, record]) => ({ key, operation_id: record.operation_id, note: key.startsWith("gateway:") ? "the gateway token stays revoked; FLUME-39 mints a new one (gateway-tokens.py mint)" : "the Access service token stays deleted; `flume identity provision` issues a new one" }));
+  /**
+   * Revocations restore cannot undo: a deleted Access token and a revoked gateway token are gone. Each entry is a dated fact
+   * about one operation, and it is dropped once it no longer describes the employee: when the binding or desk has moved on
+   * (no current step has its key), or when the provider already holds a resource the record never acted on (a FLUME-39
+   * re-mint, a re-provisioned Access token). A provider that cannot be read keeps the entry.
+   */
+  const notReversed = async (ctx: LifecycleContext) => {
+    const current = new Map<string, PlannedStep>();
+    for (const name of REVOCABLE) for (const step of adapters[name].plan(ctx, { command: "suspend", revoke: true })) if (!step.skip) current.set(step.key, step);
+    const out: Array<{ key: string; operation_id: string; at: string; resources: string[]; note: string }> = [];
+    for (const [key, record] of Object.entries(ctx.steps)) {
+      if (!DONE.has(record.status) || !(key.startsWith("cloudflare_access:") || key.startsWith("gateway:"))) continue;
+      const step = current.get(key);
+      if (!step) continue;
+      const acted = Array.isArray(record.data?.resources) ? (record.data!.resources as unknown[]).map(String) : [];
+      let live: string[] | null = null;
+      try { live = step.live ? await step.live(ctx) : null; } catch { live = null; }
+      if (live?.some(id => !acted.includes(id))) continue;
+      const what = acted.length ? ` (${acted.join(", ")})` : "";
+      out.push({ key, operation_id: record.operation_id, at: record.at, resources: acted, note: key.startsWith("gateway:")
+        ? `operation ${record.operation_id} revoked the gateway token(s)${what} at ${record.at}; a revocation is not reversible: FLUME-39 mints a new one (gateway-tokens.py mint)`
+        : `operation ${record.operation_id} deleted the Access service token${what} at ${record.at}; a deletion is not reversible: \`flume identity provision\` issues a new one` });
+    }
+    return out;
+  };
 
   const first = assess(readLifecycleState(env));
   if (first.blockers.length || !first.ctx) return refused(first.prepared, first.blockers);
@@ -332,7 +387,7 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const reports: StepReport[] = planOf(ctx).map(step => stepReport(step, "planned", { detail: step.description }));
     reports.push({ key: "local-status:active", adapter: "local", action: "set-status", resource: employee, outcome: "planned", detail: "suspended -> active, written last" });
     const rows = await inventoryAll(ctx, adapters);
-    return { ok: true, ...base(first.prepared), blockers: [] as IdentityBlocker[], steps: reports, credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: notReversed(ctx), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
+    return { ok: true, ...base(first.prepared), blockers: [] as IdentityBlocker[], steps: reports, credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: await notReversed(ctx), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
   }
 
   const operationId = randomUUID();
@@ -348,14 +403,18 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     ctx.remember = (name, value) => { ctx.captures[name] = value; persist(); };
     const reports: StepReport[] = [];
     ledger({ event: "lifecycle.operation", phase: "started", from: block.status, to: "active" });
-    const hooks = { operation_id: operationId, capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); } };
+    const hooks = {
+      operation_id: operationId,
+      capture(name: string, value: unknown) { ctx.captures[name] = value; persist(); },
+      release(name: string) { if (name in ctx.captures) { delete ctx.captures[name]; persist(); } },
+    };
     for (const step of planOf(ctx)) {
       let outcome: StepOutcome;
       try { outcome = await step.run(ctx, hooks); }
       catch (error) { outcome = { result: "unresolved", provider_code: "internal-error", detail: firstLine(error) }; }
       if (outcome.result !== "unresolved") {
         // Reversed: the suspension step is no longer done (a later suspend runs it again), and what it captured is consumed.
-        // This is the ONLY place a step record or a capture is ever dropped.
+        // This is the only place a step record is dropped.
         if (step.reverses) delete ctx.steps[step.reverses];
         for (const name of step.releases ?? []) delete ctx.captures[name];
         persist();
@@ -377,7 +436,7 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const failed = reports.some(r => r.outcome === "unresolved");
     const rows = await inventoryAll(ctx, adapters);
     ledger({ event: "lifecycle.operation", phase: "finished", ok: !failed });
-    return { ok: !failed, ...base(now.prepared), operation_id: operationId, blockers: [] as IdentityBlocker[], steps: reports, ...summarize(reports), credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: notReversed(ctx), writes: [...writes], note: failed ? "Not restored: an unresolved step keeps the employee suspended. Re-run to continue." : "Restored: provider steps were reversed first and local status is active." };
+    return { ok: !failed, ...base(now.prepared), operation_id: operationId, blockers: [] as IdentityBlocker[], steps: reports, ...summarize(reports), credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: await notReversed(ctx), writes: [...writes], note: failed ? "Not restored: an unresolved step keeps the employee suspended. Re-run to continue." : "Restored: provider steps were reversed first and local status is active." };
   }, env);
 }
 
@@ -519,7 +578,10 @@ export function formatLifecycleResult(result: Record<string, any>): string {
   for (const item of result.not_reversed ?? []) lines.push(`  not reversed: ${item.key} — ${item.note}`);
   if (Array.isArray(result.credentials) && result.credentials.length) {
     if (result.complete_revocation) lines.push("revocation COMPLETE: every credential is revoked or was never issued");
-    else lines.push(`revocation INCOMPLETE: ${(result.incomplete ?? []).length} credential(s) still usable, expiring or unverified`);
+    else {
+      const skippedSteps = (result.incomplete ?? []).filter((item: Record<string, unknown>) => item.kind === "skipped-step").length;
+      lines.push(`revocation INCOMPLETE: ${(result.incomplete ?? []).length - skippedSteps} credential(s) still usable, expiring or unverified${skippedSteps ? `; ${skippedSteps} revocation(s) skipped` : ""}`);
+    }
   }
   if (result.gateway_link) lines.push(`gateway: owner ${result.gateway_link.owner_ticket}, evidence ${result.gateway_link.evidence_status} (${result.gateway_link.evidence_path})`);
   for (const write of result.writes ?? []) lines.push(`  wrote ${write}`);

@@ -287,6 +287,13 @@ Mail authorize, the mail client, rotation, tombstones and receipts:
 
 ## Spec Change Log
 
+- 2026-10-15, second independent review (decisions recorded by the supervisor): the gateway desk reference is the generated
+  `config.yaml` when it exists; a delta (or base) it disagrees with is `gateway-ref-drift` (`unverified`, never `revoked`, a blocker
+  for a named `--revoke gateway`). A specialist always has a separate launcher-reference row. `--revoke all` still names all three
+  adapters, but one that must not run (shared consumer, drift) is a reported `skipped` step instead of refusing the retire; a
+  named `--revoke gateway` on a shared consumer stays the `shared-consumer` blocker. Each tightens AC2 (a static key usable or
+  unverified never reads as complete) and none loosens an AC.
+
 ## Review Triage Log
 
 ### 2026-10-15 — Review pass
@@ -535,3 +542,44 @@ Tests (`company-identity-lifecycle` 30 → 38 scenarios; `employee-access-lifecy
 Verification: `git diff --check` is clean; `node scripts/run-tests.mjs named-agent role-contract registry-comments company-identity employee-access employee-access-lifecycle company-identity-lifecycle identity-provision` passed 14/14 after typecheck and build; `employee_lifecycle_canary` is still `unproven`. The canary procedure now expects the rotated-away key's own row, and notes that `--revoke all` is refused on a desk that inherits the base key.
 
 Behavior change to flag: `retire --revoke all` is now refused `shared-consumer` on every desk without its own FLUME-39 key (10 live desks inherit the base). Name `--revoke cloudflare_access --revoke github` there until FLUME-39 mints dedicated tokens.
+
+### 2026-10-15 — Second independent review fixes (verdict was BLOCKING; review of `cc93a25`)
+
+Status: done (fixture build). AC5 is still the supervisor's live canary and has not been run. No live provider, Cloudflare,
+GitHub, Plane, gateway or 1Password was called; `~/.hermes`, `~/.config/flume`, `~/.local/state/flume`, `flume-access.service`
+and agents-facade were not touched.
+
+- **N1 (drift, R3).** The desk runs its generated `config.yaml` when one exists; a delta or inherited base it disagrees with
+  (or an unreadable generated config) adds an `unverified` `gateway-ref-drift` row, sharing is judged on the running key (and on
+  other desks' running and next-render keys), a drifted desk never reports a `revoked` gateway row, and a named
+  `--revoke gateway` is the blocker `gateway-ref-drift`.
+- **N2 (specialist launcher).** A specialist always gets a `ref_source: launcher` row for `op://DeLoSecrets/hermes-<id>/credential`,
+  probed with `op item get … --format json` (no `--reveal`, output discarded, never `op read`): present is `unverified`
+  `launcher-ref-unproven`, absent is `not-issued` ("the launcher reference is dead"). `--revoke gateway` also reports a skipped
+  `gateway:launcher-key:<ref>` step. The docs sentence that claimed the lifecycle already reported it is rewritten.
+- **N3 (re-opened resources, R1/R2).** `mail:allowlist-delete`, `mail:routing-disable` and `github:installation-suspend` have
+  `live()` and record `resources: []`: a re-provisioned key, a re-enabled rule or an un-suspended installation is new work (the
+  capture is replaced), and restore never writes a capture over a key present with a newer record.
+- **N4 (ownership, R4).** The capture is dropped when the PUT definitely did not commit (never sent, a 4xx, or a 5xx/timeout
+  after which GitHub reads the installation back unsuspended); a claim needs `suspended_at` no older than the capture (to the
+  second), and restore un-suspends a `done` record only while its read-back `suspended_at` is still in place.
+- **N5.** `--revoke all` skips (does not refuse) a shared or drifted gateway: `skipped` step, `skipped[]`, listed in
+  `incomplete[]`, `complete_revocation` false, `ok` unaffected; status, tombstone and the other revocations still run. A
+  non-FLUME-39 or launcher reference is a skipped step too.
+- **N6.** Tombstone, ledger and provider-ledger reads use `lstat` and treat only ENOENT as empty; EACCES/ENOTDIR fail closed.
+- **N7.** `not_reversed[]` entries carry `operation_id`, `at` and the revoked IDs, and are dropped once a re-mint or
+  re-provision superseded them.
+- **5b** waits for the facade's new stderr marker (`queued request "<id>" behind N in-flight request(s)`), emitted only after the
+  pre-queue status check passed, and asserts no audit line for the request existed before the suspend. **5c** adds an unsearchable
+  state directory and an unreadable state file.
+
+Tests: `company-identity-lifecycle` 38 → 51 scenarios (multi-part blocks split so each part stands alone), `employee-access-lifecycle`
+8 → 9. Proof the new tests bite: in a scratch copy, each of 16 single-fix reversions (N1 ×3, N2 ×2, N3 ×4, N4 ×3, N5, N6, N7, the
+in-queue re-check) made exactly its targeted block(s) fail, and an unmutated control run of the same block-wrapped suites had 0
+failures. Required mutation checks, run on the real tree through `scripts/run-tests.mjs` with typecheck and build passing: removing
+the done-step guard (in `priorDone`) fails `company-identity-lifecycle`; removing the facade mail status check fails
+`employee-access-lifecycle`; making static rows `revoked` without a read-back fails `company-identity-lifecycle`; each file restored
+byte-identical (sha256 checked).
+
+Behavior change to flag: the previous section's note that `retire --revoke all` is refused on desks that inherit the base key is
+superseded: it now retires and revokes everything else, reporting the gateway `skipped` (`shared-consumer`).

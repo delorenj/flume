@@ -95,6 +95,8 @@ flume identity credentials rere-pm --json
 ```
 
 Expect: mail `suspended-reversible`; installation `suspended-reversible`; Access, App key, Plane PAT and gateway `static-usable` or `residual-expiry`; `complete_revocation: false`.
+A specialist also shows a separate `ref_source: launcher` gateway row for `op://DeLoSecrets/hermes-<id>/credential`: `unverified` `launcher-ref-unproven` while that vault item exists (it is probed for existence only, never read), `not-issued` if it does not.
+A `gateway-ref-drift` row means the desk's generated `config.yaml` disagrees with its delta: record it, and do not run a gateway revoke until the desk is re-rendered (`gateway-member-tokens.py --render`) and its gateway restarted.
 If any row says `evidence: "fixture"`, G3 fails: record which override leaked in.
 
 ## 4. Restore
@@ -130,8 +132,9 @@ flume identity provision <disposable> --apply                 # Access service t
 flume identity bind <disposable> github --principal <throwaway-app-id> --instance <throwaway-installation-id> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
 flume identity bind <disposable> plane --principal <throwaway-plane-user-uuid> --instance https://<host>/<workspace> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
 flume identity credentials <disposable> --json                # every row except gateway must be a real provider row, not not-issued
-flume identity retire <disposable> --revoke all --apply --json   # refused `shared-consumer` if the desk only inherits the fleet base key: then run
-                                                                 #   --revoke cloudflare_access --revoke github instead; the gateway row stays shared_consumer manual-action-required
+flume identity retire <disposable> --revoke all --apply --json   # a desk that only inherits the fleet base key (or has drifted) still retires: the gateway
+                                                                 #   step is `skipped` (`shared-consumer` / `gateway-ref-drift`), the row stays shared_consumer
+                                                                 #   manual-action-required, and complete_revocation stays false. Never `--revoke gateway` there.
 flume offboard <disposable> --apply
 flume identity enroll <another-post> --handle <disposable-handle>          # must answer handle-tombstoned
 ```

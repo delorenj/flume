@@ -7,7 +7,7 @@
 //
 // This module is deliberately small and imports no lifecycle logic, so `company.ts` can consult tombstones without a
 // cycle through the coordinator.
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync, type Stats } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { identityStateDir } from "./plane";
@@ -48,16 +48,34 @@ function ensureDir(env: NodeJS.ProcessEnv): string {
   return dir;
 }
 
+const errnoOf = (error: unknown): string => (error as NodeJS.ErrnoException).code ?? (error as Error).message.split("\n")[0]!;
+
 /**
- * The state, or an empty one when no lifecycle command has ever applied. A file that exists and cannot be read is an
- * error: tombstones are a safety rail, and a rail that silently reads as empty is not one.
+ * `lstat`, or undefined when the path does NOT EXIST (ENOENT) and only then. `existsSync` answers false for a path it merely
+ * cannot see (EACCES on a parent directory, ENOTDIR), which would read a tombstone file nobody may open as "no tombstones":
+ * every other failure is thrown, so a reader fails closed.
+ */
+export function lstatIfPresent(path: string): Stats | undefined {
+  try { return lstatSync(path); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw new Error(`${path} cannot be read (${errnoOf(error)})`);
+  }
+}
+
+/**
+ * The state, or an empty one when no lifecycle command has ever applied (the file does not exist). A file that exists, or a
+ * path that cannot even be looked at, is an error: tombstones are a safety rail, and a rail that silently reads as empty is not one.
  */
 export function readLifecycleState(env: NodeJS.ProcessEnv = process.env): LifecycleState {
   const path = lifecycleStatePath(env);
-  if (!existsSync(path)) return emptyLifecycleState();
-  if (lstatSync(path).isSymbolicLink()) throw new Error(`Refusing symlinked lifecycle state ${path}`);
+  const info = lstatIfPresent(path);
+  if (!info) return emptyLifecycleState();
+  if (info.isSymbolicLink()) throw new Error(`Refusing symlinked lifecycle state ${path}`);
+  let text: string;
+  try { text = readFileSync(path, "utf8"); } catch (error) { throw new Error(`Lifecycle state ${path} cannot be read (${errnoOf(error)})`); }
   let parsed: Partial<LifecycleState>;
-  try { parsed = JSON.parse(readFileSync(path, "utf8")); } catch (error) { throw new Error(`Lifecycle state ${path} is not valid JSON: ${(error as Error).message.split("\n")[0]}`); }
+  try { parsed = JSON.parse(text); } catch (error) { throw new Error(`Lifecycle state ${path} is not valid JSON: ${(error as Error).message.split("\n")[0]}`); }
   if (!parsed || typeof parsed !== "object" || parsed.version !== 1) throw new Error(`Lifecycle state ${path} has an unknown version`);
   return { ...emptyLifecycleState(), ...parsed };
 }
@@ -79,9 +97,10 @@ export function appendLifecycleLedger(line: Record<string, unknown>, env: NodeJS
   return path;
 }
 
+/** Every ledger line; none when the ledger does not exist. A ledger that cannot be read throws (a lost `identity.rotate` line would hide an old key). */
 export function readLifecycleLedger(env: NodeJS.ProcessEnv = process.env): Array<Record<string, any>> {
   const path = lifecycleLedgerPath(env);
-  if (!existsSync(path)) return [];
+  if (!lstatIfPresent(path)) return [];
   const lines: Array<Record<string, any>> = [];
   for (const text of readFileSync(path, "utf8").split("\n")) {
     if (!text.trim()) continue;

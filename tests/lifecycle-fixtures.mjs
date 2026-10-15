@@ -118,7 +118,8 @@ export const rsa = () => generateKeyPairSync("rsa", { modulusLength: 2048, priva
 /**
  * One App per entry of `apps`: { id, slug, installation, publicKey | publicKeys }. An App may hold several keys (a rotation);
  * `gh.rejectedKeys` holds the public PEMs whose private key was deleted at GitHub, and `mode.keyRejected` rejects them all.
- * Fault modes: put = "500" | "500-after-commit" (suspends, then fails) | "noop"; delete = "500" | "noop";
+ * Fault modes: put = "500" (commits nothing) | "403" (GitHub refuses: definitely not committed) | "500-after-commit"
+ * (suspends, then fails) | "noop"; delete = "500" | "noop";
  * installationGet = "500" | "500-when-suspended" (the read-back after a committed PUT fails) | "hold" (never answers until
  * `gh.release(status)`, which also clears the mode).
  */
@@ -169,6 +170,7 @@ export async function fakeGithub(apps) {
       }
       if (m[2] && req.method === "PUT") {
         if (gh.mode.put === "500") return send(res, 500, { message: "boom" });
+        if (gh.mode.put === "403") return send(res, 403, { message: "Resource not accessible by integration" });
         if (gh.mode.put !== "noop") installation.suspended_at = new Date().toISOString();
         if (gh.mode.put === "500-after-commit") return send(res, 500, { message: "boom after commit" });
         return send(res, 204);
@@ -189,13 +191,26 @@ export async function fakeGithub(apps) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-/** A fake `op`: `op read <ref>` answers from the JSON map in OP_FIXTURE. */
+/**
+ * A fake `op`: `op read <ref>` answers from the JSON map in OP_FIXTURE; `op item get <title> --vault <v> --format json`
+ * answers whether an item exists (any `op://<v>/<title>/...` key in the map) with its overview only -- never a field value --
+ * or op's own "isn't an item" refusal. Every argv (verbs and references, never a value) is logged to OP_FAKE_LOG when set.
+ */
 export function writeFakeOp(path, serviceToken) {
   writeFileSync(path, `#!/usr/bin/env node
 const fs = require("fs");
 if (process.env.OP_SERVICE_ACCOUNT_TOKEN !== ${JSON.stringify(serviceToken)}) process.exit(1);
+const args = process.argv.slice(2);
+if (process.env.OP_FAKE_LOG) fs.appendFileSync(process.env.OP_FAKE_LOG, JSON.stringify({ argv: args }) + "\\n");
 const map = JSON.parse(fs.readFileSync(process.env.OP_FIXTURE, "utf8"));
-const [verb, ref] = process.argv.slice(2);
+const [verb, ref] = args;
+if (verb === "item" && ref === "get") {
+  const title = args[2], vault = args[args.indexOf("--vault") + 1];
+  if (args.includes("--reveal")) { process.stderr.write("[ERROR] the lifecycle must never ask op to reveal a field\\n"); process.exit(3); }
+  if (!Object.keys(map).some((key) => key.startsWith("op://" + vault + "/" + title + "/"))) { process.stderr.write("[ERROR] 2026/10/15 00:00:00 \\"" + title + "\\" isn't an item in the \\"" + vault + "\\" vault. Specify the item with its UUID, name, or domain.\\n"); process.exit(1); }
+  process.stdout.write(JSON.stringify({ id: "fixtureitem" + title.length, title, vault: { name: vault }, category: "API_CREDENTIAL", fields: [{ id: "credential", type: "CONCEALED", label: "credential" }] }));
+  process.exit(0);
+}
 if (verb !== "read" || !(ref in map)) process.exit(2);
 process.stdout.write(map[ref]);
 `, { mode: 0o755 });
