@@ -328,8 +328,11 @@ flume comment verify-plane TEST-14 --comment grolf:<comment-id> --comment rerere
   `${FLUME_IDENTITY_STATE:-$XDG_STATE_HOME/flume/identity}`, mode 0600) are appended only with `--apply`
   and hold IDs, `op://` references, board IDs, px codes, the Plane version and `evidence` (`fixture`
   whenever `FLUME_PX_BIN` is set, else `provider`). They never change a definition.
-- The agent registry's `plane.member_id` / `key_ref` are not written; a mismatch is reported as a
-  `legacy-registry-principal` warning.
+- `adopt-actor` never writes the agent registry; a mismatch is reported as a `legacy-registry-principal`
+  warning. The registry's `plane.member_id` / `key_ref` are a projection of the ADOPTED binding on an active
+  employee, written by `flume remediate hermes.registry-parity` (declared in the handbook under
+  `agent_operational_records`). An unbound or merely requested binding projects nothing. A portable specialist
+  has no board binding in its registry row: `plane.workspace|project_id|identifier` belong to project-registry.
 
 **Manual enrollment prerequisites** (Flume cannot create a Plane user or token; `bind` without a
 `--credential-ref`, or `adopt-actor` without a binding, answers `manual-enrollment-required` /
