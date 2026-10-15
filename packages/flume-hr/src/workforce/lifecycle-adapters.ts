@@ -16,6 +16,7 @@
 // Nothing here ever holds, returns or logs a secret value: rows carry IDs, `op://` references and codes.
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
@@ -151,13 +152,28 @@ async function listServiceTokens(cf: { token: string; config: ProvisioningConfig
 }
 
 async function listRules(cf: { token: string; config: ProvisioningConfig }): Promise<{ ok: true; rules: CfRoutingRule[] } | { ok: false; code: string }> {
-  const list = await cfRequest(cf.token, "GET", `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules`);
-  return cfOk(list) ? { ok: true, rules: (list.body?.result ?? []) as CfRoutingRule[] } : { ok: false, code: codeOf(list) };
+  const rules: CfRoutingRule[] = [];
+  const seen = new Set<string>();
+  const perPage = 50;
+  for (let page = 1; page <= 40; page++) {
+    const list = await cfRequest(cf.token, "GET", `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules?per_page=${perPage}&page=${page}`);
+    if (!cfOk(list)) return { ok: false, code: codeOf(list) };
+    const result = (list.body?.result ?? []) as CfRoutingRule[];
+    let fresh = 0;
+    for (const rule of result) if (!seen.has(rule.id)) { seen.add(rule.id); rules.push(rule); fresh++; }
+    const totalPages = Number(list.body?.result_info?.total_pages);
+    if (fresh === 0 || result.length < perPage || (Number.isFinite(totalPages) && page >= totalPages)) break;
+  }
+  return { ok: true, rules };
 }
 
 /** The employee's OWN literal rule: a `to` matcher for exactly their address. Whether it is ours is decided by its action. */
-const literalRule = (rules: CfRoutingRule[], email: string): CfRoutingRule | undefined => rules.find(rule => rule.matchers?.some(m => m.type === "literal" && m.field === "to" && m.value?.toLowerCase() === email.toLowerCase()));
 const pointsAtWorker = (rule: CfRoutingRule, worker: string): boolean => rule.actions?.some(action => action.type === "worker" && (action.value ?? []).includes(worker)) ?? false;
+/** A foreign rule listed first must not hide the employee's own: prefer the literal match that points at the mailbox worker. */
+const literalRule = (rules: CfRoutingRule[], email: string, worker: string): CfRoutingRule | undefined => {
+  const matches = rules.filter(rule => rule.matchers?.some(m => m.type === "literal" && m.field === "to" && m.value?.toLowerCase() === email.toLowerCase()));
+  return matches.find(rule => pointsAtWorker(rule, worker)) ?? matches[0];
+};
 
 // ---------------------------------------------------------------------------
 // mail
@@ -182,7 +198,7 @@ export const mailAdapter: LifecycleAdapter = {
     // Retired: the allowlist key is gone and the employee's own routing rule must be disabled (or absent) for the mailbox to be closed.
     const rules = await listRules(cf);
     if (!rules.ok) return [{ ...base, status: "unresolved", provider_code: rules.code, next_action: `flume identity retire ${ctx.employee} --apply`, detail: kept }];
-    const rule = literalRule(rules.rules, ctx.block.email);
+    const rule = literalRule(rules.rules, ctx.block.email, cf.config.mailbox.worker);
     const open = rule !== undefined && pointsAtWorker(rule, cf.config.mailbox.worker) && rule.enabled !== false;
     return [{ ...base, kind: "mailbox-allowlist+routing", status: open ? "unresolved" : "revoked", ...(open ? { provider_code: "routing-rule-enabled" } : { read_back: "absent" as const }), next_action: open ? `flume identity retire ${ctx.employee} --apply disables the routing rule` : "none: the mailbox is closed and its stored mail is kept", detail: kept }];
   },
@@ -218,7 +234,7 @@ export const mailAdapter: LifecycleAdapter = {
           if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
           const rules = await listRules(cf);
           if (!rules.ok) return { result: "unresolved", provider_code: rules.code, detail: "could not list routing rules" };
-          const rule = literalRule(rules.rules, context.block.email);
+          const rule = literalRule(rules.rules, context.block.email, cf.config.mailbox.worker);
           if (!rule) return { result: "converged", detail: "no routing rule exists for this address" };
           // A rule that does not point at our worker is not ours: never touched.
           if (!pointsAtWorker(rule, cf.config.mailbox.worker)) return { result: "converged", detail: "the address has a rule that does not point at the mailbox worker; it is foreign and was left untouched" };
@@ -249,7 +265,11 @@ export const mailAdapter: LifecycleAdapter = {
         const held = context.captures.mail_allowlist as { key?: string; record?: unknown } | undefined;
         const current = await cfRequest(cf.token, "GET", path);
         if (!held?.record) {
-          return current.http_status === 200 ? { result: "converged", detail: "the allowlist key is present and nothing was captured to restore" } : { result: "unresolved", provider_code: "no-captured-record", detail: "no allowlist record was captured; run `flume identity provision` to recreate the mailbox" };
+          if (current.http_status === 200) return { result: "converged", detail: "the allowlist key is present and nothing was captured to restore" };
+          if (current.http_status !== 404) return { result: "unresolved", provider_code: codeOf(current), detail: "could not read the allowlist key" };
+          // Suspend found no key to delete (`converged`): there was no mailbox to put back. Only a delete THIS lifecycle did needs a record.
+          if (context.steps[key]?.status !== "done") return { result: "converged", detail: "nothing was captured; the allowlist key did not exist when the employee was suspended" };
+          return { result: "unresolved", provider_code: "no-captured-record", detail: "no allowlist record was captured; run `flume identity provision` to recreate the mailbox" };
         }
         if (held.key !== allowlistKey(context.block)) return { result: "unresolved", provider_code: "capture-mismatch", detail: "the captured allowlist key is not this employee's" };
         if (current.http_status === 200 && isDeepStrictEqual(current.body, held.record)) return { result: "converged", detail: "the allowlist record is already present and identical" };
@@ -470,10 +490,10 @@ export const planeAdapter: LifecycleAdapter = {
 
 /** The FLUME-39 shared item: `scripts/gateway-member-tokens.py` writes each consumer's token as one field of it. */
 export const GATEWAY_TOKENS_ITEM = "yeurk5dpqkaarspvsn3cjtmkki";
-const GATEWAY_REF = new RegExp(`^op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/([A-Za-z0-9_-]{1,40})$`, "u");
+const GATEWAY_REF = new RegExp(`^op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/([A-Za-z0-9][A-Za-z0-9_-]{0,39})$`, "u");
 
 function gatewayBin(env: NodeJS.ProcessEnv): string {
-  return env.FLUME_GATEWAY_TOKENS_BIN || join(env.HOME || "", "docker", "stacks", "ai", "newapi", "ops", "gateway-tokens.py");
+  return env.FLUME_GATEWAY_TOKENS_BIN || join(env.HOME || homedir(), "docker", "stacks", "ai", "newapi", "ops", "gateway-tokens.py");
 }
 
 export function gatewayLink(env: NodeJS.ProcessEnv = process.env) {
@@ -544,9 +564,8 @@ export const gatewayAdapter: LifecycleAdapter = {
   name: "gateway",
   blockers(ctx, options) {
     if (!options.revoke) return [];
+    // A desk with no reference, or one that is not the FLUME-39 shape, plans no gateway step; the inventory row says why.
     const desk = gatewayDesk(ctx);
-    if (desk.shape === "none") return [{ code: "no-gateway-ref", detail: `the desk ${desk.profile ?? "(none)"} maps no AUTOMATICAI_GATEWAY_KEY in config.delta.yaml; there is no per-employee consumer to revoke` }];
-    if (desk.shape === "bad") return [{ code: "gateway-ref-shape", detail: `the desk gateway reference is not op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer> (FLUME-39); a consumer is never inferred from a name` }];
     if (desk.shared) return [{ code: "shared-consumer", detail: `consumer ${desk.consumer} is shared with the fleet base or another desk; revoking it would cut them off too. Mint this employee a dedicated token first (FLUME-39)` }];
     return [];
   },

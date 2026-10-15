@@ -2,7 +2,7 @@
 title: 'FLUME-53 — Retire access without losing the employee''s history'
 type: 'feature'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '3169190f91400be100a83b81e9042e1b6975db85'
 review_loop_iteration: 0
 followup_review_recommended: false

@@ -356,6 +356,15 @@ try {
     assert.equal(gh.count("DELETE", /suspended$/u), 0, "restore un-suspended an installation it did not suspend");
     assert.ok(gh.installationOf("1001").suspended_at);
     pass("an already-suspended installation is converged and restore never un-suspends what the lifecycle did not suspend");
+
+    // `revoked 0 tokens` is converged, not done, and the gateway's empty status is the read-back.
+    const w3 = await world("gateway-empty");
+    w3.gw.state.consumers.ada = []; w3.gw.save();
+    const result3 = w3.json(await w3.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--apply", "--json"]));
+    assert.equal(stepOf(result3, "gateway:token-revoke:ada").outcome, "converged");
+    assert.equal(w3.gw.revokes().length, 1);
+    assert.equal(rowOf(result3, "gateway").status, "revoked"); assert.equal(rowOf(result3, "gateway").read_back, "absent");
+    pass("a gateway revoke that reports `revoked 0 tokens` is converged and read back as absent");
   }
 
   // -- 5. bad revoke -----------------------------------------------------------------------------------------------------
@@ -383,8 +392,23 @@ try {
     writeFileSync(join(twin.fleet, "profiles/bob-pm/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: twin.gwRefOf("ada") } } } }));
     blockedWith(twin.json(await twin.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--json"]), 1), "shared-consumer");
     const badShape = await world("bad-shape", { gatewayRef: "bad" });
-    blockedWith(badShape.json(await badShape.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--json"]), 1), "gateway-ref-shape");
-    pass("a shared gateway consumer (fleet base or another desk) and a non-FLUME-39 reference block --revoke gateway before any call");
+    // A bad shape is a row, not a blocker: no consumer is inferred, no gateway step is planned.
+    const shape = badShape.json(await badShape.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--json"]));
+    assert.equal(shape.ok, true, JSON.stringify(shape.blockers));
+    assert.equal(rowOf(shape, "gateway").provider_code, "gateway-ref-shape");
+    assert.equal(shape.steps.some((s) => s.key.startsWith("gateway:")), false);
+    pass("a shared gateway consumer (fleet base or another desk) blocks --revoke gateway before any call; a non-FLUME-39 reference is an unverified row with no gateway step");
+
+    // A desk with no reference must not make retire --revoke all unusable.
+    const noRef = await world("retire-no-ref", { gatewayRef: "none" });
+    const retired = noRef.json(await noRef.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]));
+    assert.equal(retired.ok, true, JSON.stringify(retired.blockers));
+    assert.ok(stateOf(noRef).tombstones[noRef.ada.subject]);
+    assert.equal(cf.kv.has(KV_ADA), false);
+    assert.equal(rowOf(retired, "gateway").status, "not-issued");
+    assert.equal(retired.steps.some((s) => s.key.startsWith("gateway:")), false);
+    assert.equal(noRef.gw.revokes().length, 0);
+    pass("retire --revoke all on a desk with no gateway reference succeeds: tombstone written, mailbox closed, gateway not-issued, no gateway step");
   }
 
   // -- 6. outage and retry -----------------------------------------------------------------------------------------------
@@ -526,12 +550,16 @@ try {
     blockedWith(w.json(await w.runAsync(["identity", "status", "copy-pm", "suspended", "--apply", "--json"]), 1), "retired-terminal");
     blockedWith(w.json(await w.runAsync(["identity", "restore", "copy-pm", "--apply", "--json"]), 1), "retired-terminal");
     blockedWith(w.json(await w.runAsync(["identity", "bind", "copy-pm", "cloudflare_access", "--principal", "fresh.access", "--instance", ISSUER, "--credential-ref", "op://DeLoSecrets/fresh/credential", "--apply", "--json"]), 1), "subject-tombstoned");
+    const ledgerLines = ledgerOf(w).length;
+    blockedWith(w.json(await w.runAsync(["identity", "suspend", "copy-pm", "--apply", "--json"]), 1), "retired-terminal");
+    assert.equal(ledgerOf(w).length, ledgerLines, "a refused suspend wrote ledger lines");
+    blockedWith(w.json(await w.runAsync(["identity", "rotate", "copy-pm", "cloudflare_access", "--credential-ref", "op://DeLoSecrets/fresh/credential", "--apply", "--json"]), 1), "subject-tombstoned");
     assert.equal(readFileSync(copy, "utf8"), copied, "a refused command rewrote the hand-copied definition");
     // another employee binding the retired principal
     const bind = w.json(await w.runAsync(["identity", "bind", "bob-pm", "github", "--principal", "1001", "--instance", "2001", "--credential-ref", REF.adaGithub2, "--apply", "--json"]), 1);
     blockedWith(bind, "binding-tombstoned");
     const access = w.json(await w.runAsync(["identity", "bind", "bob-pm", "plane", "--principal", ADA_PLANE, "--instance", PLANE_INSTANCE, "--credential-ref", REF.adaPlane2, "--apply", "--json"]), 1);
-    assert.ok(access.blockers.some((b) => b.code === "binding-tombstoned" || b.code === "binding-conflict"), JSON.stringify(access.blockers));
+    assert.deepEqual(access.blockers.map((b) => b.code), ["binding-tombstoned"], JSON.stringify(access.blockers));
     assert.equal(readFileSync(w.bobRole, "utf8"), hand.bob, "bob's definition changed");
     pass("a retired identity's handle, subject and bindings survive `flume offboard`: handle-tombstoned, subject-tombstoned, retired-terminal and binding-tombstoned, with nothing written");
   }
@@ -558,6 +586,15 @@ try {
     assert.match(rotated.verification.next_action, /access github-inspect/u);
     const planeRot = w.json(await w.runAsync(["identity", "rotate", "ada-pm", "plane", "--credential-ref", REF.adaPlane2, "--apply", "--json"]));
     assert.match(planeRot.verification.next_action, /adopt-actor ada-pm plane --board/u);
+    const planeAfter = w.block(w.adaRole).bindings.plane;
+    assert.deepEqual({ ...planeAfter, credential_ref: REF.adaPlane }, beforeBlock.bindings.plane, "plane rotation changed more than credential_ref");
+    assert.equal(planeAfter.native_actor_id, ADA_PLANE); assert.equal(planeAfter.credential_ref, REF.adaPlane2);
+    const FRESH = "op://DeLoSecrets/ada-access-fresh/credential";
+    const cfRot = w.json(await w.runAsync(["identity", "rotate", "ada-pm", "cloudflare_access", "--credential-ref", FRESH, "--apply", "--json"]));
+    assert.equal(cfRot.ok, true);
+    assert.deepEqual({ ...w.block(w.adaRole).bindings.cloudflare_access, credential_ref: REF.adaAccess }, beforeBlock.bindings.cloudflare_access);
+    assert.equal(w.block(w.adaRole).bindings.cloudflare_access.credential_ref, FRESH);
+    blockedWith(w.json(await w.runAsync(["identity", "rotate", "ada-pm", "cloudflare_access", "--credential-ref", "not-an-op-ref", "--apply", "--json"]), 1), "invalid-credential-ref");
     // refusals
     const noop = w.json(await w.runAsync(["identity", "rotate", "ada-pm", "github", "--credential-ref", REF.adaGithub2, "--apply", "--json"]));
     assert.equal(noop.changed, false); assert.equal(noop.ok, true);
@@ -613,7 +650,124 @@ try {
     doc2.setIn(["company_identity", "bindings", "plane", "native_actor_id"], BOB_PLANE);
     writeFileSync(moved, String(doc2));
     assert.equal(w.json(await w.runAsync(["identity", "continuity", "ada", "--json"]), 1).checks.find((c) => c.field === "plane.native_actor_id").status, "broken");
+    const brokenComment = w.json(await w.runAsync(["identity", "continuity", "ada", "--comment", `ada:${COMMENT}`, "--json"]), 1);
+    assert.equal(brokenComment.status, "broken"); assert.equal(brokenComment.comments[0].status, "broken");
+    const baselineBefore = JSON.stringify(stateOf(w).continuity);
+    const refused = w.json(await w.runAsync(["identity", "continuity", "ada", "--record", "--apply", "--json"]), 1);
+    blockedWith(refused, "continuity-broken");
+    assert.equal(JSON.stringify(stateOf(w).continuity), baselineBefore, "the baseline was refreshed over a broken identity");
+    // The definition schema ties email to handle, so handle drift is email drift too (an email alone is invalid-definition).
+    {
+      const drift = YAML.parseDocument(readFileSync(moved, "utf8"));
+      drift.setIn(["company_identity", "bindings", "plane", "native_actor_id"], ADA_PLANE);
+      drift.setIn(["company_identity", "handle"], "adele");
+      drift.setIn(["company_identity", "email"], "adele@agents.delo.sh");
+      writeFileSync(moved, String(drift));
+      const drifted = w.json(await w.runAsync(["identity", "continuity", "ada", "--json"]), 1);
+      assert.equal(drifted.status, "broken", JSON.stringify(drifted));
+      for (const field of ["handle", "email", "mailbox_prefix"]) assert.equal(drifted.checks.find((c) => c.field === field).status, "broken", field);
+      assert.equal(drifted.checks.find((c) => c.field === "subject").status, "stable");
+    }
     pass("continuity reports rotation and a post move as such, stays stable on subject/handle/email/principal/actor/mailbox prefix/Plane comment provenance, and fails on drift");
+  }
+
+  // -- 12b. episodes, restore without a capture, restore fail-closed ---------------------------------------------------------
+  {
+    const w = await world("episode");
+    w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--apply", "--json"]));
+    w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    // FLUME-39 re-mints a token for the same consumer.
+    w.gw.state.consumers.ada = [{ id: 21, name: "aai:ada:1700000009", status: 1, expired_time: -1, planted_key: GATEWAY_KEY }]; w.gw.save();
+    const second = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--apply", "--json"]));
+    assert.equal(stepOf(second, "gateway:token-revoke:ada").outcome, "done");
+    assert.equal(w.gw.revokes().length, 2, "the new episode did not revoke the re-minted token");
+    assert.equal(rowOf(second, "gateway").status, "revoked");
+    pass("a new suspension episode starts clean: a re-minted gateway token is revoked again");
+
+    const none = await world("no-mailbox");
+    cf.kv.delete(KV_ADA); cf.calls.length = 0;
+    const suspended = none.json(await none.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    assert.equal(stepOf(suspended, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "converged");
+    const restored = none.json(await none.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(restored.ok, true, JSON.stringify(restored.steps));
+    assert.equal(none.block(none.adaRole).status, "active");
+    assert.equal(cf.count("PUT", /\/kv\//u), 0, "restore invented an allowlist key");
+    pass("an employee suspended with no mailbox can be restored: nothing was captured, nothing is put back");
+
+    const closed = await world("restore-fail-closed");
+    closed.json(await closed.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]));
+    cf.mode.kvPut = "500";
+    const failed = closed.json(await closed.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]), 1);
+    assert.equal(failed.ok, false);
+    assert.equal(stepOf(failed, "mail:allowlist-restore:ada@agents.delo.sh").provider_code, "http-500");
+    assert.equal(stepOf(failed, "local-status:active").outcome, "skipped");
+    assert.equal(closed.block(closed.adaRole).status, "suspended", "status active must not be written while a restore step is unresolved");
+    cf.mode = {};
+    const healed = closed.json(await closed.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]));
+    assert.equal(healed.ok, true); assert.equal(closed.block(closed.adaRole).status, "active");
+    pass("restore fails closed: an unresolved step skips the status write and leaves the employee suspended until a retry succeeds");
+  }
+
+  // -- 12c. read-back guards driven to failure ---------------------------------------------------------------------------------
+  {
+    const a = await world("guard-kv");
+    cf.mode.kvDelete = "noop";
+    const kv = a.json(await a.runAsync(["identity", "suspend", "ada-pm", "--apply", "--json"]), 1);
+    assert.equal(stepOf(kv, "mail:allowlist-delete:ada@agents.delo.sh").outcome, "unresolved");
+    assert.equal(stepOf(kv, "mail:allowlist-delete:ada@agents.delo.sh").provider_code, "delete-not-effective");
+    assert.notEqual(rowOf(kv, "mail").status, "revoked"); assert.equal(rowOf(kv, "mail").status, "static-usable");
+
+    const b = await world("guard-rule");
+    cf.mode.rulePut = "noop";
+    const rule = b.json(await b.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]), 1);
+    assert.equal(stepOf(rule, "mail:routing-disable:ada@agents.delo.sh").provider_code, "disable-not-effective");
+    assert.equal(rowOf(rule, "mail").status, "unresolved"); assert.equal(rowOf(rule, "mail").provider_code, "routing-rule-enabled");
+
+    const c = await world("guard-github");
+    gh.mode.put = "noop";
+    const put = c.json(await c.runAsync(["identity", "suspend", "ada-pm", "--revoke", "github", "--apply", "--json"]), 1);
+    assert.equal(stepOf(put, "github:installation-suspend:2001").provider_code, "suspend-not-effective");
+    assert.equal(rowOf(put, "github", "installation").status, "static-usable");
+    pass("a KV delete, a routing-rule disable and a GitHub suspend that the provider does not honor are unresolved with their read-back code, never revoked");
+  }
+
+  // -- 12d. paging -------------------------------------------------------------------------------------------------------------
+  {
+    const w = await world("paging");
+    cf.tokens.unshift(...Array.from({ length: 58 }, (_, i) => ({ id: `tok-filler-${i}`, name: `filler-${i}`, client_id: `filler-${i}.access`, expires_at: "2027-10-12T00:00:00Z" })));
+    assert.equal(cf.tokens.findIndex((t) => t.id === "tok-ada"), 58);
+    const read = w.json(await w.runAsync(["identity", "credentials", "ada-pm", "--json"]));
+    assert.equal(rowOf(read, "cloudflare_access").status, "static-usable");
+    assert.ok(cf.calls.some((c) => c.method === "GET" && /service_tokens/u.test(c.path) && /page=2/u.test(c.query)), "page 2 of the service tokens was never read");
+    const revoked = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "cloudflare_access", "--apply", "--json"]));
+    assert.equal(rowOf(revoked, "cloudflare_access").status, "revoked");
+    assert.equal(cf.tokens.some((t) => t.id === "tok-ada"), false); assert.equal(cf.tokens.length, 59);
+
+    const rules = await world("paging-rules");
+    const own = cf.rules.find((r) => r.id === "rule-ada");
+    // A foreign rule for the same address is listed first, then fifty fillers push the employee's own rule onto page 2.
+    cf.rules.unshift(...Array.from({ length: 50 }, (_, i) => ({ id: `rule-filler-${i}`, name: `filler-${i}`, enabled: true, matchers: [{ type: "literal", field: "to", value: `filler${i}@agents.delo.sh` }], actions: [{ type: "worker", value: ["agents-facade"] }] })));
+    cf.rules.unshift({ id: "rule-foreign", name: "foreign", enabled: true, matchers: [{ type: "literal", field: "to", value: "ada@agents.delo.sh" }], actions: [{ type: "forward", value: ["elsewhere@example.test"] }] });
+    assert.ok(cf.rules.findIndex((r) => r.id === own.id) >= 50);
+    const retired = rules.json(await rules.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(retired.ok, true, JSON.stringify(retired.steps));
+    assert.equal(cf.rules.find((r) => r.id === "rule-ada").enabled, false, "the employee's rule on page 2 was not disabled");
+    assert.equal(cf.rules.find((r) => r.id === "rule-foreign").enabled, true, "a foreign rule was touched");
+    assert.equal(rowOf(retired, "mail").status, "revoked");
+    pass("service tokens and routing rules are read across pages, and a foreign rule listed first never hides the employee's own");
+  }
+
+  // -- 12e. the lifecycle lock ----------------------------------------------------------------------------------------------------
+  {
+    const w = await world("concurrent");
+    const results = await Promise.all([1, 2].map(() => w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "cloudflare_access", "--apply", "--json"])));
+    const parsed = results.map((r) => w.json(r));
+    assert.equal(cf.count("DELETE", /\/kv\//u), 1, "two applies deleted the allowlist key");
+    assert.equal(cf.count("DELETE", /service_tokens/u), 1, "two applies deleted the Access token");
+    for (const key of ["mail:allowlist-delete:ada@agents.delo.sh", `cloudflare_access:token-delete:${CLIENT.ada}`]) {
+      assert.equal(parsed.filter((r) => stepOf(r, key).outcome === "already-done").length, 1, key);
+    }
+    pass("two concurrent applies serialize on the lifecycle lock: one KV DELETE and one token DELETE, the other reports already-done");
   }
 
   // -- 13. unrelated definitions stay byte-identical ----------------------------------------------------------------------

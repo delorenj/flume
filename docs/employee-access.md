@@ -384,6 +384,8 @@ for the address is never touched), a tombstone, and `--revoke all`. Restore runs
 captured record (verified by GET), un-suspends a GitHub installation only if THIS lifecycle suspended it, and writes status
 `active` LAST. The facade reads status on every request, so a crash or outage in between fails closed.
 
+While the allowlist key is absent the agents-facade Worker bounces new inbound mail to the address: inbound mail is refused while the employee is suspended or retired, stored mail is kept, and restore re-opens delivery.
+
 **Convergence.** Every `--apply` of suspend, restore or retire has an `operation_id`. State is
 `<identity state dir>/lifecycle-state.json` and `lifecycle-ledger.jsonl` (directory 0700, files 0600, secret-free), held under
 its own lock for the whole apply; the registry lock is never nested. Each provider-mutating step has a resource-scoped key such as

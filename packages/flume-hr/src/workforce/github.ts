@@ -307,11 +307,17 @@ const failureCode = (error: unknown): string => (statusOf(error) !== undefined ?
 
 type AppSession = { api: Transport; headers: { authorization: string } } | { code: "credential-unavailable" | "app-key-invalid" };
 
+/** The vault is asked for an App key once per reference per process; in memory only, never written anywhere. */
+const keyCache = new Map<string, string>();
+
 /** The App's private key from the vault, and an app JWT signed locally by @octokit/auth-app. No network. */
 async function appSession(facts: { appId: string; keyRef: string }, env: NodeJS.ProcessEnv): Promise<AppSession> {
-  let privateKey: string;
-  try { privateKey = readVaultSecret(facts.keyRef, "GitHub App private key"); }
-  catch { return { code: "credential-unavailable" }; }
+  let privateKey = keyCache.get(facts.keyRef);
+  if (privateKey === undefined) {
+    try { privateKey = readVaultSecret(facts.keyRef, "GitHub App private key"); }
+    catch { return { code: "credential-unavailable" }; }
+    keyCache.set(facts.keyRef, privateKey);
+  }
   const api = transport(githubApiBase(env), githubTimeoutMs(env));
   try {
     const jwt = (await createAppAuth({ appId: facts.appId, privateKey, request: api.request })({ type: "app" })).token;

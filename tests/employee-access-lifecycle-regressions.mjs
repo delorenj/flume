@@ -377,6 +377,7 @@ try {
   // -- 5. AC4: cross-harness receipts -------------------------------------------------------------------------------------
   {
     // Start from a clean audit window for the receipts story: a fresh hermes run and a fresh plain run, each requesting access and listing mail.
+    const sinceMark = new Date().toISOString();
     const hermes = await runAsync(["launch", "ada", "--", "chat"], { FIXTURE_REQUEST_ID: "hermes-request-0001" });
     assert.equal(hermes.status, 0, hermes.stdout + hermes.stderr);
     const hermesRun = JSON.parse(readFileSync(join(dir, "launch.json"), "utf8"));
@@ -428,6 +429,11 @@ try {
     assert.equal(json(await runAsync(["access", "receipts", "--json"]), 1).blockers[0].code, "invalid-request");
     const since = json(await runAsync(["access", "receipts", "--employee", "ada", "--since", new Date(Date.now() + 60_000).toISOString(), "--json"]));
     assert.equal(since.rows.length, 0);
+    const recent = json(await runAsync(["access", "receipts", "--employee", "ada", "--since", sinceMark, "--json"]));
+    assert.deepEqual([...recent.run_ids].sort(), [hermesRun.creds.run_id, plainRun.creds.run_id].sort(), "exactly the hermes and the plain run");
+    // The FLUME-39 evidence branch: an existing evidence path links the attribution.
+    const present = json(await runAsync(["access", "receipts", "--employee", "ada", "--json"], { FLUME_GATEWAY_EVIDENCE: dir }));
+    assert.equal(present.gateway.evidence_status, "present"); assert.equal(present.gateway.attribution, "linked");
     const human = await runAsync(["access", "receipts", "--employee", "ada"]);
     assert.match(human.stdout, /2 run\(s\)|run\(s\)/u);
 

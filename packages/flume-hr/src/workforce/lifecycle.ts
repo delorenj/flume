@@ -158,9 +158,15 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const prepared = prepare(employee);
     const blockers = [...revokeBlockers, ...prepared.blockers];
     if (prepared.block?.status === "retired" && command === "suspend") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone; it cannot be suspended" });
+    // A definition carrying a retired subject without being retired is a hand-copy (or a hand-edit): refused before anything is written.
+    if (prepared.block && prepared.block.status !== "retired" && state.tombstones[prepared.block.subject]) blockers.push({ code: "retired-terminal", detail: `subject ${prepared.block.subject} was retired ${state.tombstones[prepared.block.subject]!.retired_at}; it never returns to service` });
     let ctx: LifecycleContext | undefined;
     if (prepared.block) {
       ctx = contextOf(employee, prepared, state, env);
+      // An active employee starts a NEW episode. Records of steps restore cannot reverse (an Access token, a gateway token) or
+      // left by an out-of-band reactivation must not make the next suspension report already-done. Suspended -> retired and
+      // retries keep theirs.
+      if (prepared.block.status === "active") { for (const key of Object.keys(ctx.steps)) delete ctx.steps[key]; for (const key of Object.keys(ctx.captures)) delete ctx.captures[key]; }
       for (const name of revoke) blockers.push(...adapters[name].blockers(ctx, { command, revoke: true }));
     }
     return { prepared, blockers, ctx };
@@ -291,7 +297,7 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const reports: StepReport[] = planOf(ctx).map(step => stepReport(step, "planned", { detail: step.description }));
     reports.push({ key: "local-status:active", adapter: "local", action: "set-status", resource: employee, outcome: "planned", detail: "suspended -> active, written last" });
     const rows = await inventoryAll(ctx, adapters);
-    return { ok: true, ...base(first.prepared), blockers: [] as IdentityBlocker[], steps: reports, credentials: rows, ...revocationSummary(rows), not_reversed: notReversed(ctx), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
+    return { ok: true, ...base(first.prepared), blockers: [] as IdentityBlocker[], steps: reports, credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: notReversed(ctx), writes: [] as string[], note: "Preview only: nothing was written and no provider was mutated. Pass --apply." };
   }
 
   const operationId = randomUUID();
@@ -334,7 +340,7 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     const failed = reports.some(r => r.outcome === "unresolved");
     const rows = await inventoryAll(ctx, adapters);
     ledger({ event: "lifecycle.operation", phase: "finished", ok: !failed });
-    return { ok: !failed, ...base(now.prepared), operation_id: operationId, blockers: [] as IdentityBlocker[], steps: reports, ...summarize(reports), credentials: rows, ...revocationSummary(rows), not_reversed: notReversed(ctx), writes: [...writes], note: failed ? "Not restored: an unresolved step keeps the employee suspended. Re-run to continue." : "Restored: provider steps were reversed first and local status is active." };
+    return { ok: !failed, ...base(now.prepared), operation_id: operationId, blockers: [] as IdentityBlocker[], steps: reports, ...summarize(reports), credentials: rows, ...revocationSummary(rows), gateway_link: gatewayLink(env), not_reversed: notReversed(ctx), writes: [...writes], note: failed ? "Not restored: an unresolved step keeps the employee suspended. Re-run to continue." : "Restored: provider steps were reversed first and local status is active." };
   }, env);
 }
 

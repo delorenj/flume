@@ -42,6 +42,26 @@ flume access run rere-pm -- flume mail list
 
 Record the `run_id` the facade logged (`flume access receipts --employee rere-pm --json | jq .run_ids`).
 
+Snapshot the allowlist record, for the G2 comparison (GET only; token `op://DeLoSecrets/Cloudflare/globalAPIToken`, account and KV namespace from `FLUME_PROVISION_CONFIG`):
+
+```
+curl -s -H "Authorization: Bearer $(op read op://DeLoSecrets/Cloudflare/globalAPIToken)" \
+  "https://api.cloudflare.com/client/v4/accounts/<account_id>/storage/kv/namespaces/<kv_namespace_id>/values/allowlist%2Frererere%40agents.delo.sh" | jq -S . > /tmp/rererere-allowlist-before.json
+```
+
+Start ONE launched child that keeps its environment across the suspension (this is what G1 needs: the SAME run assertion, since a new `flume access run` is refused by the launcher before it reaches the facade):
+
+```
+mkfifo /tmp/rererere-canary.fifo
+flume access run rere-pm -- sh -c '
+  flume access request --service fixture --resource repo:alpha --permission read > /tmp/rererere-before-access.json
+  flume mail list > /tmp/rererere-before-mail.json
+  read go < /tmp/rererere-canary.fifo
+  flume access request --service fixture --resource repo:alpha --permission read --request-id after-suspend > /tmp/rererere-after-access.json
+  flume mail list > /tmp/rererere-after-mail.json
+' &
+```
+
 ## 2. Suspend (reversible adapters only)
 
 ```
@@ -51,15 +71,22 @@ flume identity suspend rere-pm --revoke github --apply --json  # sandbox install
 
 Do not pass `--revoke cloudflare_access` or `--revoke gateway`: those deletions cannot be undone by restore.
 
-Gate checks, with the run assertion from step 1 where the harness allows it, otherwise a new launch (which must now be refused):
+Gate checks. Release the launched child from step 1 so it retries with its SAME environment (same Access client and run assertion), then confirm both calls were denied:
 
 ```
-flume access run rere-pm -- flume access request --service fixture --resource repo:alpha --permission read   # launch refused: rere-pm is suspended
-flume access run rere-pm -- flume mail list                                                                  # launch refused
+echo go > /tmp/rererere-canary.fifo
+wait
+jq -r .code /tmp/rererere-after-access.json /tmp/rererere-after-mail.json   # employee-suspended, employee-suspended
+```
+
+A NEW launch must now be refused by the launcher itself (this is not G1, it is the second half of AC1):
+
+```
+flume access run rere-pm -- flume mail list    # Launch refused: rere-pm is suspended
 ```
 
 G1 and G2 are read from the facade audit (`outcome: employee-suspended`, events `access.request` and `mail.authorize`) and from the lifecycle ledger.
-Confirm the allowlist key through the Cloudflare API with the global token `op://DeLoSecrets/Cloudflare/globalAPIToken` (GET only).
+Confirm with the same GET as in step 1 that the allowlist key now answers 404.
 
 ## 3. Credentials read-back
 
@@ -79,14 +106,15 @@ flume access run rere-pm -- flume access request --service fixture --resource re
 flume access run rere-pm -- flume mail list
 ```
 
-G4: both succeed, the installation is un-suspended (`suspended_at` null), the allowlist record is identical to step 2.
+G4: both succeed, the installation is un-suspended (`suspended_at` null). G2: repeat the step 1 GET into `/tmp/rererere-allowlist-after.json` and compare: `diff <(jq -S . /tmp/rererere-allowlist-before.json) <(jq -S . /tmp/rererere-allowlist-after.json)` is empty.
 
 ## 5. Rotation (only if a spare credential exists)
 
 ```
-flume identity rotate rere-pm github --credential-ref op://DeLoSecrets/<new-item-uuid>/<new-field-id>   # preview
+flume identity rotate rere-pm github --credential-ref op://DeLoSecrets/<new-item-uuid>/<new-field-id>           # preview: writes nothing
+flume identity rotate rere-pm github --credential-ref op://DeLoSecrets/<new-item-uuid>/<new-field-id> --apply   # continuity reports `rotated` only after this
 flume access github-inspect --employee rere-pm
-flume identity continuity rere-pm --json                                                                   # github.credential_ref rotated, everything else stable
+flume identity continuity rere-pm --json                                                                           # github.credential_ref rotated, everything else stable
 ```
 
 Delete the old key in the GitHub App settings by hand (the old ref is reported `manual-action-required`), then `flume identity credentials rere-pm` must show the old probe unaffected and the new key `static-usable`.
@@ -94,8 +122,14 @@ No spare credential: record "rotation not canaried: no spare credential" and do 
 
 ## 6. Retire (disposable employee only)
 
+Retire is terminal. The disposable employee must first be provisioned and bound to THROWAWAY credentials, otherwise only `not-issued` paths run and nothing is proven:
+
 ```
 flume identity enroll <disposable> --apply
+flume identity provision <disposable> --apply                 # Access service token, routing rule, allowlist key, vault item
+flume identity bind <disposable> github --principal <throwaway-app-id> --instance <throwaway-installation-id> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
+flume identity bind <disposable> plane --principal <throwaway-plane-user-uuid> --instance https://<host>/<workspace> --credential-ref op://DeLoSecrets/<throwaway-item-uuid>/<field-id> --apply
+flume identity credentials <disposable> --json                # every row except gateway must be a real provider row, not not-issued
 flume identity retire <disposable> --revoke all --apply --json
 flume offboard <disposable> --apply
 flume identity enroll <another-post> --handle <disposable-handle>          # must answer handle-tombstoned

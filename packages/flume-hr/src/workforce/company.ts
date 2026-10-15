@@ -626,6 +626,10 @@ export async function rotateEmployeeCredential(employee: string, provider: strin
     else if (stat(target.path)?.isSymbolicLink()) problem("invalid-definition", `refusing symlinked definition ${target.path}`);
     else if (!target.block) problem("not-enrolled", `${employee} has no company identity; enroll first`);
     else if (target.block.status === "retired") problem("retired-terminal", "a retired identity never rotates a credential");
+    else {
+      const tombstone = readTombstones().find(t => t.subject === target.block!.subject);
+      if (tombstone) problem("subject-tombstoned", `subject ${tombstone.subject} was retired ${tombstone.retired_at}; it never rotates a credential`);
+    }
     const existing = target.block?.bindings?.[provider];
     if (target.block && target.block.status !== "retired" && !blockers.length && !existing) problem("no-provider-binding", `${employee} has no ${provider} binding to rotate`);
     const ref = input.credentialRef;

@@ -56,7 +56,10 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
         if (cf.mode.tokenDelete === "500-after-delete") return send(res, 500, { success: false, errors: [{ message: "boom after commit" }] });
         return ok(res, {});
       }
-      if (req.method === "GET" && url.pathname === `/zones/${zone}/email/routing/rules`) return ok(res, cf.rules);
+      if (req.method === "GET" && url.pathname === `/zones/${zone}/email/routing/rules`) {
+        const perPage = Number(url.searchParams.get("per_page") ?? 20), page = Number(url.searchParams.get("page") ?? 1);
+        return ok(res, cf.rules.slice((page - 1) * perPage, page * perPage), { result_info: { page, per_page: perPage, total_pages: Math.max(1, Math.ceil(cf.rules.length / perPage)), total_count: cf.rules.length } });
+      }
       const rule = url.pathname.match(new RegExp(`^/zones/${zone}/email/routing/rules/([^/]+)$`));
       if (rule) {
         const index = cf.rules.findIndex((r) => r.id === rule[1]);
