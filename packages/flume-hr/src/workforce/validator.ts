@@ -54,6 +54,12 @@ export const COMPANY_MAIL_DOMAIN = "agents.delo.sh";
 /** RFC 2142 mailbox names: never a person's handle. */
 export const RESERVED_HANDLES = new Set(["abuse", "ftp", "hostmaster", "info", "marketing", "news", "noc", "postmaster", "sales", "security", "support", "usenet", "uucp", "webmaster", "www"]);
 
+/** Per-provider shape of `native_actor_id`: a GitHub bot user ID is digits, a Plane user ID a lowercase UUID. */
+const ACTOR_SHAPES: Record<string, RegExp> = {
+  github: /^\d+$/u,
+  plane: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u,
+};
+
 export function parseNamedAgentYaml(text: string): unknown {
   const doc = YAML.parseDocument(text, { uniqueKeys: true });
   if (doc.errors.length) throw new NamedAgentValidationError(`Failed to parse named agent YAML: ${doc.errors[0]!.message}`);
@@ -94,6 +100,12 @@ export function validateCompanyIdentity(input: unknown): CompanyIdentity {
   const block = structural(input, validateCompany) as CompanyIdentity;
   if (block.email !== `${block.handle}@${COMPANY_MAIL_DOMAIN}`) throw new NamedAgentValidationError(`company_identity.email must be ${block.handle}@${COMPANY_MAIL_DOMAIN}`);
   if (RESERVED_HANDLES.has(block.handle)) throw new NamedAgentValidationError(`company_identity.handle "${block.handle}" is an RFC 2142 role mailbox`);
+  // The schema admits either shape; the provider decides which one is valid (FLUME-52).
+  for (const [provider, binding] of Object.entries(block.bindings ?? {})) {
+    if (binding.native_actor_id === undefined) continue;
+    const shape = ACTOR_SHAPES[provider];
+    if (shape && !shape.test(binding.native_actor_id)) throw new NamedAgentValidationError(`company_identity.bindings.${provider}.native_actor_id does not match the ${provider} actor ID format`);
+  }
   return block;
 }
 export interface RoleDeclaration {

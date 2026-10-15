@@ -547,6 +547,28 @@ try {
     pass("the client refuses outside a launcher or a redirect, an invalid configuration refuses to serve, other paths, methods and unparseable targets are refused without a crash");
   }
 
+  // -- A Plane credential is a static PAT: the facade never grants or expires one (FLUME-52) --------------
+  {
+    writeConfig(grants([{ subject: subject.ada, service: "plane", resource: "33god/TEST", permissions: ["issues:write"], max_lifetime_seconds: 3600 }]));
+    const before = { ledger: ledger().length, idempotency: readFileSync(join(state, "idempotency.json"), "utf8") };
+    for (const payload of [body({ service: "plane", resource: "33god/TEST", permissions: ["issues:write"] }), body({ service: "plane", resource: "33god/TEST", permissions: ["issues:write"], lifetime_seconds: 60 }), body({ service: "plane", resource: "33god/OTHER", permissions: ["issues:write"] })]) {
+      const denied = await direct({ clientId: CLIENT.ada }, payload, adaRun);
+      assert.equal(denied.status, 403, JSON.stringify(denied.body));
+      assert.equal(denied.body.status, "denied");
+      assert.equal(denied.body.code, "static-provider-credential");
+      assert.equal(denied.body.credential_semantics.static, true);
+      assert.equal(denied.body.credential_semantics.type, "plane_personal_access_token");
+      assert.equal(denied.body.credential_semantics.expiry.observable, false);
+      assert.ok(denied.body.credential_semantics.revocation.native);
+      for (const key of ["expires_at", "grant_id", "lifetime_seconds", "credential"]) assert.equal(denied.body[key], undefined, key);
+    }
+    assert.equal(ledger().length, before.ledger, "no ledger line for a plane request");
+    assert.equal(readFileSync(join(state, "idempotency.json"), "utf8"), before.idempotency, "a denied plane request is audit-only");
+    assert.ok(lines("audit.jsonl").some((l) => l.outcome === "static-provider-credential" && l.service === "plane" && !l.grant_id && !l.expires_at));
+    writeConfig();
+    pass("a plane request is denied static-provider-credential even with a matching grant: semantics, no expires_at or grant, audit line only");
+  }
+
   // -- Readiness stays unproven --------------------------------------------------------------
   {
     const report = json(run(["identity", "readiness", "--json"], { CLOUDFLARE_API_TOKEN: "" }));

@@ -471,7 +471,7 @@ try {
     assert.equal(quiet.status, 0, quiet.stderr);
     const report = JSON.parse(quiet.stdout);
     assert.equal(report.ready, false);
-    assert.deepEqual(Object.keys(report.checks), ["cloudflare_plan", "mail_dns_conflicts", "service_token_capacity", "access_assertion_policy", "github_sandbox_installation", "github_native_authorship", "provider_account_rights"]);
+    assert.deepEqual(Object.keys(report.checks), ["cloudflare_plan", "mail_dns_conflicts", "service_token_capacity", "access_assertion_policy", "github_sandbox_installation", "github_native_authorship", "plane_native_identity", "provider_account_rights"]);
     for (const check of Object.values(report.checks)) { assert.equal(check.status, "unproven"); assert.equal(check.ready, false); assert.equal(check.cost, null); }
     assert.equal(report.probes.cloudflare, "not_requested");
     assert.equal(cf.seen.length, 0, "no probe flag means zero network");

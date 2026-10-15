@@ -31,7 +31,7 @@
         "instance": {"type": "string", "minLength": 1},
         "credential_ref": {"type": "string", "pattern": "^op://"},
         "attribution_mode": {"enum": ["native", "shared_bot_attributed"]},
-        "native_actor_id": {"type": "string", "pattern": "^\\d+$"}
+        "native_actor_id": {"type": "string", "pattern": "^(\\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", "description": "Provider-issued actor ID adopted by `flume identity adopt-actor`: github = the bot user's numeric ID, plane = the lowercase native user UUID. The provider decides which is valid at runtime."}
       }
     }
   }

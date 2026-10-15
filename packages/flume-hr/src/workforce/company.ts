@@ -22,6 +22,7 @@ import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
 import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
+import { appendPlaneReceipt, isBoardArgument, planeBindingOf, planeBindingProblems, planeCredentialReport, planeEnrollmentPrerequisites, planeEvidence, verifyBoardViaPx, type PlaneBoardProof } from "./plane";
 import { withRegistryLock } from "./role";
 import { COMPANY_MAIL_DOMAIN, RESERVED_HANDLES, parseNamedAgentYaml, validateCompanyIdentity, validateNamedAgent, validateNamedAgentSchema } from "./validator";
 import type { CompanyIdentity, CompanyIdentityBinding, CompanyIdentityStatus } from "./types";
@@ -31,8 +32,8 @@ const EMPLOYEE = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 const STATUSES: readonly CompanyIdentityStatus[] = ["active", "suspended", "retired"];
 export const PROVIDER_REVOCATION_NOTE = "Local employment state only: provider access was not revoked (FLUME-53 owns provider revocation).";
 
-export interface IdentityBlocker { code: string; detail: string; path?: string }
-export interface ReconcileCandidate { provider: string; principal: string; person?: string; post?: string; description?: string; state: "unadopted" | "bound"; bound_at?: string }
+export interface IdentityBlocker { code: string; detail: string; path?: string; provider_code?: string; board?: string }
+export interface ReconcileCandidate { provider: string; principal: string; person?: string; post?: string; description?: string; adoptable?: boolean; disposition?: string; source?: string; state: "unadopted" | "bound"; bound_at?: string }
 
 /** One known definition, as the census read it. */
 export interface IdentityDefinition {
@@ -53,7 +54,7 @@ export interface IdentityDefinition {
 
 export interface IdentityCensus { home: string; registryPath: string; postIds: string[]; definitions: IdentityDefinition[] }
 
-export interface IdentityOptions { apply?: boolean; handle?: string }
+export interface IdentityOptions { apply?: boolean; handle?: string; /** adopt-actor plane: the boards to verify; every one must pass. */ boards?: string[] }
 
 function stat(path: string) {
   try { return lstatSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
@@ -167,17 +168,34 @@ function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: s
   return blockers;
 }
 
-function candidates(target: IdentityDefinition, census: IdentityCensus): { reconcile: ReconcileCandidate[]; warnings: string[] } {
+function candidateInventory(): { list: Array<Omit<ReconcileCandidate, "state">>; warnings: string[] } {
   const path = process.env.FLUME_IDENTITY_CANDIDATES || join(resolveFlumeRoot(), "contracts", "company-identity-candidates.yaml");
-  if (!existsSync(path)) return { reconcile: [], warnings: [`candidate inventory not found: ${path}`] };
+  if (!existsSync(path)) return { list: [], warnings: [`candidate inventory not found: ${path}`] };
   const inventory = YAML.parse(readFileSync(path, "utf8")) as { candidates?: Array<Omit<ReconcileCandidate, "state">> } | null;
+  return { list: inventory?.candidates ?? [], warnings: [] };
+}
+
+function candidates(target: IdentityDefinition, census: IdentityCensus): { reconcile: ReconcileCandidate[]; warnings: string[] } {
+  const { list, warnings } = candidateInventory();
   const reconcile: ReconcileCandidate[] = [];
-  for (const candidate of inventory?.candidates ?? []) {
+  for (const candidate of list) {
     if (!(target.person && candidate.person === target.person) && !(candidate.post && target.posts.includes(candidate.post))) continue;
     const holder = census.definitions.find(d => Object.entries(d.block?.bindings ?? {}).some(([provider, b]) => provider === candidate.provider && b.principal === candidate.principal));
     reconcile.push({ ...candidate, ...(holder ? { state: "bound", bound_at: holder.path } : { state: "unadopted" }) });
   }
-  return { reconcile, warnings: [] };
+  return { reconcile, warnings };
+}
+
+/** A principal the inventory marks `adoptable: false` is a machine-blocker for ANY employee, whoever it was listed under. */
+function staleCandidate(provider: string, principal: string | undefined): IdentityBlocker | undefined {
+  if (!principal) return undefined;
+  // Fail closed: a gate that cannot read its inventory must refuse, never pass.
+  let inventory: ReturnType<typeof candidateInventory>;
+  try { inventory = candidateInventory(); } catch (error) { return { code: "candidate-inventory-unavailable", detail: `the candidate inventory is unreadable: ${(error as Error).message.split("\n")[0]}` }; }
+  if (inventory.warnings.length) return { code: "candidate-inventory-unavailable", detail: inventory.warnings[0]! };
+  const hit = inventory.list.find(candidate => candidate.provider === provider && String(candidate.principal).toLowerCase() === principal.toLowerCase() && candidate.adoptable === false);
+  if (!hit) return undefined;
+  return { code: "stale-candidate", detail: `${principal} is a refused ${provider} candidate: ${hit.disposition ?? "not adoptable"}${hit.source ? ` (source: ${hit.source})` : ""}` };
 }
 
 function renderBlock(block: CompanyIdentity): string {
@@ -367,11 +385,27 @@ export async function bindProvider(employee: string, provider: string, input: Bi
   const problem = (code: string, detail: string) => blockers.push({ code, detail });
   if (!input.principal) problem("invalid-binding", "--principal is required");
   if (input.attributionMode !== undefined && !["native", "shared_bot_attributed"].includes(input.attributionMode)) problem("invalid-binding", "--attribution-mode must be native or shared_bot_attributed");
+  let enrollment: { prerequisites: string[] } | undefined;
   if (provider === "github") {
     for (const detail of githubBindingProblems({ principal: input.principal, instance: input.instance, credential_ref: input.credentialRef })) if (!(detail.startsWith("principal") && !input.principal)) problem("invalid-binding", detail);
     if (input.credentialRef) { const detail = githubCredentialRefProblem(input.credentialRef); if (detail) problem("invalid-credential-ref", detail); }
+  } else if (provider === "plane") {
+    // FLUME-52: principal = the native Plane user UUID, instance = https://<host>/<workspace>, credential_ref = the employee's own PAT by item UUID and field ID.
+    for (const detail of planeBindingProblems({ principal: input.principal, instance: input.instance, attribution_mode: input.attributionMode })) {
+      if (detail.startsWith("principal") && !input.principal) continue;
+      if (detail.startsWith("a plane binding is native-attributed") && !["native", "shared_bot_attributed"].includes(input.attributionMode ?? "native")) continue;
+      problem("invalid-binding", detail);
+    }
+    if (!input.credentialRef) {
+      problem("manual-enrollment-required", "no --credential-ref: Flume cannot create a Plane user or mint its token. The employee enrolls by hand (see enrollment.prerequisites), then binds by reference");
+      let handle: string | undefined;
+      try { handle = resolveEmployee(identityCensus(), employee).block?.handle; } catch { /* the bind itself reports an unknown employee */ }
+      enrollment = { prerequisites: planeEnrollmentPrerequisites(handle) };
+    } else { const detail = githubCredentialRefProblem(input.credentialRef); if (detail) problem("invalid-credential-ref", detail); }
+    const stale = staleCandidate("plane", input.principal);
+    if (stale) blockers.push(stale);
   } else if (input.credentialRef !== undefined && !input.credentialRef.startsWith("op://")) problem("invalid-credential-ref", "credential_ref must be an op:// reference");
-  if (blockers.length) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], employee, provider, apply: Boolean(options.apply) };
+  if (blockers.length) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], employee, provider, apply: Boolean(options.apply), ...(enrollment ? { enrollment } : {}) };
   const binding: CompanyIdentityBinding = {
     principal: input.principal!,
     ...(input.instance ? { instance: input.instance } : {}),
@@ -388,11 +422,12 @@ export async function bindProvider(employee: string, provider: string, input: Bi
  * `native_actor_id` on that one binding. Preview unless `--apply`.
  */
 export async function adoptNativeActor(employee: string, provider: string, options: IdentityOptions = {}) {
+  if (provider === "plane") return adoptPlaneActor(employee, options);
   const run = async () => {
     const census = identityCensus();
     const target = resolveEmployee(census, employee);
     const blockers: IdentityBlocker[] = [];
-    if (provider !== "github") blockers.push({ code: "unsupported-provider", detail: `adopt-actor supports github only, not "${provider}"` });
+    if (provider !== "github") blockers.push({ code: "unsupported-provider", detail: `adopt-actor supports github and plane, not "${provider}"` });
     if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
     else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
@@ -428,10 +463,95 @@ export async function adoptNativeActor(employee: string, provider: string, optio
   return options.apply ? withRegistryLock(environment().registryPath, run) : run();
 }
 
+/** The registry's own `plane.member_id` for this employee's posts, when it names someone else. Reported, never written. */
+function legacyRegistryWarnings(target: IdentityDefinition, census: IdentityCensus, principal: string): string[] {
+  let rows: Record<string, Record<string, unknown>>;
+  try { rows = registryRows(census.registryPath); } catch { return []; }
+  const warnings: string[] = [];
+  for (const post of target.posts) {
+    const plane = rows[post]?.plane as { member_id?: unknown } | undefined;
+    if (typeof plane?.member_id === "string" && plane.member_id !== principal) {
+      warnings.push(`legacy-registry-principal: registry agents.${post}.plane.member_id is ${plane.member_id}, not the native Plane user ${principal}; the registry belongs to another authority and is not written here`);
+    }
+  }
+  return warnings;
+}
+
+/**
+ * `flume identity adopt-actor <employee> plane --board <b...>` (FLUME-52): have PILOT verify the employee's plane binding
+ * (`px identity verify`, as the employee's own key, once per board) and stamp `native_actor_id` = the verified native user
+ * ID. Every board must pass or nothing is written. Only an enrolled, active employee is adopted, and every gate fires before
+ * any px call. Flume opens no Plane connection of its own. Preview unless `--apply`; the receipt is appended only on apply.
+ */
+async function adoptPlaneActor(employee: string, options: IdentityOptions) {
+  const run = async () => {
+    const census = identityCensus();
+    const target = resolveEmployee(census, employee);
+    const blockers: IdentityBlocker[] = [];
+    if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
+    else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+    else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
+    else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
+    else if (target.block.status !== "active") blockers.push({ code: `employee-${target.block.status}`, detail: `${employee} is ${target.block.status}; only an active employee is adopted` });
+    const evidence = planeEvidence();
+    const base = { employee, ...summary(target), apply: Boolean(options.apply), provider: "plane", evidence };
+    const none = { ok: false, changed: false, actor: null, binding: null, writes: [] as string[], ...base };
+    if (blockers.length || !target.block) return { ...none, blockers };
+    const block = target.block, existing = block.bindings?.plane;
+    const boards = [...new Set(options.boards ?? [])];
+    if (!boards.length) blockers.push({ code: "invalid-request", detail: "pass at least one --board <identifier|uuid>; board membership is verified per board and is not stored on the binding" });
+    for (const board of boards) if (!isBoardArgument(board)) blockers.push({ code: "invalid-request", detail: `--board "${board}" must be a board identifier or UUID` });
+    const bound = planeBindingOf(existing);
+    if ("code" in bound || !existing) {
+      const code = "code" in bound ? bound.code : "no-provider-binding";
+      blockers.push({ code, detail: "code" in bound ? bound.detail : "no plane binding" });
+      return { ...none, blockers, ...(code === "no-provider-binding" ? { enrollment: { prerequisites: planeEnrollmentPrerequisites(block.handle) } } : {}) };
+    }
+    const facts = bound.facts;
+    const stale = staleCandidate("plane", existing.principal);
+    if (stale) blockers.push(stale);
+    if (existing.native_actor_id !== undefined && existing.native_actor_id !== existing.principal) {
+      blockers.push({ code: "native-actor-conflict", detail: `${employee} already adopted actor ${existing.native_actor_id} but is bound to ${existing.principal}. Rotation is deliberate — remove native_actor_id by hand first` });
+    }
+    for (const other of census.definitions) {
+      if (other.path === target.path || other.missing || other.problem) continue;
+      if (other.block?.bindings?.plane?.native_actor_id === existing.principal) {
+        blockers.push({ code: "native-actor-duplicate", detail: `actor ${existing.principal} is already adopted at ${other.path}; two employees are never one native actor`, path: other.path });
+      }
+    }
+    if (blockers.length) return { ...none, binding: existing, blockers };
+
+    // Every gate above fired without a px call. From here Pilot decides, board by board.
+    const proofs: PlaneBoardProof[] = [];
+    for (const board of boards) {
+      const checked = verifyBoardViaPx(facts, block.handle, block.email, board);
+      if ("proof" in checked) { proofs.push(checked.proof); continue; }
+      blockers.push(checked.blocker);
+      if (checked.fatal) break;
+    }
+    if (blockers.length) return { ...none, binding: existing, blockers, boards: proofs.map(proof => proof.board) };
+    const first = proofs[0]!;
+    const verified = { ...base, actor: { id: first.native_user_id, email: first.email, workspace: first.workspace.slug }, boards: proofs.map(proof => proof.board), workspace: first.workspace, plane: first.plane, credential: first.credential, shared_key_fallback: false as const, warnings: legacyRegistryWarnings(target, census, existing.principal) };
+    const changed = existing.native_actor_id !== existing.principal;
+    const binding: CompanyIdentityBinding = { ...existing, native_actor_id: existing.principal };
+    const next: CompanyIdentity = { ...block, bindings: { ...(block.bindings ?? {}), plane: binding } };
+    const writes = options.apply && changed ? await writeDefinition(target, next) : [];
+    const receipt = options.apply ? appendPlaneReceipt({
+      kind: "plane.adopt", evidence, employee, handle: block.handle, subject: block.subject, instance: facts.instance, principal: existing.principal, native_actor_id: existing.principal, changed,
+      credential_ref: facts.keyRef, boards: proofs.map(proof => ({ id: proof.board.id, identifier: proof.board.identifier, name: proof.board.name })), workspace: first.workspace, plane: first.plane, credential: first.credential, shared_key_fallback: false,
+    }) : undefined;
+    return { ok: true, changed, binding, blockers, writes, ...(receipt ? { receipt } : {}), ...verified };
+  };
+  return options.apply ? withRegistryLock(environment().registryPath, run) : run();
+}
+
 /** Read-only: legacy (unenrolled) definitions stay readable. */
 export function showEmployeeIdentity(employee: string) {
   const target = resolveEmployee(identityCensus(), employee);
   const blockers: IdentityBlocker[] = target.missing ? [{ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path }]
     : target.problem ? [{ code: "invalid-definition", detail: target.problem, path: target.path }] : [];
-  return { ok: blockers.length === 0, employee, ...summary(target), enrolled: Boolean(target.block), identity: target.block, fields: target.fields, blockers };
+  const plane = target.block?.bindings?.plane;
+  // A static Plane PAT: what Pilot last verified, else the honest "not verified, expiry not observable".
+  const credentials = plane && target.block ? { plane: planeCredentialReport(target.block.subject, plane) } : undefined;
+  return { ok: blockers.length === 0, employee, ...summary(target), enrolled: Boolean(target.block), identity: target.block, fields: target.fields, ...(credentials ? { credentials } : {}), blockers };
 }

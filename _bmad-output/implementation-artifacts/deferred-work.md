@@ -24,3 +24,11 @@
 - source_spec: `spec-flume-32-hire-proof.md` and `spec-flume-15-heartbeat-retirement.md`
   summary: Update the stale fleet-status test that assumes three classification policy domains.
   evidence: Both saved pristine baselines fail the same assertion. The October 2 shared-board exceptions already declare project-registry, while fleet-status-regressions.mjs still expects only bloodbank, profile and systemd. No failure was quarantined and the production contract was preserved.
+
+### DW-1: specialist-hire-regressions fails on a test-side non-recursive rmSync of a desk skill directory (ERR_FS_EISDIR), unrelated to this diff.
+origin: spec-deferred c5abd1248305
+location: tests/specialist-hire-regressions.mjs:49
+source_spec: `FLUME-52-bind-employees-to-verified-native-plane-identities.md`
+severity: medium
+reason: The FLUME-52 diff touches no hire, onboard or skill code. The dev session reported the identical EISDIR failure in the untouched main checkout; a baseline (2e2b1b8) worktree run failed earlier at line 32 because no dist was built there, so that cross-check was inconclusive. Settle by running `node scripts/run-tests.mjs specialist-hire` on a built main checkout.
+status: open

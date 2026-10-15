@@ -34,6 +34,7 @@ import { effectiveRecall, readRecency, touchProject } from "./workforce/recency"
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, startAccessServer } from "./workforce/access";
 import { githubApiBase, githubEvidence } from "./workforce/github";
 import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
+import { formatPlaneCommentResult, verifyPlaneComments } from "./workforce/plane";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -205,6 +206,8 @@ program
 // on the definition the employee already owns. `enroll` and `status` preview
 // unless `--apply`; a blocker writes nothing and exits 1.
 
+const collect = (value: string, previous: string[] = []) => [...previous, value];
+
 const identityCmd = program
   .command("identity")
   .description("Company identity: one subject and address per employee, on the definition they already own");
@@ -227,9 +230,14 @@ function formatIdentityResult(result: Record<string, any>): string {
   if (result.from !== undefined) lines.push(`  status ${result.from ?? "none"} -> ${result.to}${result.apply ? "" : " (preview)"}`);
   if (result.changed !== undefined && result.ok) lines.push(`  ${result.changed ? (result.apply ? "written" : "would change (preview; pass --apply)") : "no change"}`);
   for (const write of result.writes ?? []) lines.push(`  wrote ${write}`);
-  for (const blocker of result.blockers ?? []) lines.push(`  ✗ ${blocker.code}: ${blocker.detail}`);
+  if (result.receipt) lines.push(`  receipt ${result.receipt}`);
+  for (const board of result.boards ?? []) lines.push(`  board ${board.identifier} (${board.id}) verified by Pilot`);
+  if (result.actor?.id && result.provider === "plane") lines.push(`  native user ${result.actor.id} (${result.actor.email}) evidence ${result.evidence}${result.credential ? `; static ${result.credential.type}, expiry not observable` : ""}`);
+  for (const step of result.enrollment?.prerequisites ?? []) lines.push(`  enroll: ${step}`);
+  if (result.credentials?.plane) lines.push(`  plane credential: static ${result.credentials.plane.type}, expiry observable ${String(result.credentials.plane.expiry?.observable)}, ${result.credentials.plane.verified ? "verified by Pilot" : "not verified"}`);
+  for (const blocker of result.blockers ?? []) lines.push(`  ✗ ${blocker.code}: ${blocker.detail}${blocker.provider_code ? ` [px ${blocker.provider_code}${blocker.board ? ` on ${blocker.board}` : ""}]` : ""}`);
   for (const [name, cap] of Object.entries(result.capabilities ?? {}) as [string, any][]) lines.push(`  ${name}: ${cap.action} — ${cap.detail}`);
-  for (const candidate of result.reconcile ?? []) lines.push(`  reconcile ${candidate.provider} ${candidate.principal} (${candidate.state}) ${candidate.description ?? ""}`.trimEnd());
+  for (const candidate of result.reconcile ?? []) lines.push(`  reconcile ${candidate.provider} ${candidate.principal} (${candidate.adoptable === false ? "not adoptable" : candidate.state}) ${candidate.description ?? ""}${candidate.adoptable === false && candidate.disposition ? ` — ${candidate.disposition}` : ""}`.trimEnd());
   for (const warning of result.warnings ?? []) lines.push(`  ! ${warning}`);
   for (const [name, check] of Object.entries(result.checks ?? {}) as [string, any][]) {
     lines.push(`${name}: ${check.status}, not ready — ${check.detail}`);
@@ -284,10 +292,10 @@ identityCmd
 identityCmd
   .command("bind")
   .argument("<employee>", "Registry id, unhired specialist, or person name")
-  .argument("<provider>", "Provider key, e.g. github")
-  .description("FLUME-50: bind one provider principal to an enrolled employee, by reference only (preview unless --apply). github: principal = App ID, instance = installation ID, credential-ref = op://<vault>/<item-uuid>/<field-id> of the App private key")
-  .option("--principal <id>", "Provider principal (github: the numeric App ID)")
-  .option("--instance <id>", "Provider instance (github: the numeric installation ID)")
+  .argument("<provider>", "Provider key, e.g. github or plane")
+  .description("FLUME-50/52: bind one provider principal to an enrolled employee, by reference only (preview unless --apply). github: principal = App ID, instance = installation ID, credential-ref = op://<vault>/<item-uuid>/<field-id> of the App private key. plane: principal = the native Plane user UUID, instance = https://<host>/<workspace>, credential-ref = the employee's own PAT by item UUID and field ID (Flume never creates a Plane user or token)")
+  .option("--principal <id>", "Provider principal (github: the numeric App ID; plane: the native user UUID)")
+  .option("--instance <id>", "Provider instance (github: the numeric installation ID; plane: https://<host>/<workspace-slug>)")
   .option("--credential-ref <ref>", "op:// reference to the credential; never a value")
   .option("--attribution-mode <mode>", "native | shared_bot_attributed")
   .option("--apply", "Write the binding (default is a preview)")
@@ -299,12 +307,13 @@ identityCmd
 identityCmd
   .command("adopt-actor")
   .argument("<employee>", "Registry id, unhired specialist, or person name")
-  .argument("<provider>", "Provider key; github")
-  .description("FLUME-51: record the native bot user ID of the employee's own GitHub App on their github binding, as GitHub reports it (preview unless --apply). Never mints a token")
+  .argument("<provider>", "Provider key; github or plane")
+  .description("FLUME-51/52: record the native actor ID on the employee's binding, as the provider reports it (preview unless --apply). github: the bot user ID of the employee's own App. plane: the native user UUID, verified by Pilot (`px identity verify`) on every --board. Never mints a token")
+  .option("--board <board>", "plane: board identifier or UUID to verify membership on; repeatable, every board must pass", collect)
   .option("--apply", "Write native_actor_id (default is a preview)")
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, provider: string, options) => {
-    await identityResult(() => adoptNativeActor(employee, provider, { apply: Boolean(options.apply) }), options.json);
+    await identityResult(() => adoptNativeActor(employee, provider, { apply: Boolean(options.apply), boards: options.board }), options.json);
   });
 
 identityCmd
@@ -452,8 +461,6 @@ const commentCmd = program
   .command("comment")
   .description("Leave and verify GitHub comments as the launched employee; authorship is whatever GitHub reads back, never text");
 
-const collect = (value: string, previous: string[] = []) => [...previous, value];
-
 commentCmd
   .command("post")
   .argument("<repository>", "owner/repo (must be the repository the token was granted for)")
@@ -490,6 +497,20 @@ commentCmd
     guardBrokenPipe();
     const result = await verifyComments({ repository, comments: options.comment });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatCommentResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+commentCmd
+  .command("verify-plane")
+  .argument("<ref>", "ticket ref, e.g. TEST-14")
+  .description("FLUME-52: read a ticket's comments through Pilot (`px show`) and report whether the named employees' own distinct native Plane users wrote them (read-only on Plane; receipt only with --apply)")
+  .requiredOption("--comment <employee:comment-id>", "<employee>:<comment uuid>, repeatable", collect)
+  .option("--apply", "Append a receipt to plane-verifications.jsonl (default is read-only)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (ref: string, options) => {
+    guardBrokenPipe();
+    const result = verifyPlaneComments({ ref, comments: options.comment, apply: Boolean(options.apply) });
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatPlaneCommentResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
   });
 
