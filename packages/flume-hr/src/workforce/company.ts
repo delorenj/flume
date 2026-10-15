@@ -335,7 +335,9 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     const block = target.block;
     const existing = block.bindings?.[provider];
     if (existing) {
-      if (isDeepStrictEqual(existing, binding)) return { ok: true, changed: false, binding: existing, blockers, writes: [] as string[], ...base };
+      // `native_actor_id` is adopted afterwards (FLUME-51), so an identical rebind must still be a no-op.
+      const { native_actor_id: _adopted, ...requested } = existing;
+      if (isDeepStrictEqual(requested, binding)) return { ok: true, changed: false, binding: existing, blockers, writes: [] as string[], ...base };
       return { ok: false, changed: false, binding: existing, blockers: [...blockers, { code: "binding-conflict", detail: `${provider} is already bound to principal ${existing.principal}; rotation is deliberate — unbind by hand first` }], writes: [] as string[], ...base };
     }
     const next: CompanyIdentity = { ...block, bindings: { ...(block.bindings ?? {}), [provider]: binding } };

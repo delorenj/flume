@@ -202,6 +202,11 @@ and nothing else. Re-adopting the same ID is a no-op; a different stored ID is
 unenrolled or retired employee is refused. A login is recorded in the report but never
 compared: it is mutable.
 
+**Deploy first.** The binding schema is closed, so a facade running a build without
+`native_actor_id` reads an adopted definition as invalid and answers that employee
+`unknown-client`. Deploy this build and restart `flume-access.service` on every host
+that runs the facade *before* `adopt-actor --apply`.
+
 **2. Post.** `flume comment post <owner/repo> <number> (--body | --body-file) [--marker k]`
 is an `--exec` consumer, so the token it uses is the one just granted:
 

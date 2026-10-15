@@ -430,6 +430,14 @@ try {
     assert.equal((await flume(["identity", "adopt-actor", "nobody-pm", "github", "--json"], 1)).ok, false);
     assert.equal(gh.since(mark2).length, 0, "no refusal reached GitHub");
     assert.equal(definitionText("fay").includes("native_actor_id"), false, "fay stays un-adopted for the not-adopted scenarios");
+    // an identical rebind of an adopted binding stays idempotent; a different principal is still a conflict
+    const rebindArgs = ["identity", "bind", "ada-pm", "github", "--principal", APPS.ada.id, "--instance", APPS.ada.installation, "--credential-ref", refFor("ada"), "--attribution-mode", "native", "--apply", "--json"];
+    const rebind = json(run(rebindArgs));
+    assert.equal(rebind.changed, false, "the same bind after adoption is a no-op");
+    assert.equal(rebind.binding.native_actor_id, String(APPS.ada.bot), "the stored binding keeps native_actor_id");
+    assert.equal(definitionText("ada").includes(`native_actor_id: "${APPS.ada.bot}"`), true);
+    const differentBind = json(run(rebindArgs.map((arg) => (arg === APPS.ada.id ? "1099" : arg))), 1);
+    assert.ok(differentBind.blockers.some((b) => b.code === "binding-conflict"), "a different principal is still binding-conflict");
     pass("adopt-actor previews by default, reads the slug with the App JWT and the public bot user, writes only native_actor_id under the lock, and blocks conflicts, duplicates, non-Bots and bad employees");
   }
 
