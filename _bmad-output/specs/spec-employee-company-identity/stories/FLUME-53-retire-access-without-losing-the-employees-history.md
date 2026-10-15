@@ -2,10 +2,10 @@
 title: 'FLUME-53 — Retire access without losing the employee''s history'
 type: 'feature'
 created: '2026-10-14'
-status: 'in-review'
+status: 'done'
 baseline_revision: '3169190f91400be100a83b81e9042e1b6975db85'
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/_bmad-output/planning-artifacts/employee-company-identity/epics.md'
   - '{project-root}/docs/employee-access.md'
@@ -13,7 +13,24 @@ context:
   - '/home/delorenj/code/33GOD/agents-facade/src/index.ts'
   - '/home/delorenj/docker/stacks/ai/newapi/ops/gateway-tokens.py'
 warnings: [oversized]
-deferred: []
+deferred:
+  - summary: >-
+      `flume identity status <employee> retired` writes no tombstone, so after `flume offboard` the handle, email, subject and bindings can be reissued.
+    evidence: |-
+      Only `flume identity retire` (lifecycle.ts suspendOrRetire) records a tombstone. The status command is the pre-existing FLUME-47 path,
+      and FLUME-53's intent forbids changing `flume identity status`. Fix in a follow-up: have the status transition to `retired`
+      record the tombstone, or refuse it and point at `flume identity retire`.
+    location: >-
+      packages/flume-hr/src/workforce/company.ts setEmployeeStatus
+    severity: medium
+  - summary: >-
+      The AGENTS.md and README command lines say "retire adds … --revoke all", which can read as if retire revokes provider access by default.
+    evidence: |-
+      Retire revokes only the adapters named with `--revoke` (or all three with `--revoke all`); without them Access, GitHub and the
+      gateway stay usable and are reported `manual-action-required`. The fix edits an agent-context file (AGENTS.md), so it is deferred.
+    location: >-
+      AGENTS.md, README.md (identity suspend|retire line)
+    severity: low
 ---
 
 <intent-contract>
@@ -272,6 +289,72 @@ Mail authorize, the mail client, rotation, tombstones and receipts:
 
 ## Review Triage Log
 
+### 2026-10-15 — Review pass
+- verdicts: 62 findings — high 0, medium 20, low 32, false 10, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` (blind) Restore never clears done keys for Access/gateway deletions, so after a FLUME-39 re-mint a later `suspend --revoke gateway` reports already-done — fixed: a suspend/retire of an `active` employee starts a new episode and drops the subject's step records and captures (lifecycle.ts assess); test re-revokes a re-minted token.
+  - `[low]` `[reject]` (blind) `continuity` exits 0 when a comment is `not-recorded` — the matrix defines `not-recorded` as a reported status, not a failure; changing it changes the specified semantics.
+  - `[low]` `[reject]` (blind) No way to re-baseline an intentional identity change — the intent defines principal/handle drift as `broken`; an accept path is new public surface.
+  - `[medium]` `[patch]` (blind) Most fault modes in the fixtures are unused (restore KV PUT failure, routing PUT, GitHub put, concurrency) — fixed with the restore fail-closed, read-back no-op and concurrent-apply tests (same root as the verification-gap rows).
+  - `[low]` `[reject]` (blind) Mail path tested against a hand-written Worker double — the intent mandates the in-test double and forbids editing agents-facade; the real Worker is gate G0 of the live canary.
+  - `[false]` `[reject]` (blind) `handleMail` validates the body before status — the spec requires the same pipeline order as `/v1/access/requests` (body, then status); a 400 still counts as a denial in receipts (kind by `http_status >= 400`), and the Worker validates the body before forwarding.
+  - `[low]` `[reject]` (blind) Tombstones live in one runtime file — the intent places them in the lifecycle state; a corrupt file throws by design (fail closed); a durable mirror would change the design.
+  - `[low]` `[reject]` (blind) `rotate --apply` never probes the new ref — the intent says rotate changes `credential_ref` only and names verification as `next_action`.
+  - `[low]` `[defer]` (blind) AGENTS.md/README wording "retire adds … --revoke all" can read as implicit revocation — fix edits an agent-context file; deferred.
+  - `[medium]` `[patch]` (blind) Live canary procedure cannot prove G1 (same run assertion), G2 (no pre-suspend capture), and its retire step uses an unprovisioned employee — fixed: FIFO-held launched child, KV GET before/after with JSON compare, rotate `--apply` note, disposable provisioned and bound first.
+  - `[low]` `[reject]` (blind) `evidence_status: present` flips on an empty directory — the intent defines `present` as "that path exists".
+  - `[false]` `[reject]` (blind) Ambiguous token rows collapse without `grant_id` — every provider-ledger line carries `grant_id` from the issuer context (access.ts:268, github.ts:178).
+  - `[low]` `[patch]` (blind) The App key is read from the vault on every lifecycle GitHub call — fixed: per-keyRef in-memory cache in `appSession` (github.ts).
+  - `[low]` `[reject]` (blind) Inventory internal-error rows say `evidence: fixture` — only on rows already `unresolved`; per-adapter evidence plumbing is more than a direct correction and rarely met.
+  - `[false]` `[reject]` (blind) audit/review/handbook/Bloodbank not wired — results already list `incomplete[]` with next actions, and rotate writes `credential_ref` through the same `writeDefinition` path as bind, which the handbook already projects (contracts/handbook.yaml:142); no named harm.
+  - `[medium]` `[patch]` (edge) Done keys survive restore or out-of-band reactivation, so a re-minted/re-provisioned resource is skipped — same fix as the first blind row (new episode on `active`).
+  - `[medium]` `[patch]` (edge) Restore with nothing captured (key already absent at suspend) is `unresolved no-captured-record` forever — fixed: 404 with a non-`done` suspend step converges; test restores an employee with no mailbox with zero KV PUTs.
+  - `[medium]` `[patch]` (edge) Routing rules listed with one unpaged GET; a rule on page 2 reads as absent and the mail row as `revoked` — fixed: `listRules` pages (per_page 50); test puts ada's rule on page 2.
+  - `[low]` `[patch]` (edge) `literalRule` takes the first literal match, so a foreign rule listed first hides the own one — fixed: prefer the match pointing at the mailbox worker.
+  - `[low]` `[reject]` (edge) 40-page service-token cap — needs over 2000 tokens; the fix adds a branch.
+  - `[medium]` `[patch]` (edge) `retire --revoke all` is refused outright for any desk without a FLUME-39 ref — fixed: only `shared-consumer` blocks (as specified); no-ref/bad-shape desks plan no gateway step and report the row; tests updated.
+  - `[low]` `[reject]` (edge) A named `--revoke` for an adapter with no binding produces no step — the credential row reports `not-issued` with its next action; nothing exists to revoke.
+  - `[low]` `[reject]` (edge) A 401 from clock skew marks the App key revoked — the intent defines app-JWT `GET /app` 401 as the rejection read-back.
+  - `[low]` `[reject]` (edge) Continuity comment prefix is ignored — matching is by subject, so another employee's comment reports `not-recorded`; only a mislabelled prefix on this employee's own comment slips through; unlikely, fix adds a branch.
+  - `[false]` `[reject]` (edge) A missing adopted actor reports `broken` instead of not-adopted — a `native-verified` receipt requires the adopted actor; losing it afterwards is drift, and `broken` is correct.
+  - `[low]` `[patch]` (edge) A consumer starting with `-` would reach gateway-tokens.py as an option — fixed: `GATEWAY_REF` requires an alphanumeric first character.
+  - `[low]` `[patch]` (edge) `gatewayBin` with `HOME` unset resolves relative to cwd — fixed: falls back to `os.homedir()`.
+  - `[low]` `[reject]` (edge) `options.env` vs `process.env` for the Cloudflare base — the CLI always passes `process.env`; threading env through `cfRequest` is more than a direct correction.
+  - `[low]` `[reject]` (edge) Null maps in a hand-corrupted state file throw a TypeError — needs a hand-edited state; validation adds branches.
+  - `[medium]` `[defer]` (edge) `flume identity status <e> retired` writes no tombstone, so the identity is reissuable after `flume offboard` — pre-existing FLUME-47 path, and the intent forbids changing `flume identity status`; deferred.
+  - `[low]` `[reject]` (edge) A crash between status `retired` and the tombstone write leaves no tombstone — millisecond window; re-running retire writes it; reordering adds failure modes.
+  - `[low]` `[reject]` (edge) An installation un-suspended out of band inside the episode is reported `already-done` — the intent mandates done keys never re-run inside an episode, and the inventory row honestly shows the installation `static-usable`.
+  - `[medium]` `[patch]` (edge, claim) `retire --revoke all` does not cover every employee — same fix as the gateway-blocker row.
+  - `[medium]` `[defer]` (edge, claim) The tombstone covers only `identity retire`, not `identity status retired` — same root as the deferred status row.
+  - `[low]` `[reject]` (edge, claim) Comment spec prefix not compared — same as the comment-prefix row.
+  - `[medium]` `[patch]` (verification-gap) Restore's fail-closed rule is tested only on success — added: KV PUT 500 on restore keeps status `suspended` (`local-status:active` skipped), then heals.
+  - `[medium]` `[patch]` (verification-gap) Read-back guards for KV delete, routing disable and GitHub suspend never fail — added `kvDelete`, `rulePut` and GitHub `put` no-op cases.
+  - `[medium]` `[patch]` (verification-gap) Service-token pagination untested — added 60 tokens with ada's on page 2 (inventory and revoke).
+  - `[medium]` `[patch]` (verification-gap) Plane comment `broken` branch and `--record` over a broken identity unasserted — added both.
+  - `[medium]` `[patch]` (verification-gap) Rotation keeps the Plane `native_actor_id` and cloudflare_access rotation untested — added before/after compare, an applied cloudflare_access rotation and a non-`op://` refusal.
+  - `[medium]` `[patch]` (verification-gap) The lifecycle lock is never exercised concurrently — added two concurrent applies: one KV DELETE and one token DELETE.
+  - `[low]` `[patch]` (verification-gap) rotate/adopt-actor/provision ignore tombstones — fixed rotate (`subject-tombstoned`) with a test; adopt-actor and provision are pre-existing commands outside the intent's consult list (residual risk).
+  - `[low]` `[patch]` (verification-gap) The `present` evidence branch never runs — added receipts with an existing `FLUME_GATEWAY_EVIDENCE` (present, linked).
+  - `[low]` `[reject]` (verification-gap, other) Worker double vs real Worker — same as the blind Worker-double row.
+  - `[false]` `[reject]` (intent) `continuity --record` needs `--apply` — the Always rule makes every command a preview unless `--apply`; the matrix input abbreviates.
+  - `[medium]` `[patch]` (intent) Gateway no-ref/bad-shape blockers refuse `--revoke all` — same fix as the gateway-blocker row.
+  - `[medium]` `[patch]` (intent) Convergence keys outlive the episode — same fix as the new-episode row.
+  - `[low]` `[patch]` (intent) Restore results lack `gateway_link` — added to restore preview and apply results.
+  - `[false]` `[reject]` (intent) Tombstone reads add a failure mode and change the status note — the Code Map directs the note change; a corrupt state failing closed is intended.
+  - `[false]` `[reject]` (intent) `revoke-failed` residual uses the line's `expires_at`, not at + 3600s — the line records the token's own residual (github.ts:245), so the reported window is correct.
+  - `[low]` `[reject]` (intent) `not-issued` rows carry no `ref`/`id` — nothing exists to reference.
+  - `[medium]` `[patch]` (intent) Restore with nothing captured fails closed — same fix as the no-capture row.
+  - `[false]` `[reject]` (intent) rotate appends the lifecycle ledger outside the lifecycle lock — one append-only line, no state-file write, no lost update.
+  - `[false]` `[reject]` (intent) Specialist desk profile prefers the post's `profile_name` — a specialist's post is its own registry row whose `profile_name` is its definition id, which is also the desk directory name (specialist.ts:76,101).
+  - `[false]` `[reject]` (intent) A `lifecycle.operation started` ledger line precedes the status write — the ledger is a local log; status is still the first mutation.
+  - `[low]` `[patch]` (intent) Suspend of a hand-copied tombstoned subject previews ok and writes ledger lines before refusing — fixed: `retired-terminal` blocker in assess; test asserts no ledger growth.
+  - `[low]` `[reject]` (intent) No in-process adapter-injection test — the spec calls for built-CLI suites; injection is an interface for later providers.
+  - `[low]` `[reject]` (intent) Partial env injection — same as the `options.env` row.
+  - `[medium]` `[patch]` (intent) Canary procedure gaps (G1, rotation preview, retire blocker) — same fix as the canary row.
+  - `[low]` `[reject]` (intent) Worker double omits `entry.handle` check and 501 — the double only drives the origin contract; the real Worker is G0.
+  - `[low]` `[patch]` (intent) Suspension makes the Worker bounce inbound mail, undocumented — one sentence added to docs/employee-access.md.
+  - `[low]` `[patch]` (intent) Test precision: receipts asserted inclusion, Plane tombstone bind accepted `binding-conflict` — receipts now assert exactly the hermes and plain run_ids via `--since`; the Plane bind asserts exactly `binding-tombstoned`.
+
 ## Design Notes
 
 - **Why step keys are scoped to the resource, not to the operation.** A retry, and a later retire after a suspend, must never send a second DELETE for a resource already done. The KV delete, the token delete and the installation suspend are keyed by subject, adapter, action and resource ID, and restore clears only what it reversed.
@@ -316,3 +399,114 @@ Status: implemented against fixtures; AC5 (live canary) is the supervisor's and 
 - New: `workforce/lifecycle.ts`, `lifecycle-adapters.ts`, `lifecycle-state.ts`, `receipts.ts`; `identity suspend|restore|retire|credentials|rotate|continuity`, `access receipts`, `mail list|read`, `POST /v1/mail/authorize`.
 - Verified: `employee-access-lifecycle` and `company-identity-lifecycle` suites pass; `named-agent role-contract registry-comments company-identity employee-access identity-provision` pass; `specialist-hire` fails with the pre-existing ERR_FS_EISDIR (DW-1). Mutation checks (done-step guard, facade mail status check, static-key `revoked` rule) each failed the suite and were restored.
 - Not done: no live command was run; `flume-access.service` was not restarted and agents-facade was not touched. Deploy the Flume origin before exercising mail through the Worker. `employee_lifecycle_canary` stays `unproven`.
+
+### 2026-10-15 — Build, review and finalize (bmad-build-auto, folder+id dispatch)
+
+Status: done (fixture build). AC5, the live Rererere canary, belongs to the supervisor and has not been run.
+Blocking condition: none.
+
+**Summary.** The lifecycle coordinator and its five adapters are built and reviewed. They cover:
+- `flume identity suspend|restore|retire|credentials|rotate|continuity`;
+- the facade's `POST /v1/mail/authorize`;
+- the plain `flume mail list|read` client;
+- the read-only `flume access receipts`.
+
+Previews write nothing. Applies converge through resource-scoped step keys under a lifecycle lock. Every credential row says honestly what is still usable. A static key is `revoked` only on a provider read-back.
+
+**Files changed** (against baseline `3169190f91400be100a83b81e9042e1b6975db85`; commits `9e36b2f`, `d7afef0` and this finalize commit):
+- `packages/flume-hr/src/workforce/lifecycle.ts` (new): the coordinator. It holds the episodes, ordering, convergence keys, tombstones, continuity and the text formatter.
+- `packages/flume-hr/src/workforce/lifecycle-adapters.ts` (new): the mail, cloudflare_access, github, plane and gateway adapters. Each one inventories, plans and runs read-back-verified steps.
+- `packages/flume-hr/src/workforce/lifecycle-state.ts` (new): the state, ledger, lock and tombstones (directory 0700, files 0600).
+- `packages/flume-hr/src/workforce/receipts.ts` (new): the `access receipts` join, emitting whitelisted fields only, plus the FLUME-39 gateway link and the proof check.
+- `packages/flume-hr/src/workforce/access.ts`: the shared `identify()` pipeline, the `handleMail` and `/v1/mail/authorize` route, and the `requestMail` client.
+- `packages/flume-hr/src/workforce/company.ts`: tombstone blockers in enroll, bind and status, plus `rotateEmployeeCredential`, `deskProfileOf` and the updated revocation note.
+- `packages/flume-hr/src/workforce/github.ts`: the app-key probe and the installation read, suspend and un-suspend calls, with a per-process key cache.
+- `packages/flume-hr/src/workforce/provision.ts`: the Cloudflare and vault helpers are now exported, with no behavior change.
+- `packages/flume-hr/src/workforce/validator.ts` and `contracts/employee-access.schema.json`: the closed `mail_request` body.
+- `packages/flume-hr/src/workforce/readiness.ts` and `tests/company-identity-regressions.mjs`: `employee_lifecycle_canary`, which stays unproven.
+- `packages/flume-hr/src/index.ts` and `packages/flume-hr/src/workforce/index.ts`: the CLI commands and exports.
+- `tests/company-identity-lifecycle-regressions.mjs`, `tests/employee-access-lifecycle-regressions.mjs` and `tests/lifecycle-fixtures.mjs` (new): two suites and their shared stateful doubles. Both suites are registered in `scripts/run-tests.mjs`.
+- `docs/employee-access.md`, `docs/identity-provisioning.md`, `AGENTS.md` and `README.md`: the FLUME-53 section and the command lines.
+- `_bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md`: the supervisor-owned canary steps and gates. Nothing in it has been executed.
+
+**Review findings.** 62 findings: 20 medium, 32 low and 10 false.
+
+Patched: 19 entries (9 medium, 10 low).
+- Medium:
+  - A new episode starts on an `active` employee.
+  - Restore works when nothing was captured.
+  - Routing-rule listing is paged.
+  - Only `shared-consumer` blocks the gateway, so `retire --revoke all` works for desks with no ref.
+  - The canary procedure covers G1 and G2, the rotation `--apply` and a provisioned disposable employee.
+  - Five test gaps are closed: restore fail-closed, the read-back no-op guards, token pagination, the continuity broken branches and rotation coverage, plus the concurrent-apply test.
+- Low:
+  - `literalRule` prefers the employee's own rule.
+  - The `GATEWAY_REF` first character must be alphanumeric.
+  - `gatewayBin` falls back to the home directory.
+  - The App key is cached per process.
+  - Restore results carry `gateway_link`.
+  - Suspend and rotate refuse a tombstoned hand-copy.
+  - The docs say inbound mail bounces while suspended.
+  - The `present` evidence branch is tested, and receipts and the Plane tombstone are asserted exactly.
+
+Deferred: 2.
+- `flume identity status retired` writes no tombstone. This is medium, pre-existing, and the intent forbids changing `identity status`.
+- The AGENTS.md and README retire wording. This is low and is an agent-context file.
+
+Rejected: 21 low and 10 false. The reason for each is in the Review Triage Log. In short:
+- The intent or spec mandates the current behavior:
+  - the same pipeline order as access requests;
+  - the Worker double;
+  - `present` meaning the path exists;
+  - a GET /app 401 counting as rejection;
+  - `not-recorded` being a status rather than a failure;
+  - rotate changing the ref only;
+  - done keys staying done within an episode.
+- The defect is unlikely and the fix would add branches:
+  - the 40-page cap;
+  - null maps in the state file;
+  - the crash window between status and tombstone;
+  - the comment prefix;
+  - env threading;
+  - evidence on internal-error rows.
+- The claim was disproved:
+  - `grant_id` is on every ledger line;
+  - the revoke-failed residual is correct;
+  - the specialist profile resolves to the same name;
+  - the ledger `started` line is not a mutation;
+  - the native-actor drift is real drift;
+  - `--record` needs `--apply` by the Always rule;
+  - the note change was directed by the Code Map;
+  - the rotate ledger append needs no lock;
+  - the audit/handbook wiring has no named harm.
+
+**Follow-up review recommended: true.** Patched by verdict this pass: high 0, medium 9, low 10.
+
+The unverified risk is the new-episode reset in `suspendOrRetire` assess. It drops a subject's step records and captures whenever the definition reads `active`, which changes the convergence semantics behind AC2. The gateway-blocker change also alters what `retire --revoke all` does. Both are verified only by fixture suites written in this same session. A follow-up pass should re-check AC2 convergence against the patched code:
+- retry after an outage;
+- retire after a suspend;
+- an out-of-band reactivation through `flume identity status`;
+- a suspend whose status write succeeds and whose provider steps fail.
+
+**Verification performed** (after the patches):
+- `git diff --check 3169190…`: no output.
+- `node scripts/run-tests.mjs named-agent role-contract registry-comments company-identity employee-access identity-provision specialist-hire`: typecheck and build pass. 14 of 15 suites pass, including `company-identity-lifecycle` (30 scenarios) and `employee-access-lifecycle`.
+  - `specialist-hire` fails with the pre-existing `ERR_FS_EISDIR` (DW-1), as the spec expects. It was not touched.
+- `node packages/flume-hr/dist/index.js identity readiness --json | jq -r .checks.employee_lifecycle_canary.status`: `unproven`.
+- Matrix test audit: every row has a covering test that ran and passed. This session added two of them:
+  - Named revoke: `revoked 0 tokens` converges.
+  - Continuity: handle and email drift is `broken`. The schema ties email to handle, so an email-only drift is `invalid-definition`.
+- Manual checks:
+  - `flume-access.service` was last started at 2026-10-14 22:05 EDT, before this run. It was not restarted.
+  - agents-facade has no change from this run. Its last commit is the supervisor's.
+  - No live `role.yaml` or `agent.yaml` was written.
+  - The procedure file holds IDs, `op://` refs and commands only.
+
+**Residual risks.**
+- AC5 has not been run. The live canary is the supervisor's. Every row in this build is `evidence: fixture`.
+- FLUME-39 has no evidence, so every gateway link is `unverified` and canary gate G6 cannot hold. That blocks full live AC4.
+- Deploy order: rebuild and restart `flume-access.service` before exercising mail through the Worker. Until then the origin answers 404 on `/v1/mail/authorize`.
+- `launchSpecialist` reads the gateway key from `op://DeLoSecrets/hermes-<employee>/credential`, which is not the FLUME-39 shape. It is unchanged, as the intent requires.
+- Two pre-existing commands do not consult tombstones: `adopt-actor` and `provision`. Only a hand-edited definition would reach them.
+- `provision.ts` `planMailbox` still lists routing rules unpaged. This is pre-existing and not in this story's diff.
+- Suspension bounces inbound mail to the address until restore. This is documented.
