@@ -161,11 +161,22 @@ Why each invocation POSTs at most once. GitHub comment creation has no idempoten
 
 ## Auto Run Result
 
-Status: ready-for-dev. This run stopped after planning, as the dispatch asked (`spec_checkpoint: true`). No source code was changed, no comment was posted, and nothing was written to GitHub, the vault or any definition.
+Status: implemented; verification passed; live AC1 blocked on Rererere (the exact gate below); live AC2 and Grolf-only readbacks done.
 
-The live facts recorded in the Code Map came from read-only checks only:
-- public `GET /users/<bot>` lookups for both bot users;
-- a `gh` read of the sandbox repository and PR #1;
-- `flume access github-inspect` for App 5296560, which uses only GETs authenticated with the App's JWT.
+What changed:
+- `native_actor_id` (`^\d+$`, optional) on the binding schema and type; block stays `version: 1`.
+- `flume identity adopt-actor <employee> github [--apply]` (`adoptNativeActor`, `resolveGithubBotActor`).
+- `execWithGithubToken` also exports `FLUME_EMPLOYEE_SUBJECT`, `FLUME_GITHUB_REPOSITORY`, `FLUME_GITHUB_APP_ID`, `FLUME_GITHUB_INSTALLATION_ID`.
+- `packages/flume-hr/src/workforce/comment.ts`: `flume comment post|verify`, the one authorship rule, reconcile-before-POST.
+- Readiness `github_native_authorship` (unproven); `github.ts` exports `transport`, `statusOf`, `requestIdOf`, `firstLine`, `isTimeout`.
+- `tests/employee-access-github-comments-regressions.mjs` (15 groups), registered in `SUITES`; `docs/employee-access.md`, `AGENTS.md` (CLAUDE.md and GEMINI.md link to it), `README.md`.
 
-Blocking condition for live AC1, still open: the Rererere App (5296560) has no installation on the sandbox. It is waiting on the operator's passkey. Grolf already has everything the Grolf-only live steps need.
+Verified: `git diff --check` clean; `node scripts/run-tests.mjs employee-access-github-comments` PASS; the seven-suite regression list PASS (11 suites, including company-identity with the extended readiness key list).
+
+Live (sandbox `delorenj/flume-identity-sandbox` PR #1 only), receipt `_bmad-output/implementation-artifacts/FLUME-51/live-proof-2026-10-14.md`:
+- Grolf adopted actor `341820121` (`gr0lfbot[bot]`), committed in the 33GOD repo.
+- Conversation comment `6181426777` and inline comment `4277681258` (proof.txt line 2, PR head) read back `native-verified`; a re-run reconciled to the same comment; `verify` of Grolf alone is `not-native-distinct` (`fewer-than-two-employees`); commit evidence is `unsupported-evidence`.
+
+Blocking condition for live AC1, still open: the Rererere App (5296560) has no installation on the sandbox (`installations: []`, 2026-10-15T00:20Z). Gate, in order: the operator passkey install of App 5296560 on the sandbox; `identity bind rererere github ... --apply`; a sandbox grant for subject `1dca27f5-06e8-47a3-86c9-49bc3ed5331c`; `adopt-actor`.
+
+Risk: a facade running a build without `native_actor_id` reads an adopted definition as invalid and answers that employee `unknown-client`. This happened live after adopting Grolf and was fixed by landing, rebuilding and restarting `flume-access.service`. Deploy the new build before adopting on any other host.
