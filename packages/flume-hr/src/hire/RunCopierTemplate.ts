@@ -46,7 +46,12 @@ export function scrubInteractiveChannelCredentials(env: NodeJS.ProcessEnv): void
 
 function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: string): void {
   const manifestPath = join(ctx.targetDir, ".project.json");
-  if (!existsSync(manifestPath) || !ctx.targetRepo) return;
+  // Return early if manifest doesn't exist (no project to register to)
+  // or if targetRepo is null/undefined (should not happen, but guard against it)
+  // Note: We allow empty string for targetRepo to handle edge cases like
+  // running from a directory ending with separator, as the hire can still
+  // succeed even if the agentId will be less ideal (e.g., "-pm").
+  if (!existsSync(manifestPath) || ctx.targetRepo == null) return;
 
   const current = readFileSync(manifestPath, "utf8");
   const parsed = JSON.parse(current) as unknown;
