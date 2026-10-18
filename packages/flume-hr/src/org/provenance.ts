@@ -50,7 +50,7 @@
 
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { loadFleetContract, resolveFleetContractPath, validateFleetContract } from "./contract";
 import {
   buildAuthorityIndex,
@@ -392,6 +392,9 @@ function deriveReleaseRoot(repo: string | null, home: string): string | null {
   const expanded = expandHome(repo, home);
   if (!isAbsolute(expanded)) return null;
   const parent = dirname(expanded);
+  // ONE install (2026-10-17): a pin that is not a `releases/<sha>` child IS the install, and the install is
+  // the whole root -- not its parent (`~/.hermes`), which would call every file under it "the pinned release".
+  if (basename(parent) !== "releases") return expanded;
   // `dirname("/")` is `/`, `dirname("/home")` is `/`. A root that shallow -- or
   // one equal to the home directory -- would classify most of the filesystem as
   // the pinned release, so it is refused rather than narrowed.

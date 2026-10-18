@@ -17,7 +17,6 @@ import type { HermesAgentContext } from "./types";
 
 const HERMES_GIT_URL = "https://github.com/delorenj/hermes-agent.git";
 const HERMES_GIT_REF = "main";
-const HERMES_GIT_SHA = "0408fec7a153e6c32c064acd2b8053917f1525f1";
 
 type ConfigSchema = ReadonlyArray<{
   section: string;
@@ -37,26 +36,24 @@ function quote(value: string): string {
   return JSON.stringify(value);
 }
 
-function detectHermesInstall(home: string): { bin: string; repo: string } {
-  const releaseRoot = join(home, ".local", "share", "hermes-agent", "releases", HERMES_GIT_SHA);
-  const devRoot = join(home, "code", "hermes-agent");
-  const candidates = [
-    join(releaseRoot, ".venv", "bin", "hermes"),
-    join(home, ".local", "bin", "hermes"),
-    join(devRoot, "venv", "bin", "hermes"),
-    join(devRoot, ".venv", "bin", "hermes"),
-  ];
-  const bin = candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
-  try {
-    const resolved = realpathSync(bin);
-    const environment = dirname(dirname(resolved));
-    if (["venv", ".venv"].includes(environment.split("/").at(-1) ?? "")) {
-      return { bin, repo: dirname(environment) };
-    }
-  } catch {
-    // A not-yet-installed pinned release is still the canonical bootstrap guess.
-  }
-  return { bin, repo: bin.startsWith(devRoot) ? devRoot : releaseRoot };
+/**
+ * Hermes is ONE code path: the gateway, ~/.local/bin/hermes and every CLI wrapper exec the same checkout of
+ * delorenj/hermes-agent (`~/.hermes/hermes-agent`, launcher `.hermes/bin/hermes`). This used to prefer an
+ * "immutable" `releases/<sha>` directory, which is how the CLI and the gateway ended up on different code
+ * (2026-10-17). A host config written here can no longer name a second checkout.
+ * Drift guard: templates/hermes-agent/scripts/hermes-single-install-check.py.
+ */
+function detectHermesInstall(home: string): { bin: string; repo: string; sha: string } {
+  const repo = join(home, ".hermes", "hermes-agent");
+  const bin = join(repo, ".hermes", "bin", "hermes");
+  // The sha is the install's LIVE HEAD (what fleet-sync records), never a constant that goes stale on the
+  // next fast-forward. Empty until the install exists.
+  const head = spawnSync("git", ["--no-optional-locks", "-C", repo, "rev-parse", "HEAD"], {
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  const sha = head.status === 0 ? head.stdout.trim() : "";
+  return { bin, repo, sha };
 }
 
 function hostSchema(): ConfigSchema {
@@ -81,7 +78,7 @@ function hostSchema(): ConfigSchema {
         ["pjangler_bin", quote("flume")],
         ["hermes_git_url", quote(HERMES_GIT_URL)],
         ["hermes_git_ref", quote(HERMES_GIT_REF)],
-        ["hermes_git_sha", quote(HERMES_GIT_SHA)],
+        ["hermes_git_sha", quote(hermes.sha)],
         ["runtime_scaffold_dir", quote(join(home, "code", "33GOD", "flume", "templates", "hermes-agent", "runtime-scaffold"))],
         ["fleet_env", quote("~/.hermes/fleet.env")],
         ["registry_file", quote("~/.hermes/agents-registry.yaml")],

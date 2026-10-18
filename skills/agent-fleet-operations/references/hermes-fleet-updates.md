@@ -8,13 +8,14 @@ Use this workflow when updating Hermes itself, changing shared non-secret
 defaults, or changing how future employees are provisioned. First classify the
 update, then touch the narrowest source of truth.
 
-> **Service model (canonical):** per agent, ONE unit —
-> `hermes-<agent>-gateway.service`. Bloodbank command ingress is the single
-> fleet-shared `hermes-fleet-bloodbank-gateway.service`. Per-agent heartbeat
-> timers, consumer units, and checkpoint timers are retired — treat any sighting
-> as drift and converge it with `flume remediate hermes.registry-parity` (registry
-> keys) or by re-running the role's `70-systemd.sh`, which deletes heartbeat units
-> it finds.
+> **Runtime model (canonical, 2026-10-17): ONE install, ONE code path.** `~/.hermes/hermes-agent` is a
+> checkout of `delorenj/hermes-agent` `main`. `hermes-gateway.service` (Hermes' own installer wrote it: ONE
+> host gateway multiplexes every profile, including the Bloodbank fleet lane), `~/.local/bin/hermes`,
+> `HERMES_FLEET_BIN` in `~/.hermes/fleet.env`, the template `[fleet]` config, every `agents/hermes/*/hermes`
+> wrapper and every registry row resolve to its launcher `.hermes/bin/hermes`. There is no `releases/<sha>`
+> checkout. Per-agent `hermes-<agent>-gateway.service` units, heartbeat timers, consumer units and checkpoint
+> timers are retired. Drift guard: `mise run hermes:one` in `templates/hermes-agent`
+> (`scripts/hermes-single-install-check.py`).
 
 ## Classify the update
 
@@ -33,25 +34,20 @@ write solves the problem.
 
 ## Update Hermes core
 
-**What actually runs (2026-09-26).** Every gateway execs the pinned release
-checkout named in `~/.hermes/fleet.env` (`HERMES_FLEET_REPO`/`HERMES_FLEET_BIN`)
-and in each unit's `10-versioned-runtime.conf` drop-in:
-`~/.local/share/hermes-agent/releases/0408fec7…/`. That directory is a blobless
-clone of `delorenj/hermes-agent` tracking `main`; its name is the pin id, not
-its HEAD. `~/.hermes/hermes-agent` is a dev checkout whose local `main` tracks
-NousResearch upstream, NOT the fork. Land fork changes like this:
+**What actually runs (2026-10-17).** One install, `~/.hermes/hermes-agent`, tracking `delorenj/main` (not Nous
+`origin/main`; never run `hermes update`). Land fork changes through a clone, never by editing the install:
 
 ```bash
-# 1. work in a detached worktree of fork main, test, push
-git -C ~/.hermes/hermes-agent fetch delorenj main
-git -C ~/.hermes/hermes-agent worktree add --detach <scratch>/hermes-fork delorenj/main
-<release>/.venv/bin/python -m pytest <tests> -o addopts=""  # run from the worktree
-git -C <scratch>/hermes-fork push delorenj HEAD:main
-# 2. deploy: fast-forward the release checkout (no reinstall unless deps changed;
-#    Hermes sweeps stale __pycache__ itself via .bytecode-fingerprint)
-git -C <release> pull --ff-only origin main
-# 3. restart each ACTIVE gateway, one unit at a time, and prove each
-systemctl --user restart hermes-<agent>-gateway.service
+# 1. work in a full clone of the fork (a worktree of the install fails the home-IO test guard), test, push
+git clone git@github.com:delorenj/hermes-agent.git ~/code/hermes-work && cd ~/code/hermes-work
+HERMES_PYTHON=<venv-with-pytest> scripts/run_tests.sh tests/agent/<the tests>
+git push origin HEAD:main
+# 2. deploy: fast-forward the one install (Hermes sweeps stale __pycache__ via .bytecode-fingerprint)
+git -C ~/.hermes/hermes-agent pull --ff-only
+# 3. restart the ONE gateway, only when idle (gateway_state.json active_agents == 0, no turn lease)
+systemctl --user restart hermes-gateway.service
+# 4. prove nothing drifted
+python3 ~/code/33GOD/hermes-agent-template/scripts/hermes-single-install-check.py
 ```
 
 A gateway is healthy when it logs `Gateway running with N platform(s)`, or
@@ -110,8 +106,7 @@ Restart long-running user services after the code update:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user try-restart 'hermes-*-gateway.service'
-systemctl --user try-restart 'hermes-fleet-bloodbank-gateway.service'
+systemctl --user restart hermes-gateway.service   # only when idle; it serves every profile
 ```
 
 Interactive `hermes` commands pick up the new code on their next launch.
