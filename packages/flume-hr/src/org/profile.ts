@@ -181,6 +181,12 @@ export interface FleetProfileContext {
   env: NodeJS.ProcessEnv;
   /** `resolveFleetHome(env, home)`: the ONE resolution the inventory also uses. */
   fleetHome: string;
+  /**
+   * The agent registry this run observes (`--agent-registry`, else the default). The renderer pins
+   * `terminal.cwd` from its rows' `project_path`, so the renderer's check must read the SAME org
+   * chart; it is handed over as `HERMES_AGENTS_REGISTRY` (as the audit child already is).
+   */
+  agentRegistryPath?: string | null;
   /** The profile root the contract's `service_model.profile_layout.root` resolves to, or null. */
   root: string | null;
   /** `service_model.profile_layout.generated_marker`. */
@@ -447,6 +453,7 @@ function rendererEnv(ctx: FleetProfileContext): NodeJS.ProcessEnv {
   }
   env.HOME = ctx.home;
   env.HERMES_FLEET_HOME = ctx.fleetHome;
+  if (ctx.agentRegistryPath) env.HERMES_AGENTS_REGISTRY = ctx.agentRegistryPath;
   // The renderer's OWN lock wait is set LONGER than this observer's child
   // budget, deliberately. Its lock helper gives up with a FATAL on stderr and
   // exit 1 -- and stderr is never read here, so that exit would be

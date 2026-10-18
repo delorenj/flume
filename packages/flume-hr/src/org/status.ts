@@ -2745,6 +2745,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       home,
       env,
       fleetHome: resolveFleetHome(env, home),
+      agentRegistryPath: stores.agents.inspectedPath,
       root: layout.root,
       generatedMarker: nonEmptyString(profileLayout.generated_marker) ?? "GENERATED FILE -- DO NOT EDIT",
       generatedFile: nonEmptyString(profileLayout.generated_file) ?? "config.yaml",

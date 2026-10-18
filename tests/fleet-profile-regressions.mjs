@@ -494,7 +494,36 @@ function writeAgentRegistry(path, agentList = AGENTS) {
     gateways: { bloodbank: { scope: "fleet", profile_name: "fleet-bloodbank-gateway", command_subject: "bloodbank.cmd.agent.invocation.start", target_field: "data.target_agent_id", systemd_unit: "hermes-fleet-bloodbank-gateway.service" } },
     agents,
   }), "utf8");
+  repinRegisteredConfigs(path, agents);
   return path;
+}
+
+// The canonical renderer's terminal.cwd pin (hermes-profile-config.py `expected_config`, 2026-10-18):
+// a placeholder cwd in the merge becomes the registry row's existing absolute project_path. The
+// template re-pins a desk once its row is written (80-registry.sh `repin`), so a fixture that seeds
+// profiles "the way provisioning leaves them" pins every registered row's generated config the same
+// way, after its row exists. A symlinked or missing config.yaml is left exactly as seeded.
+const CWD_PLACEHOLDERS = new Set(["", ".", "auto", "cwd"]);
+function withRendererPins(config, projectPath) {
+  if (!projectPath || !existsSync(projectPath)) return config;
+  const terminal = config.terminal && typeof config.terminal === "object" && !Array.isArray(config.terminal) ? config.terminal : {};
+  if (!CWD_PLACEHOLDERS.has(String(terminal.cwd ?? "").trim())) return config;
+  return { ...config, terminal: { ...terminal, cwd: projectPath } };
+}
+function repinRegisteredConfigs(registryPath, agents) {
+  for (const [key, row] of Object.entries(agents)) {
+    const file = join(dirname(registryPath), "profiles", row.profile_name ?? key, "config.yaml");
+    let stat = null;
+    try { stat = lstatSync(file); } catch { continue; }
+    if (!stat.isFile()) continue;
+    const text = readFileSync(file, "utf8");
+    const header = text.startsWith(GENERATED_HEADER) ? GENERATED_HEADER : "";
+    let parsed = null;
+    try { parsed = YAML.parse(text.slice(header.length)); } catch { continue; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
+    const pinned = withRendererPins(parsed, row.project_path);
+    if (pinned !== parsed) writeFileSync(file, header + YAML.stringify(pinned), "utf8");
+  }
 }
 
 function writeProjectRegistry(path, agentList = AGENTS) {
@@ -1934,7 +1963,9 @@ try {
     const alt = makeAltHome("home-empty-base");
     writeFileSync(join(alt.fleet, "config.yaml"), "{}\n", "utf8");
     const solo = join(alt.realProfiles, "solo-pm");
-    const delta = { model: { default: "solo-model", provider: "solo" } };
+    // An explicit (non-placeholder) terminal.cwd is an operator choice the renderer's pin never
+    // overrides, so the generated config stays byte-for-byte the delta -- the case under test.
+    const delta = { model: { default: "solo-model", provider: "solo" }, terminal: { cwd: "/srv/solo-explicit" } };
     writeFileSync(join(solo, "config.delta.yaml"), YAML.stringify(delta), "utf8");
     writeFileSync(join(solo, "config.yaml"), GENERATED_HEADER + YAML.stringify(delta), "utf8");
     const data = status(cliAt(mainRoot, [...STATUS_ARGS, "--agent", "solo-pm"], alt.env));
@@ -1996,7 +2027,9 @@ try {
     // suppress it and it names a directory, not a secret. Without it this case
     // fails under `npm run test:coverage` — what CI runs — and passes under
     // `npm test`, which is why CI and local disagreed.
-    const allowed = new Set(["PATH", "LANG", "HOME", "HERMES_FLEET_HOME", "HERMES_PROFILE_CONFIG_LOCK_TIMEOUT_SECONDS", "PYTHONDONTWRITEBYTECODE", "PYTHONHASHSEED", "PYTHONIOENCODING", "PWD", "OLDPWD", "SHLVL", "_", "NODE_V8_COVERAGE"]);
+    // HERMES_AGENTS_REGISTRY: the org chart THIS run observes -- the renderer pins terminal.cwd from
+    // its project_path, so its check must read the same registry (a path, never a credential).
+    const allowed = new Set(["PATH", "LANG", "HOME", "HERMES_FLEET_HOME", "HERMES_AGENTS_REGISTRY", "HERMES_PROFILE_CONFIG_LOCK_TIMEOUT_SECONDS", "PYTHONDONTWRITEBYTECODE", "PYTHONHASHSEED", "PYTHONIOENCODING", "PWD", "OLDPWD", "SHLVL", "_", "NODE_V8_COVERAGE"]);
     const leaked = checkRun.keys.split(",").filter((key) => key !== "" && !allowed.has(key));
     assert.deepEqual(leaked, [], "no key outside the allowlist reaches the renderer");
     const probeRun = records.find((record) => record.argv.startsWith("-B -c "));
@@ -2271,6 +2304,8 @@ try {
     const bare = policyContract((document) => {
       delete document.profile_manifest;
       delete document.authorities.agent_profile_state;
+      // No profile-tree authority, so no projection may target the profile tree either.
+      document.projections = document.projections.filter((projection) => !String(projection.target).startsWith("profiles."));
       document.schema_version = 3;
       document.compatibility.max_schema_version = 3;
     });

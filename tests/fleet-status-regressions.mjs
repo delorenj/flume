@@ -394,13 +394,25 @@ function seedProfileFixtures(home) {
 // `70-systemd.sh`'s own deferral path writes exactly this (channel-transaction.py).
 const DEFERRED_PLATFORMS = { platforms: { telegram: { enabled: false }, slack: { enabled: false } } };
 
+// The canonical renderer's terminal.cwd pin (hermes-profile-config.py `expected_config`, 2026-10-18):
+// a placeholder cwd in the merge becomes the registry row's existing absolute project_path. A
+// renderer-clean fixture states the render the renderer itself produces, so it carries the pin.
+const CWD_PLACEHOLDERS = new Set(["", ".", "auto", "cwd"]);
+function withRendererPins(config, projectPath) {
+  if (!projectPath || !existsSync(projectPath)) return config;
+  const terminal = config.terminal && typeof config.terminal === "object" && !Array.isArray(config.terminal) ? config.terminal : {};
+  if (!CWD_PLACEHOLDERS.has(String(terminal.cwd ?? "").trim())) return config;
+  return { ...config, terminal: { ...terminal, cwd: projectPath } };
+}
+
 function seedRendererCleanProfile(home, name) {
   const dir = join(home, ".hermes", "profiles", name);
   mkdirSync(join(dir, "hindsight"), { recursive: true });
   mkdirSync(join(dir, "skills"), { recursive: true });
   writeFileSync(join(dir, "profile.yaml"), `name: ${name}\n`, "utf8");
   writeFileSync(join(dir, "config.delta.yaml"), YAML.stringify(DEFERRED_PLATFORMS), "utf8");
-  writeFileSync(join(dir, "config.yaml"), `# GENERATED FILE -- DO NOT EDIT\n${YAML.stringify({ ...profileBase(home), ...DEFERRED_PLATFORMS })}`, "utf8");
+  const rendered = withRendererPins({ ...profileBase(home), ...DEFERRED_PLATFORMS }, join(reposRoot, name.replace(/-pm$/u, "")));
+  writeFileSync(join(dir, "config.yaml"), `# GENERATED FILE -- DO NOT EDIT\n${YAML.stringify(rendered)}`, "utf8");
   writeFileSync(join(dir, "hindsight", "config.json"), `{\n  "bank_id": "agent-${name}"\n}\n`, "utf8");
   for (const skill of PROFILE_CORE_SKILLS) symlinkSync(join(home, ".agents", "skills", skill), join(dir, "skills", skill));
   writeFileSync(join(home, ".hermes", "profiles", `.${name}.config.lock`), "");
