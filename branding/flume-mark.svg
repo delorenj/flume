@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>Flume: one channel of work, branching down the org</title>
+  <g stroke="#0f5f63">
+    <!-- the channel, falling from top-left -->
+    <path d="M10 14 C25 14 24 31 32 35" stroke-width="8"/>
+    <!-- three branches fanning out: director, manager, contributor -->
+    <path d="M32 35 C39 37 44 36 49 33" stroke-width="5"/>
+    <path d="M32 35 C38 40 42 44 46 47" stroke-width="5"/>
+    <path d="M32 35 C34 41 35 45 35 50" stroke-width="5"/>
+  </g>
+  <!-- the water running through it -->
+  <g stroke="#7fd3c8" stroke-width="2">
+    <path d="M10 14 C25 14 24 31 32 35"/>
+    <path d="M32 35 C39 37 44 36 49 33"/>
+    <path d="M32 35 C38 40 42 44 46 47"/>
+    <path d="M32 35 C34 41 35 45 35 50"/>
+  </g>
+  <!-- where the work lands -->
+  <g fill="#0f5f63">
+    <circle cx="51.5" cy="31.5" r="4"/><circle cx="48.5" cy="49" r="4"/><circle cx="35" cy="53" r="4"/>
+  </g>
+</svg>
