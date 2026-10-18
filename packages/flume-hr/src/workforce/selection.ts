@@ -154,8 +154,8 @@ async function writeSelection(plan: RoleSelectionPlan, ctx: SelectionContext): P
 }
 
 // Hermes' own bookkeeping inside a strict skills root (mirrors Skillex's strict policy): never a skill.
-const BOOKKEEPING_FILES = new Set([".usage.json", ".usage.json.lock", ".curator_state", ".curator_suppressed", ".sync_state"]);
-const BOOKKEEPING_DIRS = new Set([".curator_backups"]);
+const BOOKKEEPING_FILES = new Set([".usage.json", ".usage.json.lock", ".curator_state", ".curator_suppressed", ".sync_state", ".bundled_manifest", ".curator_ledger.jsonl"]);
+const BOOKKEEPING_DIRS = new Set([".curator_backups", ".locks"]);
 
 /**
  * Refuse, before anything changes, a desk that is not Skillex-only yet holds local skills. The discovery
@@ -272,7 +272,11 @@ export async function auditRoleSelection(profile: string, deskPath: string, bind
   const { profile: options } = context(ctx);
   const shown = await showProfile(profile, { ...options, project: plan.project });
   problems.push(...skillDiagnostics(shown.findings).map(detail => `${profile}: ${detail}`));
-  for (const change of shown.data?.changes ?? []) problems.push(`${profile}: profile skills ${change.action}: ${change.path}`);
+  // A receipt-only refresh means every link already converges and only the recorded source
+  // revision is stale (any catalog commit moves it); that is bookkeeping, not a projection defect.
+  for (const change of shown.data?.changes ?? []) {
+    if (change.action !== "write-receipt") problems.push(`${profile}: profile skills ${change.action}: ${change.path}`);
+  }
   const managed = new Map((shown.data?.managed ?? []).map(candidate => [candidate.name, candidate]));
   for (const skill of plan.skills) {
     if (!managed.has(skill.name)) problems.push(`${profile}: loadout skill ${skill.name} is absent from the desk's Skillex projection`);

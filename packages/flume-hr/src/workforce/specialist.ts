@@ -220,7 +220,21 @@ export async function auditSpecialist(employee: string) {
 
 /** No chdir, no sticky profile switch, no inherited/global inference credential. */
 export async function launchSpecialist(employee: string, args: string[], cwd = process.cwd()): Promise<number> {
-  const audited = await auditSpecialist(employee);
+  let audited = await auditSpecialist(employee);
+  // The employment record decides identity and memory routing: a record that disagrees with the
+  // definition is refused for the operator to look at, never rewritten on the way to a launch.
+  const recordDrift = audited.problems.some(problem => /^Record differs|Bloodbank disabled/u.test(problem));
+  if (!audited.ok && !recordDrift) {
+    // Ordinary use drifts a desk: a Hermes run re-dumps its YAML, a fleet base or catalog edit moves
+    // the projection. Converge through the same onboarding refresh an operator would run; it still
+    // refuses handwritten changes and foreign skills, so only benign drift heals here.
+    try {
+      await hireSpecialist(join(environment().home, ".agents/workforce", employee, "agent.yaml"), true, { expectedEmployee: employee });
+    } catch (error) {
+      throw new Error(`Specialist launch refused: ${audited.problems.join("; ")}; onboarding refresh failed: ${(error as Error).message}`);
+    }
+    audited = await auditSpecialist(employee);
+  }
   if (!audited.ok) throw new Error(`Specialist launch refused: ${audited.problems.join("; ")}`);
   if (args.some(arg => {
     if (/^-p/u.test(arg)) return true;
