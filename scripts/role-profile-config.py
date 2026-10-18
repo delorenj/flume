@@ -73,7 +73,9 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
         if not isinstance(skills, dict):
             raise SystemExit("skills delta must be a mapping")
         delta["skills"] = {**skills, "external_dirs": []}
-    merged = r.deep_merge(r.load_yaml(r.BASE), delta)
+    # THE expected config (base + delta + every renderer pin, e.g. terminal.cwd from the registry row);
+    # a bare deep_merge here rewrote the desk's config.yaml without its pin.
+    merged = r.expected_config(r.load_yaml(r.BASE), delta, pdir)
     text = r.dump_yaml(delta)
     if not delta_path.exists() or delta_path.read_text() != text:
         tmp = delta_path.with_name(".config.delta.yaml.role-tmp")

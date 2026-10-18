@@ -192,6 +192,15 @@ authorities:
         operator-owned override SSOT, and only the four fleet-owned dotted paths
         below are rewritten.
       - >-
+        config.yaml is the renderer's expected_config: that merge PLUS the
+        renderer pins, and nothing else computes it. terminal.cwd is projected
+        from agents.{agent_id}.project_path (see projections:
+        profile_terminal_cwd) when the merged value is a placeholder (., auto,
+        cwd or unset); mcp_servers.codegraph gets --path to the desk's repo.
+        80-registry.sh re-pins after it writes the row, so a fresh hire is
+        pinned; `hermes-profile-config.py check` WARNs on a stale project_path,
+        which leaves the placeholder ($HOME under the multiplexed gateway).
+      - >-
         PM desks are Skillex-only (skillex ADR-0001, Hermes PM amendment
         2026-10-01). Step 10 writes config.delta.skills.external_dirs: []
         through lib/skills-policy.py under the renderer lock; Skillex owns
@@ -316,6 +325,16 @@ projections:
     target: projects.{slug}.agents.{role}.role_dir
     direction: agent_registry_to_pjangler_project_registry
     writable_by: project-registry
+
+  # The renderer pins the generated config's terminal.cwd to the org chart row
+  # (a delta's explicit non-placeholder terminal.cwd wins). Under the ONE
+  # multiplexed gateway a placeholder cwd resolves to $HOME, so this is what
+  # puts a desk's turns in, and attributes them to, its project.
+  - field: profile_terminal_cwd
+    source: agents.{agent_id}.project_path
+    target: profiles.{profile_name}.config.yaml
+    direction: agent_registry_to_hermes_profile_tree
+    writable_by: runtime-template
 
 classifications:
   managed_agent:

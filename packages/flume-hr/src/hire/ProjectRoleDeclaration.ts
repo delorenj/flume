@@ -40,7 +40,8 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
             finally:
                 if os.path.exists(temporary):
                     os.unlink(temporary)
-            r.write_generated(pdir / "config.yaml", r.deep_merge(r.load_yaml(r.BASE), delta))
+            # THE expected config (merge + renderer pins), never a bare deep_merge that strips them.
+            r.write_generated(pdir / "config.yaml", r.expected_config(r.load_yaml(r.BASE), delta, pdir))
 `;
 
 /** Role-owned projection, after the existing template has established the desk. */

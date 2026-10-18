@@ -346,7 +346,9 @@ try {
     // carries three: its own records, the board projection (a DIFFERENT owner), and
     // the bloodbank gate, which contract.ts:624 requires to be alone in its block.
     assert.equal(parsed.data.authorities.length, 7, "envelope must carry exactly the declared authorities");
-    assert.equal(parsed.data.projections.length, 6, "envelope must carry exactly the declared projections");
+    // Seven: the sixth overlap pair plus profile_terminal_cwd (2026-10-18), the renderer's registry
+    // project_path -> generated config.yaml terminal.cwd pin.
+    assert.equal(parsed.data.projections.length, 7, "envelope must carry exactly the declared projections");
     assert.equal(parsed.data.classifications.length, 5, "envelope must carry five lifecycle classes");
     assert.equal(parsed.data.retired.length, 6, "envelope must carry exactly the declared retired modes, including heartbeat");
     assert.equal(parsed.data.byte_stable, true, "tracked contract must round-trip byte-stably");
@@ -415,6 +417,7 @@ try {
       ["projects.{slug}.ticket_provider.board_id", "agents.{agent_id}.plane.project_id"],
       ["projects.{slug}.ticket_provider.workspace", "agents.{agent_id}.plane.workspace"],
       ["agents.{agent_id}.role_dir", "projects.{slug}.agents.{role}.role_dir"],
+      ["agents.{agent_id}.project_path", "profiles.{profile_name}.config.yaml"],
     ];
     for (const [source, target] of overlaps) {
       const matches = parsed.data.projections.filter((item) => item.source === source && item.target === target);
@@ -431,6 +434,10 @@ try {
     assert.equal(identifier.direction, "pjangler_project_registry_to_agent_registry");
     const roleDir = parsed.data.projections.find((item) => item.source === "agents.{agent_id}.role_dir");
     assert.equal(roleDir.direction, "agent_registry_to_pjangler_project_registry", "truth flows the other way for role_dir");
+    // The renderer, not a registry writer, owns the generated config: the org chart is only its input.
+    const cwd = parsed.data.projections.find((item) => item.field === "profile_terminal_cwd");
+    assert.equal(cwd.writable_by, "runtime-template");
+    assert.equal(cwd.direction, "agent_registry_to_hermes_profile_tree");
   });
 
   check("every projection endpoint is a field some authority really declares", () => {
