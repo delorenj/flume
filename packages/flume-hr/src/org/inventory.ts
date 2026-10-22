@@ -58,6 +58,7 @@ import {
   type FleetPathClassification,
   type FleetPathView,
   type FleetStoreView,
+  parkedChannels,
 } from "./types";
 
 /** A registry larger than this is not a fleet registry; it is an accident. */
@@ -1133,6 +1134,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
       : roleDir,
     profile_name: profileName,
     hindsight_write_bank: hindsightWriteBank,
+    channels_offline: parkedChannels(raw),
     profile_path: profilePath,
     runtime_path: runtimePath,
     expected_units: expectedUnits,

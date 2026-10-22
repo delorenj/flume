@@ -33,6 +33,7 @@ import { accessReceipts } from "./workforce/receipts";
 import { provisionEmployee } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
+import { channelList, channelOffline, channelOnline, formatChannelList, formatChannelResult } from "./workforce/channel";
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, requestMail, startAccessServer } from "./workforce/access";
 import { githubApiBase, githubEvidence } from "./workforce/github";
 import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
@@ -656,6 +657,63 @@ commentCmd
     const result = verifyPlaneComments({ ref, comments: options.comment, apply: Boolean(options.apply) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatPlaneCommentResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+// ============================================================================
+// CHANNELS: park a chat bot on purpose, and bring it back
+// ============================================================================
+
+const channelCmd = program
+  .command("channel")
+  .description("An employee's chat channels: park one offline (token rotated out, Telegram's active-bot cap) and bring it back");
+
+async function channelResult<T extends { ok: boolean }>(action: () => Promise<T>, json: boolean, format: (result: T) => string): Promise<void> {
+  guardBrokenPipe();
+  let result: T;
+  try { result = await action(); }
+  catch (error) { result = { ok: false, blockers: [{ code: "channel-failed", detail: (error as Error).message }] } as unknown as T; }
+  const failed = result as unknown as { blockers?: Array<{ code: string; detail: string }> };
+  await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n`
+    : (result as { employee?: string }).employee || !failed.blockers?.length ? format(result)
+      : `${failed.blockers.map((blocker) => `✗ ${blocker.code}: ${blocker.detail}`).join("\n")}\n`);
+  await exitAfterFlush(result.ok ? 0 : 1);
+}
+
+channelCmd
+  .command("offline")
+  .argument("<employee>", "Registry id (or profile name)")
+  .description("Park a channel: keep the credential reference, pin the platform disabled, record why. Preview unless --apply")
+  .option("--platform <platform>", "telegram or slack", "telegram")
+  .option("--reason <text>", "Why it is parked; recorded as offline_reason")
+  .option("--apply", "Write it (default is a preview)")
+  .option("--no-reload", "Do not touch the running gateway; the change is written but not picked up")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await channelResult(() => channelOffline(employee, { platform: options.platform, reason: options.reason, apply: Boolean(options.apply), noReload: options.reload === false }), options.json, formatChannelResult);
+  });
+
+channelCmd
+  .command("online")
+  .argument("<employee>", "Registry id (or profile name)")
+  .description("Bring a channel back. With --credential-ref this is the rotation path: the new bot is verified with its platform (getMe) first. Preview unless --apply")
+  .option("--platform <platform>", "telegram or slack", "telegram")
+  .option("--credential-ref <ref>", "op://<vault>/<item-uuid>/<field> of the NEW bot token (default: re-enable the reference already in the delta)")
+  .option("--app-token-ref <ref>", "slack only: op:// reference of the app-level token")
+  .option("--apply", "Verify, write and re-enable (default is a preview)")
+  .option("--no-reload", "Do not touch the running gateway; the change is written but not picked up")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await channelResult(() => channelOnline(employee, { platform: options.platform, credentialRef: options.credentialRef, appTokenRef: options.appTokenRef, apply: Boolean(options.apply), noReload: options.reload === false }), options.json, formatChannelResult);
+  });
+
+channelCmd
+  .command("list")
+  .description("Every employee x platform: registry status, delta enabled, credential reference present (names only), live gateway state, and how many Telegram bots are active")
+  .option("--employee <id>", "Only this employee")
+  .option("--all", "Also list deferred channels nobody wired")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    await channelResult(async () => channelList(options.employee, { all: Boolean(options.all) }), options.json, formatChannelList);
   });
 
 // ============================================================================

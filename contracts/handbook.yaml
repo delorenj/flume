@@ -39,7 +39,7 @@
 # very drift this contract exists to name.
 
 schema_version: 5
-contract_version: 1.5.0
+contract_version: 1.6.0
 
 compatibility:
   min_schema_version: 1
@@ -147,6 +147,13 @@ authorities:
       - agents.{agent_id}.runtime_repo
       - agents.{agent_id}.telegram.provisioning_status
       - agents.{agent_id}.slack.provisioning_status
+      # A channel the operator PARKED on purpose (`flume channel offline`): the status above reads
+      # `offline`, and these two say since when and why. Written only by `flume channel`, under the
+      # registry lock and the profile config lock; cleared by `flume channel online`.
+      - agents.{agent_id}.telegram.offline_since
+      - agents.{agent_id}.telegram.offline_reason
+      - agents.{agent_id}.slack.offline_since
+      - agents.{agent_id}.slack.offline_reason
       - agents.{agent_id}.bloodbank.gateway_scope
       - agents.{agent_id}.bloodbank.target_agent_id
       - agents.{agent_id}.hermes.bin
@@ -786,9 +793,15 @@ service_manifest:
       - slack
     status_field: provisioning_status
     verified_status: verified
+    # `offline` is a deferred status the OPERATOR chose (`flume channel offline`): a rotated-out
+    # token, Telegram's active-bot cap, a revoked bot. The credential reference stays in the delta,
+    # the delta pins the platform disabled, and the row records offline_since/offline_reason. The
+    # observers read it exactly as they read `deferred` -- the gateway must not be trying to
+    # connect it -- so a parked channel is reported, never a failure and never "unable to assess".
     deferred_statuses:
       - disabled
       - deferred
+      - offline
     enabled_path: "platforms.{platform}.enabled"
     secret_env:
       telegram:

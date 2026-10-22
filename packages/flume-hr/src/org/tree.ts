@@ -60,7 +60,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { bold, cyan, dim, gray, green, magenta, red, yellow } from "../utils/style";
 import { redactHome } from "./output";
-import { FleetError } from "./types";
+import { FleetError, parkedChannels } from "./types";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -127,6 +127,8 @@ export interface OrgNode {
    * departments and any row whose runtime is not Hermes.
    */
   desk: OrgDeskState;
+  /** Platforms the operator parked on purpose (`flume channel offline`). Visible, never a defect. */
+  channels_offline: string[];
 }
 
 export type OrgDeskState = "present" | "missing" | "n/a";
@@ -330,6 +332,8 @@ interface RegistryAgent {
   profile_name: string;
   /** The optional per-row override. Absent from the schema today; honoured anyway. */
   reports_to: string | null;
+  /** Platforms the operator parked on purpose; drawn as `[telegram offline]`. */
+  channels_offline: string[];
 }
 
 interface RegistryRead {
@@ -365,6 +369,7 @@ function readRegistry(path: string): RegistryRead {
       project_path: asString(row.project_path),
       profile_name: asString(row.profile_name) ?? key,
       reports_to: asString(row.reports_to),
+      channels_offline: parkedChannels(row),
     });
   }
   return { agents, warnings };
@@ -672,6 +677,7 @@ function makeNode(partial: Partial<OrgNode> & Pick<OrgNode, "id" | "kind">): Org
     department: null,
     note: null,
     desk: "n/a",
+    channels_offline: [],
     ...partial,
     edge,
     inferred: edge === "inferred",
@@ -799,6 +805,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
         repo: agent.repo,
         project_path: agent.project_path,
         desk: deskState(agent),
+        channels_offline: agent.channels_offline,
       }),
     );
   }
@@ -1079,6 +1086,8 @@ function nodeLabel(node: OrgNode): string {
   parts.push(green(node.role));
   if (node.repo) parts.push(dim("·"), gray(node.repo));
   if (node.desk === "missing") parts.push(red("[no desk]"));
+  // A parked channel is the operator's own decision: shown, in the warning colour, never red.
+  for (const platform of node.channels_offline) parts.push(yellow(`[${platform} offline]`));
   if (node.edge === "registry") parts.push(dim("[reports_to]"));
   if (node.note && node.inferred) parts.push(dim(`[${node.note}]`));
   return parts.join(" ");

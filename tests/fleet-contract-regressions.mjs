@@ -1175,7 +1175,7 @@ try {
 
   check("the current handbook requires only the gateway and explicitly retires heartbeat units", () => {
     const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
-    assert.equal(contract.contract_version, "1.5.0");
+    assert.equal(contract.contract_version, "1.6.0");
     assert.deepEqual(contract.service_model.per_agent, { gateway_unit: "hermes-{agent_id}-gateway.service" });
     assert.equal("heartbeat" in contract.service_manifest, false);
     assert.equal(contract.authorities.systemd_lifecycle.writable_fields.some((field) => field.includes("heartbeat")), false);

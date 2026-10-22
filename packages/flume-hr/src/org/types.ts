@@ -687,6 +687,8 @@ export interface FleetInventoryRow {
   profile_name: FleetFieldValue<string>;
   /** Explicit personal-bank declaration for a named agent, when present. */
   hindsight_write_bank: FleetFieldValue<string>;
+  /** Platforms the operator parked on purpose (`provisioning_status: offline`). Informational: never a finding. */
+  channels_offline: string[];
   profile_path: FleetFieldValue<string>;
   runtime_path: FleetFieldValue<string>;
   expected_units: FleetFieldValue<string[]>;
@@ -2312,6 +2314,25 @@ export type FleetSystemdUnregisteredClass = (typeof FLEET_SYSTEMD_UNREGISTERED_C
 /** How the manager probe ended. `available` is any state the manifest lists (`degraded` included). */
 export const FLEET_SYSTEMD_MANAGER_CODES = ["available", "manager-unavailable", "manager-timeout"] as const;
 export type FleetSystemdManagerCode = (typeof FLEET_SYSTEMD_MANAGER_CODES)[number];
+
+/**
+ * The registry status of a channel the operator PARKED on purpose (`flume channel offline`): the
+ * credential reference stays, the delta pins the platform disabled, the registry says when and why.
+ * The observers read it as a deferred declaration, so it is visible and never a failure.
+ */
+export const CHANNEL_PARKED_STATUS = "offline";
+/** The messaging platforms a registry row can park; the handbook's `messaging.platforms` is the contract. */
+export const CHANNEL_PLATFORM_IDS = ["telegram", "slack"] as const;
+
+/** Platforms whose registry block says `provisioning_status: offline`. */
+export function parkedChannels(row: unknown): string[] {
+  if (typeof row !== "object" || row === null) return [];
+  const record = row as Record<string, unknown>;
+  return CHANNEL_PLATFORM_IDS.filter((platform) => {
+    const block = record[platform];
+    return typeof block === "object" && block !== null && (block as Record<string, unknown>).provisioning_status === CHANNEL_PARKED_STATUS;
+  });
+}
 
 /**
  * The desired gateway state, DERIVED from the registry's messaging declaration

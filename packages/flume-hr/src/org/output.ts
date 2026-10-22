@@ -755,6 +755,8 @@ interface RosterEntry {
   board: string;
   tickets: string;
   state: string;
+  /** `[telegram offline]` for each channel the operator parked on purpose; empty when none. */
+  parked: string;
   /** Every issue against this agent, worst first. `shown` is how many the cap left room for. */
   issues: InventoryIssue[];
   shown: number;
@@ -864,6 +866,8 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
     return {
       glyph: rank === 2 ? red(glyph.fail) : rank === 1 ? yellow(glyph.warn) : green(glyph.pass),
       id: bounded(id, 128),
+      // A channel the operator parked is a decision, not a defect: it follows the tally, never inside it.
+      parked: row.channels_offline.map((platform) => `[${platform} offline]`).join(" "),
       repo: bounded(row.repo.value ?? row.project_id.value ?? "-"),
       repoPaint: projectState === "resolved" ? plain : stateColor(projectState),
       role: fieldCell(row.role),
@@ -959,7 +963,8 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
     // row whose detail the cap withheld must still say how bad it is.
     const row = `    ${entry.glyph}  ${cell(entry.id, plain, columns.id)}  ${cell(entry.repo, entry.repoPaint, columns.repo)}  `
       + `${cell(entry.role, cyan, columns.role)}  ${cell(entry.board, dim, columns.board)}  `
-      + `${cell(entry.tickets, dim, columns.tickets)}  ${cell(entry.state, dim, columns.state)}  ${issueTally(entry.issues)}`;
+      + `${cell(entry.tickets, dim, columns.tickets)}  ${cell(entry.state, dim, columns.state)}  ${issueTally(entry.issues)}`
+      + (entry.parked ? `  ${yellow(entry.parked)}` : "");
     lines.push(row.trimEnd());
     for (const issue of entry.issues.slice(0, entry.shown)) lines.push(issueLine(issue, codeWidth, 0, width));
     const held = entry.issues.length - entry.shown;

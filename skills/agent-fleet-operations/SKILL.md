@@ -33,6 +33,9 @@ flume review [--agent <id>]        performance review across all nine observatio
 flume handbook validate            authorities, classes, service model, retired modes
 flume audit [repo] [--rules ids]   the employee invariants a repository is subject to
 flume remediate <finding> [repo]   correct one finding
+flume channel list [--employee e]  every employee x platform: status, delta enabled, ref names, live gateway state, active Telegram bot count
+flume channel offline <employee> [--platform p] [--reason ".."] [--apply]   park a channel on purpose (preview unless --apply)
+flume channel online <employee> [--platform p] [--credential-ref op://..] [--apply]   bring it back / rotate to a new bot (getMe-verified)
 ```
 
 `roster`, `record`, `review` and `handbook validate` are strictly read-only, take
@@ -314,6 +317,25 @@ process control, service changes, board changes, or Bloodbank activation.
   scripts predate 0208c9e, re-parse role.yaml. The same migration flips an
   unmarked legacy `reconcile.enabled: false` to the operational default `true`
   (inert since the heartbeat retired, but it is a role.yaml diff you own).
+- **Parking a bot is `flume channel offline`, not a hand edit.** Telegram caps how many bots
+  are active, so tokens rotate; a rejected or rotated-out bot is OFFLINE, not broken. `flume
+  channel offline <employee> --reason "..." --apply` keeps the `op://` reference in the delta,
+  pins `platforms.telegram.enabled: false`, renders that ONE profile (registry flock, then the
+  profile config lock; never an absorb) and records `telegram.provisioning_status: offline` with
+  `offline_since`/`offline_reason` in the registry. The handbook lists `offline` among the
+  deferred statuses, so `flume org`/`roster` show `[telegram offline]` and `flume review` reads
+  it as parked, never a failure. Bring it back with `flume channel online <employee> --apply`
+  (re-verifies the existing reference), or rotate: `--credential-ref op://<vault>/<item-uuid>/<field>`
+  resolves the new token with `op` at apply time only, asks Telegram `getMe`, refuses a revoked
+  token or a bot another profile owns, and records `bot_username`/`bot_id`. A gateway config
+  re-scan only STARTS a newly enabled platform; it never stops a running one and skips a bot
+  sitting in the reconnect queue. So the command cycles just that profile through the gateway's
+  control socket (`unserve-profile` then `serve-profile` on `~/.hermes/gateway.sock`), falling
+  back to `systemctl --user reload hermes-gateway` (all profiles drain) when the socket does not
+  answer; `--no-reload` writes and says the gateway was not told. `flume channel list` shows
+  the live state and the active Telegram bot count. `infra-doctor` derives its channel
+  expectations from the same registry status and delta pin: OFFLINE is informational, an online
+  bot that is fatal with `telegram_auth_error` fails and names rotate-or-park.
 - A disabled PM gateway is usually a dead bot, not a dead project. Test the
   vaulted token with getMe, feeding the URL on stdin
   (`printf 'url = "https://api.telegram.org/bot%s/getMe"\n' "$tok" | curl -s --config -`),

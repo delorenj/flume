@@ -1742,6 +1742,25 @@ async function main() {
     assert.equal(JSON.stringify(gateway).includes(SECRET_SENTINEL), false);
   });
 
+  check("a channel the operator parked (offline) reads as deferred: pinned off passes, an unpinned one is named", () => {
+    // `flume channel offline` records provisioning_status: offline. The handbook lists it among the
+    // deferred statuses, so a parked channel is visible and judged like a deferred one: the gateway
+    // must not be trying to connect it, and the delta must pin it off. It is never "undeclared".
+    const registry = join(temp, "parked-offline.yaml");
+    writeAgentRegistry(registry, AGENTS.map((agent) => (
+      agent.name === "bravo-pm" || agent.name === "charlie-pm" ? { ...agent, telegram: "offline" } : agent
+    )));
+    setState(canonicalState({}));
+    const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
+    const bravo = agentNamed(data, "bravo-pm");
+    assert.equal(bravo.systemd.capability.declared, "deferred");
+    assert.equal(bravo.systemd.capability.platforms.telegram, "deferred");
+    assert.equal(leafOf(bravo, FIELDS.gateway).state, "pass", JSON.stringify(detailsOf(leafOf(bravo, FIELDS.gateway))));
+    const charlie = leafOf(agentNamed(data, "charlie-pm"), FIELDS.gateway);
+    assert.ok(detailsOf(charlie).includes("platform-enablement-inherited:telegram"), "a parked channel the delta does not pin off still inherits the fleet base's enablement");
+    assert.equal(detailsOf(charlie).some((detail) => detail === "channel-undeclared"), false);
+  });
+
   check("an undeclared row whose gateway is correctly disabled is a warning, not a failure", () => {
     setState(canonicalState({ "echo-pm": { gatewayEnabled: false, gatewayActive: false } }));
     const data = systemdRun();
