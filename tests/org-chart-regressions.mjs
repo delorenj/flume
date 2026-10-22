@@ -228,6 +228,47 @@ departments:
   assert.doesNotMatch(out, /[├└]── ~ /);
 });
 
+// 2026-10-22: Navi is one of IPM's products, so navi-pm reports to the IPM lead
+// while both stay members of the manager-less AutomaticAI department.
+check("org.yaml reports_to nests a member under another member and keeps its department", () => {
+  const aai = fleet("reports-to", {
+    agents: {
+      "ipm-pm": { role: "pm" },
+      "navi-pm": { role: "pm" },
+      "portal-pm": { role: "pm" },
+      "loop-a": { role: "pm" },
+      "loop-b": { role: "pm" },
+    },
+    org: `version: 1
+company: {name: "Fixture Co.", handle: "Fix"}
+ceo: {id: ceo, display_name: "Boss", title: "CEO"}
+departments:
+  - id: aai
+    name: "AutomaticAI"
+    order: 1
+    manager: null
+    members: [ipm-pm, navi-pm, portal-pm, loop-a, loop-b]
+reports_to:
+  navi-pm: ipm-pm
+  portal-pm: nobody-pm
+  loop-a: loop-b
+  loop-b: loop-a
+`,
+    desks: ["ipm-pm", "navi-pm", "portal-pm", "loop-a", "loop-b"],
+  });
+  const chart = json(aai);
+  const navi = node(chart, "navi-pm");
+  assert.equal(navi.reports_to, "ipm-pm");
+  assert.equal(navi.department, "aai");
+  assert.equal(navi.inferred, false);
+  // An unknown manager or a loop is a warning, never a guess: they stay in the department.
+  assert.notEqual(node(chart, "portal-pm").reports_to, "nobody-pm");
+  assert.ok(!(node(chart, "loop-a").reports_to === "loop-b" && node(chart, "loop-b").reports_to === "loop-a"));
+  const text = run(aai).stdout;
+  assert.match(text, /ipm-pm[^\n]*\n[│ ]+└── navi-pm/);
+  assert.match(text, /phantom/);
+});
+
 check("the header names the file that was read, and says how the path was chosen", () => {
   // Default resolution: no `via`.
   const plain = run(env).stdout;

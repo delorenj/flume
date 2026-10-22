@@ -212,6 +212,12 @@ departments:
     members:
       - n8n-specialist
 
+# Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
+# agent stays a member of its department (Holocene, which renders departments flat,
+# reads nothing here); `flume org` nests it under the named manager.
+reports_to:
+  navi-pm: james-brennan-pm   # Navi is one of IPM's five products (operator, 2026-10-22)
+
 defaults:
   unassigned_department:
     id: unassigned

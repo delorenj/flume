@@ -25,7 +25,9 @@
  *
  *   1. the registry row's own optional `reports_to` -- the provisioner writes
  *      it, so it outranks anything hand-edited;
- *   2. org.yaml's `departments[].manager` / `departments[].members`;
+ *   2. org.yaml's `departments[].manager` / `departments[].members`, with its
+ *      `reports_to` map nesting a placed member under another placed agent
+ *      inside its department;
  *   3. the inferred default (see `inferParent`).
  *
  * `reports_to` does not exist in the registry schema today. It is honoured here
@@ -395,6 +397,11 @@ interface OrgHierarchy {
   personas: Map<string, string>;
   departments: OrgDepartment[];
   hidden: string[];
+  /**
+   * org.yaml's `reports_to` map: a reporting line INSIDE a department. The agent
+   * keeps its department; only its parent node moves under the named manager.
+   */
+  reportsTo: Map<string, string>;
   /** org.yaml's own declared bucket for whatever stays unplaced. */
   unassigned: { id: string; name: string; order: number };
   warnings: string[];
@@ -412,6 +419,7 @@ function emptyHierarchy(): OrgHierarchy {
     personas: new Map(),
     departments: [],
     hidden: [],
+    reportsTo: new Map(),
     unassigned: { ...DEFAULT_UNASSIGNED },
     warnings: [],
   };
@@ -494,6 +502,15 @@ function readHierarchy(path: string): OrgHierarchy {
     if (id) result.hidden.push(id);
   }
 
+  const reportsTo = asRecord(document.reports_to);
+  if (reportsTo) {
+    for (const [id, raw] of Object.entries(reportsTo)) {
+      const manager = asString(raw);
+      if (manager) result.reportsTo.set(id.trim(), manager);
+      else result.warnings.push(`reports_to.${id} is not an agent id and was skipped`);
+    }
+  }
+
   const unassigned = asRecord(asRecord(document.defaults)?.unassigned_department);
   if (unassigned) {
     const order = unassigned.order;
@@ -553,6 +570,31 @@ function indexPlacements(hierarchy: OrgHierarchy, warnings: string[]): Map<strin
         rank: department.manager ? index : RANK_MEMBER_BASE + index,
       });
     });
+  }
+
+  // org.yaml's `reports_to` re-parents a placed agent under another placed agent and
+  // keeps its department. Anything it cannot honour is a warning, never a guess.
+  for (const [id, manager] of hierarchy.reportsTo) {
+    const placement = placements.get(id);
+    if (!placement) {
+      warnings.push(`reports_to.${id}: \`${id}\` is not placed in any department; the line is ignored`);
+      continue;
+    }
+    if (manager === id || !placements.has(manager)) {
+      warnings.push(`reports_to.${id}: \`${manager}\` is not a placed agent; \`${id}\` stays where its department puts it`);
+      continue;
+    }
+    let cursor: string | undefined = manager;
+    const seen = new Set<string>([id]);
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      cursor = hierarchy.reportsTo.get(cursor);
+    }
+    if (cursor) {
+      warnings.push(`reports_to.${id}: following \`${manager}\` loops back; the line is ignored`);
+      continue;
+    }
+    placement.parent = manager;
   }
   return placements;
 }
@@ -820,6 +862,10 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     for (const member of department.members) notePhantom(member);
   }
   for (const id of hierarchy.personas.keys()) notePhantom(id);
+  for (const [id, manager] of hierarchy.reportsTo) {
+    notePhantom(id);
+    notePhantom(manager);
+  }
   const phantom = [...phantomSet].sort();
 
   // --- edges ----------------------------------------------------------------
