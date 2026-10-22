@@ -50,6 +50,7 @@ const QUARANTINED = new Map([
  */
 const SUITES = [
   "tests/engagement-regressions.mjs",
+  "tests/org-chart-regressions.mjs",
   "tests/fleet-shared-bloodbank-regressions.mjs",
   "tests/hermes-profile-inheritance-regressions.mjs",
   "tests/pjan-48-regressions.mjs",

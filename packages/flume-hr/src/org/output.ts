@@ -56,7 +56,7 @@ import { compareStatusFindings, hostSortKey, observationSortKey } from "./health
 import { bold, cyan, dim, glyph, gray, green, joinDot, padVisible, red, statusStyle, terminalWidth, truncateVisible, visibleWidth, yellow } from "../utils/style";
 
 /** Commands allowed to produce a fleet envelope. */
-export const FLEET_COMMANDS = ["fleet.contract.validate", "fleet.inventory", "fleet.provenance", "fleet.status"] as const;
+export const FLEET_COMMANDS = ["fleet.contract.validate", "fleet.inventory", "fleet.provenance", "fleet.status", "fleet.org"] as const;
 
 /**
  * The `data` keys each command's success envelope must carry.
@@ -67,6 +67,12 @@ export const FLEET_COMMANDS = ["fleet.contract.validate", "fleet.inventory", "fl
  * threw INTERNAL_ERROR out of `renderFleetJson` instead.
  */
 const FLEET_COMMAND_DATA_KEYS: Record<string, readonly string[]> = {
+  // `flume org --json` was rejected as INTERNAL_ERROR from the day the command
+  // shipped because "fleet.org" was in neither this table nor FLEET_COMMANDS.
+  "fleet.org": [
+    "root", "nodes", "placed", "unplaced", "no_desk", "phantom", "hidden",
+    "dangling", "cycles", "warnings", "company", "sources", "totals",
+  ],
   "fleet.contract.validate": [
     "contract_path", "authorities", "projections", "classifications",
     "service_model", "activation", "retired", "extensions", "truncated", "diagnostics",

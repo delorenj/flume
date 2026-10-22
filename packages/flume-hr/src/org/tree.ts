@@ -33,15 +33,30 @@
  * over this file the first time somebody writes the field and wonders why the
  * chart ignores it.
  *
- * READ-ONLY, with no exceptions. This module opens two files for reading and
- * touches nothing else: no registry write, no org.yaml write, no directory, no
- * network, no process probe. `flume org` must be safe to run at any moment,
- * including in the middle of a hire.
+ * THE DEFAULT, in full (it is org.yaml's own documented contract, and Holocene's
+ * @holocene/org-model merge does the same): placed agents win; an agent nothing
+ * places nests into the department of the placed agent whose `project_path` is
+ * its deepest ancestor (else one sharing its exact path); anything still
+ * unplaced falls into the declared `Unassigned` department. There is no
+ * "the only director" rule: whether the fleet has one director or five is not
+ * evidence about who an unrelated agent reports to, and the roles that make an
+ * agent a director (`director`, `hr-director`, `workflows-director`, ...) are
+ * not a closed set this module can enumerate.
+ *
+ * A DESK is `<registry dir>/profiles/<profile_name>`. A Hermes employee whose
+ * registry row has no desk is drawn with a `[no desk]` marker and counted in the
+ * footer: a row with no profile is a record of somebody who cannot work.
+ *
+ * READ-ONLY, with no exceptions. This module opens two files for reading, stats
+ * one profile directory per Hermes employee, and touches nothing else: no
+ * registry write, no org.yaml write, no directory created, no network, no
+ * process probe. `flume org` must be safe to run at any moment, including in
+ * the middle of a hire.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { bold, cyan, dim, gray, green, magenta, red, yellow } from "../utils/style";
 import { redactHome } from "./output";
@@ -107,7 +122,17 @@ export interface OrgNode {
   inferred: boolean;
   /** Why this edge was chosen, when it is worth saying out loud. */
   note: string | null;
+  /**
+   * Whether the employee's Hermes profile directory exists. `n/a` for the root,
+   * departments and any row whose runtime is not Hermes.
+   */
+  desk: OrgDeskState;
 }
+
+export type OrgDeskState = "present" | "missing" | "n/a";
+
+/** Which input chose a source path; the header quotes it so a path is never anonymous. */
+export type OrgPathVia = "option" | `env ${string}` | "default";
 
 /** A `reports_to` that named something no node answers to. */
 export interface OrgDanglingEdge {
@@ -119,9 +144,16 @@ export interface OrgDanglingEdge {
 export interface OrgChartSources {
   registry_path: string;
   registry_present: boolean;
+  /** Where `registry_path` resolves to when it is a symlink; equal to it otherwise. */
+  registry_real_path: string;
+  registry_via: OrgPathVia;
   org_path: string;
   org_present: boolean;
+  org_real_path: string;
+  org_via: OrgPathVia;
   org_version: number | null;
+  /** The directory profiles (desks) are looked up under. */
+  desk_root: string;
 }
 
 export interface OrgChartTotals {
@@ -129,6 +161,8 @@ export interface OrgChartTotals {
   rendered_agents: number;
   placed: number;
   unplaced: number;
+  /** Hermes employees with a registry row and no profile directory. */
+  no_desk: number;
   phantom: number;
   hidden: number;
   departments: number;
@@ -142,6 +176,8 @@ export interface OrgChartResult {
   placed: string[];
   /** Agent ids org.yaml does not place; drawn under an inferred edge. */
   unplaced: string[];
+  /** Hermes employees whose registry row has no profile directory (no desk). */
+  no_desk: string[];
   /** Ids org.yaml names that the registry does not have. Never rendered. */
   phantom: string[];
   /** Ids org.yaml's `hidden:` list omits from the chart entirely. */
@@ -232,6 +268,27 @@ function readSource(path: string, label: string): unknown {
 // registry is precisely the class of bug this repo keeps paying for.
 // ---------------------------------------------------------------------------
 
+/** Which input chose the registry path; mirrors `resolveOrgRegistryPath` exactly. */
+export function describeOrgRegistryVia(options: BuildOrgChartOptions = {}): OrgPathVia {
+  const env = options.env ?? process.env;
+  if (options.registryPath?.trim()) return "option";
+  if (env.HERMES_AGENTS_REGISTRY?.trim()) return "env HERMES_AGENTS_REGISTRY";
+  if (env.HERMES_FLEET_REGISTRY_FILE?.trim()) return "env HERMES_FLEET_REGISTRY_FILE";
+  return "default";
+}
+
+/** Which input chose the hierarchy path; mirrors `resolveOrgHierarchyPath` exactly. */
+export function describeOrgHierarchyVia(options: BuildOrgChartOptions = {}): OrgPathVia {
+  const env = options.env ?? process.env;
+  if (options.orgPath?.trim()) return "option";
+  if (env.HERMES_ORG_PATH?.trim()) return "env HERMES_ORG_PATH";
+  return "default";
+}
+
+function realPathOrSelf(path: string): string {
+  try { return realpathSync(path); } catch { return path; }
+}
+
 /** Where the agent registry lives for this process. */
 export function resolveOrgRegistryPath(options: BuildOrgChartOptions = {}): string {
   const env = options.env ?? process.env;
@@ -269,6 +326,8 @@ interface RegistryAgent {
   type: string;
   display_name: string;
   project_path: string | null;
+  /** The desk directory name under `profiles/`; the agent id when the row omits it. */
+  profile_name: string;
   /** The optional per-row override. Absent from the schema today; honoured anyway. */
   reports_to: string | null;
 }
@@ -304,6 +363,7 @@ function readRegistry(path: string): RegistryRead {
       type: asString(row.type) ?? "unknown",
       display_name: asString(row.display_name) ?? key,
       project_path: asString(row.project_path),
+      profile_name: asString(row.profile_name) ?? key,
       reports_to: asString(row.reports_to),
     });
   }
@@ -511,47 +571,70 @@ interface InferredEdge {
   note: string;
 }
 
+/** A recorded placement that can vouch for where a neighbour belongs. */
+interface PlacementEvidence {
+  id: string;
+  project_path: string | null;
+  /** The declared department id the evidence agent sits in. */
+  department: string;
+}
+
 /**
- * THE DOCUMENTED DEFAULT for an agent nothing places. Kept in one function so
+ * THE DOCUMENTED DEFAULT for an agent nothing places -- org.yaml's own contract,
+ * and the same one Holocene's org-model merge applies. Kept in one function so
  * there is exactly one answer to "why is this agent here", and so the render can
  * quote the reason back on the node itself.
  *
- *   1. a `director` reports to the root -- a director IS a top-level report;
- *   2. anyone else reports to the NEAREST director, where nearest means the
- *      deepest director whose `project_path` contains theirs; failing that, the
- *      only director in the fleet, if there is exactly one;
- *   3. otherwise -- no director, or several with no path evidence to choose
- *      between them -- the agent hangs in org.yaml's own declared `Unassigned`
- *      department rather than being guessed into somebody's reporting line.
+ *   1. the agent nests into the department of the RECORDED placement whose
+ *      `project_path` is the deepest directory containing theirs;
+ *   2. failing that, into the department of a recorded placement at exactly the
+ *      same path (a repo's PM and its scrum master share one directory);
+ *   3. otherwise the declared `Unassigned` department. Not guessed.
  *
- * Rule 3 is the important one. Picking a boss at random from a tie would produce
- * a chart that reads as authoritative and is not.
+ * Only recorded placements are evidence. An inferred agent never vouches for
+ * another, so one wrong guess cannot propagate down a chain of guesses.
+ *
+ * There is deliberately no "only director" rule and no "director reports to the
+ * root" rule: a director is not evidence about who an unrelated employee
+ * reports to, and a fleet with one `director` row can have four more directors
+ * under other role names. Rule 3 is the important one: picking a boss to make
+ * the tree look finished would produce a chart that reads as authoritative and
+ * is not.
+ *
+ * `departmentParent` maps a declared department id to the node the member
+ * hangs from (its manager when it has a live one, else the department node).
  */
 function inferParent(
   agent: RegistryAgent,
-  directors: RegistryAgent[],
-  rootId: string,
+  evidence: readonly PlacementEvidence[],
+  departmentParent: (departmentId: string) => string | null,
   unassignedId: string,
 ): InferredEdge {
-  if (agent.role === "director") {
-    return { parent: rootId, note: "inferred: role `director` reports to the root" };
-  }
-  const others = directors.filter((director) => director.id !== agent.id);
-  const containing = others
-    .filter((director) => isPathAncestor(director.project_path, agent.project_path))
+  const usable = evidence.filter((entry) => entry.id !== agent.id && entry.project_path && agent.project_path);
+  const containing = usable
+    .filter((entry) => isPathAncestor(entry.project_path, agent.project_path))
     .sort((left, right) => (right.project_path?.length ?? 0) - (left.project_path?.length ?? 0));
-  const nearest = containing[0];
-  if (nearest) {
-    return { parent: nearest.id, note: `inferred: nearest director by project path (${nearest.id})` };
+  for (const entry of containing) {
+    const parent = departmentParent(entry.department);
+    if (parent) {
+      return { parent, note: `inferred: nested by project path under ${entry.id} (department ${entry.department})` };
+    }
   }
-  const only = others.length === 1 ? others[0] : undefined;
-  if (only) {
-    return { parent: only.id, note: `inferred: the fleet's only director (${only.id})` };
+  const sibling = usable.find(
+    (entry) => entry.project_path && agent.project_path && resolve(entry.project_path) === resolve(agent.project_path),
+  );
+  if (sibling) {
+    const parent = departmentParent(sibling.department);
+    if (parent) {
+      return { parent, note: `inferred: same project path as ${sibling.id} (department ${sibling.department})` };
+    }
   }
-  if (others.length > 1) {
-    return { parent: unassignedId, note: "inferred: several directors and no path evidence; not guessed" };
-  }
-  return { parent: unassignedId, note: "inferred: no director in the fleet" };
+  return {
+    parent: unassignedId,
+    note: agent.project_path
+      ? "inferred: no recorded placement owns this project path; not guessed"
+      : "inferred: no project path to nest by; not guessed",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -588,6 +671,7 @@ function makeNode(partial: Partial<OrgNode> & Pick<OrgNode, "id" | "kind">): Org
     project_path: null,
     department: null,
     note: null,
+    desk: "n/a",
     ...partial,
     edge,
     inferred: edge === "inferred",
@@ -628,6 +712,19 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     type: "human",
     edge: "root",
   });
+
+  // A desk is `<registry dir>/profiles/<profile_name>`. The registry's own
+  // directory (after symlinks) is the fleet home, so the lookup follows the file
+  // actually read.
+  const deskRoot = join(dirname(realPathOrSelf(registryPath)), "profiles");
+  const deskState = (agent: RegistryAgent): OrgDeskState => {
+    if (agent.type !== "hermes") return "n/a";
+    try {
+      return statSync(join(deskRoot, agent.profile_name)).isDirectory() ? "present" : "missing";
+    } catch {
+      return "missing";
+    }
+  };
 
   const nodesById = new Map<string, OrgNode>([[root.id, root]]);
   const ranks = new Map<string, number>([[root.id, 0]]);
@@ -701,6 +798,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
         type: agent.type,
         repo: agent.repo,
         project_path: agent.project_path,
+        desk: deskState(agent),
       }),
     );
   }
@@ -719,7 +817,6 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
 
   // --- edges ----------------------------------------------------------------
   const placements = indexPlacements(hierarchy, warnings);
-  const directors = visible.filter((agent) => agent.role === "director");
   const dangling: OrgDanglingEdge[] = [];
   const parentOf = new Map<string, string>();
 
@@ -745,6 +842,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     return null;
   };
 
+  const deferred: RegistryAgent[] = [];
   for (const agent of visible) {
     const node = nodesById.get(agent.id);
     if (!node) continue;
@@ -791,8 +889,28 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
       }
     }
 
-    // 3. the documented default.
-    const inferred = inferParent(agent, directors, root.id, unassignedId);
+    // 3. the documented default -- decided after every recorded edge is known,
+    //    because only recorded placements count as evidence.
+    deferred.push(agent);
+  }
+
+  const evidence: PlacementEvidence[] = [];
+  for (const agent of visible) {
+    const node = nodesById.get(agent.id);
+    if (node && !node.inferred && node.department && agent.project_path) {
+      evidence.push({ id: agent.id, project_path: agent.project_path, department: node.department });
+    }
+  }
+  const departmentParent = (departmentId: string): string | null => {
+    const manager = hierarchy.departments.find((entry) => entry.id === departmentId)?.manager;
+    if (manager && registry.agents.has(manager) && !hiddenSet.has(manager)) return manager;
+    const nodeId = departmentNodeId.get(departmentId);
+    return nodeId && nodesById.has(nodeId) ? nodeId : null;
+  };
+  for (const agent of deferred) {
+    const node = nodesById.get(agent.id);
+    if (!node) continue;
+    const inferred = inferParent(agent, evidence, departmentParent, unassignedId);
     if (inferred.parent === unassignedId) ensureUnassigned();
     node.reports_to = inferred.parent;
     node.edge = "inferred";
@@ -822,8 +940,8 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
         if (node) {
           const rescue = inferParent(
             registry.agents.get(cursor) ?? { ...(node as unknown as RegistryAgent), reports_to: null },
-            directors.filter((director) => !loop.includes(director.id)),
-            root.id,
+            evidence.filter((entry) => !loop.includes(entry.id)),
+            departmentParent,
             unassignedId,
           );
           if (rescue.parent === unassignedId) ensureUnassigned();
@@ -867,6 +985,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
   const rendered = nodes.filter((node) => node.kind === "agent");
   const placed = rendered.filter((node) => !node.inferred).map((node) => node.id).sort();
   const unplaced = rendered.filter((node) => node.inferred).map((node) => node.id).sort();
+  const noDesk = rendered.filter((node) => node.desk === "missing").map((node) => node.id).sort();
 
   // Independent recount, in the spirit of `inventory.ts`: if the tree ever drops
   // an employee, that must surface as a stated discrepancy rather than as an
@@ -880,6 +999,7 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     nodes,
     placed,
     unplaced,
+    no_desk: noDesk,
     phantom,
     hidden,
     dangling,
@@ -889,15 +1009,21 @@ export function buildOrgChart(options: BuildOrgChartOptions = {}): OrgChartResul
     sources: {
       registry_path: registryPath,
       registry_present: existsSync(registryPath),
+      registry_real_path: realPathOrSelf(registryPath),
+      registry_via: describeOrgRegistryVia(options),
       org_path: orgPath,
       org_present: hierarchy.present,
+      org_real_path: realPathOrSelf(orgPath),
+      org_via: describeOrgHierarchyVia(options),
       org_version: hierarchy.version,
+      desk_root: deskRoot,
     },
     totals: {
       registry_rows: registry.agents.size,
       rendered_agents: rendered.length,
       placed: placed.length,
       unplaced: unplaced.length,
+      no_desk: noDesk.length,
       phantom: phantom.length,
       hidden: hidden.length,
       departments: nodes.filter((node) => node.kind === "department").length,
@@ -944,10 +1070,31 @@ function nodeLabel(node: OrgNode): string {
   }
   const mark = node.inferred ? yellow(INFERRED_MARK) : "";
   const name = node.inferred ? dim(node.display_name) : bold(node.display_name);
-  const parts = [`${mark}${name}`, dim(`(${node.id})`), dim("·"), green(node.role)];
+  const parts = [`${mark}${name}`, dim(`(${node.id})`), dim("·")];
+  // A persona title from org.yaml is the operator's word for the job; the role
+  // is the registry's. Show both when they differ, so "Director of Workflows"
+  // is visible and `workflows-director` is still checkable. A title merely
+  // derived from the role adds nothing and is left out.
+  if (node.title && node.title !== titleFromRole(node.role)) parts.push(magenta(node.title), dim("·"));
+  parts.push(green(node.role));
   if (node.repo) parts.push(dim("·"), gray(node.repo));
+  if (node.desk === "missing") parts.push(red("[no desk]"));
   if (node.edge === "registry") parts.push(dim("[reports_to]"));
   if (node.note && node.inferred) parts.push(dim(`[${node.note}]`));
+  return parts.join(" ");
+}
+
+/**
+ * The path the header names. It is the path that was READ, never a default
+ * restated: a symlink shows where it lands, and a path chosen by an env var or
+ * flag says so, so a header cannot quietly describe a file other than the one
+ * behind the tree.
+ */
+function sourceLabel(path: string, realPath: string, via: OrgPathVia): string {
+  const shown = redactHome(path);
+  const parts = [shown];
+  if (realPath !== path) parts.push(`-> ${redactHome(realPath)}`);
+  if (via !== "default") parts.push(`(via ${via === "option" ? "flag" : via})`);
   return parts.join(" ");
 }
 
@@ -979,14 +1126,12 @@ export function formatOrgChart(chart: OrgChartResult, options: FormatOrgChartOpt
       ? `${chart.company.name}${chart.company.handle ? ` (${chart.company.handle})` : ""}`
       : "Org chart";
     lines.push(bold(company));
-    lines.push(
-      dim(`registry  ${redactHome(chart.sources.registry_path)}  ${chart.totals.registry_rows} employees`),
-    );
+    lines.push(dim(`registry  ${sourceLabel(chart.sources.registry_path, chart.sources.registry_real_path, chart.sources.registry_via)}  ${chart.totals.registry_rows} employees`));
     lines.push(
       dim(
         chart.sources.org_present
-          ? `hierarchy ${redactHome(chart.sources.org_path)}  v${chart.sources.org_version ?? "?"}`
-          : `hierarchy ${redactHome(chart.sources.org_path)}  MISSING — every edge below is inferred`,
+          ? `hierarchy ${sourceLabel(chart.sources.org_path, chart.sources.org_real_path, chart.sources.org_via)}  v${chart.sources.org_version ?? "?"}`
+          : `hierarchy ${sourceLabel(chart.sources.org_path, chart.sources.org_real_path, chart.sources.org_via)}  MISSING — every edge below is inferred`,
       ),
     );
     lines.push("");
@@ -1004,6 +1149,7 @@ export function formatOrgChart(chart: OrgChartResult, options: FormatOrgChartOpt
       `${bold(String(totals.registry_rows))} in the registry`,
       `${bold(String(totals.placed))} placed`,
       `${totals.unplaced > 0 ? yellow(String(totals.unplaced)) : bold("0")} inferred`,
+      `${totals.no_desk > 0 ? red(String(totals.no_desk)) : bold("0")} no desk`,
       `${totals.phantom > 0 ? red(String(totals.phantom)) : bold("0")} phantom`,
       `${bold(String(totals.hidden))} hidden`,
       `${bold(String(totals.departments))} departments`,
@@ -1018,6 +1164,11 @@ export function formatOrgChart(chart: OrgChartResult, options: FormatOrgChartOpt
       lines.push("");
       lines.push(`${red("phantom")} ${dim(`— named in ${redactHome(chart.sources.org_path)}, absent from the registry (not rendered)`)}`);
       for (const id of chart.phantom) lines.push(`  ${dim("·")} ${id}`);
+    }
+    if (chart.no_desk.length > 0) {
+      lines.push("");
+      lines.push(`${red("no desk")} ${dim(`— registry row, but no profile directory under ${redactHome(chart.sources.desk_root)}`)}`);
+      for (const id of chart.no_desk) lines.push(`  ${dim("·")} ${id}`);
     }
     if (chart.unplaced.length > 0) {
       lines.push("");

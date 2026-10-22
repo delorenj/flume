@@ -517,12 +517,11 @@ export function registerOrgCli(program: Command): void {
         });
         // A drifted chart is still ok:true — same rule as the inventory. Only a
         // COMMAND failure (unreadable registry, malformed hierarchy) is ok:false.
-        const nextActions = chart.unplaced.length || chart.phantom.length
-          ? [
-            "Place the unplaced agents in ~/.hermes/org.yaml; edges marked ~ were inferred, not recorded",
-            "Remove the phantom ids — they name agents with no registry row",
-          ]
-          : ["Every registered agent is placed; edit ~/.hermes/org.yaml to reshape the tree"];
+        const nextActions: string[] = [];
+        if (chart.unplaced.length) nextActions.push("Place the unplaced agents in ~/.hermes/org.yaml; edges marked ~ were inferred, not recorded");
+        if (chart.phantom.length) nextActions.push("Remove the phantom ids — they name agents with no registry row");
+        if (chart.no_desk.length) nextActions.push("Employees marked [no desk] have a registry row and no profile directory; hire them properly or offboard the row");
+        if (!nextActions.length) nextActions.push("Every registered agent is placed; edit ~/.hermes/org.yaml to reshape the tree");
         await write(fleetSuccessEnvelope(ORG_COMMAND, chart, nextActions), json, () => formatOrgChart(chart));
       } catch (error) {
         const normalized = normalizeFleetError(error);
