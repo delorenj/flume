@@ -1,0 +1,222 @@
+# DeloHQ company definition — the operator's hand-edited org chart.
+#
+# Sibling of agents-registry.yaml. Consumed by Holocene's /api/modules/org/tree
+# (@holocene/org-model merge) and by `flume org`. Keyed strictly by agent_id
+# (the registry's top-level agent keys).
+#
+# Precedence: this file wins. Any agent NOT placed here is auto-derived from its
+# project_path nesting (agents under a placed agent's directory nest into that
+# department); anything still unplaced falls into "Unassigned" so the chart never
+# breaks when the fleet grows. Edit this file and reload — the tree reshapes.
+#
+# Override the path with HERMES_ORG_PATH.
+#
+# TRACKED IN GIT: the real file is ~/code/33GOD/flume/org/org.yaml; ~/.hermes/org.yaml
+# is a symlink to it. Edit either path in place (never replace the symlink with a
+# copy), then commit + push flume.
+#
+# 2026-10-22 every registry employee is now placed explicitly (no inferred edges),
+# the two phantoms (condaleeza, delocontainers-pm: no registry row, no profile, no
+# unit; only ancient backups remember them) are gone, and a Workflows department
+# exists under rererere. Placement is by evidence: .project.json / README / role.
+#
+# 2026-09-20 reconciled against agents-registry.yaml: removed 7 agent_ids that no
+# longer exist (candybar-pm, coachingagentframework-pm, delodocs-pm, drumjangler-pm,
+# hermes-agent-pm, intelliforia-voice-agent-pm, jacksnaps-pm) and placed the 11 real
+# agents that were missing. Department assignment for those 11 was INFERRED from repo
+# — correct any that are wrong; this file is the authority, not the inference.
+version: 1
+
+company:
+  name: "33GOD Co."
+  handle: "DeloHQ"
+
+ceo:
+  id: ceo
+  display_name: "delo"
+  title: "Operator / CEO"
+  telegram_user: "@delorenj"
+
+# Reusable title/expertise per agent_id (optional; fills node title + badges).
+personas:
+  33god-pm:
+    title: "Chief of Staff"
+    expertise: [orchestration, platform]
+  pjangler-pm:
+    title: "Head of Provisioning"
+    expertise: [bootstrap, scaffolding, hiring]
+  voxxy-pm:
+    title: "Voice Lead (TTS)"
+    expertise: [tts, audio]
+  holocene-pm:
+    title: "Control-Plane Lead"
+    expertise: [dashboard, observability]
+  bloodbank-pm:
+    title: "Event Bus Lead"
+    expertise: [nats, events, dapr]
+  candystore-pm:
+    title: "Persistence Lead"
+    expertise: [event-store, audit]
+  skillex-pm:
+    title: "Skills Lead"
+    expertise: [agent-skills]
+  nautilus-trader-pm:
+    title: "Quant / Trading"
+    expertise: [trading, quant]
+  keepy-money-pm:
+    title: "Personal Finance"
+    expertise: [finance, budgeting]
+  delonet-director:
+    title: "Director of Infrastructure"
+    expertise: [homelab, networking, traefik]
+  infra-pm:
+    title: "Infrastructure Lead"
+    expertise: [docker, systemd, homelab]
+  delonet-company-reporter:
+    title: "Company Reporter"
+    expertise: [reporting, daily-journal]
+  marge-simpson:
+    title: "Director of HR"
+    expertise: [hiring, onboarding, identity, skills, org-design]
+  context-director:
+    title: "Director of Context"
+    expertise: [vault, knowledge-management, indexing, searchability, notebooks]
+  peter-griffin:
+    title: "Token Ops Engineer"
+    expertise: [llm-gateway, routing, token-economics, quotas, cost]
+  rererere:
+    title: "Director of Workflows"
+    expertise: [workflows, n8n, automation, orchestration]
+  n8n-specialist:
+    title: "n8n Workflow Specialist"
+    expertise: [n8n, workflows, webhooks, automation]
+  infra-specialist:
+    title: "Host Infrastructure Specialist"
+    expertise: [big-chungus, systemd, docker, hardware]
+  flume-pm:
+    title: "Head of Workforce"
+    expertise: [hiring, org-chart, handbook, agent-lifecycle]
+  monitoring-pm:
+    title: "Monitoring Lead"
+    expertise: [observability, synthetic-monitoring, alerting]
+  client-portal-pm:
+    title: "Portal & Gateway Lead"
+    expertise: [client-portal, llm-gateway, billing-portal]
+  james-brennan-pm:
+    title: "IPM Lead (client: James Brennan)"
+    expertise: [ipm, client-delivery]
+  navi-pm:
+    title: "Navi Lead (IPM technician app)"
+    expertise: [ipm, mobile, technician-app]
+  milkshake-pm:
+    title: "Client Billing Lead"
+    expertise: [cost-calculation, invoicing, client-accounts]
+
+# Departments, in display order. manager + members are agent_ids. A manager is
+# rendered first inside its department; members follow in the order listed.
+departments:
+  - id: platform
+    name: "Platform"
+    order: 1
+    manager: 33god-pm
+    members:
+      - bloodbank-pm
+      - candystore-pm
+      - holocene-pm
+      - flume-pm
+
+  - id: tooling
+    name: "Developer Tooling"
+    order: 2
+    manager: pjangler-pm
+    members:
+      - skillex-pm
+      - zshyzsh-pm
+
+  - id: delonet
+    name: "DeLoNET / Infrastructure"
+    order: 3
+    manager: delonet-director
+    members:
+      - infra-pm
+      - infra-specialist
+      - monitoring-pm
+      - delonet-company-reporter
+
+  - id: voice-ai
+    name: "Voice & AI"
+    order: 4
+    manager: voxxy-pm
+    members: []
+
+  - id: automaticai
+    name: "AutomaticAI"
+    order: 5
+    # automatic-ai-pm was removed from the registry 2026-09-20 12:10 by another writer,
+    # resolving its identity conflict with condaleeza over repo `automatic-ai`.
+    # 2026-10-18: condaleeza is absent from the registry (phantom), so the department
+    # reports straight to the CEO; Peter Griffin (Token Ops) is its first member.
+    # 2026-10-22 (operator): AAI's lines of business are james-brennan (the IPM client,
+    # being renamed to its product name IPM; repo/path still james-brennan), client-portal
+    # (the AAI API gateway + client-management dashboard) and Navi (one IPM product, split
+    # into its own repo; the other four IPM products are still inside james-brennan).
+    manager: null
+    members:
+      - james-brennan-pm     # IPM (client James Brennan)
+      - client-portal-pm
+      - navi-pm              # IPM product: technician app
+      - peter-griffin
+      - milkshake-pm
+
+  - id: finance
+    name: "Finance & Trading"
+    order: 6
+    manager: null
+    members:
+      - nautilus-trader-pm
+      - keepy-money-pm
+
+  - id: products
+    name: "Products"
+    order: 7
+    manager: null
+    members:
+      - slowburns-pm
+      - sidepiece-pm
+      - tonnybox-pm
+      - deckard-pm
+      - gruvato-pm
+      - heyma-pm
+      - ssbnk-pm
+      - dumply
+      - green-in-between-pm  # "a better game of pool"
+      - pile-of-dumb-things-pm  # tower-of-lost-things, a toddler game
+      - idealscenario-pm     # story discovery for TruthOrDarePics.com
+
+  - id: people
+    name: "People & HR"
+    order: 8
+    manager: marge-simpson
+    members: []
+
+  - id: context
+    name: "Context & Knowledge"
+    order: 9
+    manager: context-director
+    members: []
+
+  - id: workflows
+    name: "Workflows"
+    order: 10
+    manager: rererere
+    members:
+      - n8n-specialist
+
+defaults:
+  unassigned_department:
+    id: unassigned
+    name: "Unassigned"
+    order: 999
+
+# agent_ids to omit from the chart entirely (legacy dupes, retired bots).
+hidden: []
