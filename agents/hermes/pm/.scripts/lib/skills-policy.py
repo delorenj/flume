@@ -98,7 +98,7 @@ def set_policy(profile, source):
         if not rendered_before and current_dirs != []:
             raise RuntimeError(
                 "config.yaml has out-of-band drift; inspect with hermes-profile-config.py "
-                "check and absorb it before enforcing the PM skills policy"
+                "check, review `absorb --profile <name> --dry-run`, then absorb it before enforcing the PM skills policy"
             )
         if old_delta != delta:
             renderer.backup([path, config], "skills-policy")
