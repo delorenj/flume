@@ -102,6 +102,9 @@ personas:
   client-portal-pm:
     title: "Portal & Gateway Lead"
     expertise: [client-portal, llm-gateway, billing-portal]
+  bennett:
+    title: "Director of James Brennan Applications"
+    expertise: [ipm, navi, client-delivery, portfolio, portal-features]
   james-brennan-pm:
     title: "IPM Lead (client: James Brennan)"
     expertise: [ipm, client-delivery]
@@ -162,9 +165,7 @@ departments:
     # into its own repo; the other four IPM products are still inside james-brennan).
     manager: null
     members:
-      - james-brennan-pm     # IPM (client James Brennan)
-      - client-portal-pm
-      - navi-pm              # IPM product: technician app
+      - client-portal-pm     # Shared portal/gateway ownership stays here; Jim-specific work coordinates with Bennett.
       - peter-griffin
       - milkshake-pm
 
@@ -212,11 +213,20 @@ departments:
     members:
       - n8n-specialist
 
+  - id: brennan-apps
+    name: "James Brennan Applications"
+    order: 11
+    manager: bennett
+    members:
+      - james-brennan-pm
+      - navi-pm
+
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
 # reads nothing here); `flume org` nests it under the named manager.
 reports_to:
-  navi-pm: james-brennan-pm   # Navi is one of IPM's five products (operator, 2026-10-22)
+  james-brennan-pm: bennett
+  navi-pm: bennett   # Portfolio director; the IPM PM remains a collaborator, not a replacement.
 
 defaults:
   unassigned_department:
