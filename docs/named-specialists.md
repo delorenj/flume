@@ -31,3 +31,24 @@ Refresh preserves unrelated notes and config delta settings. Flume refuses an un
 Portable CLI profiles disable the dashboard and its basic authentication, and clear the inherited dashboard secret in their owned delta. The shared fleet base and unrelated dashboard settings remain unchanged. Other inherited raw credentials refuse projection before employee state is created.
 
 Launch first audits; when the only problems are projection drift (profile files, desk contract, skill links or receipt), it converges through the same refresh as `flume onboard --employee <id>` and audits again. A record that disagrees with the definition, a pending publication, foreign skills or a handwritten `config.yaml` still refuse. An enrolled, active company identity with a `cloudflare_access` binding authorized on the `identity.delo.sh` Access policy is required. Launch then resolves only the employee's member-token reference, `secrets.onepassword.env.AUTOMATICAI_GATEWAY_KEY` in the profile delta (`op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-<id>`, minted with `gateway-tokens.py mint hermes-<id>`), falling back to `op://DeLoSecrets/hermes-<id>/credential`, into the child process environment. It uses the declared `HERMES_FLEET_BIN` from the trusted fleet environment, or the template configuration's `hermes_bin`, and refuses an unavailable pin. Without a declared runtime it uses `hermes` on PATH. Tests pin their fixture executable explicitly. Launch pins the profile, preserves the requested CWD and propagates the Hermes exit code. A missing vault token or Hermes executable is a deployment dependency; a fixture is not a live acceptance receipt. FLUME-39 owns minting the missing member token. Hire neither mints it nor starts Bloodbank, cron or systemd. Partial projection failures report the owned state; inspect it and retry `onboard` after correcting the cause.
+
+## Persona update (FLUME-69)
+
+`flume identity update <employee>` renames the person and re-voices their charter on the definition they already own — for a portable specialist, `~/.agents/workforce/<id>/agent.yaml`. It is a preview unless `--apply`:
+
+```sh
+flume identity update bennett --name Christopher --json                  # preview
+flume identity update bennett --name Christopher --apply --json          # write + converge
+flume identity update bennett --tone "Warm, direct and precise." --apply --json
+flume identity update bennett --directives-file directives.yaml --apply --json
+```
+
+`--name` changes `display_name` only. **No personality is invented from the name**: tone and directives change only when the operator passes `--tone` or `--directives-file` (a YAML list of strings, or one directive per line; it replaces the list). Re-running with the same inputs is a no-op.
+
+Every changed candidate is validated before publication and checked again on read-back: `id`, `role`, `skills`, `memory` (write and recall banks), `desk`, `schema_version`, `identity`, the whole `company_identity` block, and `charter.purpose` must remain semantically equal. YAML comments are retained; byte-identical formatting is not promised. Apply keeps the registry lock through a fresh-state check, real onboarding preflight, definition publication and the onboarding refresh. The profile adapter takes the canonical profile lock inside that transaction. A read-back failure restores the original definition inode before any refresh. Existing ownership conflicts refuse during preflight, without changing the definition.
+
+If a later projection step fails or the process is interrupted, the candidate definition remains canonical. The command reports a partial result and `recovery.next_action: flume onboard --employee <id>`; the existing profile publication journal recovers forwards, never by restoring an old definition over a later identity change. Re-running the same persona apply also converges an unfinished projection instead of incorrectly reporting a no-op. No live gateway restart is performed; active conversations may retain their earlier system prompt until their next session.
+
+Scope, honestly reported. Repo employees (post `role.yaml` holders) are refused with `unsupported-post-definition` until the named-post flow grows the same guarantees. These surfaces are **not** changed by this command and are listed `unmanaged` in every result: provider display names (GitHub App name, Plane user display name), the 1Password vault item label, the `<handle>@agents.delo.sh` mailbox (it follows the immutable company handle), chat avatars, and external Slack workspace display names. The profile's `SOUL.md`, `profile.yaml` metadata and the registry row's `display_name` ARE updated, because they project from the definition.
+
+A name change is not a post rename: the employee id, desk, profile directory, gateway unit, Bloodbank routing and memory banks all stay. Rename the post, never — the same rule the named-agent contract already carries.

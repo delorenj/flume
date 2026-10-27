@@ -70,6 +70,7 @@ const SUITES = [
   "tests/role-contract-regressions.mjs",
   "tests/named-agent-contract-regressions.ts",
   "tests/specialist-hire-regressions.mjs",
+  "tests/persona-update-regressions.mjs",
   "tests/fleet-profile-regressions.mjs",
   "tests/fleet-systemd-regressions.mjs",
   "tests/pjan-86-hermes-deploy-regressions.mjs",

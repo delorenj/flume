@@ -34,9 +34,14 @@ try{
   const config=YAML.parse(readFileSync(join(f.profile,'config.yaml'),'utf8'));assert.deepEqual(config.dashboard,{enabled:false,basic_auth:{enabled:false,secret:''},theme:'preserve'});assert.deepEqual(readFileSync(join(f.fleet,'config.yaml')),fleetBase);
   for(const file of ['config.yaml','config.delta.yaml','specialist-projection.json','profile.yaml','SOUL.md','hindsight/config.json'])assert.equal(readFileSync(join(f.profile,file),'utf8').includes('fixture-dashboard-value'),false);
   pass('public dry-run and hire clear inherited dashboard auth without copying its secret or changing fleet base');
-  const row=YAML.parse(readFileSync(f.registry,'utf8')).agents.specialist;assert.equal(row.employment,'portable-specialist');assert.equal(row.repo,undefined);assert.equal(row.project_path,undefined);assert.equal(row.bloodbank.enabled,false);
+  const row=YAML.parse(readFileSync(f.registry,'utf8')).agents.specialist;assert.equal(row.employment,'portable-specialist');assert.equal(row.repo,undefined);assert.equal(row.project_path,undefined);assert.deepEqual(row.bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'});
   assert.equal(readFileSync(join(f.desk,'agent.yaml'),'utf8'),readFileSync(f.definition,'utf8'));assert.ok(lstatSync(f.profile).isDirectory());assert.equal(existsSync(join(f.profile,'.agents')),false);assert.deepEqual(YAML.parse(readFileSync(join(f.profile,'config.yaml'),'utf8')).skills.external_dirs,[]);assert.equal(readlinkSync(join(f.profile,'skills/alpha')),join(f.catalog,'all-skills/alpha'));assert.deepEqual(result.recall_banks,['agent-specialist','infra']);
-  assert.equal(config.skills.inherit_global,false);assert.deepEqual(JSON.parse(readFileSync(join(f.profile,'hindsight/config.json'),'utf8')).recall_types,['world','experience','observation']);const standalone=f.json(f.inspect());assert.deepEqual(standalone.data.changes,[]);assert.deepEqual(standalone.data.managed.map(s=>s.name).sort(),['alpha']);pass('standalone Skillex inspection from normal HOME honors persisted exact loadout despite global activation');
+  // The pinned template (hermes-agent 1c20c5f) inherits shared global skill
+  // selection in specialist profiles: Hermes itself never reads the key
+  // (external_dirs: [] plus project_discovery: false keep discovery strict),
+  // and strict Skillex ownership still holds -- see the standalone inspection
+  // below proving only alpha is managed despite the global activation.
+  assert.equal(config.skills.inherit_global,true);assert.deepEqual(JSON.parse(readFileSync(join(f.profile,'hindsight/config.json'),'utf8')).recall_types,['world','experience','observation']);const standalone=f.json(f.inspect());assert.deepEqual(standalone.data.changes,[]);assert.deepEqual(standalone.data.managed.map(s=>s.name).sort(),['alpha','global']);pass('standalone Skillex inspection honors persisted loadout plus the inherited shared global selection');
   pass('repository-free hire creates canonical desk links, strict real profile and explicit record');assert.ok(f.json(f.run(['audit','--employee','specialist','--json'])).ok);pass('scoped audit verifies declared identity, exact loadout and memory');
   const projects=join(f.dir,'projects.yaml');writeFileSync(projects,'schema_version: 1\nprojects: {}\n');
   const roster=f.json(f.run(['roster','--agent','specialist','--agent-registry',f.registry,'--project-registry',projects,'--json']));const employee=roster.data.rows[0];assert.equal(employee.employment.value,'portable-specialist');assert.equal(employee.project_id.value,null);assert.equal(employee.correlation.value,'portable-specialist');assert.equal(employee.repo.value,null);assert.equal(employee.role_dir.value,null);assert.equal(employee.desk_path.value,f.desk);assert.deepEqual(employee.expected_units.value,[]);assert.equal(employee.findings.includes('project-record-missing'),false);assert.equal(employee.findings.includes('board-binding-missing'),false);pass('actual roster reports portable provenance without fabricated project, board, role directory or units');
@@ -45,13 +50,13 @@ try{
   writeFileSync(join(f.profile,'handwritten.md'),'keep');writeFileSync(join(f.desk,'notes.md'),'keep');const delta=YAML.parse(readFileSync(join(f.profile,'config.delta.yaml'),'utf8'));delta.operator={profile:'keep'};writeFileSync(join(f.profile,'config.delta.yaml'),YAML.stringify(delta));
   f.contract.charter.purpose='Updated charter';f.contract.skills={set:'second'};f.contract.memory.recall_banks=['docker'];f.save();const updated=f.json(f.run(['onboard','--definition',f.definition,'--json']));assert.ok(updated.changed);assert.match(readFileSync(join(f.profile,'SOUL.md'),'utf8'),/Updated charter/);assert.deepEqual(updated.skills,['beta']);assert.deepEqual(updated.recall_banks,['agent-specialist','docker']);assert.deepEqual(YAML.parse(readFileSync(join(f.profile,'config.yaml'),'utf8')).operator,{base:'preserve',profile:'keep'});assert.equal(readFileSync(join(f.profile,'handwritten.md'),'utf8'),'keep');assert.equal(readFileSync(join(f.desk,'notes.md'),'utf8'),'keep');for(const comment of ['# org comment','# employee comment','# leaf comment'])assert.ok(readFileSync(f.registry,'utf8').includes(comment));
   const snapshot=tree(f.home),again=f.json(f.run(['onboard','--employee','specialist','--json']));assert.equal(again.changed,false);assert.deepEqual(tree(f.home),snapshot);pass('refresh updates once; preserves settings, comments and handwriting; no-op preserves bytes/mtimes and receipts');
-  const refreshedStandalone=f.json(f.inspect());assert.deepEqual(refreshedStandalone.data.changes,[]);assert.deepEqual(refreshedStandalone.data.managed.map(s=>s.name).sort(),['beta']);
+  const refreshedStandalone=f.json(f.inspect());assert.deepEqual(refreshedStandalone.data.changes,[]);assert.deepEqual(refreshedStandalone.data.managed.map(s=>s.name).sort(),['beta','global']);
   assert.equal(YAML.parse(readFileSync(f.registry,'utf8')).agents.specialist.hindsight.operator_note,'keep');rmSync(join(f.desk,'.agents/skills/beta'));const broken=f.run(['audit','--employee','specialist','--json']);assert.notEqual(broken.status,0);assert.match(broken.stdout,/Desk skill differs/);f.json(f.run(['onboard','--employee','specialist']));pass('scoped audit reports owning-desk drift and onboarding repairs it while preserving registry extensions');
   const unenrolled=f.run(['launch','specialist','--','chat'],{FIXTURE_ACCESS:'yes'});assert.notEqual(unenrolled.status,0);assert.match(unenrolled.stderr,/not enrolled/);assert.equal(existsSync(f.env.LAUNCH_RECEIPT),false);pass('launch refuses an unenrolled employee: access is derived from enrolled configuration');
   f.json(f.run(['identity','enroll','specialist','--apply','--json']));const enrolledDoc=YAML.parseDocument(readFileSync(join(f.desk,'agent.yaml'),'utf8'));enrolledDoc.setIn(['company_identity','bindings'],{cloudflare_access:{principal:'specialist-client.access',instance:'https://team.cloudflareaccess.com',credential_ref:'op://DeLoSecrets/specialist-access/credential'}});writeFileSync(join(f.desk,'agent.yaml'),String(enrolledDoc));f.json(f.run(['onboard','--employee','specialist','--json']));
   writeFileSync(join(f.dir,'access.yaml'),YAML.stringify({version:1,url:'https://access.example.test',cloudflare_access:{issuer:'https://team.cloudflareaccess.com',audience:'aud-fixture'},launcher:{signing_key_ref:'op://DeLoSecrets/flume-launcher/signing-key',public_key:signing.publicKey.export({type:'spki',format:'pem'})},grants:[]}));
   const missing=f.run(['launch','specialist','--','--help']);assert.notEqual(missing.status,0);assert.match(missing.stderr,/Deployment dependency.*member token/);assert.equal(existsSync(f.env.LAUNCH_RECEIPT),false);pass('missing member token is a deployment dependency, never inherited access');
-  const launched=f.run(['launch','specialist','--','chat','-q','hello'],{FIXTURE_ACCESS:'yes',OPENAI_API_KEY:'foreign-fixture'});assert.equal(launched.status,0,launched.stdout+launched.stderr);const receipt=JSON.parse(readFileSync(f.env.LAUNCH_RECEIPT,'utf8'));assert.equal(receipt.cwd,join(f.dir,'unrelated'));assert.deepEqual(receipt.args,['--profile','specialist','chat','-q','hello']);assert.deepEqual(receipt.skills,['beta']);assert.match(receipt.soul,/Updated charter/);assert.ok(receipt.ownToken);assert.equal(receipt.foreignKey,null);assert.deepEqual(receipt.access,{id:'specialist-client.access',secret:'fixture-access-secret',assertion:true,url:'https://access.example.test',opKeys:[]});assert.equal(f.run(['launch','specialist','--','chat'],{FIXTURE_ACCESS:'yes',FIXTURE_EXIT:'7'}).status,7);assert.notEqual(f.run(['launch','specialist','--','--profile=other'],{FIXTURE_ACCESS:'yes'}).status,0);pass('fixture launch preserves CWD, pins charter/loadout/token, propagates exit and refuses profile override');
+  const launched=f.run(['launch','specialist','--','chat','-q','hello'],{FIXTURE_ACCESS:'yes',OPENAI_API_KEY:'foreign-fixture'});assert.equal(launched.status,0,launched.stdout+launched.stderr);const receipt=JSON.parse(readFileSync(f.env.LAUNCH_RECEIPT,'utf8'));assert.equal(receipt.cwd,join(f.dir,'unrelated'));assert.deepEqual(receipt.args,['--profile','specialist','chat','-q','hello']);assert.deepEqual(receipt.skills,['beta','global']);assert.match(receipt.soul,/Updated charter/);assert.ok(receipt.ownToken);assert.equal(receipt.foreignKey,null);assert.deepEqual(receipt.access,{id:'specialist-client.access',secret:'fixture-access-secret',assertion:true,url:'https://access.example.test',opKeys:[]});assert.equal(f.run(['launch','specialist','--','chat'],{FIXTURE_ACCESS:'yes',FIXTURE_EXIT:'7'}).status,7);assert.notEqual(f.run(['launch','specialist','--','--profile=other'],{FIXTURE_ACCESS:'yes'}).status,0);pass('fixture launch preserves CWD, pins charter/loadout/token, propagates exit and refuses profile override');
   for(const [label,edit,needle] of [['identity',c=>c.memory.write_bank='agent-other',/write_bank/],['catalog',c=>c.skills={set:'absent'},/resolution failed/],['path',c=>c.desk={path:'/tmp/escape'},/desk must be/],['selection',c=>c.skills={set:'first',pack:'missing@1.0.0'},/resolution failed|exclusive/]]){const x=await fixture(label);edit(x.contract);x.save();const untouched=tree(x.home),refused=x.run(['hire','--definition',x.definition]);assert.notEqual(refused.status,0);assert.match(refused.stdout+refused.stderr,needle);assert.deepEqual(tree(x.home),untouched);pass(`${label}: invalid definition refuses before effects`);}
   for(const label of ['profile','desk','ancestor','registry','skill']){const x=await fixture(`unsafe-${label}`),target=join(x.dir,'foreign');mkdirSync(target);if(label==='profile'){mkdirSync(dirname(x.profile),{recursive:true});symlinkSync(target,x.profile);}if(label==='desk'){mkdirSync(dirname(x.desk),{recursive:true});symlinkSync(target,x.desk);}if(label==='ancestor')symlinkSync(target,join(x.home,'.agents/workforce'));if(label==='registry'){rmSync(x.registry);symlinkSync(join(x.dir,'absent'),x.registry);}if(label==='skill'){x.json(x.run(['hire','--definition',x.definition]));rmSync(join(x.desk,'.agents/skills/alpha'));writeFileSync(join(x.desk,'.agents/skills/alpha'),'handwritten');}const untouched=tree(x.home),refused=x.run([label==='skill'?'onboard':'hire','--definition',x.definition]);assert.notEqual(refused.status,0);assert.deepEqual(tree(x.home),untouched);pass(`${label}: unsafe path/ownership refuses before replacing state`);}
   const drift=await fixture('profile-drift');drift.json(drift.run(['hire','--definition',drift.definition,'--json']));
@@ -59,7 +64,7 @@ try{
   const repaired=drift.json(drift.run(['onboard','--employee','specialist','--json']));assert.ok(repaired.changed);assert.equal(readlinkSync(join(drift.profile,'skills/alpha')),join(drift.catalog,'all-skills/alpha'));assert.equal(drift.inspect().status,0);
   const repairedSnapshot=tree(drift.home);assert.equal(drift.json(drift.run(['onboard','--employee','specialist','--json'])).changed,false);assert.deepEqual(tree(drift.home),repairedSnapshot);pass('missing managed profile skill is repairable drift and a second refresh is unchanged');
   const catalogOptions={registryRoot:drift.catalog,home:drift.home,stateHome:drift.env.XDG_STATE_HOME};assert.ok((await addSetSkills('first',['beta'],catalogOptions)).ok);assert.equal(drift.inspect().status,6);
-  const sameSet=drift.json(drift.run(['onboard','--employee','specialist','--json']));assert.ok(sameSet.changed);assert.deepEqual(sameSet.skills,['alpha','beta']);assert.equal(readlinkSync(join(drift.desk,'.agents/skills/beta')),join(drift.catalog,'all-skills/beta'));assert.deepEqual(drift.json(drift.inspect()).data.managed.map(s=>s.name).sort(),['alpha','beta']);
+  const sameSet=drift.json(drift.run(['onboard','--employee','specialist','--json']));assert.ok(sameSet.changed);assert.deepEqual(sameSet.skills,['alpha','beta']);assert.equal(readlinkSync(join(drift.desk,'.agents/skills/beta')),join(drift.catalog,'all-skills/beta'));assert.deepEqual(drift.json(drift.inspect()).data.managed.map(s=>s.name).sort(),['alpha','beta','global']);
   const sameSetSnapshot=tree(drift.home);assert.equal(drift.json(drift.run(['onboard','--employee','specialist','--json'])).changed,false);assert.deepEqual(tree(drift.home),sameSetSnapshot);pass('same selected catalog set can change membership and converge without a definition edit');
   const handwritten=join(drift.profile,'skills/foreign');mkdirSync(handwritten);writeFileSync(join(handwritten,'SKILL.md'),'handwritten skill');const handwrittenSnapshot=tree(drift.home);const refusal=drift.run(['onboard','--employee','specialist','--json']);assert.notEqual(refusal.status,0);assert.match(refusal.stdout+refusal.stderr,/Profile skill ownership refused/);assert.deepEqual(tree(drift.home),handwrittenSnapshot);pass('repairing managed drift still refuses handwritten profile payloads before effects');
   const bound=await fixture('bound-employee');bound.json(bound.run(['hire','--definition',bound.definition]));
@@ -87,5 +92,72 @@ try{
   partial.contract.skills={set:'second'};partial.contract.charter.purpose='Recovered charter';partial.save();
   await withLock('skillex:activation:v2',async()=>{const failed=partial.run(['onboard','--definition',partial.definition,'--json']);assert.notEqual(failed.status,0);assert.match(failed.stdout,/Partial specialist projection/);},{home:partial.home,stateHome:partial.env.XDG_STATE_HOME});
   const recovered=partial.json(partial.run(['onboard','--employee','specialist','--json']));assert.deepEqual(recovered.skills,['beta']);assert.ok(partial.json(partial.run(['audit','--employee','specialist','--json'])).ok);assert.equal(partial.json(partial.run(['onboard','--employee','specialist','--json'])).changed,false);pass('real Skillex lock failure reports partial hire/refresh and converges after retry');
+  const fleetDefault=await fixture('fleet-bloodbank-default');
+  fleetDefault.json(fleetDefault.run(['hire','--definition',fleetDefault.definition]));
+  const freshRow=()=>YAML.parse(readFileSync(fleetDefault.registry,'utf8')).agents.specialist;
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'},'a fresh hire advertises the routable fleet contract');
+  // The legacy canonical writer force-disabled every portable specialist
+  // (`enabled: false`, no routing identity) and the gateway refused to route to
+  // them. Reproduce that legacy row shape, then prove the new contract.
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.setIn(['agents','specialist','bloodbank'],{enabled:false});writeFileSync(fleetDefault.registry,String(doc));}
+  const quarantined=fleetDefault.json(fleetDefault.run(['audit','--employee','specialist','--json']));
+  assert.ok(quarantined.ok,'an explicit strict false is the operator quarantine and passes audit');
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:false,gateway_scope:'fleet',target_agent_id:'specialist'},'onboarding must never revert an explicit quarantine but still backfills the routing identity');
+  // Absent block entirely: audit reports drift (missing route metadata)...
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.deleteIn(['agents','specialist','bloodbank']);writeFileSync(fleetDefault.registry,String(doc));}
+  const absentRun=fleetDefault.run(['audit','--employee','specialist','--json']);
+  assert.notEqual(absentRun.status,0,'a record without the fleet routing identity is drift');
+  const absent=JSON.parse(absentRun.stdout);
+  assert.equal(absent.ok,false);
+  assert.ok(absent.problems.some(problem=>/bloodbank/.test(problem)),JSON.stringify(absent.problems));
+  // ...and an empty mapping (every leaf deleted) is drift too.
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.setIn(['agents','specialist','bloodbank'],doc.createNode({}));writeFileSync(fleetDefault.registry,String(doc));}
+  assert.notEqual(fleetDefault.run(['audit','--employee','specialist','--json']).status,0,'a bloodbank mapping with no route metadata is drift');
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'},'absent means enabled: onboarding backfills the routable fleet contract');
+  assert.ok(fleetDefault.json(fleetDefault.run(['audit','--employee','specialist','--json'])).ok);
+  // An existing mapping is edited leaf-by-leaf: its comments and unknown
+  // operator fields survive the backfill (no whole-block replacement).
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.deleteIn(['agents','specialist','bloodbank','gateway_scope']);doc.deleteIn(['agents','specialist','bloodbank','target_agent_id']);doc.getIn(['agents','specialist','bloodbank'],true).set('operator_note','keep');doc.getIn(['agents','specialist','bloodbank'],true).commentBefore=' bloodbank comment\n';writeFileSync(fleetDefault.registry,String(doc));}
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist',operator_note:'keep'},'an existing mapping keeps unknown operator fields through the backfill');
+  const rawBloodbank=readFileSync(fleetDefault.registry,'utf8');
+  assert.ok(rawBloodbank.includes('bloodbank comment'),'an existing mapping keeps its comments through the backfill');
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.deleteIn(['agents','specialist','bloodbank','operator_note']);writeFileSync(fleetDefault.registry,String(doc));}
+  // Absent enabled key with valid route metadata PASSES audit (fleet default:
+  // addressable) and onboarding backfills only the enabled leaf.
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.deleteIn(['agents','specialist','bloodbank','enabled']);writeFileSync(fleetDefault.registry,String(doc));}
+  assert.equal(freshRow().bloodbank.enabled,undefined);
+  assert.deepEqual(YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8')).getIn(['agents','specialist','bloodbank'],true).items.map(({key})=>String(key)).sort(),['gateway_scope','target_agent_id'],'fixture sanity: scope/target still present');
+  assert.ok(fleetDefault.json(fleetDefault.run(['audit','--employee','specialist','--json'])).ok,'absent enabled with valid route metadata is the fleet default and passes audit');
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'},'onboarding backfills the absent enabled leaf without touching valid metadata');
+  // A malformed (non-mapping) block is drift that onboarding converges whole.
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.setIn(['agents','specialist','bloodbank'],'nope');writeFileSync(fleetDefault.registry,String(doc));}
+  assert.notEqual(fleetDefault.run(['audit','--employee','specialist','--json']).status,0,'a malformed bloodbank record is drift');
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'},'a malformed record converges to the routable fleet contract');
+  assert.ok(fleetDefault.json(fleetDefault.run(['audit','--employee','specialist','--json'])).ok);
+  // A PRESENT non-boolean enabled is operator handwriting neither the writer
+  // nor the audit coerces: onboard refuses before any write, the row is
+  // untouched, and audit flags it.
+  for(const invalid of ['false',null,1,['false']]){
+    const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.setIn(['agents','specialist','bloodbank','enabled'],invalid);writeFileSync(fleetDefault.registry,String(doc));
+    const before=readFileSync(fleetDefault.registry,'utf8');
+    const refused=fleetDefault.run(['onboard','--employee','specialist','--json']);
+    assert.notEqual(refused.status,0,`onboard must refuse present enabled ${JSON.stringify(invalid)}`);
+    assert.match(refused.stdout+refused.stderr,/Bloodbank enabled for specialist must be a boolean/u,`refusal names the strict typing for ${JSON.stringify(invalid)}`);
+    assert.equal(readFileSync(fleetDefault.registry,'utf8'),before,'refusal leaves the registry byte-identical');
+    assert.notEqual(fleetDefault.run(['audit','--employee','specialist','--json']).status,0,`audit flags present enabled ${JSON.stringify(invalid)}`);
+  }
+  {const doc=YAML.parseDocument(readFileSync(fleetDefault.registry,'utf8'));doc.setIn(['agents','specialist','bloodbank','enabled'],true);writeFileSync(fleetDefault.registry,String(doc));}
+  fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'});
+  // Idempotent: a converged row re-onboards with changed=false and no rewrite.
+  const idempotent=fleetDefault.json(fleetDefault.run(['onboard','--employee','specialist','--json']));
+  assert.equal(idempotent.changed,false,'a converged row re-onboards without changes');
+  assert.deepEqual(freshRow().bloodbank,{enabled:true,gateway_scope:'fleet',target_agent_id:'specialist'});
+  pass('fleet-default Bloodbank: fresh rows route, explicit false survives, absent/malformed backfill on onboard, strict typing refuses without mutation');
   console.log(`\n${count} specialist check groups passed`);
 }finally{rmSync(work,{recursive:true,force:true});}

@@ -28,6 +28,7 @@ import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { updateEmployeePersona } from "./workforce/persona";
 import { employeeContinuity, employeeCredentials, formatLifecycleResult, restoreEmployee, retireEmployee, suspendEmployee } from "./workforce/lifecycle";
 import { accessReceipts } from "./workforce/receipts";
 import { provisionEmployee } from "./workforce/provision";
@@ -228,9 +229,26 @@ function formatIdentityResult(result: Record<string, any>): string {
   const lines: string[] = [];
   if (result.error) lines.push(`✗ ${result.error}`);
   if (result.definition) lines.push(`${result.employee}: ${result.kind} definition ${result.definition}${result.person ? ` (person ${result.person})` : ""}`);
-  if (result.identity) lines.push(`  subject ${result.identity.subject}  ${result.identity.email}  ${result.identity.status}`);
-  else if (result.enrolled === false && result.ok) lines.push("  not enrolled");
-  if (result.from !== undefined) lines.push(`  status ${result.from ?? "none"} -> ${result.to}${result.apply ? "" : " (preview)"}`);
+  if (result.from && typeof result.from === "object" && result.from.display_name !== undefined) {
+    // FLUME-69 persona update: from/to are persona objects, not status strings.
+    const { from, to } = result;
+    lines.push(`  name ${from.display_name} -> ${to.display_name}${from.display_name === to.display_name ? "" : result.apply ? "" : " (preview)"}`);
+    if (from.tone !== to.tone) lines.push(`  tone ${from.tone ?? "(none)"} -> ${to.tone}`);
+    if (from.directives.length !== to.directives.length || JSON.stringify(from.directives) !== JSON.stringify(to.directives)) lines.push(`  directives ${from.directives.length} -> ${to.directives.length}`);
+    for (const [key, value] of Object.entries(result.immutable ?? {})) lines.push(`  preserved ${key}${value === null || typeof value !== "object" ? `: ${JSON.stringify(value)}` : ""}`);
+  } else {
+    if (result.identity) lines.push(`  subject ${result.identity.subject}  ${result.identity.email}  ${result.identity.status}`);
+    else if (result.enrolled === false && result.ok) lines.push("  not enrolled");
+    if (result.from !== undefined) lines.push(`  status ${result.from ?? "none"} -> ${result.to}${result.apply ? "" : " (preview)"}`);
+  }
+  if (result.managed) lines.push(`  managed: agent.yaml ${result.managed.agent_yaml}; projection ${result.managed.projection?.length ? result.managed.projection.join(", ") : result.managed.projection}; registry ${result.managed.registry_row}`);
+  if (result.recovery) lines.push(`  partial: definition retained; recover with ${result.recovery.next_action}`);
+  if (result.rollback) {
+    lines.push(`  rollback: definition_restored=${result.rollback.definition_restored} projection_converged_back=${result.rollback.projection_converged_back}`);
+    if (result.rollback.converge_error) lines.push(`  ✗ rollback converge: ${result.rollback.converge_error}`);
+    if (result.rollback.next_action) lines.push(`  ${result.rollback.next_action}`);
+  }
+  for (const surface of result.unmanaged ?? []) lines.push(`  unmanaged ${surface.surface}: ${surface.detail}`);
   if (result.changed !== undefined && result.ok) lines.push(`  ${result.changed ? (result.apply ? "written" : "would change (preview; pass --apply)") : "no change"}`);
   for (const write of result.writes ?? []) lines.push(`  wrote ${write}`);
   if (result.receipt) lines.push(`  receipt ${result.receipt}`);
@@ -280,6 +298,19 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, status: string, options) => {
     await identityResult(() => setEmployeeStatus(employee, status, { apply: Boolean(options.apply) }), options.json);
+  });
+
+identityCmd
+  .command("update")
+  .argument("<employee>", "Registry id, unhired specialist, or person name (portable specialists only today)")
+  .description("FLUME-69: update an employee's persona — display name and charter tone/directives — on the definition they already own. Identity, company identity, bindings, memory banks, skills and desk are proven preserved. Provider display names, vault labels, mailbox and avatars are NOT changed (reported unmanaged). Preview unless --apply")
+  .option("--name <name>", "New display name (the person's name; never derived personality)")
+  .option("--tone <tone>", "New charter tone sentence")
+  .option("--directives-file <path>", "YAML list (or one-per-line) of replacement charter directives")
+  .option("--apply", "Write the definition and converge the projection (default is a preview)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(() => updateEmployeePersona(employee, { apply: Boolean(options.apply), name: options.name, tone: options.tone, directivesFile: options.directivesFile }), options.json);
   });
 
 identityCmd

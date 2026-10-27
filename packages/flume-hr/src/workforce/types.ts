@@ -31,6 +31,8 @@ export interface NamedAgentContract {
   role: string;
   charter: AgentCharter;
   skills: AgentSkillsBinding;
+  /** Optional TTS voice slug; overrides the fleet vox_voice default in the projection. */
+  voice?: string;
   memory: AgentMemoryBinding;
   desk?: AgentDeskManifest;
   /** Requires schema_version 2; see contracts/company-identity.schema.json. */

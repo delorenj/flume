@@ -132,6 +132,27 @@ function identityContinuity(p: Prepared): void {
   if (!isDeepStrictEqual(enrolled, incoming)) throw new Error("Company identity continuity: the definition's company_identity differs from the enrolled desk agent.yaml; carry the enrolled block forward (flume identity show) or onboard with --employee");
 }
 
+/** Strict Bloodbank typing for a present mapping: an absent enabled key means
+ * enabled (the fleet default), an explicit false is the operator's quarantine,
+ * and any other PRESENT value (string "false", null, 1, an array) is operator
+ * handwriting the writer refuses to coerce or guess about. */
+function fleetBloodbankEnabled(id: string, block: Record<string, unknown>): boolean {
+  const enabled = block.enabled;
+  if (enabled === undefined) return true;
+  if (enabled === false) return false;
+  if (enabled === true) return true;
+  throw new Error(`Bloodbank enabled for ${id} must be a boolean: absent means enabled, explicit false quarantines; refusing to coerce ${JSON.stringify(enabled)}`);
+}
+
+/** The same strictness, checked before any desk or registry write, so a refusal
+ * leaves the employee's desk, marker and registry row untouched. An absent or
+ * non-mapping block is not an error: onboarding converges it. */
+function bloodbankContinuity(p: Prepared): void {
+  const block = registry(p.registryPath)[p.definition.id]?.bloodbank;
+  if (!block || typeof block !== "object" || Array.isArray(block)) return;
+  fleetBloodbankEnabled(p.definition.id, block as Record<string, unknown>);
+}
+
 function deskContractDiffers(p: Prepared): boolean {
   const path = join(p.desk, "contract.yaml");
   return !existsSync(path) || readFileSync(path, "utf8") !== renderDeskContract(p.definition);
@@ -144,13 +165,28 @@ async function profileOwnership(p: Prepared): Promise<void> {
   if (!shown.ok && shown.exit !== ExitCode.DRIFT) throw new Error(`Profile skill ownership refused: ${shown.findings.map(f => `${f.code}: ${f.message}`).join("; ")}`);
 }
 
+/** Hold the registry lock across an owning-definition edit and its onboarding refresh. */
+export async function withSpecialistUpdate<T>(employee: string, action: (refresh: (dryRun?: boolean, candidatePath?: string) => ReturnType<typeof hireSpecialist>) => Promise<T>): Promise<T> {
+  if (!/^[a-z0-9][a-z0-9_-]{0,57}$/u.test(employee)) throw new Error("Unsafe employee identity");
+  const p = environment();
+  return withRegistryLock(p.registryPath, () => action((dryRun = false, candidatePath) =>
+    runSpecialist(candidatePath ?? join(p.home, ".agents/workforce", employee, "agent.yaml"), true, { expectedEmployee: employee, dryRun }, true)));
+}
+
 /** Hire is exclusive; onboard reconciles the same owned definition. */
 export async function hireSpecialist(definitionPath: string, onboard = false, options: SpecialistOptions = {}) {
+  return runSpecialist(definitionPath, onboard, options);
+}
+async function runSpecialist(definitionPath: string, onboard = false, options: SpecialistOptions = {}, registryLockHeld = false) {
   const initial = await prepare(definitionPath, options.expectedEmployee); // Invalid catalog/paths refuse before lock creation or publication.
   const apply = async () => {
     const p = await prepare(definitionPath, options.expectedEmployee || initial.definition.id);
     ownership(p, !onboard);
     identityContinuity(p);
+    // Bloodbank typing is validated before any desk or registry write: a
+    // present non-boolean enabled refuses the whole refresh with the row
+    // untouched instead of coercing or half-writing.
+    bloodbankContinuity(p);
     const preview = projection(p, true);
     await profileOwnership(p);
     if (options.dryRun) return { ok: true, dryRun: true, id: p.definition.id, desk: p.desk, profile: p.profile, projection: preview, selection: await previewRoleSelection(p.definition.id, p.plan, p.selection) };
@@ -183,7 +219,30 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
             }
           } else if (!isDeepStrictEqual(current[key], value)) doc.setIn(["agents", p.definition.id, key], value);
         }
-        if (current.bloodbank?.enabled !== false) doc.setIn(["agents", p.definition.id, "bloodbank", "enabled"], false);
+        // Fleet default: an employee is addressable. The record advertises the
+        // routable fleet contract (enabled, scope fleet, target self). An
+        // explicit strict-boolean false already on the row is the operator's
+        // quarantine; onboarding never reverts it. Absent or non-mapping rows
+        // converge whole (a plain object here would break later per-leaf
+        // setIn: Expected YAML collection); an existing mapping is edited
+        // leaf-by-leaf so its comments and unknown fields survive. The node
+        // check decides the write strategy; `current` (doc.toJS()) supplies
+        // the values -- getIn without keep returns the YAMLMap node itself,
+        // whose properties are not the row's leaves.
+        const isBloodbankMap = YAML.isMap(doc.getIn(["agents", p.definition.id, "bloodbank"], true));
+        const priorBloodbank = isBloodbankMap ? current.bloodbank as Record<string, unknown> | undefined : undefined;
+        const wantedBloodbank: Record<string, unknown> = {
+          enabled: priorBloodbank ? fleetBloodbankEnabled(p.definition.id, priorBloodbank) : true,
+          gateway_scope: "fleet",
+          target_agent_id: p.definition.id,
+        };
+        if (!isBloodbankMap) {
+          doc.setIn(["agents", p.definition.id, "bloodbank"], doc.createNode(wantedBloodbank));
+        } else {
+          for (const [leaf, value] of Object.entries(wantedBloodbank)) {
+            if (!isDeepStrictEqual(priorBloodbank?.[leaf], value)) doc.setIn(["agents", p.definition.id, "bloodbank", leaf], value);
+          }
+        }
       });
       const completionChanged = write(markerPath, JSON.stringify({ ...marker, status: "complete" }, null, 2) + "\n");
       return { ok: true, id: p.definition.id, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks,
@@ -192,7 +251,7 @@ export async function hireSpecialist(definitionPath: string, onboard = false, op
       throw new Error(`${started ? "Partial specialist projection; inspect owned state and retry onboard" : "Specialist refused before projection"}: ${(error as Error).message}`);
     }
   };
-  return options.dryRun ? apply() : withRegistryLock(initial.registryPath, apply);
+  return options.dryRun || registryLockHeld ? apply() : withRegistryLock(initial.registryPath, apply);
 }
 
 export async function auditSpecialist(employee: string) {
@@ -214,7 +273,24 @@ export async function auditSpecialist(employee: string) {
       for (const [leaf, wanted] of Object.entries(value)) if (!isDeepStrictEqual(current?.[key]?.[leaf], wanted)) problems.push(`Record differs: ${key}.${leaf}`);
     } else if (!isDeepStrictEqual(current?.[key], value)) problems.push(`Record differs: ${key}`);
   }
-  if (current?.bloodbank?.enabled !== false) problems.push("Portable specialist must have Bloodbank disabled");
+  // Fleet default: an employee is addressable. The record must advertise the
+  // routable fleet contract. An absent enabled key means enabled: with valid
+  // scope/target the row passes and onboarding backfills the key. An explicit
+  // strict-boolean false is the operator's quarantine and passes as-is; a
+  // present non-boolean enabled, a malformed block, or an enabled row missing
+  // {gateway_scope: fleet, target_agent_id: self} is drift the next onboarding
+  // refresh converges or refuses.
+  const currentBloodbank = current?.bloodbank;
+  if (!(currentBloodbank && typeof currentBloodbank === "object" && !Array.isArray(currentBloodbank))) {
+    problems.push("Record differs: bloodbank (must be the routable fleet mapping)");
+  } else if (currentBloodbank.enabled === false) {
+    // Operator quarantine: pass untouched.
+  } else if (currentBloodbank.enabled !== true && currentBloodbank.enabled !== undefined) {
+    problems.push("Record differs: bloodbank.enabled (must be a boolean: absent means enabled, explicit false quarantines)");
+  } else {
+    if (currentBloodbank.gateway_scope !== "fleet") problems.push("Record differs: bloodbank.gateway_scope (fleet is the only ingress)");
+    if (currentBloodbank.target_agent_id !== employee) problems.push("Record differs: bloodbank.target_agent_id (must be this employee)");
+  }
   return { ok: problems.length === 0, id: employee, standing: problems.length ? "on notice" : "in good standing", problems, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks, skills: p.plan.skills.map(s => s.name) };
 }
 
@@ -223,7 +299,7 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
   let audited = await auditSpecialist(employee);
   // The employment record decides identity and memory routing: a record that disagrees with the
   // definition is refused for the operator to look at, never rewritten on the way to a launch.
-  const recordDrift = audited.problems.some(problem => /^Record differs|Bloodbank disabled/u.test(problem));
+  const recordDrift = audited.problems.some(problem => /^Record differs/u.test(problem));
   if (!audited.ok && !recordDrift) {
     // Ordinary use drifts a desk: a Hermes run re-dumps its YAML, a fleet base or catalog edit moves
     // the projection. Converge through the same onboarding refresh an operator would run; it still

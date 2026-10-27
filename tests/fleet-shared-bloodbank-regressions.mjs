@@ -28,4 +28,19 @@ assert.match(parity, /must advertise bloodbank \{ gateway_scope: fleet/);
 assert.match(parity, /normalize fleet bloodbank routing for/);
 assert.match(parity, /retired per-agent consumer unit still on disk/);
 
+// The portable-specialist writer must never force a quarantine again: a row
+// it touches converges to {enabled, gateway_scope: fleet, target_agent_id:
+// self} with an explicit false preserved. These static pins keep the old
+// force-disabled projection from coming back unnoticed.
+assert.doesNotMatch(read("src/workforce/specialist.ts"), /must have Bloodbank disabled/);
+assert.match(read("src/workforce/specialist.ts"), /target_agent_id: p\.definition\.id/);
+assert.match(read("src/workforce/specialist.ts"), /gateway_scope: "fleet"/);
+// The bloodbank block must be written as a real YAML node (a plain object
+// stored with setIn breaks every later per-leaf setIn: "Expected YAML
+// collection"), and a present non-boolean enabled must refuse instead of
+// coercing -- explicit quarantine survives, strict typing holds.
+assert.match(read("src/workforce/specialist.ts"), /doc\.setIn\(\["agents", p\.definition\.id, "bloodbank"\], doc\.createNode\(wantedBloodbank\)\)/);
+assert.match(read("src/workforce/specialist.ts"), /refusing to coerce/);
+assert.match(read("src/workforce/specialist.ts"), /bloodbankContinuity\(p\)/);
+
 console.log("fleet-shared Bloodbank provisioning regressions: ok");

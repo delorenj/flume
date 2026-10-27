@@ -146,6 +146,14 @@ desk:
   assert.equal((contract as any).repo, undefined);
   assert.equal((contract as any).project_path, undefined);
   console.log("  ok: valid named agent definition passes schema validation");
+  const voiced = validateNamedAgentSchema({ ...contract, voice: "walken" });
+  assert.equal(voiced.voice, "walken");
+  const resolvedVoiced = await validateNamedAgent(voiced, { home: fixtureHome, skillexRoot, resolveSkills: false });
+  assert.equal(resolvedVoiced.voice, "walken");
+  for (const voice of ["", "bad voice!", "../walken", "x".repeat(65), null, 17]) {
+    assert.throws(() => validateNamedAgentSchema({ ...contract, voice }), NamedAgentValidationError);
+  }
+  console.log("  ok: optional voice slug survives validation/resolution; invalid slugs and nonstrings refuse");
 
   // ==========================================================================
   // Test 2: Omission of desk resolves default path
