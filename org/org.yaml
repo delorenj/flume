@@ -103,8 +103,8 @@ personas:
     title: "Portal & Gateway Lead"
     expertise: [client-portal, llm-gateway, billing-portal]
   bennett:
-    title: "Director of James Brennan Applications"
-    expertise: [ipm, navi, client-delivery, portfolio, portal-features]
+    title: "Executive Office Manager — AutomaticAI"
+    expertise: [executive-administration, intake, scheduling, follow-ups, correspondence]
   james-brennan-pm:
     title: "IPM Lead (client: James Brennan)"
     expertise: [ipm, client-delivery]
@@ -165,7 +165,8 @@ departments:
     # into its own repo; the other four IPM products are still inside james-brennan).
     manager: null
     members:
-      - client-portal-pm     # Shared portal/gateway ownership stays here; Jim-specific work coordinates with Bennett.
+      - bennett              # Christopher, Executive Office Manager; reports to the CEO, not a project lead.
+      - client-portal-pm     # Shared portal/gateway ownership stays here.
       - peter-griffin
       - milkshake-pm
 
@@ -216,7 +217,9 @@ departments:
   - id: brennan-apps
     name: "James Brennan Applications"
     order: 11
-    manager: bennett
+    # 2026-10-27: Jarad reassigned Christopher to the AutomaticAI executive office.
+    # The portfolio director seat is vacant; existing project leads keep their duties.
+    manager: null
     members:
       - james-brennan-pm
       - navi-pm
@@ -224,9 +227,7 @@ departments:
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
 # reads nothing here); `flume org` nests it under the named manager.
-reports_to:
-  james-brennan-pm: bennett
-  navi-pm: bennett   # Portfolio director; the IPM PM remains a collaborator, not a replacement.
+reports_to: {}  # The vacant Brennan portfolio seat has no acting director.
 
 defaults:
   unassigned_department:
