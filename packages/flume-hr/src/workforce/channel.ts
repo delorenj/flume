@@ -6,7 +6,7 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { CHANNEL_PARKED_STATUS } from "../org/types";
-import { hostPlatform, isLaunchdHost, launchdGatewayTarget } from "../kernel/host-platform";
+import { hostPlatform, isLaunchdHost, launchdGatewayTarget, observeLaunchdGateway } from "../kernel/host-platform";
 
 /**
  * `flume channel`: park a chat channel on purpose, and bring it back.
@@ -285,7 +285,9 @@ function restartLaunchdGateway(): { ok: boolean; detail: string } {
     `${label} failed: ${(String(run.stderr ?? "") || (run.error as NodeJS.ErrnoException | undefined)?.code || run.error?.message || `exit ${run.status}`).trim()}`;
   const hermes = spawnSync("hermes", ["gateway", "restart"], { encoding: "utf8", timeout: 60_000 });
   if (!hermes.error && hermes.status === 0) return { ok: true, detail: "restarted the launchd gateway with hermes gateway restart" };
-  const target = launchdGatewayTarget();
+  // Kick the domain the gateway is actually loaded in (gui/<uid> or user/<uid>).
+  const observed = observeLaunchdGateway();
+  const target = observed.state === "running" || observed.state === "stopped" ? observed.target : launchdGatewayTarget();
   const kick = spawnSync("launchctl", ["kickstart", "-k", target], { encoding: "utf8", timeout: 30_000 });
   if (!kick.error && kick.status === 0) return { ok: true, detail: `${failure("hermes gateway restart", hermes)}; restarted it with launchctl kickstart -k ${target}` };
   return { ok: false, detail: `${failure("hermes gateway restart", hermes)}; ${failure(`launchctl kickstart -k ${target}`, kick)}` };

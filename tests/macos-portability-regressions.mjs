@@ -201,6 +201,8 @@ try {
     stopped: bin("launchctl-stopped", { launchctl: "#!/bin/sh\nprintf '%s = {\\n\\tstate = not running\\n}\\n' \"$2\"\n" }),
     absent: bin("launchctl-absent", { launchctl: "#!/bin/sh\necho 'Could not find service \"ai.hermes.gateway\" in domain for port' >&2\nexit 113\n" }),
     broken: bin("launchctl-broken", { launchctl: "#!/bin/sh\necho 'launchctl: internal error' >&2\nexit 5\n" }),
+    // Installed over SSH / a Background session: Hermes put the job in user/<uid>, not gui/<uid>.
+    userDomain: bin("launchctl-user-domain", { launchctl: "#!/bin/sh\ncase \"$2\" in user/*) printf '%s = {\\n\\tstate = running\\n\\tpid = 4343\\n}\\n' \"$2\" ;; *) echo 'Could not find service \"ai.hermes.gateway\" in domain for user gui: 501' >&2; exit 113 ;; esac\n" }),
   };
 
   const repo = join(work, "mac-repo");
@@ -225,6 +227,7 @@ try {
       [launchctl.stopped, "fail", /is not running, so 1 role\(s\)/u],
       [launchctl.absent, "fail", /is not-loaded/u],
       [launchctl.broken, "skip", /unable to assess on a launchd host/u],
+      [launchctl.userDomain, "pass", /launchd gateway ai\.hermes\.gateway is running and serves 1 role\(s\) \(mac-repo-pm\)/u],
     ];
     for (const [launchd, status, summary] of cases) {
       const finding = sentinel(run(["audit", repo, "--json", "--rules", "systemd.sentinel"], repo, macEnv(launchd)));
@@ -286,6 +289,9 @@ try {
     assert.equal(up.data.health.verdict, "unproven", "a Mac's systemd domain cannot claim proof");
     const down = review(launchctl.absent);
     assert.equal(host(down, "systemd.manager").state, "fail");
+    const user = review(launchctl.userDomain);
+    assert.equal(user.data.systemd.manager.state, "running", "a gateway Hermes loaded into user/<uid> is found");
+    assert.equal(host(user, "systemd.manager").state, "pass");
     assert.equal(host(review(launchctl.broken), "systemd.manager").state, "unsupported");
     assert.equal(readFileSync(systemctlLog, "utf8"), "", "no systemctl child on a launchd host");
   });

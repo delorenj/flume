@@ -23,7 +23,7 @@ import { isAbsolute, join, resolve, sep } from "node:path";
 import { isSafePathSegment } from "./inventory";
 import { entryStat, readBounded, RENDERER_BASE_FILE, type BoundedRead } from "./profile";
 import { mapBounded, probeText, sleepBounded, throwIfCancelled, type FleetRunContext } from "./runtime";
-import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_LABEL, parseLaunchctlPrint, type LaunchdGatewayObservation } from "../kernel/host-platform";
+import { hostPlatform, isLaunchdHost, launchdGatewayTargets, launchdNotObservable, LAUNCHD_GATEWAY_LABEL, parseLaunchctlPrint, pickLaunchdObservation, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import {
   FLEET_STATUS_SYSTEMD_CONCURRENCY,
   type FleetContract,
@@ -1478,26 +1478,33 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
  * No pid reaches the record: two runs over one launchd state stay byte-identical.
  */
 async function collectLaunchdHealth(ctx: FleetSystemdContext): Promise<FleetSystemdHealth> {
-  const target = launchdGatewayTarget(ctx.uid === undefined ? (typeof process.getuid === "function" ? process.getuid() : null) : ctx.uid);
-  const result = await probeText(ctx.run, "launchctl", ["print", target], {
-    env: systemctlEnv(ctx),
-    timeoutMs: ctx.manifest.probe.timeout_ms,
-    keepStdoutOnFailure: true,
-  });
-  throwIfCancelled(ctx.run);
-  const gateway: LaunchdGatewayObservation = result.outcome === "timeout"
-    ? { state: "unobservable", word: "timeout", pid: null, target, detail: `launchctl print ${target} did not answer within ${ctx.manifest.probe.timeout_ms} ms` }
-    : parseLaunchctlPrint({
-      status: result.status,
-      stdout: result.value ?? "",
-      stderr: "",
-      error: result.status === null ? (result.outcome === "cancelled" ? "cancelled" : "launchctl could not be run") : null,
-    }, target);
+  // gui/<uid> first, then user/<uid>: the domains Hermes itself installs the gateway into.
+  const observations: LaunchdGatewayObservation[] = [];
+  let result: Awaited<ReturnType<typeof probeText>> | null = null;
+  for (const target of launchdGatewayTargets(ctx.uid === undefined ? (typeof process.getuid === "function" ? process.getuid() : null) : ctx.uid)) {
+    result = await probeText(ctx.run, "launchctl", ["print", target], {
+      env: systemctlEnv(ctx),
+      timeoutMs: ctx.manifest.probe.timeout_ms,
+      keepStdoutOnFailure: true,
+    });
+    throwIfCancelled(ctx.run);
+    const observation: LaunchdGatewayObservation = result.outcome === "timeout"
+      ? { state: "unobservable", word: "timeout", pid: null, target, detail: `launchctl print ${target} did not answer within ${ctx.manifest.probe.timeout_ms} ms` }
+      : parseLaunchctlPrint({
+        status: result.status,
+        stdout: result.value ?? "",
+        stderr: "",
+        error: result.status === null ? (result.outcome === "cancelled" ? "cancelled" : "launchctl could not be run") : null,
+      }, target);
+    observations.push(observation);
+    if (observation.state !== "not-loaded") break;
+  }
+  const gateway = pickLaunchdObservation(observations);
   const units = launchdNotObservable("per-agent systemd units");
   const manager: FleetSystemdManagerRecord = { code: "launchd-host", state: gateway.state, detail: `${units}; ${gateway.detail}` };
   const probe: FleetProbeRecord = {
     id: `${SYSTEMD_PROBE_KIND}:launchctl-print`, kind: SYSTEMD_PROBE_KIND, target: `launchctl print ${LAUNCHD_GATEWAY_LABEL}`,
-    outcome: gateway.state === "unobservable" ? (result.outcome === "timeout" ? "timeout" : result.outcome === "cancelled" ? "cancelled" : "failed") : "ok",
+    outcome: gateway.state === "unobservable" ? (result?.outcome === "timeout" ? "timeout" : result?.outcome === "cancelled" ? "cancelled" : "failed") : "ok",
     reason: gateway.state === "unobservable" ? "launchd-host" : null,
   };
   const perAgent = ctx.serviceModel?.per_agent ?? {};

@@ -48,6 +48,30 @@ export function launchdGatewayTarget(uid: number | null = currentUid()): string 
 }
 
 /**
+ * Every domain Hermes may have loaded the gateway into, in Hermes' own probe order
+ * (`hermes_cli/gateway_launchd.py` `_probe_launchd_domain_for_label`): `gui/<uid>` (an Aqua
+ * login), then `user/<uid>` (Background: `hermes gateway install` run over SSH or from a
+ * non-Aqua session picks it, and it is the recommended domain on macOS 26+).
+ */
+export function launchdGatewayTargets(uid: number | null = currentUid()): string[] {
+  const id = uid ?? "$(id -u)";
+  return [`gui/${id}/${LAUNCHD_GATEWAY_LABEL}`, `user/${id}/${LAUNCHD_GATEWAY_LABEL}`];
+}
+
+/**
+ * Fold one observation per domain into the gateway's: the first domain that has it loaded
+ * (running, stopped or unreadable) answers; only when every domain says not-loaded is it not-loaded.
+ */
+export function pickLaunchdObservation(observations: LaunchdGatewayObservation[]): LaunchdGatewayObservation {
+  const loaded = observations.find((observation) => observation.state !== "not-loaded");
+  if (loaded) return loaded;
+  const first = observations[0];
+  if (!first) throw new Error("pickLaunchdObservation needs at least one observation");
+  const domains = observations.map((observation) => observation.target.split("/").slice(0, 2).join("/"));
+  return { ...first, detail: `${LAUNCHD_GATEWAY_LABEL} is not loaded in ${domains.join(" or ")}; run ${LAUNCHD_GATEWAY_INSTALL}` };
+}
+
+/**
  * The launchd gateway, as `launchctl print` reports it.
  *
  * `running`      loaded and launchd reports `state = running`.
@@ -99,21 +123,26 @@ export function parseLaunchctlPrint(
   return { state: "stopped", word, pid, target, detail: `${LAUNCHD_GATEWAY_LABEL} is loaded but ${word}; start it with launchctl kickstart -k ${target} (or hermes gateway start)` };
 }
 
-/** One read-only `launchctl print` of the single multiplexed gateway. Never mutates launchd. */
+/** Read-only `launchctl print` of the single multiplexed gateway, gui then user domain. Never mutates launchd. */
 export function observeLaunchdGateway(options: { uid?: number | null; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {}): LaunchdGatewayObservation {
-  const target = launchdGatewayTarget(options.uid === undefined ? currentUid() : options.uid);
-  const result: SpawnSyncReturns<string> = spawnSync("launchctl", ["print", target], {
-    encoding: "utf8",
-    env: options.env ?? process.env,
-    timeout: options.timeoutMs ?? 10_000,
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  return parseLaunchctlPrint({
-    status: result.status,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-    error: result.error ? String((result.error as NodeJS.ErrnoException).code ?? result.error.message) : null,
-  }, target);
+  const observations: LaunchdGatewayObservation[] = [];
+  for (const target of launchdGatewayTargets(options.uid === undefined ? currentUid() : options.uid)) {
+    const result: SpawnSyncReturns<string> = spawnSync("launchctl", ["print", target], {
+      encoding: "utf8",
+      env: options.env ?? process.env,
+      timeout: options.timeoutMs ?? 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    const observation = parseLaunchctlPrint({
+      status: result.status,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+      error: result.error ? String((result.error as NodeJS.ErrnoException).code ?? result.error.message) : null,
+    }, target);
+    observations.push(observation);
+    if (observation.state !== "not-loaded") break;
+  }
+  return pickLaunchdObservation(observations);
 }
 
 /** Every executable named `command` on `env.PATH`, in PATH order. Spawns nothing. */

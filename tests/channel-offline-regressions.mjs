@@ -481,7 +481,8 @@ await check("on a launchd host the fallback is hermes gateway restart, then laun
   const second = await json(["channel", "online", "ada-pm", "--apply"], { ...mac, FAKE_HERMES_EXIT: "1" });
   assert.equal(second.body.gateway.action, "restart");
   assert.match(second.body.gateway.detail, /hermes gateway restart failed.*launchctl kickstart -k gui\/\d+\/ai\.hermes\.gateway/u);
-  assert.match(readFileSync(launchLog, "utf8"), /^hermes gateway restart\nlaunchctl kickstart -k gui\/\d+\/ai\.hermes\.gateway\n$/u);
+  // A read-only `launchctl print` (gui, then user domain) finds where the gateway is loaded first.
+  assert.match(readFileSync(launchLog, "utf8"), /^hermes gateway restart\n(launchctl print (gui|user)\/\d+\/ai\.hermes\.gateway\n)+launchctl kickstart -k gui\/\d+\/ai\.hermes\.gateway\n$/u);
   assert.equal(readFileSync(SYSLOG, "utf8"), "", "systemctl is never consulted on a launchd host");
   await startSocket();
 });
