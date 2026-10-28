@@ -62,7 +62,7 @@ import {
   type FleetInventoryOptions,
 } from "./inventory";
 import { bounded, redactHome } from "./output";
-import { mapBounded, probe, remainingMs, throwIfCancelled, type FleetRunContext } from "./runtime";
+import { mapBounded, probe, remainingMs, throwIfCancelled, type FleetProbeResult, type FleetRunContext } from "./runtime";
 import {
   FLEET_PROVENANCE_MAX_FACTS,
   FLEET_PROVENANCE_MAX_PROBES,
@@ -479,6 +479,67 @@ function gitArgv(path: string, args: readonly string[]): string[] {
   return ["git", "--no-optional-locks", "-C", path, ...args];
 }
 
+/** A branch name safe to splice into a `branch.<ref>.remote` config key (never an option). */
+const TRACKABLE_REF = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/u;
+/** A remote NAME (not a URL) safe to hand to `git remote get-url` as one argv entry. */
+const REMOTE_NAME = /^[A-Za-z0-9._][A-Za-z0-9._-]*$/u;
+
+/**
+ * The URL of the remote the pinned branch tracks, falling back to `origin`.
+ *
+ * The fleet's deploy contract is "the install tracks a `delorenj/*` branch"
+ * (hermes-agent-template `hermes-single-install-check.py`), and the operator's
+ * own checkout keeps `origin` on upstream NousResearch with `main` tracking the
+ * `delorenj` remote. Reading `origin` unconditionally therefore reported every
+ * correctly deployed checkout as pointing at upstream, and a checkout with no
+ * `origin` at all (an adopted host that dropped upstream on purpose) as
+ * unobserved. `branch.<ref>.remote` is what `git pull` on that branch fetches,
+ * so it is the remote that names what the checkout is. A ref that is not a
+ * local branch (a sha, a tag) has no tracking remote and keeps the `origin` read.
+ */
+async function probeTrackedRemote(ctx: FleetRunContext, path: string, ref: string | null): Promise<FleetProbeResult> {
+  if (ref !== null && TRACKABLE_REF.test(ref)) {
+    const tracked = await probe(ctx, gitArgv(path, ["config", "--get", `branch.${ref}.remote`]));
+    if (tracked.outcome === "timeout" || tracked.outcome === "cancelled") return tracked;
+    const name = tracked.outcome === "ok" ? (tracked.value ?? "").trim() : "";
+    // `.` means "this repository" (a local upstream) and names no remote identity.
+    if (name !== "" && name !== "." && REMOTE_NAME.test(name)) {
+      return probe(ctx, gitArgv(path, ["remote", "get-url", name]));
+    }
+    // git also accepts a bare URL as `branch.<ref>.remote`; that URL IS the identity.
+    if (gitRemoteIdentity(name) !== null) return { outcome: "ok", value: name };
+  }
+  return probe(ctx, gitArgv(path, ["remote", "get-url", "origin"]));
+}
+
+/**
+ * One repository's identity from any of git's URL spellings, or null.
+ *
+ * `git@github.com:o/r.git`, `ssh://git@github.com/o/r` and
+ * `https://github.com/o/r.git` all name one repository; a literal comparison
+ * called the operator's SSH-tracked checkout a mismatch against an HTTPS pin.
+ * The host is case-folded (DNS); userinfo, port, a trailing `.git` and slashes
+ * are dropped; the path keeps its case. Anything unparseable returns null and
+ * the caller keeps the literal comparison.
+ */
+export function gitRemoteIdentity(url: string): string | null {
+  const text = url.trim();
+  const scheme = /^(?:ssh|git|https?|git\+ssh|ssh\+git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/iu.exec(text);
+  const scp = scheme ? null : /^(?:[^@/\s]+@)?([^/:\s]+):(?!\/\/)(.+)$/u.exec(text);
+  const match = scheme ?? scp;
+  if (!match) return null;
+  const host = match[1]!.toLowerCase();
+  const path = match[2]!.replace(/\/+$/u, "").replace(/\.git$/u, "").replace(/^\/+/u, "");
+  return host && path ? `${host}/${path}` : null;
+}
+
+/** `match` when both sides are present and name one repository; otherwise compareFact decides. */
+function sameRepositoryStatus(desired: FleetProvenanceSide, observed: FleetProvenanceSide): FleetProvenanceStatus | undefined {
+  if (desired.state !== "present" || observed.state !== "present" || desired.value === null || observed.value === null) return undefined;
+  const identity = gitRemoteIdentity(desired.value);
+  return identity !== null && identity === gitRemoteIdentity(observed.value) ? "match" : undefined;
+}
+
 /**
  * Observe one checkout without following it anywhere it did not declare.
  *
@@ -491,7 +552,7 @@ function gitArgv(path: string, args: readonly string[]): string[] {
  * realpath-equal the probed directory, or the checkout is `not-a-repository-root`
  * and NOTHING is read from it.
  */
-async function probeCheckout(ctx: FleetRunContext, declared: string, home: string): Promise<CheckoutObservation> {
+async function probeCheckout(ctx: FleetRunContext, declared: string, home: string, trackedRef: string | null = null): Promise<CheckoutObservation> {
   const target = shownPath(declared);
   const base: CheckoutObservation = {
     target, classification: "undeclared", reached: false, outcome: "skipped", reason: null,
@@ -514,7 +575,10 @@ async function probeCheckout(ctx: FleetRunContext, declared: string, home: strin
       reason: toplevel.outcome === "timeout" ? "probe-timeout" : toplevel.outcome === "cancelled" ? "probe-cancelled" : "probe-failed",
     };
   }
-  const canonical = (path: string): string => { try { return realpathSync(path); } catch { return resolve(path); } };
+  // `.native` is realpath(3): on a case-insensitive APFS volume it returns the
+  // on-disk case, which is what `git rev-parse --show-toplevel` prints. The JS
+  // realpath keeps the caller's spelling, so ~/Code vs ~/code compared unequal.
+  const canonical = (path: string): string => { try { return realpathSync.native(path); } catch { return resolve(path); } };
   if (canonical(toplevel.value) !== canonical(expanded)) {
     // Deliberately reported as SKIPPED rather than failed: the probe ran and
     // answered; this command declined the answer. An operator reading
@@ -523,14 +587,15 @@ async function probeCheckout(ctx: FleetRunContext, declared: string, home: strin
   }
 
   const [remote, head, status] = await Promise.all([
-    probe(ctx, gitArgv(expanded, ["remote", "get-url", "origin"])),
+    probeTrackedRemote(ctx, expanded, trackedRef),
     probe(ctx, gitArgv(expanded, ["rev-parse", "HEAD"])),
     probe(ctx, gitArgv(expanded, ["status", "--porcelain"])),
   ]);
 
-  // A checkout with no `origin` remote is a real, reportable state, not a
-  // failure of this command: `remote get-url` exits nonzero and the identity
-  // fact goes `unobserved`. HEAD and cleanliness are independent and survive it.
+  // A checkout with no tracking remote and no `origin` is a real, reportable
+  // state, not a failure of this command: `remote get-url` exits nonzero and the
+  // identity fact goes `unobserved`. HEAD and cleanliness are independent and
+  // survive it.
   const worst = [remote.outcome, head.outcome, status.outcome].find((outcome) => outcome !== "ok") ?? "ok";
   return {
     target,
@@ -895,13 +960,16 @@ function addCheckoutFacts(ctx: ProvenanceContext, subject: AgentSubject, observa
     return present_ ? null : `the declared checkout was read, but ${what} could not be`;
   };
 
+  const identityDesired = pinSide(pin.hermes_git_url, SOURCE_TEMPLATE_CONFIG);
+  const identityObserved = observedValue(reached ? observation.remote : null);
   addFact(ctx, {
     id: "hermes.checkout_identity", scope: "agent", agent_id: agentId, field: identityField,
-    desired: pinSide(pin.hermes_git_url, SOURCE_TEMPLATE_CONFIG),
-    observed: observedValue(reached ? observation.remote : null),
+    desired: identityDesired,
+    observed: identityObserved,
+    status: sameRepositoryStatus(identityDesired, identityObserved),
     detail: reached
-      ? (why("its origin remote", observation.remote !== null) ?? "the remote the declared checkout actually points at, against the configured pin")
-      : `${why("its origin remote", false)}; no other repository's identity is reported for this agent`,
+      ? (why("its tracking remote (branch.<git_ref>.remote, else origin)", observation.remote !== null) ?? "the remote the declared checkout's pinned branch tracks (else origin), against the configured pin; URL spellings of one repository match")
+      : `${why("its tracking remote", false)}; no other repository's identity is reported for this agent`,
   });
 
   addFact(ctx, {
@@ -1038,14 +1106,15 @@ export async function collectFleetProvenance(options: FleetProvenanceOptions): P
     if (declared === null) continue;
     const expanded = expandHome(declared, home);
     let key: string;
-    try { key = realpathSync(expanded); } catch { key = resolve(expanded); }
+    try { key = realpathSync.native(expanded); } catch { key = resolve(expanded); }
     if (!byCanonical.has(key)) byCanonical.set(key, declared);
   }
   const targets = [...byCanonical.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
   // `remainingMs` throws TIMEOUT/CANCELLED, which are command failures and must
   // escape this whole function rather than degrade a fact.
   remainingMs(runContext);
-  const observations = await mapBounded(targets, PROBE_CONCURRENCY, async ([, declared]) => probeCheckout(runContext, declared, home));
+  const pinnedRef = nonEmptyString(pin.config.hermes_git_ref);
+  const observations = await mapBounded(targets, PROBE_CONCURRENCY, async ([, declared]) => probeCheckout(runContext, declared, home, pinnedRef));
   const byDeclared = new Map<string, CheckoutObservation>();
   targets.forEach(([canonical, declared], index) => {
     const observation = observations[index]!;
@@ -1068,7 +1137,7 @@ export async function collectFleetProvenance(options: FleetProvenanceOptions): P
     if (declared !== null) {
       const expanded = expandHome(declared, home);
       let key: string;
-      try { key = realpathSync(expanded); } catch { key = resolve(expanded); }
+      try { key = realpathSync.native(expanded); } catch { key = resolve(expanded); }
       observation = byDeclared.get(key) ?? null;
     }
     addCheckoutFacts(ctx, subject, observation);

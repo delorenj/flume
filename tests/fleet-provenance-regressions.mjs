@@ -718,6 +718,47 @@ try {
     );
   });
 
+  checkWithAgents(1, "identity is the remote the pinned branch tracks, in any URL spelling, not a hard-coded origin", () => {
+    // The fleet's own layout: origin on upstream, the pinned branch tracking the
+    // fork remote (hermes-single-install-check requires a delorenj/* upstream).
+    // Reading `origin` reported every correctly deployed checkout as upstream.
+    const pinData = provenance(cli(["record", "--agent", liveIds[0], "--json"]));
+    const pinUrl = factFor(pinData, "hermes.checkout_identity", liveIds[0])?.desired?.value;
+    const pinRef = factFor(pinData, "hermes.git_ref", liveIds[0])?.desired?.value;
+    if (typeof pinUrl !== "string" || typeof pinRef !== "string") skipCase("tracking-remote identity", "the host template config pins no hermes_git_url/hermes_git_ref");
+    const parsed = /^https?:\/\/([^/]+)\/(.+)$/u.exec(pinUrl);
+    if (!parsed) skipCase("tracking-remote identity", `the pin URL is not https (${pinUrl}); the scp-spelling case needs one`);
+    const scpSpelling = `git@${parsed[1]}:${parsed[2]}`;
+
+    const tracked = join(temp, "tracking-checkout");
+    makeRepo(tracked, 1);
+    assert.equal(git(tracked, ["remote", "add", "origin", "git@example.invalid:upstream/unrelated.git"]).status, 0);
+    assert.equal(git(tracked, ["remote", "add", "fork", scpSpelling]).status, 0);
+    assert.equal(git(tracked, ["config", `branch.${pinRef}.remote`, "fork"]).status, 0);
+    assert.equal(git(tracked, ["config", `branch.${pinRef}.merge`, `refs/heads/${pinRef}`]).status, 0);
+    const victim = liveIds[0];
+    const registry = mutatedRegistry("tracking-checkout", REAL_AGENT_REGISTRY, (document) => {
+      document.setIn(["agents", victim, "hermes", "repo"], tracked);
+    });
+    const data = provenance(cli(["record", "--agent-registry", registry, "--agent", victim, "--json"]));
+    const identity = factFor(data, "hermes.checkout_identity", victim);
+    assert.equal(identity.observed.value, scpSpelling, "the tracking remote's URL is the observed identity, not origin's");
+    assert.equal(identity.status, "match", "an scp-spelled URL of the pinned repository matches the https pin");
+    assert.equal(JSON.stringify(identity).includes("upstream/unrelated"), false, "origin leaked into the identity");
+
+    // No tracking config: origin is read, as before, and an unrelated origin is a mismatch.
+    const untracked = join(temp, "untracked-checkout");
+    makeRepo(untracked, 1);
+    assert.equal(git(untracked, ["remote", "add", "origin", "git@example.invalid:upstream/unrelated.git"]).status, 0);
+    const registry2 = mutatedRegistry("untracked-checkout", REAL_AGENT_REGISTRY, (document) => {
+      document.setIn(["agents", victim, "hermes", "repo"], untracked);
+    });
+    const data2 = provenance(cli(["record", "--agent-registry", registry2, "--agent", victim, "--json"]));
+    const identity2 = factFor(data2, "hermes.checkout_identity", victim);
+    assert.equal(identity2.observed.value, "git@example.invalid:upstream/unrelated.git");
+    assert.equal(identity2.status, "mismatch");
+  });
+
   checkWithAgents(1, "a dirty checkout is dirty, and dirtiness never shadows the value comparison", () => {
     const dirty = join(temp, "dirty-checkout");
     makeRepo(dirty, 1);

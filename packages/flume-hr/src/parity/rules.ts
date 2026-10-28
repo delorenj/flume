@@ -1065,10 +1065,10 @@ function templateLineageProbe(templateRoot: string): (blobId: string) => boolean
       // reporting every file as locally-modified. Require the checkout found
       // to be the template itself.
       let root: string | null = null;
-      try { root = realpathSync(templateRoot); } catch { root = null; }
+      try { root = realpathSync.native(templateRoot); } catch { root = null; }
       const top = spawnSync("git", ["-C", templateRoot, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
       let found: string | null = null;
-      if (top.status === 0) { try { found = realpathSync(top.stdout.trim()); } catch { found = null; } }
+      if (top.status === 0) { try { found = realpathSync.native(top.stdout.trim()); } catch { found = null; } }
       usable = root !== null && found !== null && root === found;
     }
     if (!usable) return true;

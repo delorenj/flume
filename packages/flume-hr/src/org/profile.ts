@@ -306,7 +306,8 @@ function gitArgv(path: string, args: readonly string[]): string[] {
 }
 
 function canonical(path: string): string {
-  try { return realpathSync(path); } catch { return resolve(path); }
+  // realpath(3): the on-disk case on a case-insensitive APFS volume, as git prints it.
+  try { return realpathSync.native(path); } catch { return resolve(path); }
 }
 
 function within(root: string, candidate: string): boolean {
