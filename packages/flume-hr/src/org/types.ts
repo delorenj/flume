@@ -2275,6 +2275,9 @@ export const FLEET_SYSTEMD_ITEM_KINDS = [
   // Collection: the manager or a child could not answer, or answered in a
   // shape this build does not read.
   "manager-unavailable", "manager-timeout", "show-failed", "show-timeout", "show-too-large", "property-malformed", "agent-id-unsafe",
+  // A launchd host (macOS): there is no user manager and no per-agent unit, so every leaf is
+  // `unsupported` -- unable to assess -- never an error that reads as a broken agent.
+  "launchd-host",
   // Topology (agents.{agent_id}.systemd.gateway_unit): the canonical gateway
   // against what the manager loads and what the registry row records.
   "gateway-missing", "misnamed-gateway", "duplicate-gateway",
@@ -2311,8 +2314,13 @@ export type FleetSystemdItemKind = (typeof FLEET_SYSTEMD_ITEM_KINDS)[number];
 export const FLEET_SYSTEMD_UNREGISTERED_CLASSES = ["retired", "transient", "profile-correlated", "managed-exception", "unclassified"] as const;
 export type FleetSystemdUnregisteredClass = (typeof FLEET_SYSTEMD_UNREGISTERED_CLASSES)[number];
 
-/** How the manager probe ended. `available` is any state the manifest lists (`degraded` included). */
-export const FLEET_SYSTEMD_MANAGER_CODES = ["available", "manager-unavailable", "manager-timeout"] as const;
+/**
+ * How the manager probe ended. `available` is any state the manifest lists (`degraded` included).
+ * `launchd-host` is a macOS host: systemctl was never spawned, and the record's `state` is what
+ * `launchctl print` says of the one multiplexed LaunchAgent (`running`, `stopped`, `not-loaded`,
+ * `unobservable`).
+ */
+export const FLEET_SYSTEMD_MANAGER_CODES = ["available", "manager-unavailable", "manager-timeout", "launchd-host"] as const;
 export type FleetSystemdManagerCode = (typeof FLEET_SYSTEMD_MANAGER_CODES)[number];
 
 /**

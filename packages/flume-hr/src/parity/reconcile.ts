@@ -58,6 +58,7 @@ import type {
 } from "../engine/types";
 import { loadFleetContract, resolveFleetContractPath, validateFleetContract } from "../org/contract";
 import { collectFleetInventory, resolveInventoryStores, resolveProfileLayout } from "../org/inventory";
+import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import type { FleetInventory, FleetInventoryFinding } from "../org/types";
 
 /**
@@ -153,7 +154,7 @@ function readFleetUncached(ctx: LifecycleContext): FleetSnapshot {
     inventory: null,
     unreadable: null,
     rows: new Map(),
-    agentRegistryPath: join(home, ".hermes", "agents-registry.yaml"),
+    agentRegistryPath: resolveAgentRegistryPath(process.env, home),
     projectRegistry: ctx.registryPath ?? "",
     profileTemplate: null,
     home,

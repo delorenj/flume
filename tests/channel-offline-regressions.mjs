@@ -459,6 +459,33 @@ await check("without a control socket the gateway is reloaded, and an unconfirme
   await json(["channel", "online", "ada-pm", "--apply"]);
 });
 
+await check("on a launchd host the fallback is hermes gateway restart, then launchctl kickstart -k, never systemctl", async () => {
+  socketServer.close();
+  rmSync(SOCK, { force: true });
+  const launchLog = join(work, "launchd.log");
+  const macBin = join(work, "mac-bin");
+  mkdirSync(macBin, { recursive: true });
+  writeFileSync(join(macBin, "hermes"), `#!/bin/sh\necho "hermes $@" >> "${launchLog}"\nexit "\${FAKE_HERMES_EXIT:-0}"\n`);
+  writeFileSync(join(macBin, "launchctl"), `#!/bin/sh\necho "launchctl $@" >> "${launchLog}"\nexit 0\n`);
+  chmodSync(join(macBin, "hermes"), 0o755);
+  chmodSync(join(macBin, "launchctl"), 0o755);
+  const mac = { FLUME_HOST_PLATFORM: "darwin", PATH: `${macBin}:${BIN}:${process.env.PATH}`, FLUME_CHANNEL_CONFIRM_MS: "1200" };
+  writeFileSync(SYSLOG, "");
+  writeFileSync(launchLog, "");
+  const first = await json(["channel", "offline", "ada-pm", "--apply"], mac);
+  assert.equal(first.status, 0);
+  assert.equal(first.body.gateway.action, "restart");
+  assert.match(first.body.gateway.detail, /no gateway control socket; restarted the launchd gateway with hermes gateway restart/u);
+  assert.equal(readFileSync(launchLog, "utf8"), "hermes gateway restart\n");
+  writeFileSync(launchLog, "");
+  const second = await json(["channel", "online", "ada-pm", "--apply"], { ...mac, FAKE_HERMES_EXIT: "1" });
+  assert.equal(second.body.gateway.action, "restart");
+  assert.match(second.body.gateway.detail, /hermes gateway restart failed.*launchctl kickstart -k gui\/\d+\/ai\.hermes\.gateway/u);
+  assert.match(readFileSync(launchLog, "utf8"), /^hermes gateway restart\nlaunchctl kickstart -k gui\/\d+\/ai\.hermes\.gateway\n$/u);
+  assert.equal(readFileSync(SYSLOG, "utf8"), "", "systemctl is never consulted on a launchd host");
+  await startSocket();
+});
+
 await check("a gateway that refuses to serve the profile falls back to a reload", async () => {
   socketServer.close();
   rmSync(SOCK, { force: true });

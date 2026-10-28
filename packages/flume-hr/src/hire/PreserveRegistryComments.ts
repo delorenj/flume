@@ -7,6 +7,8 @@ import { isDeepStrictEqual } from "node:util";
 import { parse } from "smol-toml";
 import YAML, { type Node } from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
+import { resolveFleetHomeDir } from "../kernel/fleet-paths";
+import { modernBash } from "../kernel/host-platform";
 import { withRegistryLock } from "../workforce/role";
 import { resolveTemplateConfigPath } from "./EnsureTemplateConfig";
 
@@ -31,14 +33,15 @@ export function copierFleetPaths(env: NodeJS.ProcessEnv): { registryPath: string
   };
   const fleetEnv = expand(env.HERMES_FLEET_ENV || configPath("fleet_env") || join(home, ".hermes", "fleet.env"));
   const library = join(resolveFlumeRoot(), "templates/hermes-agent/template/.scripts/lib");
-  const parsed = spawnSync("bash", ["--noprofile", "--norc", "-p", "-c", FLEET_REGISTRY_ENV,
+  // fleet-env.sh needs bash >= 4.4 (`local -n`, `mapfile -d`): "bash" on Linux, never /bin/bash 3.2 on macOS.
+  const parsed = spawnSync(modernBash(env), ["--noprofile", "--norc", "-p", "-c", FLEET_REGISTRY_ENV,
     "flume-registry-env", join(library, "fleet-env.sh"), fleetEnv, join(library, "parse-fleet-env.py")],
     { encoding: "utf8", env, timeout: 5_000, maxBuffer: 1024 * 1024 });
   if (parsed.error || parsed.status !== 0) throw new Error(`Fleet environment: ${parsed.error?.message || parsed.stderr.trim() || `loader exited ${parsed.status}`}`);
   const effective = JSON.parse(parsed.stdout) as Record<string, string | undefined>;
   const bin = effective.HERMES_FLEET_BIN || configPath("hermes_bin");
   return { registryPath: expand(effective.REGISTRY_FILE || env.HERMES_AGENTS_REGISTRY || effective.HERMES_FLEET_REGISTRY_FILE
-    || configPath("registry_file") || join(home, ".hermes", "agents-registry.yaml")), ...(bin ? { fleetBin: expand(bin) } : {}) };
+    || configPath("registry_file") || join(resolveFleetHomeDir(env, home), "agents-registry.yaml")), ...(bin ? { fleetBin: expand(bin) } : {}) };
 }
 
 export function copierRegistryPath(env: NodeJS.ProcessEnv): string {

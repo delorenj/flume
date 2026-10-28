@@ -25,6 +25,7 @@ import { formatAuditReport, formatMigrationReport, SCAFFOLD_SCRIPTS_ONLY_ENV, ty
 import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
+import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
@@ -152,7 +153,8 @@ program.command("launch")
   });
 
 async function runHire(title: string, options: Record<string, unknown>): Promise<void> {
-  const isDarwin = process.platform === "darwin";
+  const platform = hostPlatform();
+  const isDarwin = isLaunchdHost(platform);
   const local = Boolean(options.local ?? false);
   const context: HermesAgentContext = {
     targetDir: process.cwd(),
@@ -175,7 +177,9 @@ async function runHire(title: string, options: Record<string, unknown>): Promise
     // Email is opt-in only: `--email` wires it, otherwise it is never done.
     skipEmail: options.email ? false : undefined,
     skipPlane: (options.skipPlane as boolean | undefined) ?? local,
+    // A launchd host has no systemd --user; the summary points at `hermes gateway install` instead.
     skipSystemd: (options.skipSystemd as boolean | undefined) ?? (local || isDarwin),
+    hostPlatform: platform,
   };
   try {
     const ctx = lifecycleContext(context.targetDir, Boolean(context.dryRun), false, context);

@@ -1,9 +1,11 @@
 import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync} from "node:fs";
 import {join, dirname, resolve} from "node:path";
 import {homedir} from "node:os";
-import {spawn,spawnSync} from "node:child_process";
+import {spawnSync} from "node:child_process";
 import YAML from "yaml";
 import {resolveFlumeRoot} from "../kernel/paths";
+import {withFileLock} from "../kernel/file-lock";
+import {resolveAgentRegistryPath} from "../kernel/fleet-paths";
 import {validateRoleDeclaration, type RoleDeclaration} from "./validator";
 import {applyRoleSelection, auditRoleSelection, planRoleSelection, preflightRoleSelection, previewRoleSelection, resolveRoleLoadout, roleSelectionManifest, type RoleSelectionPreview, type RoleSelectionResult, type SelectionContext} from "./selection";
 import type {ResolvedSkill, ValidationOptions} from "./types";
@@ -22,7 +24,7 @@ export interface RoleProjectionResult {
 function read(path:string): any {return existsSync(path) ? YAML.parse(readFileSync(path,"utf8")) ?? {} : {};}
 function paths(options:RoleProjectionOptions) {
   const home=options.home ?? homedir(), fleet=options.fleetRoot ?? process.env.HERMES_FLEET_HOME ?? join(home,".hermes");
-  return {home,fleet,registry:options.registryPath ?? process.env.HERMES_AGENTS_REGISTRY ?? process.env.HERMES_FLEET_REGISTRY_FILE ?? join(fleet,"agents-registry.yaml"),
+  return {home,fleet,registry:options.registryPath ?? resolveAgentRegistryPath(process.env,home,fleet),
     org:options.orgPath ?? process.env.HERMES_ORG_PATH ?? join(fleet,"org.yaml")};
 }
 function selectionContext(options:RoleProjectionOptions, p:ReturnType<typeof paths>): SelectionContext {
@@ -88,13 +90,9 @@ export async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Pr
   mkdirSync(dirname(path),{recursive:true});
   const lock=path+'.lock';
   if(existsSync(lock)&&lstatSync(lock).isSymbolicLink()) throw new Error(`Refusing registry lock symlink ${lock}`);
-  const child=spawn('flock',['-w','30',lock,'sh','-c','printf "locked\\n"; read release'],{stdio:['pipe','pipe','pipe']});
-  await new Promise<void>((resolve,reject)=>{
-    child.stdout.once('data',()=>resolve());
-    child.once('error',reject);
-    child.once('exit',code=>reject(new Error(`Registry lock unavailable (exit ${code})`)));
-  });
-  try {return await action();} finally {child.stdin.end('\n');await new Promise<void>(resolve=>child.once('close',()=>resolve()));}
+  // flock(1) where it exists (Linux, unchanged); python3's fcntl.flock on a host without it (macOS).
+  // Both take flock(2) on the same `<path>.lock`, so they exclude each other and the template's writers.
+  return withFileLock(lock,action);
 }
 export async function projectRoleDeclaration(input:unknown, employee:string, profile:string, options:RoleProjectionOptions={}): Promise<RoleProjectionResult> {
   if(options.dryRun) return projectUnlocked(input,employee,profile,options);

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { Command, type InvokeResult } from "../engine/Command";
 import type { HermesAgentContext } from "./types";
+import { LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, launchdGatewayTarget } from "../kernel/host-platform";
 
 interface DurableServiceState {
   gateway: string;
@@ -42,6 +43,11 @@ export function renderHermesSummary(ctx: HermesAgentContext): string {
     `gateway: ${service.gateway}`,
   ];
   if (deferrals.length) lines.push(`deferred: ${deferrals.join(", ")}`);
+  // A launchd host has no per-agent unit for flume to activate. Say what finishes the job instead of
+  // leaving a silent deferral: Hermes installs the ONE multiplexed LaunchAgent itself.
+  if (deferrals.some((deferral) => deferral.startsWith("launchd gateway activation"))) {
+    lines.push(`next: ${LAUNCHD_GATEWAY_INSTALL}  (installs and starts the LaunchAgent ${LAUNCHD_GATEWAY_LABEL}; check it with launchctl print ${launchdGatewayTarget()})`);
+  }
   for (const assertion of ctx.deploymentPostconditions ?? []) lines.push(`verified: ${assertion}`);
   if (outcome === "planned") lines.push("Apply by rerunning without --dry-run.");
   return lines.join("\n");

@@ -16,3 +16,7 @@ export * from "./lifecycle.js";
 export * from "./receipts.js";
 export * from "./launcher.js";
 export { buildOrgChart } from "../org/tree";
+// Host portability seams (a launchd host, a host without flock(1), a fleet outside ~/.hermes).
+export * from "../kernel/host-platform";
+export * from "../kernel/file-lock";
+export * from "../kernel/fleet-paths";

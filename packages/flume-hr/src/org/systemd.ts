@@ -23,6 +23,7 @@ import { isAbsolute, join, resolve, sep } from "node:path";
 import { isSafePathSegment } from "./inventory";
 import { entryStat, readBounded, RENDERER_BASE_FILE, type BoundedRead } from "./profile";
 import { mapBounded, probeText, sleepBounded, throwIfCancelled, type FleetRunContext } from "./runtime";
+import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_LABEL, parseLaunchctlPrint, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import {
   FLEET_STATUS_SYSTEMD_CONCURRENCY,
   type FleetContract,
@@ -213,6 +214,10 @@ export interface FleetSystemdContext {
   sweep: boolean;
   /** A path as it may be shown: bounded and home-redacted. Never a realpath. */
   shown: (path: string) => string;
+  /** The service manager's platform; absent means `hostPlatform(env)`. A launchd host never spawns systemctl. */
+  platform?: NodeJS.Platform;
+  /** launchd's per-user domain uid for `launchctl print gui/<uid>/...`; absent means this process's. */
+  uid?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1459,6 +1464,71 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
 }
 
 // ---------------------------------------------------------------------------
+// A launchd host
+// ---------------------------------------------------------------------------
+
+/**
+ * The systemd domain on a macOS host: nothing to sample, said explicitly.
+ *
+ * systemctl is never spawned. Every agent leaf is `unsupported` with the `launchd-host` kind, which
+ * the health aggregate reads as UNREAD (unable to assess) rather than as a broken agent, and the
+ * shared Bloodbank unit is `unobserved`. The one fact a Mac CAN answer -- is the single multiplexed
+ * LaunchAgent `ai.hermes.gateway` loaded and running -- is read once with a read-only
+ * `launchctl print` and carried on the manager record, whose `state` is that answer's bucket.
+ * No pid reaches the record: two runs over one launchd state stay byte-identical.
+ */
+async function collectLaunchdHealth(ctx: FleetSystemdContext): Promise<FleetSystemdHealth> {
+  const target = launchdGatewayTarget(ctx.uid === undefined ? (typeof process.getuid === "function" ? process.getuid() : null) : ctx.uid);
+  const result = await probeText(ctx.run, "launchctl", ["print", target], {
+    env: systemctlEnv(ctx),
+    timeoutMs: ctx.manifest.probe.timeout_ms,
+    keepStdoutOnFailure: true,
+  });
+  throwIfCancelled(ctx.run);
+  const gateway: LaunchdGatewayObservation = result.outcome === "timeout"
+    ? { state: "unobservable", word: "timeout", pid: null, target, detail: `launchctl print ${target} did not answer within ${ctx.manifest.probe.timeout_ms} ms` }
+    : parseLaunchctlPrint({
+      status: result.status,
+      stdout: result.value ?? "",
+      stderr: "",
+      error: result.status === null ? (result.outcome === "cancelled" ? "cancelled" : "launchctl could not be run") : null,
+    }, target);
+  const units = launchdNotObservable("per-agent systemd units");
+  const manager: FleetSystemdManagerRecord = { code: "launchd-host", state: gateway.state, detail: `${units}; ${gateway.detail}` };
+  const probe: FleetProbeRecord = {
+    id: `${SYSTEMD_PROBE_KIND}:launchctl-print`, kind: SYSTEMD_PROBE_KIND, target: `launchctl print ${LAUNCHD_GATEWAY_LABEL}`,
+    outcome: gateway.state === "unobservable" ? (result.outcome === "timeout" ? "timeout" : result.outcome === "cancelled" ? "cancelled" : "failed") : "ok",
+    reason: gateway.state === "unobservable" ? "launchd-host" : null,
+  };
+  const perAgent = ctx.serviceModel?.per_agent ?? {};
+  const agents = new Map<string, FleetSystemdAgentResult>();
+  for (const input of ctx.agents) {
+    const gatewayUnit = derive(perAgent.gateway_unit, input.agentId);
+    const expected = [gatewayUnit].filter((unit): unit is string => unit !== null).sort();
+    agents.set(input.agentId, emptyAgentResult(input, expected, { gateway: gatewayUnit }, (unit) => aspect(
+      "unsupported",
+      [{ path: unit, kind: "launchd-host", desired: "a systemd --user unit", observed: "launchd-host", detail: "launchd-host" }],
+      "launchd-host", "a systemd --user unit", units,
+    ), ctx.manifest.messaging.platforms));
+  }
+  return {
+    manager,
+    window: { samples: ctx.manifest.stabilization.samples, interval_ms: ctx.manifest.stabilization.interval_ms },
+    listingTruncated: false,
+    units: { listed: 0, unit_files: 0, transient: 0 },
+    agents,
+    shared: {
+      unit: ctx.sharedGateway.unit, profile: ctx.sharedGateway.profile,
+      state: "unobserved", code: "launchd-host",
+      detail: `the fleet-shared Bloodbank unit is a systemd --user unit; on a launchd host ${LAUNCHD_GATEWAY_LABEL} multiplexes every profile and launchd reports it ${gateway.state}`,
+    },
+    unregistered: null,
+    unregisteredReason: ctx.sweep ? "launchd-host" : "agent-scope",
+    probes: [probe],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -1470,6 +1540,7 @@ async function classifyUnregistered(ctx: FleetSystemdContext, shared: Shared, ow
  */
 export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<FleetSystemdHealth> {
   throwIfCancelled(ctx.run);
+  if (isLaunchdHost(ctx.platform ?? hostPlatform(ctx.env))) return collectLaunchdHealth(ctx);
   const probes: FleetProbeRecord[] = [];
   const window = { samples: ctx.manifest.stabilization.samples, interval_ms: ctx.manifest.stabilization.interval_ms };
 

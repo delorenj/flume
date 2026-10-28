@@ -6,6 +6,7 @@ import { join } from "node:path";
 import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { CHANNEL_PARKED_STATUS } from "../org/types";
+import { hostPlatform, isLaunchdHost, launchdGatewayTarget } from "../kernel/host-platform";
 
 /**
  * `flume channel`: park a chat channel on purpose, and bring it back.
@@ -70,7 +71,8 @@ export interface ChannelOptions {
 }
 
 export interface GatewayPickup {
-  action: "none" | "skipped" | "profile-cycle" | "reload";
+  /** `restart` is the launchd fallback: `hermes gateway restart`, else `launchctl kickstart -k`. */
+  action: "none" | "skipped" | "profile-cycle" | "reload" | "restart";
   confirmed: boolean;
   detail: string;
   /** What gateway_state.json says about the channel afterwards, or null when it has no entry. */
@@ -262,11 +264,31 @@ async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offl
       detail = `serve-profile: ${up.error}`;
     }
   } else detail = "no gateway control socket";
+  if (isLaunchdHost(hostPlatform())) {
+    // A launchd host has no `hermes-gateway` unit to reload. Hermes restarts its own LaunchAgent;
+    // a bare kickstart of the label is the fallback when the CLI is not on PATH or refuses.
+    const restarted = restartLaunchdGateway();
+    if (!restarted.ok) return { action: "restart", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${detail}; ${restarted.detail}` };
+    const seen = await confirmState(key, want, since, options.confirmMs ?? (Number(process.env.FLUME_CHANNEL_CONFIRM_MS) || 90_000));
+    return { action: "restart", confirmed: seen.confirmed, state: seen.state, detail: `${detail}; ${restarted.detail} (every profile drains and restarts)` };
+  }
   const reload = spawnSync("systemctl", ["--user", "reload", "hermes-gateway"], { encoding: "utf8", timeout: 30_000 });
   if (reload.status !== 0) return { action: "reload", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${detail}; systemctl --user reload hermes-gateway failed: ${(reload.stderr || reload.error?.message || `exit ${reload.status}`).trim()}` };
   // A reload drains and restarts every profile; give it room unless the caller bounded the wait.
   const seen = await confirmState(key, want, since, options.confirmMs ?? (Number(process.env.FLUME_CHANNEL_CONFIRM_MS) || 90_000));
   return { action: "reload", confirmed: seen.confirmed, state: seen.state, detail: `${detail}; reloaded hermes-gateway (SIGUSR1: every profile drains and restarts)` };
+}
+
+/** The launchd gateway restart: `hermes gateway restart`, then `launchctl kickstart -k gui/<uid>/ai.hermes.gateway`. */
+function restartLaunchdGateway(): { ok: boolean; detail: string } {
+  const failure = (label: string, run: ReturnType<typeof spawnSync>): string =>
+    `${label} failed: ${(String(run.stderr ?? "") || (run.error as NodeJS.ErrnoException | undefined)?.code || run.error?.message || `exit ${run.status}`).trim()}`;
+  const hermes = spawnSync("hermes", ["gateway", "restart"], { encoding: "utf8", timeout: 60_000 });
+  if (!hermes.error && hermes.status === 0) return { ok: true, detail: "restarted the launchd gateway with hermes gateway restart" };
+  const target = launchdGatewayTarget();
+  const kick = spawnSync("launchctl", ["kickstart", "-k", target], { encoding: "utf8", timeout: 30_000 });
+  if (!kick.error && kick.status === 0) return { ok: true, detail: `${failure("hermes gateway restart", hermes)}; restarted it with launchctl kickstart -k ${target}` };
+  return { ok: false, detail: `${failure("hermes gateway restart", hermes)}; ${failure(`launchctl kickstart -k ${target}`, kick)}` };
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -223,7 +223,22 @@ function audit(repo, fleet) {
     env: { ...process.env, HERMES_FLEET_HOME: fleet },
   });
   // Audit exits non-zero when findings exist; stdout is the payload either way.
-  return (r.stdout || "") + (r.stderr || "");
+  return withoutOrgRules((r.stdout || "") + (r.stderr || ""));
+}
+
+// The org.* rules read the fleet registry too (HERMES_FLEET_HOME now moves it, like every other reader)
+// and name every fixture employee in their own "no project record" detail. These assertions are about
+// the Hermes profile rules, so the org rules' detail lines are not part of what they grep.
+function withoutOrgRules(text) {
+  const kept = [];
+  let inOrgRule = false;
+  for (const line of text.split("\n")) {
+    if (/^\s*\S\s+org\.\S+/u.test(line)) { inOrgRule = true; continue; }
+    if (inOrgRule && /^\s+↳/u.test(line)) continue;
+    inOrgRule = false;
+    kept.push(line);
+  }
+  return kept.join("\n");
 }
 
 const { repo } = makeRepo();
@@ -414,7 +429,7 @@ const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodba
   const fleet = makeFleet({});
   addProfile(fleet, "off-pm", NO_BLOODBANK);
   writeRegistry(fleet, { "off-pm": { role: "pm", profile_name: "off-pm", bloodbank: { enabled: false } } });
-  assert.doesNotMatch(audit(repo, fleet), /off-pm:/, "a PM with routing disabled must not be reported");
+  assert.doesNotMatch(audit(repo, fleet), /off-pm: (?:no )?platform_toolsets/, "a PM with routing disabled must not be reported");
 }
 
 // 16. Least privilege. A routable employee that is NOT a delegating PM has never

@@ -19,6 +19,8 @@ import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
+import { resolveAgentRegistryPath, resolveFleetHomeDir } from "../kernel/fleet-paths";
+import { hostPlatform, isLaunchdHost, LAUNCHD_GATEWAY_LABEL } from "../kernel/host-platform";
 
 export interface OffboardResult {
   ok: boolean;
@@ -36,16 +38,13 @@ export interface OffboardOptions {
   apply?: boolean;
   homeDir?: string;
   registryPath?: string;
-}
-
-function agentRegistryPath(homeDir: string): string {
-  const fromEnv = process.env.HERMES_AGENTS_REGISTRY?.trim() || process.env.HERMES_FLEET_REGISTRY_FILE?.trim();
-  return fromEnv || join(homeDir, ".hermes", "agents-registry.yaml");
+  /** The service manager's platform; defaults to `hostPlatform()` (the FLUME_HOST_PLATFORM seam). */
+  platform?: NodeJS.Platform;
 }
 
 export function offboardEmployee(employeeId: string, options: OffboardOptions = {}): OffboardResult {
   const homeDir = options.homeDir ?? homedir();
-  const registryPath = options.registryPath ?? agentRegistryPath(homeDir);
+  const registryPath = options.registryPath ?? resolveAgentRegistryPath(process.env, homeDir);
   const errors: string[] = [];
   const leftBehind: string[] = [];
 
@@ -69,13 +68,18 @@ export function offboardEmployee(employeeId: string, options: OffboardOptions = 
   // Name what survives BEFORE touching anything, so a dry run reports the same
   // list an apply does.
   const profileName = typeof record.profile_name === "string" ? record.profile_name : employeeId;
-  const desk = join(homeDir, ".hermes", "profiles", profileName);
+  const desk = join(resolveFleetHomeDir(process.env, homeDir), "profiles", profileName);
   if (existsSync(desk)) leftBehind.push(`desk ${desk} (still on disk)`);
   const roleDir = typeof record.role_dir === "string" ? record.role_dir : undefined;
   if (roleDir && existsSync(roleDir)) leftBehind.push(`role directory ${roleDir} (tracked in its own repository)`);
-  const units = join(homeDir, ".config", "systemd", "user");
-  for (const unit of [`hermes-${employeeId}-gateway.service`]) {
-    if (existsSync(join(units, unit))) leftBehind.push(`systemd unit ${unit} (disable it yourself: systemctl --user disable --now ${unit})`);
+  if (isLaunchdHost(options.platform ?? hostPlatform())) {
+    // No per-agent unit exists to report: one multiplexed LaunchAgent serves every profile it finds.
+    leftBehind.push(`gateway: per-agent units are not observable on a launchd host; the multiplexed ${LAUNCHD_GATEWAY_LABEL} keeps serving profile ${profileName} until its desk is removed and the gateway restarted (hermes gateway restart)`);
+  } else {
+    const units = join(homeDir, ".config", "systemd", "user");
+    for (const unit of [`hermes-${employeeId}-gateway.service`]) {
+      if (existsSync(join(units, unit))) leftBehind.push(`systemd unit ${unit} (disable it yourself: systemctl --user disable --now ${unit})`);
+    }
   }
 
   if (!options.apply) {

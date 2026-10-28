@@ -601,7 +601,8 @@ export function resolveInventoryStores(options: FleetInventoryOptions = {}): Res
 
   const agentsKey = env.HERMES_AGENTS_REGISTRY?.trim() ?? "";
   const fleetKey = env.HERMES_FLEET_REGISTRY_FILE?.trim() ?? "";
-  const agentsDefault = join(home, ".hermes", "agents-registry.yaml");
+  // The same default `workforce/role.ts` writes through: $HERMES_FLEET_HOME before ~/.hermes.
+  const agentsDefault = join(resolveFleetHome(env, home), "agents-registry.yaml");
   const agentsConfigured = resolve(expandHome(agentsKey || fleetKey || agentsDefault, home));
 
   let disagreement: string | null = null;

@@ -7,6 +7,8 @@ import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
 import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration } from "../workforce/role";
 import { resolveFlumeRoot } from "../kernel/paths";
+import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
+import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import { roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
 import { showProfile, syncProfile } from "@delorenj/skillex";
@@ -122,6 +124,18 @@ export interface Context {
   // PJAN-28: opt-in gate for mapping legacy committed skills into
   // .agents/skills.json. Absent/false => migrate only REPORTS the proposal.
   acceptRegistryMatches?: boolean;
+  /**
+   * The service manager's platform. Absent means `hostPlatform()` (process.platform, or the
+   * FLUME_HOST_PLATFORM test seam). A launchd host gets explicit "not observable" findings from every
+   * systemd rule instead of a failure, and a launchd observation of the one multiplexed gateway.
+   */
+  platform?: NodeJS.Platform;
+}
+
+
+/** This audit's service-manager platform. */
+function ctxPlatform(ctx: Context): NodeJS.Platform {
+  return ctx.platform ?? hostPlatform();
 }
 
 
@@ -348,8 +362,9 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
 }
 
 
+/** The org chart, resolved the way workforce/role.ts writes it (HERMES_AGENTS_REGISTRY, ..., HERMES_FLEET_HOME). */
 function registryPath(homeDir: string): string {
-  return join(homeDir, ".hermes", "agents-registry.yaml");
+  return resolveAgentRegistryPath(process.env, homeDir);
 }
 
 
@@ -457,6 +472,8 @@ function legacyConsumerUnitPath(homeDir: string, agentId: string): string {
 
 
 function systemctlUser(args: string[]): { ok: boolean; stdout: string; stderr: string } {
+  // A launchd host has no user manager to ask; say so rather than spawning a missing binary.
+  if (isLaunchdHost(hostPlatform())) return { ok: false, stdout: "", stderr: launchdNotObservable("systemd --user units") };
   const result = spawnSync("systemctl", ["--user", ...args], { encoding: "utf8" });
   // A spawn that never started (no systemctl on PATH) leaves stdout and stderr
   // unset, and `.trim()` on them would throw out of the audit.
@@ -1411,6 +1428,41 @@ function ctxEscape(value: string): string {
 }
 
 
+/**
+ * `systemd.sentinel` on a launchd host.
+ *
+ * There are no per-agent units to read. The one thing that decides whether these roles are served
+ * is the single multiplexed LaunchAgent `hermes gateway install` writes, so that is what is observed
+ * (read-only `launchctl print`). Roles whose `service_state.gateway` is `deferred` need nothing; a
+ * gateway launchctl cannot describe is `skip` (unable to assess), never a pass or a failure.
+ * `deployment.systemd: deferred` is NOT an exemption here: a hire on a launchd host always records it.
+ */
+export function launchdSentinelFinding(roles: readonly RoleMeta[], gateway: LaunchdGatewayObservation): AuditFinding {
+  const id = "systemd.sentinel";
+  const title = "Hermes systemd/sentinel units enabled + active";
+  const served = roles.filter((role) => role.serviceStateGateway !== "deferred");
+  const units = launchdNotObservable("per-agent systemd units");
+  const facts = [
+    units,
+    `${gateway.target}: ${gateway.word}${gateway.pid !== null ? ` (pid ${gateway.pid})` : ""}`,
+  ];
+  if (!served.length) {
+    return { id, title, status: "pass", summary: `every Hermes role here declares its gateway deferred; ${LAUNCHD_GATEWAY_LABEL} is ${gateway.word}`, details: facts, fixable: false };
+  }
+  const who = `${served.length} role(s) (${served.map((role) => role.agentId).join(", ")})`;
+  if (gateway.state === "running") {
+    return { id, title, status: "pass", summary: `launchd gateway ${LAUNCHD_GATEWAY_LABEL} is running and serves ${who}`, details: facts, fixable: false };
+  }
+  if (gateway.state === "unobservable") {
+    return { id, title, status: "skip", summary: `unable to assess on a launchd host: ${gateway.detail}`, details: facts, fixable: false };
+  }
+  const fix = gateway.state === "not-loaded"
+    ? `${LAUNCHD_GATEWAY_INSTALL} installs and starts the LaunchAgent ${LAUNCHD_GATEWAY_LABEL}`
+    : `launchctl kickstart -k ${launchdGatewayTarget()} (or hermes gateway start) starts it`;
+  return { id, title, status: "fail", summary: `launchd gateway ${LAUNCHD_GATEWAY_LABEL} is ${gateway.word}, so ${who} are not served`, details: [...facts, fix], fixable: false };
+}
+
+
 function checkUnit(unit: string): { enabled: boolean; active: boolean } {
   const enabled = systemctlUser(["is-enabled", unit]).ok;
   const active = systemctlUser(["is-active", unit]).ok;
@@ -2145,7 +2197,7 @@ function memberProblemDetails(fleetRoot: string, baseProblems: readonly string[]
   const configs = new Map<string, any>();
   let members = 0;
   let inheriting = 0;
-  const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+  const registry = readRegistry(resolveAgentRegistryPath(process.env, homedir(), fleetRoot));
   for (const [agentId, raw] of Object.entries(registry ?? {})) {
     const entry = (raw ?? {}) as Record<string, unknown>;
     const profile = String(entry.profile_name || agentId);
@@ -2683,7 +2735,8 @@ function parseSystemctlShow(text: string): Record<string, string>[] {
  * active, or the reason it is not. `unobservable` means the user manager could
  * not answer at all, which is a statement about the observer and not the unit.
  */
-function readResyncUnit(unit: string): { unit: string; problems: string[]; unobservable?: string } {
+function readResyncUnit(unit: string, platform: NodeJS.Platform = hostPlatform()): { unit: string; problems: string[]; unobservable?: string } {
+  if (isLaunchdHost(platform)) return { unit, problems: [], unobservable: `${unit}: ${launchdNotObservable("systemd --user units")}` };
   const shown = systemctlUser(["show", "--no-pager", "-p", "Id,LoadState,UnitFileState,ActiveState,SubState,Result", unit]);
   if (!shown.ok) {
     return { unit, problems: [], unobservable: `systemctl --user show ${unit} failed${shown.stderr ? `: ${shown.stderr}` : ""}` };
@@ -3070,6 +3123,7 @@ return [
       if (!roles.length) {
         return { id: "systemd.sentinel", title: "Hermes systemd/sentinel units enabled + active", status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
       }
+      if (isLaunchdHost(ctxPlatform(ctx))) return launchdSentinelFinding(roles, observeLaunchdGateway());
       const requiredRoles = roles.filter((role) => role.deploymentSystemd !== "deferred");
       if (!requiredRoles.length) {
         return { id: "systemd.sentinel", title: "Hermes systemd/sentinel units enabled + active", status: "pass", summary: "systemd is intentionally deferred for every local-only Hermes role", details: [], fixable: false };
@@ -3129,9 +3183,19 @@ return [
       };
     },
     migrate: (ctx, finding) => {
-      const roles = discoverRoles(ctx.repoRoot).filter((role) => role.deploymentSystemd !== "deferred");
       const changedFiles: string[] = [];
       const details: string[] = [];
+      if (isLaunchdHost(ctxPlatform(ctx))) {
+        // flume never writes a LaunchAgent: Hermes owns `hermes gateway install`. Nothing here runs
+        // 70-systemd.sh or systemctl, and a healthy launchd gateway needs nothing at all.
+        const observed = launchdSentinelFinding(discoverRoles(ctx.repoRoot), observeLaunchdGateway());
+        return {
+          id: finding.id, title: finding.title,
+          status: observed.status === "fail" || observed.status === "skip" ? "blocked" : "noop",
+          summary: observed.summary, changedFiles, details: observed.details,
+        };
+      }
+      const roles = discoverRoles(ctx.repoRoot).filter((role) => role.deploymentSystemd !== "deferred");
       if (!roles.length) {
         return { id: finding.id, title: finding.title, status: "skipped", summary: "systemd is intentionally deferred for local-only Hermes roles", changedFiles, details };
       }
@@ -3548,7 +3612,7 @@ return [
       const baseDeadline = toolDeadlineProblem(base);
       if (baseDeadline) details.push(`fleet base ${baseDeadline}: ${basePath}`);
 
-      const registry = readRegistry(join(fleetRoot, "agents-registry.yaml"));
+      const registry = readRegistry(resolveAgentRegistryPath(process.env, ctx.homeDir, fleetRoot));
       for (const [agentId, raw] of Object.entries(registry ?? {})) {
         const entry = (raw ?? {}) as Record<string, unknown>;
         const bloodbank = entry.bloodbank;
@@ -3955,7 +4019,7 @@ return [
       const aspects: string[] = [];
 
       // 1. The units: installed, enabled and active. A failed one is none of those.
-      const readings = RESYNC_UNITS.map(readResyncUnit);
+      const readings = RESYNC_UNITS.map((unit) => readResyncUnit(unit, ctxPlatform(ctx)));
       for (const reading of readings) {
         if (reading.problems.length) failures.push(`${reading.unit} ${reading.problems.join(" and ")}`);
         if (reading.unobservable) unassessed.push(reading.unobservable);
@@ -4269,7 +4333,7 @@ return [
           }
         }
       }
-      if (unitsTouched && !ctx.dryRun) {
+      if (unitsTouched && !ctx.dryRun && !isLaunchdHost(ctxPlatform(ctx))) {
         systemctlUser(["daemon-reload"]);
         details.push("systemctl --user daemon-reload (restart units to pick up the new HERMES_HOME)");
       }
@@ -4292,7 +4356,7 @@ return [
       const roles = discoverRoles(ctx.repoRoot);
       const details: string[] = [];
       let malformedRoleGate = false;
-      const registryPath = join(ctx.homeDir, ".hermes", "agents-registry.yaml");
+      const registryPath = resolveAgentRegistryPath(process.env, ctx.homeDir);
       const registry = readRegistry(registryPath);
       if (!registry) {
         if (!roles.length && declaredAgentIds(ctx.repoRoot).length === 0) {
@@ -4398,7 +4462,7 @@ return [
     migrate: (ctx, finding) => {
       const changedFiles: string[] = [];
       const details: string[] = [];
-      const registryPath = join(ctx.homeDir, ".hermes", "agents-registry.yaml");
+      const registryPath = resolveAgentRegistryPath(process.env, ctx.homeDir);
       let raw = safeReadText(registryPath);
       if (raw === null) {
         return { id: finding.id, title: finding.title, status: "blocked", summary: `registry unreadable at ${registryPath}`, changedFiles, details };
@@ -4551,10 +4615,13 @@ return [
           if (ctx.dryRun) {
             details.push(`would remove retired consumer unit ${legacyUnit}`);
           } else {
-            systemctlUser(["disable", "--now", basename(legacyUnit)]);
+            const managed = !isLaunchdHost(ctxPlatform(ctx));
+            if (managed) systemctlUser(["disable", "--now", basename(legacyUnit)]);
             rmSync(legacyUnit, { force: true });
-            systemctlUser(["daemon-reload"]);
-            systemctlUser(["reset-failed"]);
+            if (managed) {
+              systemctlUser(["daemon-reload"]);
+              systemctlUser(["reset-failed"]);
+            }
             details.push(`removed retired consumer unit ${legacyUnit}`);
           }
           changedFiles.push(legacyUnit);

@@ -4,6 +4,7 @@ import { existsSync, unlinkSync } from "node:fs";
 import * as p from "@clack/prompts";
 import { Command, type InvokeResult } from "../engine/Command";
 import type { HermesAgentContext } from "./types";
+import { modernBash } from "../kernel/host-platform";
 
 /**
  * BotFather token wire-up for a per-(repo, role) Hermes bot.
@@ -131,9 +132,13 @@ export class WireTelegram extends Command {
     const marker = join(roleDir, ".scripts", ".done-30-telegram");
     if (existsSync(marker)) unlinkSync(marker);
 
+    // "bash" on Linux, exactly as before; a bash >= 4.4 (or a message naming the fix) on macOS.
+    let bash: string;
+    try { bash = modernBash(); } catch (error) { return { success: false, message: `✗ ${(error as Error).message}` }; }
+
     const spinner = p.spinner();
     spinner.start("Verifying token + wiring profile");
-    const result = spawnSync("bash", [script], {
+    const result = spawnSync(bash, [script], {
       stdio: "inherit",
       env: {
         ...process.env,

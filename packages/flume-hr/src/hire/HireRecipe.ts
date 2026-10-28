@@ -19,11 +19,17 @@ import { join, resolve } from "node:path";
 import YAML from "yaml";
 import { changedTreePaths, snapshotTree } from "../utils/tree-diff";
 import { preflightRenderedHermes } from "../kernel/preflight";
+import { hostPlatform, isLaunchdHost, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL } from "../kernel/host-platform";
+
+/** What a launchd host defers instead of systemd units: the one multiplexed LaunchAgent, installed by Hermes. */
+export const LAUNCHD_GATEWAY_DEFERRAL = `launchd gateway activation (run ${LAUNCHD_GATEWAY_INSTALL}: one multiplexed ${LAUNCHD_GATEWAY_LABEL} serves every profile)`;
 
 function deploymentDeferrals(ctx: HermesAgentContext): string[] {
   const deferred: string[] = [];
   if (ctx.local || ctx.skipPlane) deferred.push("ticket-board provisioning");
-  if (ctx.local || ctx.skipSystemd) deferred.push("systemd service activation");
+  if (ctx.local || ctx.skipSystemd) {
+    deferred.push(isLaunchdHost(ctx.hostPlatform ?? hostPlatform()) ? LAUNCHD_GATEWAY_DEFERRAL : "systemd service activation");
+  }
   if (ctx.local) deferred.push("automatic Skillex resync (host service)");
   const projectManifest = join(ctx.targetDir, ".project.json");
   if (!ctx.skipPlane && existsSync(projectManifest)) {

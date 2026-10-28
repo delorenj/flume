@@ -63,6 +63,7 @@ import YAML from "yaml";
 import { bold, cyan, dim, gray, green, magenta, red, yellow } from "../utils/style";
 import { redactHome } from "./output";
 import { FleetError, parkedChannels } from "./types";
+import { resolveFleetHomeDir } from "../kernel/fleet-paths";
 
 // ---------------------------------------------------------------------------
 // Limits
@@ -303,7 +304,7 @@ export function resolveOrgRegistryPath(options: BuildOrgChartOptions = {}): stri
   }
   if (override) return resolve(expandHome(override, home));
   const configured = env.HERMES_AGENTS_REGISTRY?.trim() || env.HERMES_FLEET_REGISTRY_FILE?.trim();
-  return resolve(expandHome(configured || join(home, ".hermes", "agents-registry.yaml"), home));
+  return resolve(expandHome(configured || join(resolveFleetHomeDir(env, home), "agents-registry.yaml"), home));
 }
 
 /** Where the hand-edited hierarchy lives; org.yaml documents HERMES_ORG_PATH itself. */

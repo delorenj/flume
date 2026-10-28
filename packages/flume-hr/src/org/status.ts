@@ -91,6 +91,7 @@ import { collectFleetProvenance } from "./provenance";
 import { captureSelf, mapBounded, remainingMs, throwIfCancelled, type FleetRunContext } from "./runtime";
 import { collectScaffoldParity, type FleetScaffoldAgentResult, type FleetScaffoldParity } from "./scaffold";
 import { collectSystemdHealth, type FleetSystemdAgentResult, type FleetSystemdHealth } from "./systemd";
+import { LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL } from "../kernel/host-platform";
 import {
   FLEET_PROFILE_EXTRA_CLASSES,
   FLEET_SYSTEMD_CAPABILITY_STATES,
@@ -1923,7 +1924,8 @@ function systemdParityVerdict(rule: Record<string, unknown> | undefined): "pass"
 function systemdObserverDrift(result: FleetSystemdAgentResult | undefined): boolean | null {
   if (result === undefined) return null;
   const leaves = [result.topology, result.gateway];
-  if (leaves.some((leaf) => leaf.state === "error")) return null;
+  // An unread leaf (a collection error, or a launchd host's `unsupported`) compares nothing.
+  if (leaves.some((leaf) => leaf.state === "error" || leaf.state === "unsupported")) return null;
   const covered = leaves.some((leaf) => leaf.items.some((item) => SYSTEMD_RULE_COVERED_KINDS.has(item.kind)));
   if (covered) return true;
   const uncovered = leaves.some((leaf) => leaf.state === "fail" || leaf.state === "warn");
@@ -3229,18 +3231,28 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     };
     // The manager, in EVERY scope: an `--agent` run that could not reach the
     // user manager has to say so as loudly as a fleet-wide one.
+    // A launchd host (macOS) has no user manager. Its finding is the one multiplexed LaunchAgent
+    // instead: running passes, loaded-but-stopped or not installed fails (an operator action), and
+    // a launchctl that could not answer is `unsupported` -- unable to assess, never an error.
+    const launchd = systemdHealth.manager.code === "launchd-host";
     hostFinding(
       SYSTEMD_MANAGER_RULE_ID,
-      systemdHealth.manager.code === "available" ? "pass" : "error",
+      launchd
+        ? systemdHealth.manager.state === "running" ? "pass" : systemdHealth.manager.state === "unobservable" ? "unsupported" : "fail"
+        : systemdHealth.manager.code === "available" ? "pass" : "error",
       SYSTEMD_FIELD_GATEWAY,
       systemdHealth.manager.detail,
-      [
-        `manager ${systemdHealth.manager.state}`,
-        `code ${systemdHealth.manager.code}`,
-        `window ${systemdHealth.window.samples} sample(s) ${systemdHealth.window.interval_ms} ms apart`,
-      ],
+      launchd
+        ? [`launchd ${LAUNCHD_GATEWAY_LABEL} ${systemdHealth.manager.state}`, `code ${systemdHealth.manager.code}`]
+        : [
+          `manager ${systemdHealth.manager.state}`,
+          `code ${systemdHealth.manager.code}`,
+          `window ${systemdHealth.window.samples} sample(s) ${systemdHealth.window.interval_ms} ms apart`,
+        ],
       systemdHealth.manager.state,
-      "a user manager in a state service_manifest.probe.manager_available_states lists, answering within the declared budget",
+      launchd
+        ? `the single multiplexed LaunchAgent ${LAUNCHD_GATEWAY_LABEL} loaded and running (${LAUNCHD_GATEWAY_INSTALL})`
+        : "a user manager in a state service_manifest.probe.manager_available_states lists, answering within the declared budget",
     );
     // The shared gateway and the sweep are FLEET-SCOPE facts. Under `--agent`
     // neither is probed, and neither is reported: a finding whose coverage was
@@ -3249,7 +3261,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       const shared = systemdHealth.shared;
       hostFinding(
         SYSTEMD_SHARED_RULE_ID,
-        shared.state === "healthy" ? "pass" : shared.state === "error" || shared.state === "unobserved" ? "error" : "fail",
+        shared.state === "healthy" ? "pass" : shared.code === "launchd-host" ? "unsupported" : shared.state === "error" || shared.state === "unobserved" ? "error" : "fail",
         SYSTEMD_FIELD_GATEWAY,
         shared.detail,
         [

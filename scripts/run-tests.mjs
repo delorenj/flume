@@ -86,6 +86,7 @@ const SUITES = [
   "tests/company-identity-lifecycle-regressions.mjs",
   "tests/employee-access-lifecycle-regressions.mjs",
   "tests/channel-offline-regressions.mjs",
+  "tests/macos-portability-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);

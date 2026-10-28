@@ -32,6 +32,8 @@ export interface HermesAgentContext extends CommandContext {
   skipSystemd?: boolean;
   skipBloodbank?: boolean;
   skipPlane?: boolean;
+  /** The service manager's platform (`hostPlatform()`); a launchd host defers to `hermes gateway install`. */
+  hostPlatform?: NodeJS.Platform;
 
   // MCP apply paths render and prove local lifecycle state first. The selected
   // external scripts run only from the owning recipe/project transaction after
