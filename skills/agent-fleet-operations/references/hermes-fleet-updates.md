@@ -111,6 +111,29 @@ hermes-gateway-restart --reason "<why>"   # waits for idle; it serves every prof
 
 Interactive `hermes` commands pick up the new code on their next launch.
 
+### The real import env and the safe restart
+
+When a gateway must load NEW Python code (a newly pip-installed package, a
+first-time platform plugin), a plain restart is not always enough and the
+import env is not the obvious one:
+
+- The gateway process bootstraps through `hermes_bootstrap`, which redirects
+  `sys.path` to a PM-managed env under
+  `~/.hermes/installs/<release-id>/venv` — NOT the repo `.venv` and NOT the
+  dev checkout. A package installed into the wrong env is invisible to the
+  gateway no matter how many times you restart it. Verify before installing:
+  read the unit's `ExecStart`, resolve which env `hermes_bootstrap` actually
+  enters, and install there.
+- Restarting the fleet gateway from inside a turn that the gateway itself is
+  driving kills the dispatching process before its own completion events
+  publish. Use `hermes-gateway-restart --reason "<why>"`: it detaches itself
+  when run from inside the gateway and waits for your own turn to end. Never
+  arm a cron line or a hand-rolled `systemd-run` timer for this.
+- After any restart, prove liveness from the journal, not `is-active` alone:
+  look for the platform-adapter attach line (e.g. `Bloodbank gateway
+  connected`) and for the durable consumer's `num_pending` draining to 0 at
+  `http://127.0.0.1:8222/jsz?streams=true&consumers=true`.
+
 ## Update shared base config
 
 For shared non-secret settings, edit only the fleet default profile:
