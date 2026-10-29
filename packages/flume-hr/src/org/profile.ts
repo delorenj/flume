@@ -71,6 +71,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { readTomlScalar } from "../kernel/host-config";
 import { blobId } from "../scaffold/compare";
+import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, lacksRequiredTarget } from "../parity/singleton-links";
 import { rootEntryGlob } from "./contract";
 import { isSafePathSegment } from "./inventory";
 import { mapBounded, probe, probeText, throwIfCancelled, type FleetRunContext } from "./runtime";
@@ -141,15 +142,13 @@ export const PROFILE_PYTHON_PROBE = [
  * OWN role-local runtime. A link among them that points anywhere else belongs
  * to another agent.
  *
- * Mirrors `OWNED_PROFILE_ENTRIES` and `OWNED_PROFILE_FILES` in
- * `src/parity/rules.ts`, which is not imported here because it would pull the
- * whole recipe world into a read-only observer; the suite pins the two lists
- * equal (DW-92).
+ * Derived from `OWNED_PROFILE_ENTRIES` and `OWNED_PROFILE_FILES` in
+ * `src/parity/singleton-links.ts`, the fs-only module the
+ * `hermes.runtime-singleton` rule shares with this observer. (`rules.ts`
+ * itself is not imported here: it would pull the whole recipe world into a
+ * read-only observer.) One list, one judgement of link health (DW-92).
  */
-export const PROFILE_SINGLETON_LINKS = [
-  "memories", "sessions", "workspace", "logs", "cron", "plans", "hooks", "pairing", "audio_cache", "image_cache",
-  "SOUL.md", "state.db", "kanban.db",
-] as const;
+export const PROFILE_SINGLETON_LINKS = [...OWNED_PROFILE_ENTRIES, ...OWNED_PROFILE_FILES] as const;
 
 /** Identifier words this module is willing to emit: a key, a section, a bank id, a root entry name. */
 const WORD = /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,63}$/u;
@@ -860,10 +859,18 @@ async function inspectAgent(ctx: FleetProfileContext, shared: Shared, input: Fle
     // runtime. Neither side is followed INTO -- only the two paths are resolved.
     if (!within(runtime, pointed) && !within(runtimeReal, canonical(pointed))) {
       pathItems.push({ path: link, kind: "misowned-link", desired: "a link into this agent's role-local runtime", observed: "a link elsewhere", detail: `misowned-link:${link}` });
+    } else if (lacksRequiredTarget(link, full)) {
+      // Contained, and pointing at nothing usable. Hermes will not create the
+      // target of a link, so the profile cannot initialize (the re-hire case).
+      // Same judgement, same word, as the rule's `missing-target:` finding.
+      pathItems.push({ path: link, kind: "missing-target", desired: "a link into this agent's role-local runtime whose target exists", observed: "a link whose target is missing or the wrong kind", detail: `missing-target:${link}` });
     }
   }
   const pathState = worst(pathItems, PATH_RANK);
-  const pathCode: FleetProfilePathCode = pathState === "pass" ? "ok" : pathItems.some((item) => item.kind === "misowned-link") ? "misowned-link" : "unverifiable";
+  const pathCode: FleetProfilePathCode = pathState === "pass"
+    ? "ok"
+    : pathItems.some((item) => item.kind === "misowned-link") ? "misowned-link"
+      : pathItems.some((item) => item.kind === "missing-target") ? "missing-target" : "unverifiable";
   const pathAspect = {
     ...aspect(
       pathState,
@@ -872,6 +879,8 @@ async function inspectAgent(ctx: FleetProfileContext, shared: Shared, input: Fle
       "a real, contained, unambiguous profile directory whose singleton links point into this agent's runtime",
       pathCode === "misowned-link"
         ? `${pathItems.filter((item) => item.kind === "misowned-link").length} singleton entr${pathItems.filter((item) => item.kind === "misowned-link").length === 1 ? "y is" : "ies are"} not a link into this agent's role-local runtime`
+        : pathCode === "missing-target"
+          ? `${pathItems.filter((item) => item.kind === "missing-target").length} singleton link(s) point into this agent's runtime at a target that is missing or the wrong kind; Hermes will not create it`
         : pathCode === "unverifiable"
           ? `${pathItems.length} singleton link(s) could not be judged: the row records no role_dir and no project_path to derive one from, or the link could not be read`
           : "the profile directory is real, contained, safely named and unambiguous",

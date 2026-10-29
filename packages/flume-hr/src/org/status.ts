@@ -487,6 +487,7 @@ const PROFILE_RULE_DETAIL_PATTERNS: readonly RegExp[] = [
   /^profile dir missing: /u,
   /^wrong-target: /u,
   /^not-a-symlink: /u,
+  /^missing-target: /u,
   /^profile config missing /u,
   /^config\.yaml is a symlink /u,
   /^config\.yaml is not a rendered artifact /u,
@@ -497,7 +498,7 @@ const PROFILE_RULE_DETAIL_PATTERNS: readonly RegExp[] = [
 /** The byte-policy observer may reject a profile alias the core supports. */
 const PROFILE_RULE_COVERED_GATE_KINDS: ReadonlySet<string> = new Set(["missing", "not-a-directory"]);
 const PROFILE_RULE_COVERED_KINDS: ReadonlySet<string> = new Set([
-  "misowned-link", "generated-symlink", "generated-missing", "marker-missing", "delta-missing", "delta-symlink",
+  "misowned-link", "missing-target", "generated-symlink", "generated-missing", "marker-missing", "delta-missing", "delta-symlink",
   "pin-missing", "pin-symlink", "pin-malformed", "bank-missing", "bank-custom", "bank-alias", "bank-mismatch",
 ]);
 
@@ -1966,7 +1967,7 @@ function profileObserverDrift(result: FleetProfileAgentResult | undefined): bool
   if (result.path.state === "error") return null;
   const gateKinds = result.path.items.map((item) => item.kind);
   if (gateKinds.some((kind) => PROFILE_RULE_COVERED_GATE_KINDS.has(kind))) return true;
-  if (result.path.items.some((item) => item.kind === "misowned-link")) return true;
+  if (result.path.items.some((item) => item.kind === "misowned-link" || item.kind === "missing-target")) return true;
   // The rule reads the two config files and the pin. An `error` or an
   // `unobserved` on either is a partial reading, and a verdict over a partial
   // reading is not one to hold the rule against.
@@ -3416,7 +3417,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       if (!profileObserved) profileCounts.unobserved += 1;
       else {
         const aspects = [profileResult.path, profileResult.identity, profileResult.config, profileResult.bank, profileResult.skills];
-        const gateFailed = profileResult.path.state !== "pass" && profileResult.path.code !== "misowned-link" && profileResult.path.code !== "unverifiable";
+        const gateFailed = profileResult.path.state !== "pass" && profileResult.path.code !== "misowned-link" && profileResult.path.code !== "missing-target" && profileResult.path.code !== "unverifiable";
         if (gateFailed) {
           if (profileResult.path.state === "fail") profileCounts.blocked_at_path += 1;
           else profileCounts.incomplete += 1;

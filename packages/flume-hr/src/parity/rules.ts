@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, readdirSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync, chmodSync, copyFileSync, rmSync } from "node:fs";
+import { constants as fsConstants, existsSync, lstatSync, statSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, readdirSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync, chmodSync, copyFileSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -11,6 +11,7 @@ import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import { roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
+import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, isDanglingLink, lacksRequiredTarget, linkState, ownedDirMode, targetMustExist } from "./singleton-links";
 import { showProfile, syncProfile } from "@delorenj/skillex";
 
 
@@ -1598,29 +1599,17 @@ const SHARED_PROFILE_ENTRIES = [".env"] as const;
 // silently drifted", which look identical on disk otherwise.
 const PROFILE_RENDER_MARKER = "GENERATED FILE -- DO NOT EDIT";
 
-// Person-owned. SOUL.md is load-bearing: Hermes reads it from HERMES_HOME and
-// seeds the stock "You are Hermes Agent, created by Nous Research" default into
-// any fresh profile dir, which would silently shadow each agent's real identity.
-const OWNED_PROFILE_ENTRIES = [
-  "memories",
-  "sessions",
-  "workspace",
-  "logs",
-  "cron",
-  "plans",
-  "hooks",
-  "pairing",
-  "audio_cache",
-  "image_cache",
-] as const;
-
-const OWNED_PROFILE_FILES = ["SOUL.md", "state.db", "kanban.db"] as const;
+// The owned-entry lists and the link-health judgement live in ./singleton-links
+// (shared with the `flume review` profile observer, org/profile.ts).
 
 
 interface SingletonLink {
   path: string;
   target: string;
+  /** Owned directory: migrate materializes it, even when the link is already correct. */
   ensureTargetDir: boolean;
+  /** The link is only healthy while its target exists (owned directories and SOUL.md). */
+  requireTarget: boolean;
 }
 
 
@@ -2236,6 +2225,61 @@ function fleetBinPath(ctx: Context): string {
 }
 
 
+/**
+ * Create a missing owned directory behind a profile link.
+ *
+ * Returns false when the target cannot be materialized (something non-directory
+ * or a dangling link already occupies the name): the caller must then leave that
+ * link alone and the result carries a `blocked:` detail, because replacing or
+ * deleting whatever sits there is not this rule's call.
+ */
+function materializeOwnedDir(link: SingletonLink, role: RoleMeta, ctx: Context, details: string[], changedFiles: string[]): boolean {
+  const occupant = lstatIfPresent(link.target);
+  if (occupant) {
+    if (existsSync(link.target) && statSync(link.target).isDirectory()) return true;
+    details.push(`blocked: ${link.target} exists but is not a directory (${occupant.isSymbolicLink() ? "a dangling link" : "a file"}); ${role.agentId}'s ${basename(link.path)} link needs an operator to clear it`);
+    return false;
+  }
+  const mode = ownedDirMode(basename(link.path));
+  details.push(`${ctx.dryRun ? "would create" : "create"} runtime dir ${link.target}${mode === undefined ? "" : ` (mode ${mode.toString(8)})`}`);
+  changedFiles.push(link.target);
+  if (!ctx.dryRun) {
+    mkdirSync(link.target, { recursive: true, ...(mode === undefined ? {} : { mode }) });
+    // mkdir's mode is masked by the umask and applies only to the leaf; say what we mean.
+    if (mode !== undefined) chmodSync(link.target, mode);
+  }
+  return true;
+}
+
+/**
+ * SOUL.md is identity, so migrate never invents one. When the runtime has none it
+ * seeds the one source that is already authoritative for the desk -- the role's
+ * own tracked SOUL.md that hermes.pm-scaffold composes, the very file template
+ * step 20 copies -- and otherwise reports `blocked:` and points at the composer.
+ * An existing runtime SOUL.md is never overwritten.
+ */
+function seedSoul(link: SingletonLink, role: RoleMeta, ctx: Context, details: string[], changedFiles: string[]): boolean {
+  if (lstatIfPresent(link.target)) {
+    if (existsSync(link.target) && statSync(link.target).isFile()) return true;
+    details.push(`blocked: ${link.target} is ${existsSync(link.target) ? "not a regular file" : "a dangling link"}; ${role.agentId} has no soul until an operator clears it`);
+    return false;
+  }
+  const source = join(role.roleDir, "SOUL.md");
+  const sourceStat = lstatIfPresent(source);
+  if (!sourceStat || !sourceStat.isFile() || sourceStat.size === 0) {
+    details.push(`blocked: ${role.agentId} has no SOUL.md to link (${link.target} is absent and ${source} is ${sourceStat ? "empty or not a file" : "absent"}); compose it with: flume remediate hermes.pm-scaffold`);
+    return false;
+  }
+  details.push(`${ctx.dryRun ? "would seed" : "seed"} ${link.target} from ${source}`);
+  changedFiles.push(link.target);
+  if (!ctx.dryRun) {
+    mkdirSync(dirname(link.target), { recursive: true });
+    copyFileSync(source, link.target, fsConstants.COPYFILE_EXCL);
+  }
+  return true;
+}
+
+
 function singletonPlan(ctx: Context, role: RoleMeta): SingletonPlan {
   const fleetRoot = fleetHome(ctx);
   const profileName = role.profileName || role.agentId;
@@ -2243,13 +2287,13 @@ function singletonPlan(ctx: Context, role: RoleMeta): SingletonPlan {
   const runtimeDir = join(role.roleDir, "runtime");
   const links: SingletonLink[] = [];
   for (const entry of SHARED_PROFILE_ENTRIES) {
-    links.push({ path: join(profileDir, entry), target: join(fleetRoot, entry), ensureTargetDir: false });
+    links.push({ path: join(profileDir, entry), target: join(fleetRoot, entry), ensureTargetDir: false, requireTarget: false });
   }
   for (const entry of OWNED_PROFILE_ENTRIES) {
-    links.push({ path: join(profileDir, entry), target: join(runtimeDir, entry), ensureTargetDir: true });
+    links.push({ path: join(profileDir, entry), target: join(runtimeDir, entry), ensureTargetDir: true, requireTarget: true });
   }
   for (const entry of OWNED_PROFILE_FILES) {
-    links.push({ path: join(profileDir, entry), target: join(runtimeDir, entry), ensureTargetDir: false });
+    links.push({ path: join(profileDir, entry), target: join(runtimeDir, entry), ensureTargetDir: false, requireTarget: targetMustExist(entry) });
   }
   const sharedSeeds = ["config.yaml", "auth.json", ".env"].map((entry) => ({
     rootPath: join(fleetRoot, entry),
@@ -2366,31 +2410,6 @@ function profileConfigFindings(profileDir: string, profileName: string, declared
     }
   }
   return out;
-}
-
-
-function isDanglingLink(path: string): boolean {
-  try {
-    return lstatSync(path).isSymbolicLink() && !existsSync(path);
-  } catch {
-    return false;
-  }
-}
-
-
-function linkState(path: string, target: string): "ok" | "missing" | "not-a-symlink" | "wrong-target" {
-  let stat;
-  try {
-    stat = lstatSync(path);
-  } catch {
-    return "missing";
-  }
-  if (!stat.isSymbolicLink()) return "not-a-symlink";
-  try {
-    return readlinkSync(path) === target ? "ok" : "wrong-target";
-  } catch {
-    return "wrong-target";
-  }
 }
 
 
@@ -3284,6 +3303,12 @@ return [
         for (const link of plan.links) {
           const state = linkState(link.path, link.target);
           if (state !== "ok") details.push(`${state}: ${link.path} -> ${link.target}`);
+          // A link in the right place is not a healthy link while its target is
+          // absent (or the wrong kind): Hermes refuses to create the target of a
+          // link, so the profile fails to initialize. This is the re-hire case
+          // (correct links, fresh runtime dir). state.db/kanban.db are exempt
+          // (sqlite creates them through the link).
+          else if (link.requireTarget && lacksRequiredTarget(basename(link.path), link.path)) details.push(`missing-target: ${link.path} -> ${link.target}`);
         }
         const declaration=readRoleDeclaration(process.env.FLUME_ROLES_ROOT??resolveFlumeRoot(),role.role,role.agentId,profileNameOf(role));
         if(declaration.skills) {
@@ -3350,12 +3375,15 @@ return [
         }
         for (const link of plan.links) {
           const state = linkState(link.path, link.target);
-          if (state === "ok") continue;
           // Person-owned targets must exist before linking or the agent starts
-          // against a dangling path and silently recreates empty state.
-          if (link.ensureTargetDir && !existsSync(link.target) && !ctx.dryRun) {
-            mkdirSync(link.target, { recursive: true });
-          }
+          // against a dangling path and silently recreates empty state. This runs
+          // for a link that is ALREADY correct too: the re-hire case is correct
+          // links over a fresh runtime dir, and Hermes will not create the
+          // target of a link itself. It only ever creates what is absent; an
+          // existing target (and everything in it) is never touched.
+          if (link.ensureTargetDir && !materializeOwnedDir(link, role, ctx, details, changedFiles)) continue;
+          if (!link.ensureTargetDir && link.requireTarget && !seedSoul(link, role, ctx, details, changedFiles)) continue;
+          if (state === "ok") continue;
           details.push(`link ${link.path} -> ${link.target}`);
           changedFiles.push(link.path);
           if (ctx.dryRun) continue;

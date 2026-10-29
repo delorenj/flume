@@ -313,7 +313,13 @@ function seedFleet() {
     RUNTIMES[name] = made.runtime;
     return made;
   };
-  const ownLinks = (name) => ({ "SOUL.md": join(RUNTIMES[name], "SOUL.md"), memories: join(RUNTIMES[name], "memories") });
+  // The link targets exist, as they do on a desk that has run: a link into a
+  // runtime that was never populated is the observer's `missing-target` finding.
+  const ownLinks = (name) => {
+    mkdirSync(join(RUNTIMES[name], "memories"), { recursive: true });
+    writeFileSync(join(RUNTIMES[name], "SOUL.md"), "soul\n", "utf8");
+    return { "SOUL.md": join(RUNTIMES[name], "SOUL.md"), memories: join(RUNTIMES[name], "memories") };
+  };
 
   // -- the path gate ----------------------------------------------------------
   repoFor("clean-pm"); seedProfile("clean-pm", { links: ownLinks("clean-pm") }); register("clean-pm");
@@ -977,6 +983,30 @@ try {
     assert.equal(noproj.profile.path.code, "unverifiable");
     assert.equal(fieldOf(noproj, FIELDS.bank).state, "pass", "an unverifiable link does not block the dependents");
     assert.equal(noproj.healthy, true, "a warn is not a proven failure");
+  });
+
+  check("a correct link into a runtime whose target is missing is a missing-target path fail (the re-hire case); a dangling state.db is not", () => {
+    // The link points INTO this agent's runtime, so containment passes; the
+    // target is gone because the runtime was re-created. Hermes will not create
+    // the target of a link, so the profile cannot initialize. state.db is created
+    // lazily by sqlite through the link and must never be a finding.
+    const runtime = RUNTIMES["marker-pm"];
+    const stateLink = join(profilesRoot, "marker-pm", "state.db");
+    rmSync(join(runtime, "memories"), { recursive: true });
+    symlinkSync(join(runtime, "state.db"), stateLink);
+    try {
+      const agent = agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm");
+      const path = fieldOf(agent, FIELDS.path);
+      assert.equal(path.state, "fail");
+      assert.deepEqual(itemsOf(path).map((item) => [item.path, item.kind, item.detail]), [["memories", "missing-target", "missing-target:memories"]]);
+      assert.equal(agent.profile.path.code, "missing-target");
+      assert.equal(fieldOf(agent, FIELDS.bank).state, "pass", "the gate passed, so the dependents are still observed");
+    } finally {
+      rmSync(stateLink);
+      mkdirSync(join(runtime, "memories"), { recursive: true });
+    }
+    const healed = fieldOf(agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm"), FIELDS.path);
+    assert.equal(healed.state, "pass", "restoring the target clears the finding");
   });
 
   // -- AC2: the generated config through the canonical renderer ------------
@@ -2050,7 +2080,7 @@ try {
     const rules = readFileSync(join(PKG, "src", "parity", "rules.ts"), "utf8");
     const auditStart = rules.indexOf('id: "hermes.runtime-singleton",');
     const audit = rules.slice(auditStart, rules.indexOf("migrate: (ctx, finding) => {", auditStart));
-    const findings = rules.slice(rules.indexOf("function profileConfigFindings("), rules.indexOf("function isDanglingLink("));
+    const findings = rules.slice(rules.indexOf("function profileConfigFindings("), rules.indexOf("function realOrSelf("));
     const literals = [];
     for (const source of [audit, findings]) {
       for (const match of source.matchAll(/(?:details|out)\.push\(\s*`([^`]*)`/gu)) literals.push(match[1]);
@@ -2385,16 +2415,18 @@ try {
     assert.doesNotMatch(script, /CORE_RUNTIME_SKILLS=/, "the template delegates selection to Skillex");
     assert.deepEqual(contract.profile_manifest.skill_core.required, [], "default fleet policy does not require a global projection");
     assert.match(contract.profile_manifest.skill_core.source, /explicit fleet byte-policy/);
-    // And the singleton links the observer checks are the ones the rule provisions.
+    // And the singleton links the observer checks are the ones the rule provisions:
+    // both read ONE list, from the fs-only module they share.
+    const shared = readFileSync(join(PKG, "src", "parity", "singleton-links.ts"), "utf8");
+    const entriesBlock = /export const OWNED_PROFILE_ENTRIES = \[([^\]]*)\]/u.exec(shared);
+    const filesBlock = /export const OWNED_PROFILE_FILES = \[([^\]]*)\]/u.exec(shared);
+    assert.ok(entriesBlock && filesBlock, "singleton-links.ts must declare the owned profile entries and files");
     const rules = readFileSync(join(PKG, "src", "parity", "rules.ts"), "utf8");
-    const entriesBlock = /const OWNED_PROFILE_ENTRIES = \[([^\]]*)\]/u.exec(rules);
-    const filesBlock = /const OWNED_PROFILE_FILES = \[([^\]]*)\]/u.exec(rules);
-    assert.ok(entriesBlock && filesBlock, "rules.ts must declare the owned profile entries and files");
-    const ruleLinks = [...`${entriesBlock[1]},${filesBlock[1]}`.matchAll(/"([^"]+)"/gu)].map((match) => match[1]);
+    assert.doesNotMatch(rules, /const OWNED_PROFILE_(ENTRIES|FILES) =/u, "rules.ts must import the owned lists, not keep a second copy");
+    assert.match(rules, /from "\.\/singleton-links"/u, "rules.ts imports the shared link contract");
     const observer = readFileSync(join(PKG, "src", "org", "profile.ts"), "utf8");
-    const observerBlock = /PROFILE_SINGLETON_LINKS = \[([^\]]*)\]/u.exec(observer);
-    const observerLinks = [...observerBlock[1].matchAll(/"([^"]+)"/gu)].map((match) => match[1]);
-    assert.deepEqual([...observerLinks].sort(), [...ruleLinks].sort(), "PROFILE_SINGLETON_LINKS must mirror the rule's OWNED_PROFILE_ENTRIES + OWNED_PROFILE_FILES");
+    assert.match(observer, /PROFILE_SINGLETON_LINKS = \[\.\.\.OWNED_PROFILE_ENTRIES, \.\.\.OWNED_PROFILE_FILES\] as const/u, "the observer derives its links from the shared lists");
+    assert.match(observer, /from "\.\.\/parity\/singleton-links"/u, "the observer imports the shared link contract");
   });
 
   // -- the gates that make this reachable on a fresh clone --------------------

@@ -2017,9 +2017,10 @@ export const FLEET_PROFILE_ITEM_KINDS = [
   // The path gate: the profile directory itself. `ambiguous` is a duplicate
   // profile name across registry rows; `unverifiable` is a singleton link the
   // observer could not judge because the row records neither a role directory
-  // nor a project path to derive one from.
+  // nor a project path to derive one from. `missing-target` is a singleton link
+  // into this agent's own runtime whose target is absent or the wrong kind: Hermes will not create it.
   "unnamed", "symlink", "missing", "not-a-directory", "name-unsafe", "case-collision", "ambiguous", "unreadable",
-  "misowned-link", "unverifiable",
+  "misowned-link", "missing-target", "unverifiable",
   // The identity file.
   "malformed", "unknown-key", "inert-config-block", "identity-mismatch",
   // The generated config and its inputs. `delta-not-override-only` is a delta
@@ -2066,7 +2067,7 @@ export type FleetProfileExtraClass = (typeof FLEET_PROFILE_EXTRA_CLASSES)[number
  * failure carried onto every agent.
  */
 export const FLEET_PROFILE_PATH_CODES = [
-  "ok", "misowned-link", "unverifiable", "unnamed", "symlink", "missing", "not-a-directory", "name-unsafe", "case-collision", "ambiguous", "unreadable",
+  "ok", "misowned-link", "missing-target", "unverifiable", "unnamed", "symlink", "missing", "not-a-directory", "name-unsafe", "case-collision", "ambiguous", "unreadable",
 ] as const;
 /** A path code, or the root gate's failure carried onto the agent as `root:<root code>`. */
 export type FleetProfilePathCode = (typeof FLEET_PROFILE_PATH_CODES)[number] | `root:${FleetProfileRootCode}`;

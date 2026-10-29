@@ -53,6 +53,7 @@ const SUITES = [
   "tests/org-chart-regressions.mjs",
   "tests/fleet-shared-bloodbank-regressions.mjs",
   "tests/hermes-profile-inheritance-regressions.mjs",
+  "tests/runtime-singleton-targets-regressions.mjs",
   "tests/pjan-48-regressions.mjs",
   "tests/fleet-contract-regressions.mjs",
   "tests/fleet-inventory-regressions.mjs",
