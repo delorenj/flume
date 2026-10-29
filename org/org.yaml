@@ -39,6 +39,9 @@ ceo:
 
 # Reusable title/expertise per agent_id (optional; fills node title + badges).
 personas:
+  joe-pesci:
+    title: "Personal Chief of Staff — Portfolio & Ventures"
+    expertise: [portfolio-strategy, business-analysis, prioritization, launch-planning]
   33god-pm:
     title: "Chief of Staff"
     expertise: [orchestration, platform]
@@ -118,6 +121,14 @@ personas:
 # Departments, in display order. manager + members are agent_ids. A manager is
 # rendered first inside its department; members follow in the order listed.
 departments:
+  # 2026-10-29: personal advisor across Jarad's ventures, not inside AutomaticAI.
+  # Department manager reports directly to the CEO; existing PM lines stay intact.
+  - id: founder-office
+    name: "Founder's Office — Portfolio & Ventures"
+    order: 0
+    manager: joe-pesci
+    members: []
+
   - id: platform
     name: "Platform"
     order: 1
