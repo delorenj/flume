@@ -280,7 +280,7 @@
     "heartbeat_role_yaml_state": "retired",
     "provisioning_removes_retired_heartbeat_units": true,
     "liveness_owner": "gateway unit Restart=on-failure",
-    "scheduling_owner": "bloodbank",
+    "scheduling_owner": "candybar",
     "persistence_owner": "krebs leases"
   },
   "service_stabilization": {

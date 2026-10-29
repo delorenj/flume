@@ -44,8 +44,8 @@ HERMES_PYTHON=<venv-with-pytest> scripts/run_tests.sh tests/agent/<the tests>
 git push origin HEAD:main
 # 2. deploy: fast-forward the one install (Hermes sweeps stale __pycache__ via .bytecode-fingerprint)
 git -C ~/.hermes/hermes-agent pull --ff-only
-# 3. restart the ONE gateway, only when idle (gateway_state.json active_agents == 0, no turn lease)
-systemctl --user restart hermes-gateway.service
+# 3. restart the ONE gateway; the wrapper waits for idle (active_agents == 0, no turn lease) and coalesces callers
+hermes-gateway-restart --reason "<why>"
 # 4. prove nothing drifted
 python3 ~/code/33GOD/hermes-agent-template/scripts/hermes-single-install-check.py
 ```
@@ -106,7 +106,7 @@ Restart long-running user services after the code update:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user restart hermes-gateway.service   # only when idle; it serves every profile
+hermes-gateway-restart --reason "<why>"   # waits for idle; it serves every profile (never raw systemctl restart)
 ```
 
 Interactive `hermes` commands pick up the new code on their next launch.

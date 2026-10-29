@@ -39,7 +39,7 @@
 # very drift this contract exists to name.
 
 schema_version: 5
-contract_version: 1.6.0
+contract_version: 1.7.0
 
 compatibility:
   min_schema_version: 1
@@ -48,6 +48,36 @@ compatibility:
 x-delonet/provenance:
   assessment: fleet-convergence-live-assessment-2026-08-31
   epic: registry-wide-fleet-convergence-control-plane
+
+# Declaration of who owns "when". An `x-` key is never interpreted as policy and
+# is not an authority block (an authority declares a writable store; Candybar's
+# manifest registry is not a field this contract writes).
+x-delonet/scheduling:
+  owner: candybar
+  summary: >-
+    Candybar is the single clock for recurring work: it owns WHEN, firing
+    Bloodbank commands and Hermes invocations. Krebs leases own persistence;
+    Hermes, systemd services and webhook workflows only EXECUTE.
+  forbidden:
+    - crontab entry
+    - new systemd .timer
+    - systemd-run --on-*
+    - at/batch
+    - launchd interval
+    - Hermes internal recurring job (the cronjob tool, or `hermes cron create`
+      without --scheduler external)
+    - workflow-engine Schedule Trigger
+    - private recurring sleep/poll loop
+  allowed_execution:
+    - systemd .service
+    - Hermes job pinned scheduler=external
+    - webhook workflow
+    - any exec argv
+  authored_rule: roles/_base.md#flume:scheduling-policy
+  explainer: docs/scheduling-policy.md
+  audit: scripts/audit-scheduling-policy.mjs
+  standing_exception: candybar-watchdog.timer (AD-22); any other must be an exact
+    owner-approved record in candybar/deploy/scheduling-policy.json
 
 authorities:
   project_identity:
@@ -858,9 +888,9 @@ activation:
 
 retired:
   - id: per-agent-heartbeat
-    reason: Gateway restart owns runtime liveness; Bloodbank scheduling and Krebs
-      leases own scheduling and persistence. Per-employee heartbeat ticks are
-      retired.
+    reason: Gateway restart owns runtime liveness; Candybar owns recurring schedules
+      (firing Bloodbank commands and Hermes invocations) and Krebs leases own
+      persistence. Per-employee heartbeat ticks are retired.
     superseded_by: service_model.per_agent.gateway_unit
     detect:
       - '-heartbeat\.(?:service|timer)$'

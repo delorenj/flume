@@ -141,7 +141,8 @@ check actual pinned Hermes discovery; UI source labels do not establish ownershi
 Per agent there is exactly one unit: `hermes-<agent-id>-gateway.service`, chat
 ingress. Per-agent heartbeat timers are retired and provisioning removes any it
 finds, recording `service_state.heartbeat: retired`. Liveness is the gateway's
-own `Restart=on-failure`; scheduling is Bloodbank; persistence is krebs leases.
+own `Restart=on-failure`; scheduling is Candybar (it fires Bloodbank commands and Hermes
+invocations); persistence is krebs leases.
 A heartbeat timer, a per-agent Bloodbank consumer, a checkpoint timer, or a
 filesystem inbox is drift.
 
