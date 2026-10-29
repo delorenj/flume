@@ -52,15 +52,17 @@ function write(path: string, bytes: string) {
   finally { rmSync(temporary, { force: true }); }
   return true;
 }
-function environment() {
-  const home = process.env.HOME || homedir();
-  const hermesRoot = resolve(process.env.HERMES_FLEET_HOME || join(home, ".hermes"));
-  const { registryPath, fleetBin } = copierFleetPaths({ ...process.env, HOME: home });
+interface PolicyContext { home?: string; fleetHome?: string; registry?: string }
+function environment(options: PolicyContext = {}) {
+  const home = options.home || process.env.HOME || homedir();
+  const hermesRoot = resolve(options.fleetHome || process.env.HERMES_FLEET_HOME || join(home, ".hermes"));
+  const fleetPaths = copierFleetPaths({ ...process.env, HOME: home });
+  const registryPath = options.registry || fleetPaths.registryPath, fleetBin = fleetPaths.fleetBin;
   const selection: SelectionContext = { home, hermesRoot, skillexRoot: process.env.PJ_SKILLS_REGISTRY_ROOT || join(home, "code/skillex"), stateHome: process.env.XDG_STATE_HOME || join(home, ".local/state") };
   return { home, hermesRoot, registryPath, fleetBin, selection };
 }
-async function prepare(definitionPath: string, expectedEmployee?: string) {
-  const p = environment();
+async function prepare(definitionPath: string, expectedEmployee?: string, options: PolicyContext = {}) {
+  const p = environment(options);
   const source = resolve(definitionPath);
   safe(source);
   const bytes = readFileSync(source, "utf8");
@@ -293,6 +295,21 @@ export async function auditSpecialist(employee: string) {
     if (currentBloodbank.target_agent_id !== employee) problems.push("Record differs: bloodbank.target_agent_id (must be this employee)");
   }
   return { ok: problems.length === 0, id: employee, standing: problems.length ? "on notice" : "in good standing", problems, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks, skills: p.plan.skills.map(s => s.name) };
+}
+
+/** Narrow instruction projection; registry lock is held by the policy-refresh caller. */
+export async function refreshSpecialistSchedulingPolicy(employee: string, record: any, check: boolean, context: PolicyContext = {}) {
+  const p = await prepare(record.definition_path, employee, context);
+  const marker = ownership(p, false);
+  if (marker.status !== "complete") throw new Error("Incomplete specialist publication");
+  if (record.definition_path !== join(p.desk, "agent.yaml") || record.profile_name !== employee) throw new Error("Specialist policy ownership conflict");
+  const run = spawnSync("python3", [join(resolveFlumeRoot(), "scripts/specialist-policy-refresh.py"), ...(check ? ["--check"] : [])], {
+    input: JSON.stringify({ request: { ...specialistSchedulingRequest(p.definition, resolveFlumeRoot()), definition: record.definition_path },
+      purpose: p.definition.charter.purpose }), encoding: "utf8", timeout: 35_000,
+    env: { ...process.env, HERMES_FLEET_HOME: p.hermesRoot, PYTHONDONTWRITEBYTECODE: "1" },
+  });
+  if (run.error || run.status !== 0) throw new Error(run.error?.message || run.stderr.trim() || "Specialist policy projection failed");
+  return JSON.parse(run.stdout) as { changed: string[]; files: unknown[] };
 }
 
 /** No chdir, no sticky profile switch, no inherited/global inference credential. */

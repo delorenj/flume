@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -119,6 +120,20 @@ try {
       assert.equal(policySection(text), policy);
       assert.match(text, /Preserve public charter[\s\S]*Preserve persona/);
       assert.deepEqual(YAML.parse(readFileSync(join(home, ".agents/workforce/public-specialist/agent.yaml"), "utf8")), definition);
+      const portableProfile = join(fleet, "profiles/public-specialist");
+      const soulPath = join(portableProfile, "SOUL.md"), receiptPath = join(portableProfile, "specialist-projection.json");
+      const stalePolicy = policy.replace("Candybar owns when", "Historical policy owns when");
+      const historical = text.replace(policy, stalePolicy);
+      const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+      receipt.files["SOUL.md"] = createHash("sha256").update(historical).digest("hex");
+      writeFileSync(soulPath, historical); writeFileSync(receiptPath, JSON.stringify(receipt, null, 2) + "\n");
+      const configBefore = readFileSync(join(portableProfile, "config.yaml"), "utf8");
+      const narrowPreview = cli(["refresh-scheduling-policy"]); assert.equal(narrowPreview.status, 0, narrowPreview.stdout + narrowPreview.stderr);
+      assert.equal(JSON.parse(narrowPreview.stdout).counts["would-change"], 1); assert.equal(readFileSync(soulPath, "utf8"), historical);
+      const narrow = cli(["refresh-scheduling-policy", "--apply"]); assert.equal(narrow.status, 0, narrow.stdout + narrow.stderr);
+      assert.equal(JSON.parse(narrow.stdout).counts.changed, 1); assert.equal(readFileSync(soulPath, "utf8"), text);
+      assert.equal(readFileSync(join(portableProfile, "config.yaml"), "utf8"), configBefore);
+      const repeatedNarrow = cli(["refresh-scheduling-policy", "--apply"]); assert.equal(repeatedNarrow.status, 0); assert.equal(JSON.parse(repeatedNarrow.stdout).changed_file_count, 0);
       const again = cli(["onboard", "--employee", "public-specialist"]); assert.equal(again.status, 0, again.stdout + again.stderr); assert.equal(JSON.parse(again.stdout).changed, false);
     });
   }

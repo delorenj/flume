@@ -61,9 +61,10 @@ manifest, read back the registered schedule through Candybar's API, prove an
 actual terminal invocation and its intended effect, and verify every competing
 native clock is disabled. Preserve evidence of the single-clock cutover; tests,
 registration alone, or a successful dispatch receipt are not execution proof.
-Use Candybar's current component documentation at `~/code/33GOD/candybar/` for
-registration, execution proof and scheduling-policy lint; inspect its actual
-interfaces rather than inventing CLI flags or claiming a linter is live.
+Externally pinned Hermes execution is allowed; an arbitrary agent daemon is not
+required. From `~/code/33GOD/candybar/`, run the actual policy lint command:
+`uv run candybar doctor --repo . --live --json`. Keep findings visible; this
+instruction update does not claim runtime cutover or a clean machine.
 
 **Narrow exceptions, never a blanket infrastructure exemption:**
 - The existing `candybar-watchdog.timer` and its page-only service remain OUTSIDE

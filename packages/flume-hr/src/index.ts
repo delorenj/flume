@@ -29,6 +29,7 @@ import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { refreshSchedulingPolicy } from "./workforce/policy-refresh";
 import { updateEmployeePersona } from "./workforce/persona";
 import { employeeContinuity, employeeCredentials, formatLifecycleResult, restoreEmployee, retireEmployee, suspendEmployee } from "./workforce/lifecycle";
 import { accessReceipts } from "./workforce/receipts";
@@ -64,6 +65,23 @@ program
   .name("flume")
   .description("The workforce: hire, onboard and review the agents that do the work")
   .version("1.0.0");
+
+program
+  .command("refresh-scheduling-policy")
+  .description("Refresh only Flume-owned Candybar instruction sections; preview by default")
+  .option("--apply", "Apply safe owned policy changes; never provision or rewrite personas")
+  .option("--registry <file>", "Org chart path")
+  .option("--fleet-home <dir>", "Hermes workforce root")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    try {
+      const result = await refreshSchedulingPolicy({ apply: Boolean(options.apply), registry: options.registry, fleetHome: options.fleetHome });
+      console.log(JSON.stringify(result, null, 2));
+      process.exitCode = result.ok ? 0 : 1;
+    } catch (error) {
+      console.log(JSON.stringify({ ok: false, error: (error as Error).message })); process.exitCode = 2;
+    }
+  });
 
 // ============================================================================
 // HIRING
