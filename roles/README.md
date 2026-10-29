@@ -149,6 +149,11 @@ read per target). Do not claim a desk-level fallback chain for Bloodbank turns. 
 fallback entries do not carry the provider's `extra_body` effort either, so record the
 ledger's actual effort rather than the configured one.
 
+| Runtime policy boundary | Source / verification |
+| --- | --- |
+| Recurring schedules, every role | `_base.md` bounded `flume:scheduling-policy` section: Candybar owns the single clock, runners only execute. Portable specialist projection receives the same section through `workforce/scheduling.ts`; no policy copy in a specialist definition or template. |
+| Instruction drift, current employees | `node scripts/audit-scheduling-policy.mjs` reads the registry and actual profile SOULs, exits nonzero for missing/stale coverage, and never changes employee state. This is not Candybar's runtime bypass-schedule linter. See `docs/scheduling-policy.md`. |
+
 ## Named agents
 
 A role directory is a **post** (`agent_id` / `profile`). A post held by a

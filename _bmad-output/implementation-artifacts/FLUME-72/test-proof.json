@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "output": "> flume@1.0.0 typecheck\n> npm run typecheck --workspaces --if-present\n\n\n> @delorenj/flume-core@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json\n\n\n> @delorenj/flume-hr@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json"
+    },
+    {
+      "name": "build",
+      "command": "npm run build",
+      "exit_code": 0,
+      "output": "> flume@1.0.0 build\n> npm run build --workspaces --if-present\n\n\n> @delorenj/flume-hr@1.0.0 build\n> esbuild src/index.ts src/mcp-server.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist\n\n\n  dist/index.js             1.3mb \u26a0\ufe0f\n  dist/mcp-server.js      824.2kb\n  dist/index.js.map         3.0mb\n  dist/mcp-server.js.map    2.0mb\n\n\u26a1 Done in 32ms"
+    },
+    {
+      "name": "scheduling-policy",
+      "command": "node tests/scheduling-policy-regressions.mjs",
+      "exit_code": 0,
+      "output": "PASS composer propagates byte-identical policy to dev (named and unnamed)\nPASS composer propagates byte-identical policy to pm (named and unnamed)\nPASS composer propagates byte-identical policy to reporter (named and unnamed)\nPASS composer propagates byte-identical policy to review (named and unnamed)\nPASS composer propagates byte-identical policy to director (named and unnamed)\nPASS composer propagates byte-identical policy to infra-specialist (named and unnamed)\nPASS composer propagates byte-identical policy to unconfigured-future-role (named and unnamed)\nPASS portable specialist adapter projects shared policy without changing the owning definition\nPASS policy includes ownership, every bypass class, proof and bounded exceptions\nPASS registry guard counts real profile policy, stale, absent, duplicate, missing, portable and symlink cases\nPASS CLI exits 1 on drift and zero only on a complete current registry\nPASS malformed/empty registry, duplicate YAML keys and invented flags fail closed\nPASS built public hire/onboard path propagates to a portable specialist and converges\nscheduling-policy: 13 check groups passed; 7 roles x named/unnamed rendered"
+    },
+    {
+      "name": "project-bank",
+      "command": "node tests/soul-project-bank-regressions.mjs",
+      "exit_code": 0,
+      "output": "soul-project-bank: all assertions passed"
+    },
+    {
+      "name": "named-agent",
+      "command": "node tests/named-agent-regressions.mjs",
+      "exit_code": 0,
+      "output": "named-agent regressions: all assertions passed"
+    },
+    {
+      "name": "scaffold",
+      "command": "node tests/pjan-48-regressions.mjs",
+      "exit_code": 0,
+      "output": "PJAN-48 regressions: passed"
+    }
+  ]
+}

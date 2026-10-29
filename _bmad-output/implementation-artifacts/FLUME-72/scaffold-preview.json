@@ -1,0 +1,66 @@
+{
+  "repo": "/home/delorenj/code/33GOD/flume",
+  "dryRun": true,
+  "ok": false,
+  "selectedRules": [
+    "hermes.pm-scaffold"
+  ],
+  "results": [
+    {
+      "id": "hermes.pm-scaffold",
+      "title": "Hermes orchestrator scaffold parity",
+      "status": "partial",
+      "summary": "5 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/hermes",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/20-runtime-repo.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/31-slack.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/99-summary.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/channel-transaction.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/bash-guard.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/fd-lock.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/fleet-env.sh",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/parse-fleet-env.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/profile-config-lock.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/profile-renderer.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/voice-config.py"
+      ],
+      "details": [
+        "flume-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)",
+        "flume-pm: preserved locally-modified .scripts/01-config.sh",
+        "flume-pm: preserved locally-modified .scripts/80-registry.sh",
+        "flume-pm: preserved locally-modified .scripts/_lib.sh",
+        "flume-pm: preserved locally-modified .scripts/config.example.toml",
+        "flume-pm: preserved locally-modified .scripts/lib/skills-policy.py"
+      ]
+    }
+  ],
+  "changedFiles": [
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/20-runtime-repo.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/30-telegram.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/31-slack.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/70-systemd.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/99-summary.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/channel-transaction.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/bash-guard.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/fd-lock.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/fleet-env.sh",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/parse-fleet-env.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/profile-config-lock.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/profile-renderer.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/project-skills.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/.scripts/lib/voice-config.py",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/SOUL.md",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/hermes",
+    "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md"
+  ]
+}

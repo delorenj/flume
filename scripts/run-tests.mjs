@@ -62,6 +62,7 @@ const SUITES = [
   "tests/fleet-health-regressions.mjs",
   "tests/fleet-scaffold-regressions.mjs",
   "tests/soul-project-bank-regressions.mjs",
+  "tests/scheduling-policy-regressions.mjs",
   "tests/named-agent-regressions.mjs",
   "tests/named-agent-recency-regressions.mjs",
   "tests/role-projection-regressions.mjs",

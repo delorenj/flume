@@ -1,0 +1,357 @@
+{
+  "ok": false,
+  "read_only": true,
+  "runtime_schedules_assessed": false,
+  "policy_source": "roles/_base.md",
+  "policy_sha256": "437bcfb70dd97e7dadba875dab3b0642eb063a50c4aad8ab5eaa069ace03f6c1",
+  "registry": "/home/delorenj/.hermes/agents-registry.yaml",
+  "audited": 38,
+  "counts": {
+    "pass": 0,
+    "drift": 37,
+    "unproven": 1
+  },
+  "rows": [
+    {
+      "id": "dumply",
+      "role": "tutor",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/dumply/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "36c1f5a2e92cd1d018311eaf4c8f1e8886672eae78212e033c681d0e3d5d506f"
+    },
+    {
+      "id": "bloodbank-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "700565677283ccfa092338e46b08392fdf8cd71f6e023b2f146e9b1689c6aa73"
+    },
+    {
+      "id": "33god-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "7c476c47f266e397a0a3852eef921ddcb15b1a9d77f34bdb3bfe497c102c9d9d"
+    },
+    {
+      "id": "candystore-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/candystore-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "f15c15c7bfac62ffb7275572b391d3580b48bf518d1ed3236eb86c4a9506f9b9"
+    },
+    {
+      "id": "nautilus-trader-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "4513e88c7120635e16cb2eaa4ee82b1eb1c3773d610612eb71d998a658c5c90c"
+    },
+    {
+      "id": "zshyzsh-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "0cdc1e3d9e7f1c2b928887b089c1f111f6c97f7b27df729af272e02e9db2e60c"
+    },
+    {
+      "id": "holocene-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/holocene-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "99acda00b123c2d1ecb6c55fc38b58c1dbc37eba78356a976c8b548c2a7ee2ed"
+    },
+    {
+      "id": "skillex-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "401e1e34fc6c7771f8089ae1f5ce08b9b46285424d0dbfc029bc9f49c54e3ebc"
+    },
+    {
+      "id": "voxxy-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/voxxy-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "ff4abd241653a4fe568809f8b41c5ca508962df97c1916fd03a37f15df41327d"
+    },
+    {
+      "id": "gruvato-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "1754b9512bff7233fb495ed256296b39571b8cf484492852d1d4ec7313e2f57b"
+    },
+    {
+      "id": "keepy-money-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "c35c4c33d4298a397c16fd7deb6904234399cb167242fe28a3a794d441c96a27"
+    },
+    {
+      "id": "slowburns-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/slowburns-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "a704d37858ccfac9c3b04f344febdbdfac11b34c2bdf87581e0cfb3ae4fe5129"
+    },
+    {
+      "id": "delonet-company-reporter",
+      "role": "reporter",
+      "employment": "post",
+      "status": "unproven",
+      "profile": "/home/delorenj/.hermes/profiles/delonet-company-reporter/SOUL.md",
+      "detail": "Profile SOUL.md missing"
+    },
+    {
+      "id": "james-brennan-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/james-brennan-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "ccc50e3bbc831a5e33424c2608c56b70022089ca41c2a50df394d64eb243ecff"
+    },
+    {
+      "id": "pjangler-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "9f0dbcf813749d8da50ab519d16d0791b4231b2adaf29d5c469b2b7de38d540a"
+    },
+    {
+      "id": "heyma-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "e5391c3b9153a0050a0cf2b6c0f648bf594fadf52bc46df828bcfb37f4644d16"
+    },
+    {
+      "id": "delonet-director",
+      "role": "director",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/delonet-director/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "f233fbadab5b3ce23758e309632e317773b5dcc2a59ba52097428dc5e8b71251"
+    },
+    {
+      "id": "deckard-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/deckard-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "d313c7f9f92e13450983c8ade278c3f749fa73d3f941a43f6bdca3e1910953d0"
+    },
+    {
+      "id": "infra-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "6261f68aa7ece8029ed21df393defacc00affd02a7226a5854084789f40f9555"
+    },
+    {
+      "id": "ssbnk-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "1af0e4c92852c51c487b24d97ec1aef225301966a6a865e632e7f0a234c9b5a7"
+    },
+    {
+      "id": "tonnybox-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/tonnybox-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "6ac4c1c6a61c6a6ac71694e4ba34179905dc07e28bdc6ab2429e1d778f6ce67f"
+    },
+    {
+      "id": "sidepiece-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/sidepiece-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "74b5d9e81b45a5a523edc8bea123c882965a04cadd863f14d0e4c59bf307b0fa"
+    },
+    {
+      "id": "client-portal-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/client-portal-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "9ff08ef084fa23008cae0819a11a7a530fc4ea9a41ed656c27fff6b18fef2c68"
+    },
+    {
+      "id": "flume-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/flume-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "e970283bf360c4678679b3ca9531fb952e7e59f9a94d6684953b3f2a084396ff"
+    },
+    {
+      "id": "pile-of-dumb-things-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/pile-of-dumb-things-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "85e9509065f6fd9af874b53787db7c764d9dfaa940058580c3d09696ffa4f7ed"
+    },
+    {
+      "id": "green-in-between-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/green-in-between-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "39cdb0297b7b7d85180f8bbf2033eb138eef1bca373c633851b7b7b6c8784426"
+    },
+    {
+      "id": "infra-specialist",
+      "role": "infra-specialist",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/infra-specialist/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "ec099fe8cd697e9883b239111bbc19f3dbfb878e777bf8cceb456b97ef62e256"
+    },
+    {
+      "id": "n8n-specialist",
+      "role": "n8n-specialist",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/n8n-specialist/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "a1cfdcf4ef2c20f1bd4a6d6ecf033d20a3e260fd3c38162b13357a5c48c1e663"
+    },
+    {
+      "id": "monitoring-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/monitoring-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "e4469569f0cc7f78144b6c5f9a1c00b1844a80a3e70e1956a401f563d893110b"
+    },
+    {
+      "id": "idealscenario-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/idealscenario-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "a0289956c48ecc7ea3d95ef341d5c8c79ba784cc4a0d01cc8ef816aec0487c00"
+    },
+    {
+      "id": "rererere",
+      "role": "workflows-director",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/rererere/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "89daafcdcfe5cd3aa6d79dd4795b271ef2f386d4440403133e9349ee63de8976"
+    },
+    {
+      "id": "navi-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/navi-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "197b76c240dde486120e5129ebd88e9efdc82afc6b24d1caf98b54a25c66da1a"
+    },
+    {
+      "id": "marge-simpson",
+      "role": "hr-director",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/marge-simpson/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "f77e3d6cfabdfe305dc1989f130f44d9321b68244c3ae1a2f6bff01cf88c2813"
+    },
+    {
+      "id": "peter-griffin",
+      "role": "token-ops-engineer",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/peter-griffin/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "05e59826d9a40b6cbeed1bfc3efd065f6415597e2aac196fa6f54bce8dce7316"
+    },
+    {
+      "id": "milkshake-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/milkshake-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "611e0ec6a32afa435fb9f649622246b6302c7b19bb13fcf5d17969bc65508629"
+    },
+    {
+      "id": "context-director",
+      "role": "context-director",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/context-director/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "0bed18b1675bd1dad111ae3e49bafb31a72fcc6a6cfbf75077798090575f6a44"
+    },
+    {
+      "id": "bennett",
+      "role": "automaticai-executive-office-manager",
+      "employment": "portable-specialist",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/bennett/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair; portable specialist needs an owning Flume onboarding refresh, not direct SOUL edits",
+      "soul_sha256": "b6e03f1ced499dc71511ee9b11280c186141eaaf1a0c028f524d5dfb2868abc5"
+    },
+    {
+      "id": "pilot-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/pilot-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "9ba07befe7171a3a4f259297cf180ad911e0484ee55c1297973e8b6a9fb46391"
+    }
+  ]
+}
