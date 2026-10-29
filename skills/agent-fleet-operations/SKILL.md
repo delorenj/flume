@@ -160,7 +160,7 @@ a workflow-engine Schedule Trigger or a private recurring poll loop for an
 agent or desk; register a Candybar manifest (skill `candybar`) and let it fire
 a `.service`, a Hermes job pinned `scheduler=external` or any exec argv. The
 standing exception is `candybar-watchdog.timer` (AD-22). Rule and audit:
-[`docs/scheduling-policy.md`](../../docs/scheduling-policy.md) and
+flume's `docs/scheduling-policy.md` and
 `flume refresh-scheduling-policy --json`.
 
 Bloodbank command ingress is **fleet-shared**: `hermes-fleet-bloodbank-gateway.service`
