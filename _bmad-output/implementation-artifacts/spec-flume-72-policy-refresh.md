@@ -2,7 +2,7 @@
 title: 'FLUME-72: Narrow deployed scheduling-policy refresh'
 type: 'chore'
 created: '2026-10-29'
-status: 'in-progress'
+status: 'completed-with-ownership-refusals'
 route: 'oneshot'
 review_loop_iteration: 0
 context: []
