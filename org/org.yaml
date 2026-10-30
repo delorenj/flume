@@ -39,6 +39,9 @@ ceo:
 
 # Reusable title/expertise per agent_id (optional; fills node title + badges).
 personas:
+  morgan-finance:
+    title: "Director of Finance — AutomaticAI"
+    expertise: [milkshake, client-finance, bookkeeping, mercury-reconciliation]
   joe-pesci:
     title: "Personal Chief of Staff — Portfolio & Ventures"
     expertise: [portfolio-strategy, business-analysis, prioritization, launch-planning]
@@ -180,6 +183,7 @@ departments:
       - client-portal-pm     # Shared portal/gateway ownership stays here.
       - peter-griffin
       - milkshake-pm
+      - morgan-finance      # Finance officer; works with Milkshake and Portal leads.
 
   - id: finance
     name: "Finance & Trading"
