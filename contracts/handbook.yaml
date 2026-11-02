@@ -460,6 +460,52 @@ classifications:
         participants:
           - intelliforia
           - intelliforia-mobile
+      - id: tolt-shared-board
+        kind: shared-board
+        owner: operator
+        source: projects.{slug}.ticket_provider.board_id
+        lifecycle_state: intentionally-unmanaged
+        rationale: >
+          TOLT monorepo: one shared board (Plane eb302959, identifier TOLT) for
+          root, game and forge; scope by repo:* label. Operator ruling
+          2026-11-02.
+        policy_domains:
+          - project-registry
+        participants:
+          - tolt
+          - tower-of-dumb-things
+          - lost-things-forge
+      - id: tolt-shared-identifier
+        kind: shared-board
+        owner: operator
+        source: projects.{slug}.ticket_provider.identifier
+        lifecycle_state: intentionally-unmanaged
+        rationale: >
+          TOLT monorepo: one shared board (Plane eb302959, identifier TOLT) for
+          root, game and forge; scope by repo:* label. Operator ruling
+          2026-11-02.
+        policy_domains:
+          - project-registry
+        participants:
+          - tolt
+          - tower-of-dumb-things
+          - lost-things-forge
+      - id: tolt-shared-agent-identifier
+        kind: shared-board
+        owner: operator
+        source: agents.{agent_id}.plane.identifier
+        lifecycle_state: intentionally-unmanaged
+        rationale: >
+          TOLT monorepo: the director (repo:tolt) and the game PM (repo:game,
+          repo:forge and unlabeled intake) both carry the shared board's
+          identifier TOLT in their agent rows, the agent-side projection of the
+          project rows above; each is scoped by repo:* label. Operator ruling
+          2026-11-02.
+        policy_domains:
+          - project-registry
+        participants:
+          - pile-of-dumb-things-pm
+          - tolt-director
 
   retired:
     notes:

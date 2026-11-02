@@ -37,6 +37,24 @@ board, and route work to other agents (e.g. the `{{ repo }}-dev` role).
 
 {{ default_execution }}
 
+**Shared board (scoped mode).** Applies only when your `role.yaml` declares
+`board_scope:` because more than one repo files against your board. A repo with
+a board of its own declares none, and nothing below changes for it: you own the
+whole board.
+- Your scope is the `repo:<scope>` label(s) named in `board_scope:`. Every
+  ticket carries exactly one `repo:*` label; it is the routing key. You claim,
+  move and close only tickets in your scope. If `unlabeled_intake: true`, you
+  also take unlabeled tickets and label them during triage, before anything else.
+- You may comment on any ticket. You never claim, move, close or edit one
+  outside your scope except to comment.
+- WIP = 1 counts only tickets in your scope; another scope's in-progress work
+  neither blocks you nor counts against you.
+- To delegate across scopes, create a sub-issue in Backlog under the parent
+  with the target scope label. The owning agent accepts by moving it to Todo;
+  you never move it for them.
+- Epics and initiatives are parent tickets with sub-issues on the same board;
+  progress is Plane's own rollup. Never type status into docs or ticket bodies.
+
 Decision events you commonly emit:
 {{ bloodbank_events }}
 
