@@ -9,7 +9,7 @@
 // live ~/.hermes). The registry is the real TOLT shape plus an unrelated row full of YAML comments.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import YAML from "yaml";
 
@@ -300,6 +300,85 @@ await check("a row with no bloodbank block is reported as already unroutable, an
   assert.ok(body.nextActions.some((a) => a.includes("no bloodbank block")));
   assert.equal("bloodbank" in f.agents()[PILE], false, "no block is invented");
   assert.equal("plane" in f.agents()[PILE], false);
+});
+
+await check("a bloodbank-enabled row with NO plane block is still disabled: not 'already retired', applied, then converges", async () => {
+  const f = fleet(registryText({ pilePlane: "" }));
+  const before = f.read();
+  const preview = await f.json(["retire", PILE]);
+  assert.equal(preview.status, 0);
+  assert.equal(preview.body.alreadyRetired, false, "enabled routing is work to do even without a board claim");
+  assert.equal(preview.body.bloodbank.changed, true);
+  assert.equal(preview.body.removedPlane, null);
+  assert.equal(f.read(), before, "preview writes nothing");
+  const applied = await f.json(["retire", PILE, "--apply"]);
+  assert.equal(applied.status, 0, JSON.stringify(applied.body));
+  assert.equal(applied.body.applied, true);
+  assert.equal(f.agents()[PILE].bloodbank.enabled, false);
+  assert.equal(f.read(), before.replace("      enabled: true # keep routing on until retired\n", "      enabled: false # keep routing on until retired\n"));
+  const again = await f.json(["retire", PILE, "--apply"]);
+  assert.equal(again.body.alreadyRetired, true);
+  assert.equal(again.body.applied, false);
+});
+
+// ---- owner eligibility: each of the resolver's four checks -----------------------------------------
+
+/** Edit one row's block of the registry text (from the `  <id>:` line to the next two-space key or comment). */
+function editRow(text, id, from, to) {
+  const start = text.indexOf(`\n  ${id}:\n`);
+  assert.ok(start >= 0, `row ${id} exists`);
+  const end = text.slice(start + 1).search(/\n {2}[#\w]/u);
+  const block = text.slice(start, end < 0 ? undefined : start + 1 + end);
+  assert.ok(block.includes(from), `${id} contains ${JSON.stringify(from)}`);
+  return text.slice(0, start) + block.replace(from, to) + (end < 0 ? "" : text.slice(start + 1 + end));
+}
+
+for (const [name, from, to, why] of [
+  ["no profile_name", "    profile_name: tolt-pm\n", "", /tolt-pm has no profile_name/u],
+  ["gateway_scope is not fleet", "gateway_scope: fleet", "gateway_scope: agent", /tolt-pm gateway_scope is not 'fleet'/u],
+  ["target_agent_id is someone else", "target_agent_id: tolt-pm", "target_agent_id: tolt-director", /tolt-pm target_agent_id mismatch \(tolt-director\)/u],
+]) {
+  await check(`an owner with ${name} is ineligible: its tickets are flagged owner-ineligible`, async () => {
+    const f = fleet(editRow(registryText(), "tolt-pm", from, to));
+    const { body } = await f.json(["retire", PILE]);
+    const after = body.routing.find((entry) => entry.board === BOARD).after;
+    const game = after.routes.find((route) => route.label === "repo:game");
+    assert.equal(game.owner, "tolt-pm", "still chosen as owner: the resolver does not skip ineligible rows");
+    assert.equal(game.eligible, false);
+    assert.match(game.why, why);
+    assert.equal(after.claimants.find((c) => c.id === "tolt-pm").eligible, false);
+    assert.ok(after.flags.some((flag) => flag.code === "owner-ineligible" && flag.detail.includes("repo:game") && flag.detail.includes("tolt-pm")), JSON.stringify(after.flags));
+    assert.ok(body.flags.some((flag) => flag.startsWith("owner-ineligible:")));
+    // The healthy rows beside it are unaffected.
+    assert.equal(after.routes.find((route) => route.label === "repo:forge").eligible, true);
+  });
+}
+
+// ---- the surgery proof ----------------------------------------------------------------------------
+
+await check("the proof refuses to write when the edit would change another row (shared YAML anchor)", async () => {
+  // tolt-pm's bloodbank block is an alias of pile's. Setting pile's enabled:false through the anchor would
+  // silently turn tolt-pm's routing off too; the proof must catch that and leave the file alone.
+  const text = registryText({ pileBloodbank: `    bloodbank: &shared_bb
+      enabled: true
+      gateway_scope: fleet
+      target_agent_id: ${PILE}
+` }).replace(/(  tolt-pm:\n(?:.*\n)*?)    bloodbank:\n      enabled: true\n      gateway_scope: fleet\n      target_agent_id: tolt-pm\n/u, "$1    bloodbank: *shared_bb\n");
+  assert.ok(text.includes("bloodbank: *shared_bb"), "the fixture edit applied");
+  const f = fleet(text);
+  const before = f.read();
+  const mode = statSync(f.registry).mode;
+  const run = await f.json(["retire", PILE, "--apply"]);
+  assert.equal(run.status, 1);
+  assert.equal(run.body.ok, false);
+  assert.equal(run.body.applied, false);
+  assert.match(run.body.errors[0], /refusing to write/u);
+  assert.equal(f.read(), before, "registry byte-identical");
+  assert.equal(statSync(f.registry).mode, mode);
+  assert.ok(!readdirSync(f.fleetHome).some((name) => name.includes(".tmp") || name.includes("retire")), "no temp file left behind");
+  const text2 = await f.run(["retire", PILE, "--apply"]);
+  assert.equal(text2.status, 1);
+  assert.match(text2.stdout, /refusing to write/u);
 });
 
 // ---- channels: reuse channelOffline -------------------------------------------------------------
