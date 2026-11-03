@@ -9,7 +9,7 @@ import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration } from "..
 import { resolveFlumeRoot } from "../kernel/paths";
 import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
-import { roleDeclarationCheck } from "../workforce/audit";
+import { retiredRoutingCheck, roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
 import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, isDanglingLink, lacksRequiredTarget, linkState, ownedDirMode, targetMustExist } from "./singleton-links";
 import { showProfile, syncProfile } from "@delorenj/skillex";
@@ -2850,6 +2850,7 @@ function resyncDeskProblems(record: Record<string, any>, recordPath: string): { 
 export function createHermesChecks(): RecipeOwnedCheck[] {
 return [
   roleDeclarationCheck,
+  retiredRoutingCheck,
   {
     id: "hermes.pm-scaffold",
     title: "Hermes orchestrator scaffold parity",

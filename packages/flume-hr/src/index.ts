@@ -25,6 +25,7 @@ import { formatAuditReport, formatMigrationReport, SCAFFOLD_SCRIPTS_ONLY_ENV, ty
 import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
+import { retireFromService, formatRetireResult } from "./hire/retire";
 import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
 import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
@@ -221,6 +222,20 @@ program
     guardBrokenPipe();
     const result = offboardEmployee(employee, { apply: Boolean(options.apply) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+program
+  .command("retire")
+  .argument("<employee>", "Employee id, e.g. 33god-pm")
+  .description("Take an employee out of service but keep their record: bloodbank off, board claim removed, live channels parked, then who gets each ticket")
+  .option("--reason <text>", "Why; recorded as offline_reason on any channel it parks")
+  .option("--apply", "Write the change (default is a dry run)")
+  .option("--json", "Output machine-parseable JSON (the full record, including the removed plane block)")
+  .action(async (employee: string, options) => {
+    guardBrokenPipe();
+    const result = await retireFromService(employee, { apply: Boolean(options.apply), reason: options.reason });
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatRetireResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
   });
 

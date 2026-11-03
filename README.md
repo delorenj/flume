@@ -35,6 +35,7 @@ with complexity, and it is the pillar every name in this repo is held to.
 flume hire <title>            # bring on a new employee for this repo (title defaults to pm)
 flume onboard [title]         # re-run the onboarding checklist; convergent, no --force
 flume offboard <employee>     # remove the org-chart row; dry run unless --apply
+flume retire <employee> [--reason ".."]  # out of service, record kept: bloodbank off, plane board claim removed, live channels parked; reports who gets each ticket on the board afterwards; dry run unless --apply
 
 flume identity enroll <employee>           # one subject + <handle>@agents.delo.sh on the employee's own definition; preview unless --apply
 flume identity show <employee>             # read it back; legacy definitions stay readable

@@ -35,6 +35,7 @@ with complexity, and it is the pillar every name in this repo is held to.
 flume hire <title>            # bring on a new employee for this repo
 flume onboard                 # run the onboarding checklist (idempotent)
 flume offboard <employee>     # retire an employee
+flume retire <employee> [--reason ".."] [--apply]  # out of service, record kept: bloodbank off, plane board claim removed, live channels parked; reports who gets each ticket afterwards. Never hand-edit a status to "retire" a PM: a still-claiming row keeps winning the shared board
 
 flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
 flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)

@@ -212,6 +212,8 @@ const RULE_DOMAIN: Readonly<Record<string, FleetStatusDomain>> = Object.freeze({
   "hermes.skillex-resync": "profile",
   // Registry parity between the two canonical stores.
   "hermes.registry-parity": "registry",
+  // A retired employee must not keep a board claim or a live bloodbank row; no board may have two defaults.
+  "hermes.retired-routing": "registry",
   // The org-wide rules (`src/parity/reconcile.ts`), which answer for the
   // findings the INVENTORY raises rather than for anything in a repository.
   // Every one is host-scoped, so none of them spawns a per-agent audit child --

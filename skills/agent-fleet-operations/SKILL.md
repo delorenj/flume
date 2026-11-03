@@ -47,6 +47,7 @@ flume remediate <finding> [repo]   correct one finding
 flume channel list [--employee e]  every employee x platform: status, delta enabled, ref names, live gateway state, active Telegram bot count
 flume channel offline <employee> [--platform p] [--reason ".."] [--apply]   park a channel on purpose (preview unless --apply)
 flume channel online <employee> [--platform p] [--credential-ref op://..] [--apply]   bring it back / rotate to a new bot (getMe-verified)
+flume retire <employee> [--reason ".."] [--apply]   take an employee out of service, keep the row: bloodbank.enabled false AND the plane board claim removed (disabling bloodbank alone still wins the board and drops the ticket), live channels parked via channel offline; prints who gets each ticket per board; the gateway restart stays yours
 ```
 
 `roster`, `record`, `review` and `handbook validate` are strictly read-only, take
@@ -306,6 +307,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | launcher and unit `HERMES_HOME` point at the named desk; no dead `HERMES_OAUTH_FILE` |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer` |
+  | `hermes.retired-routing` | host | no row with a `retired` channel still has a `plane` board claim or enabled bloodbank, and no Plane board has two `plane.scope_default: true` rows. Not auto-fixable; each finding names `flume retire <id> --apply` |
 
   `hermes.fleet-config` is deliberately **not** auto-fixable: those are fleet-wide
   operator decisions and a wrong guess changes every agent at once. When you
