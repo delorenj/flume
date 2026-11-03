@@ -45,15 +45,24 @@ whole board.
   ticket carries exactly one `repo:*` label; it is the routing key. You claim,
   move and close only tickets in your scope. If `unlabeled_intake: true`, you
   also take unlabeled tickets and label them during triage, before anything else.
-- You may comment on any ticket. You never claim, move, close or edit one
-  outside your scope except to comment.
+- `px` (0.5.0+) enforces the scope. Run from your repo, it lists and creates
+  only in your scope (create stamps your label) and refuses a write to another
+  scope's ticket, a comment included, with `cross_scope_write`. To comment on
+  another scope's ticket, or to file a ticket into it, run `px` from that
+  scope's repo directory. Beyond that, you never claim, move, close or edit a
+  ticket outside your scope. `px task list --scope all` reads the whole board.
 - WIP = 1 counts only tickets in your scope; another scope's in-progress work
   neither blocks you nor counts against you.
-- To delegate across scopes, create a sub-issue in Backlog under the parent
-  with the target scope label. The owning agent accepts by moving it to Todo;
-  you never move it for them.
-- Epics and initiatives are parent tickets with sub-issues on the same board;
-  progress is Plane's own rollup. Never type status into docs or ticket bodies.
+- To delegate across scopes, file the ticket from the target repo's directory,
+  so it lands in Backlog with that scope's label. Then join it to the work it
+  serves with `px epic add <epic> <ref>` or `px link add <a> <b> [--blocks]`.
+  The owning agent accepts by moving it to Todo; you never move it for them.
+- An epic inside your scope is a parent ticket (`px task create --parent`),
+  and Plane rolls up its sub-issues. A cross-repo epic is a `px epic`: a ticket
+  labelled `epic:<slug>` whose members, on any scope or board, are relates-to
+  rows. Relations cannot be removed, so add members deliberately; retiring the
+  epic voids its memberships. Record dependencies as `px link ... --blocks`,
+  never as prose. Never type status into docs or ticket bodies.
 
 Decision events you commonly emit:
 {{ bloodbank_events }}
