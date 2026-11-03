@@ -276,6 +276,25 @@ await check("board-unowned: retiring the only claimant leaves the board with nob
   assert.ok(board.before.flags.every((flag) => flag.code !== "board-unowned"), "it was owned before");
 });
 
+await check("label-unclaimed: a label only the retiring row declared is still reported, with its fallback owner", async () => {
+  // The live shape after the hand fix: pile holds no claim, so tolt-pm is the only row declaring repo:game.
+  const f = fleet(registryText({ pilePlane: "" }));
+  const { body } = await f.json(["retire", "tolt-pm"]);
+  const board = body.routing.find((entry) => entry.board === BOARD);
+  const game = board.after.routes.find((route) => route.label === "repo:game");
+  assert.ok(game, `repo:game must stay in the report after its only declarer leaves: ${JSON.stringify(board.after.routes)}`);
+  assert.equal(game.owner, "lost-things-forge-pm", "first in order (no default left, then id)");
+  assert.equal(game.declared, false);
+  assert.equal(board.after.routes.find((route) => route.label === "repo:forge").declared, true);
+  assert.equal(board.after.routes.find((route) => route.label === null).declared, true);
+  assert.ok(board.after.flags.some((flag) => flag.code === "label-unclaimed" && flag.detail.includes("repo:game") && flag.detail.includes("lost-things-forge-pm")), JSON.stringify(board.after.flags));
+  assert.ok(board.before.flags.every((flag) => flag.code !== "label-unclaimed"), "every label was declared before");
+  assert.ok(body.flags.some((flag) => flag.startsWith("label-unclaimed:")));
+  const text = (await f.run(["retire", "tolt-pm"])).stdout;
+  assert.match(text, /repo:game\s+lost-things-forge-pm {2}\(fallback: nobody declares it\)/u);
+  assert.match(text, /! label-unclaimed:/u);
+});
+
 await check("a bus-ineligible claimant that is the last eligible one: the remaining owner is flagged, not hidden", async () => {
   // forge-pm and a second claimant whose bloodbank block is missing: after retiring forge-pm, repo:forge's
   // only remaining claimant is unroutable.

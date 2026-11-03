@@ -99,6 +99,8 @@ export interface TicketRoute {
   owner: string | null;
   eligible: boolean;
   why: string;
+  /** True when the owner declares this label; false when the ticket only lands there by the first-in-order fallback. */
+  declared: boolean;
 }
 
 /** Who owns one ticket carrying `labels` (lowercased names) among already ordered claimants. */
@@ -109,7 +111,7 @@ export function pickClaimant(ordered: readonly Claimant[], labels: readonly stri
   return ordered.find((claimant) => claimant.scopeLabels.some((label) => wanted.has(label))) ?? ordered[0];
 }
 
-export type BoardFlagCode = "board-unowned" | "multiple-defaults" | "owner-ineligible";
+export type BoardFlagCode = "board-unowned" | "multiple-defaults" | "owner-ineligible" | "label-unclaimed";
 
 export interface BoardFlag {
   code: BoardFlagCode;
@@ -119,19 +121,25 @@ export interface BoardFlag {
 export interface BoardRouting {
   board: string;
   claimants: Claimant[];
-  /** One route per label any claimant declares, then the unlabeled ticket. */
+  /** One route per label any claimant declares (plus any `alsoLabels`), then the unlabeled ticket. */
   routes: TicketRoute[];
   flags: BoardFlag[];
 }
 
-export function boardRouting(agents: Row, board: string): BoardRouting {
+/**
+ * `alsoLabels` are labels to route even though no remaining claimant declares them: retire passes the labels the
+ * board knew BEFORE the change, so a label only the retired row declared (repo:game when tolt-pm leaves) is still
+ * reported, with the claimant its tickets now fall back to.
+ */
+export function boardRouting(agents: Row, board: string, alsoLabels: readonly string[] = []): BoardRouting {
   const claimants = claimantsOf(agents, board);
-  const labels = [...new Set(claimants.flatMap((claimant) => claimant.scopeLabels))].sort();
+  const extra = alsoLabels.map((label) => String(label).trim().toLowerCase()).filter(Boolean);
+  const labels = [...new Set([...claimants.flatMap((claimant) => claimant.scopeLabels), ...extra])].sort();
   const routes: TicketRoute[] = [...labels, null].map((label) => {
     const owner = pickClaimant(claimants, label === null ? [] : [label]);
     return owner
-      ? { label, owner: owner.id, eligible: owner.eligible, why: owner.why }
-      : { label, owner: null, eligible: false, why: `no registry row claims board ${board}` };
+      ? { label, owner: owner.id, eligible: owner.eligible, why: owner.why, declared: label === null || owner.scopeLabels.includes(label) }
+      : { label, owner: null, eligible: false, why: `no registry row claims board ${board}`, declared: false };
   });
   const flags: BoardFlag[] = [];
   if (!claimants.some((claimant) => claimant.eligible)) {
@@ -147,6 +155,9 @@ export function boardRouting(agents: Row, board: string): BoardRouting {
     flags.push({ code: "multiple-defaults", detail: `${defaults.length} rows declare plane.scope_default: true on board ${board} (${defaults.join(", ")}); the first by id wins every unmatched ticket` });
   }
   for (const route of routes) {
+    if (route.label !== null && route.owner !== null && !route.declared) {
+      flags.push({ code: "label-unclaimed", detail: `no claimant on board ${board} declares ${route.label}; those tickets fall back to ${route.owner}, the first in order` });
+    }
     if (route.owner !== null && !route.eligible) {
       flags.push({ code: "owner-ineligible", detail: `${route.label ?? "(unlabeled)"} on board ${board} goes to ${route.owner}, which is ineligible: ${route.why}; those tickets are dropped` });
     }

@@ -140,7 +140,12 @@ export async function retireFromService(employeeId: string, options: RetireOptio
   // Routing, before and after, for every board this row claimed. `after` is the pure transform of the
   // same parsed rows the write will be proven against, so a preview reports what an apply produces.
   const after: Row = { ...agents, [employeeId]: planned.row };
-  result.routing = claimedBoards(row).map((board) => ({ board, before: boardRouting(agents, board), after: boardRouting(after, board) }));
+  result.routing = claimedBoards(row).map((board) => {
+    const before = boardRouting(agents, board);
+    // Every label the board routed before, so one only this row declared is still reported after it leaves.
+    const known = before.routes.flatMap((route) => (route.label === null ? [] : [route.label]));
+    return { board, before, after: boardRouting(after, board, known) };
+  });
   result.flags = result.routing.flatMap((entry) => entry.after.flags.map((flag) => `${flag.code}: ${flag.detail}`));
   if (result.bloodbank.present === false) result.nextActions.push(`${employeeId} has no bloodbank block: already unroutable by the bus; nothing to disable`);
 
@@ -236,7 +241,7 @@ export function formatRetireResult(result: RetireResult): string {
   for (const channel of result.channels) lines.push(`  ${channel.platform}: ${channel.action} - ${channel.detail}${channel.command ? `\n      run: ${channel.command}` : ""}`);
   for (const entry of result.routing) {
     lines.push(`  board ${entry.board}, tickets now go to:`);
-    for (const route of entry.after.routes) lines.push(`    ${(route.label ?? "(unlabeled)").padEnd(12)} ${route.owner ?? "nobody"}${route.owner !== null && !route.eligible ? "  (INELIGIBLE: dropped)" : ""}`);
+    for (const route of entry.after.routes) lines.push(`    ${(route.label ?? "(unlabeled)").padEnd(12)} ${route.owner ?? "nobody"}${route.label !== null && route.owner !== null && !route.declared ? "  (fallback: nobody declares it)" : ""}${route.owner !== null && !route.eligible ? "  (INELIGIBLE: dropped)" : ""}`);
     const lost = entry.before.routes.filter((route) => route.owner === result.employeeId).map((route) => route.label ?? "(unlabeled)");
     if (lost.length) lines.push(`    (before: ${lost.join(", ")} went to ${result.employeeId})`);
   }
