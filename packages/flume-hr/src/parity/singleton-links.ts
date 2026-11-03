@@ -34,14 +34,30 @@ export const OWNED_PROFILE_ENTRIES = [
   "image_cache",
 ] as const;
 
-export const OWNED_PROFILE_FILES = ["SOUL.md", "state.db", "kanban.db"] as const;
+export const OWNED_PROFILE_FILES = ["SOUL.md", "kanban.db"] as const;
+
+/**
+ * Person-owned files that live IN the profile, with the runtime link pointing back.
+ *
+ * Hermes (>= v0.22.6, gateway/run_runtime.py `_build_profile_authority`) derives a
+ * profile's home from realpath(state.db).parent and refuses to serve a desk whose
+ * store resolves anywhere else ("session authority database does not belong to the
+ * reserved profile"). Linking profile -> runtime took every singleton desk off the
+ * gateway on 2026-11-03, so the direction is inverted for the store: the real file
+ * stays in the profile and <role>/runtime/state.db is a link to it, so the
+ * repo-local view still finds it. sqlite keeps its -wal/-shm beside the real file.
+ */
+export const PROFILE_HOMED_FILES = ["state.db"] as const;
+
+/** SQLite sidecars that travel with a homed store when migrate moves it. */
+export const SQLITE_SIDECARS = ["-wal", "-shm", "-journal"] as const;
 
 /**
  * Owned files whose target MUST exist for the link to be healthy.
  *
  * SOUL.md is the desk's identity: a link to a missing one means the desk has no
- * soul, and Hermes would seed the stock default over it. state.db and kanban.db
- * are deliberately absent: sqlite creates them on first open THROUGH the link,
+ * soul, and Hermes would seed the stock default over it. kanban.db is
+ * deliberately absent: sqlite creates it on first open THROUGH the link,
  * so a dangling one is a desk that has not run yet, not a defect.
  */
 const REQUIRED_PROFILE_FILES: ReadonlySet<string> = new Set(["SOUL.md"]);
@@ -91,6 +107,19 @@ export function linkState(path: string, target: string): LinkState {
 export function isDanglingLink(path: string): boolean {
   try {
     return lstatSync(path).isSymbolicLink() && !existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Is the profile-side entry of a PROFILE_HOMED_FILES store a symlink? Hermes resolves it
+ * and refuses the whole desk when the real file is not in the profile, so this is a
+ * defect whether or not the link resolves. Never follows the link.
+ */
+export function homedStoreLink(profilePath: string): boolean {
+  try {
+    return lstatSync(profilePath).isSymbolicLink();
   } catch {
     return false;
   }

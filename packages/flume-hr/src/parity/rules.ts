@@ -11,7 +11,7 @@ import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import { retiredRoutingCheck, roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
-import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, isDanglingLink, lacksRequiredTarget, linkState, ownedDirMode, targetMustExist } from "./singleton-links";
+import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, PROFILE_HOMED_FILES, SQLITE_SIDECARS, homedStoreLink, isDanglingLink, lacksRequiredTarget, linkState, ownedDirMode, targetMustExist } from "./singleton-links";
 import { showProfile, syncProfile } from "@delorenj/skillex";
 
 
@@ -1610,6 +1610,12 @@ interface SingletonLink {
   ensureTargetDir: boolean;
   /** The link is only healthy while its target exists (owned directories and SOUL.md). */
   requireTarget: boolean;
+  /**
+   * A PROFILE_HOMED_FILES entry: `path` is the runtime link, `target` the real file in
+   * the profile. Migrate first moves a store still living in the runtime (the pre-2026-11-03
+   * direction) home, and the audit flags a profile-side link Hermes would refuse.
+   */
+  homed?: boolean;
 }
 
 
@@ -2280,6 +2286,78 @@ function seedSoul(link: SingletonLink, role: RoleMeta, ctx: Context, details: st
 }
 
 
+/**
+ * Bring a PROFILE_HOMED_FILES store home before its runtime link is written.
+ *
+ * `link.path` is runtime/<store>, `link.target` the profile's <store>. The pre-2026-11-03
+ * layout had the real store in the runtime and a profile link to it, which Hermes >= v0.22.6
+ * refuses. The store and its sqlite sidecars are renamed into the profile (same filesystem:
+ * open handles follow the inode, and the rename over the old link is atomic, so the profile
+ * path never vanishes). Stale sidecars already in the profile -- left there when the store
+ * was first linked away -- would attach to the moved store as its WAL, so they are parked
+ * first. Data is never deleted; anything ambiguous is `blocked:`.
+ */
+function homeStore(link: SingletonLink, role: RoleMeta, ctx: Context, details: string[], changedFiles: string[]): "moved" | "unchanged" | "blocked" {
+  const home = link.target;
+  const away = link.path;
+  const homeStat = lstatIfPresent(home);
+  const awayStat = lstatIfPresent(away);
+  const awayIsStore = Boolean(awayStat && awayStat.isFile());
+  if (homeStat && !homeStat.isSymbolicLink()) {
+    if (!homeStat.isFile()) {
+      details.push(`blocked: ${home} is not a regular file; ${role.agentId}'s ${basename(home)} needs an operator to clear it`);
+      return "blocked";
+    }
+    if (awayIsStore) {
+      // Two real stores: which one holds the history is an operator's call, and parking the
+      // runtime one through the generic path would strand its -wal/-shm (sqlite names sidecars
+      // after the resolved file, so they would belong to neither store).
+      details.push(`blocked: ${role.agentId} has two real stores, ${home} and ${away}; keep one (move the other with its -wal/-shm aside) before linking`);
+      return "blocked";
+    }
+    return "unchanged";
+  }
+  if (homeStat) {
+    // The profile entry is a link. Only the one shape flume itself wrote is moved automatically.
+    let resolved: string | null = null;
+    try { resolved = realpathSync(home); } catch { resolved = null; }
+    const awayReal = awayIsStore ? realpathSync(away) : null;
+    if (resolved === null && !awayIsStore) {
+      details.push(`${ctx.dryRun ? "would remove" : "remove"} dangling store link ${home} (sqlite creates ${basename(home)} in the profile on first open)`);
+      changedFiles.push(home);
+      if (!ctx.dryRun) unlinkSync(home);
+      return "unchanged";
+    }
+    if (resolved === null || resolved !== awayReal) {
+      details.push(`blocked: ${home} links to ${readlinkSync(home)}, not to ${away}; move that store into ${dirname(home)} by hand`);
+      return "blocked";
+    }
+  } else if (!awayIsStore) {
+    return "unchanged"; // a desk that has not run yet: sqlite creates the store in the profile
+  }
+  for (const sidecar of SQLITE_SIDECARS) {
+    const stale = `${home}${sidecar}`;
+    if (!lstatIfPresent(stale)) continue;
+    const parked = `${stale}.pre-homing`;
+    if (lstatIfPresent(parked)) {
+      details.push(`blocked: ${stale} is stale and ${parked} already exists; clear one before ${role.agentId}'s store can move home`);
+      return "blocked";
+    }
+    details.push(`${ctx.dryRun ? "would park" : "park"} stale ${stale} at ${parked}`);
+    changedFiles.push(stale);
+    if (!ctx.dryRun) renameSync(stale, parked);
+  }
+  details.push(`${ctx.dryRun ? "would move" : "move"} store ${away} home to ${home}`);
+  changedFiles.push(home, away);
+  if (ctx.dryRun) return "moved";
+  renameSync(away, home);
+  for (const sidecar of SQLITE_SIDECARS) {
+    if (lstatIfPresent(`${away}${sidecar}`)) renameSync(`${away}${sidecar}`, `${home}${sidecar}`);
+  }
+  return "moved";
+}
+
+
 function singletonPlan(ctx: Context, role: RoleMeta): SingletonPlan {
   const fleetRoot = fleetHome(ctx);
   const profileName = role.profileName || role.agentId;
@@ -2294,6 +2372,9 @@ function singletonPlan(ctx: Context, role: RoleMeta): SingletonPlan {
   }
   for (const entry of OWNED_PROFILE_FILES) {
     links.push({ path: join(profileDir, entry), target: join(runtimeDir, entry), ensureTargetDir: false, requireTarget: targetMustExist(entry) });
+  }
+  for (const entry of PROFILE_HOMED_FILES) {
+    links.push({ path: join(runtimeDir, entry), target: join(profileDir, entry), ensureTargetDir: false, requireTarget: false, homed: true });
   }
   const sharedSeeds = ["config.yaml", "auth.json", ".env"].map((entry) => ({
     rootPath: join(fleetRoot, entry),
@@ -3302,12 +3383,15 @@ return [
           details.push(`profile dir missing: ${plan.profileDir}`);
         }
         for (const link of plan.links) {
+          if (link.homed && homedStoreLink(link.target)) {
+            details.push(`linked-store: ${link.target} is a link; Hermes refuses a desk whose ${basename(link.target)} resolves outside its profile (run: flume remediate hermes.runtime-singleton)`);
+          }
           const state = linkState(link.path, link.target);
           if (state !== "ok") details.push(`${state}: ${link.path} -> ${link.target}`);
           // A link in the right place is not a healthy link while its target is
           // absent (or the wrong kind): Hermes refuses to create the target of a
           // link, so the profile fails to initialize. This is the re-hire case
-          // (correct links, fresh runtime dir). state.db/kanban.db are exempt
+          // (correct links, fresh runtime dir). kanban.db is exempt
           // (sqlite creates them through the link).
           else if (link.requireTarget && lacksRequiredTarget(basename(link.path), link.path)) details.push(`missing-target: ${link.path} -> ${link.target}`);
         }
@@ -3375,7 +3459,12 @@ return [
           if (!ctx.dryRun) mkdirSync(plan.profileDir, { recursive: true });
         }
         for (const link of plan.links) {
-          const state = linkState(link.path, link.target);
+          // A homed store moves first: the link state below must see where it lands.
+          const homing = link.homed ? homeStore(link, role, ctx, details, changedFiles) : "unchanged";
+          if (homing === "blocked") continue;
+          const state = ctx.dryRun && homing === "moved"
+            ? "missing" // the dry run reported the move; the real run links over the vacated path
+            : linkState(link.path, link.target);
           // Person-owned targets must exist before linking or the agent starts
           // against a dangling path and silently recreates empty state. This runs
           // for a link that is ALREADY correct too: the re-hire case is correct

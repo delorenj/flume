@@ -71,7 +71,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import YAML from "yaml";
 import { readTomlScalar } from "../kernel/host-config";
 import { blobId } from "../scaffold/compare";
-import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, lacksRequiredTarget } from "../parity/singleton-links";
+import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, PROFILE_HOMED_FILES, homedStoreLink, lacksRequiredTarget } from "../parity/singleton-links";
 import { rootEntryGlob } from "./contract";
 import { isSafePathSegment } from "./inventory";
 import { mapBounded, probe, probeText, throwIfCancelled, type FleetRunContext } from "./runtime";
@@ -864,6 +864,13 @@ async function inspectAgent(ctx: FleetProfileContext, shared: Shared, input: Fle
       // target of a link, so the profile cannot initialize (the re-hire case).
       // Same judgement, same word, as the rule's `missing-target:` finding.
       pathItems.push({ path: link, kind: "missing-target", desired: "a link into this agent's role-local runtime whose target exists", observed: "a link whose target is missing or the wrong kind", detail: `missing-target:${link}` });
+    }
+  }
+  // The store is the one owned file that must be REAL in the profile: Hermes refuses a desk
+  // whose state.db resolves anywhere else, so a link here is misowned wherever it points.
+  for (const store of PROFILE_HOMED_FILES) {
+    if (homedStoreLink(join(profileDir, store))) {
+      pathItems.push({ path: store, kind: "misowned-link", desired: "a real file in the profile (Hermes refuses a store that resolves outside it)", observed: "a link", detail: `linked-store:${store}` });
     }
   }
   const pathState = worst(pathItems, PATH_RANK);

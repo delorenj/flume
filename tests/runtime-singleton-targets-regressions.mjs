@@ -24,8 +24,12 @@ const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages", "flume-hr", "dist", "index.js");
 const RULE = "hermes.runtime-singleton";
 const DIRS = ["memories", "sessions", "workspace", "logs", "cron", "plans", "hooks", "pairing", "audio_cache", "image_cache"];
-const FILES = ["SOUL.md", "state.db", "kanban.db"];
+const FILES = ["SOUL.md", "kanban.db"];
+// The store is homed: the real state.db lives in the profile and the runtime links back to it
+// (Hermes >= v0.22.6 refuses a desk whose state.db resolves outside its profile).
+const HOMED = ["state.db"];
 const tmpRoots = [];
+const lstatIfPresentSafe = (path) => { try { return lstatSync(path); } catch { return undefined; } };
 
 // /tmp when it exists: Skillex refuses to write activation receipts under a
 // source repository, and a TMPDIR inside one is how a harness can end up here.
@@ -78,6 +82,7 @@ function fixture({ roleSoul = "I am demo-pm.\n", runtimeSoul = "seeded soul\n", 
 
   // Correct links, every one of them.
   if (links) for (const entry of [...DIRS, ...FILES]) symlinkSync(join(runtime, entry), join(profile, entry));
+  if (links) for (const entry of HOMED) symlinkSync(join(profile, entry), join(runtime, entry));
 
   const env = { ...process.env, HOME: home, HERMES_FLEET_HOME: fleet, PJ_SKILLS_REGISTRY_ROOT: join(home, "registry") };
   const run = (...args) => {
@@ -100,7 +105,7 @@ function fixture({ roleSoul = "I am demo-pm.\n", runtimeSoul = "seeded soul\n", 
 
 // The rule also reports the Skillex projection (a fresh profile has none yet, until a
 // migrate writes it). The runtime links are what this suite is about.
-const linkLines = (finding) => finding.details.filter((d) => /^(missing|missing-target|wrong-target|not-a-symlink): /u.test(d));
+const linkLines = (finding) => finding.details.filter((d) => /^(missing|missing-target|wrong-target|not-a-symlink|linked-store): /u.test(d));
 const targetsOf = (finding) => finding.details.filter((d) => d.startsWith("missing-target: ")).map((d) => d.split(" -> ")[0].split("/").pop());
 const snapshot = (dir) => readdirSync(dir).sort().join(",");
 const linksOf = (profile) => Object.fromEntries([...DIRS, ...FILES].map((e) => [e, lstatSync(join(profile, e)).isSymbolicLink() ? readlinkSync(join(profile, e)) : null]));
@@ -130,7 +135,8 @@ try {
     const f = fixture();
     for (const dir of DIRS) mkdirSync(join(f.runtime, dir), { recursive: true });
     assert.ok(!existsSync(join(f.runtime, "state.db")) && !existsSync(join(f.runtime, "kanban.db")));
-    assert.ok(lstatSync(join(f.profile, "state.db")).isSymbolicLink() && !existsSync(join(f.profile, "state.db")), "state.db dangles");
+    assert.ok(lstatSync(join(f.runtime, "state.db")).isSymbolicLink() && !existsSync(join(f.runtime, "state.db")), "the runtime's state.db link dangles");
+    assert.ok(!existsSync(join(f.profile, "state.db")), "and the profile has no store yet");
     const { finding } = f.audit();
     assert.deepEqual(linkLines(finding), [], `dangling state.db/kanban.db alone must not be a finding:\n${finding.details.join("\n")}`);
     // And once the rest of the profile is wired, the rule as a whole passes with them still dangling.
@@ -295,6 +301,107 @@ try {
     const { status } = f.remediate();
     assert.equal(status, 0);
     assert.equal(f.audit().status, 0);
+  }
+
+  // 12. The pre-2026-11-03 layout: the real store in the runtime, the profile linking to it.
+  //     Hermes >= v0.22.6 refuses that desk, so the audit fails and migrate moves the store home
+  //     with its sidecars, parks the stale profile-side sidecars, and links the runtime back.
+  {
+    const f = fixture();
+    for (const dir of DIRS) mkdirSync(join(f.runtime, dir), { recursive: true });
+    unlinkSync(join(f.runtime, "state.db"));
+    writeFileSync(join(f.runtime, "state.db"), "the real store\n");
+    writeFileSync(join(f.runtime, "state.db-wal"), "live wal\n");
+    writeFileSync(join(f.runtime, "state.db-shm"), "live shm\n");
+    symlinkSync(join(f.runtime, "state.db"), join(f.profile, "state.db"));
+    writeFileSync(join(f.profile, "state.db-wal"), "stale wal\n");
+    writeFileSync(join(f.profile, "state.db-shm"), "stale shm\n");
+
+    const before = f.audit().finding;
+    assert.equal(before.status, "fail");
+    assert.ok(before.details.some((d) => d.startsWith("linked-store: ") && d.includes("/profiles/demo-pm/state.db is a link")), before.details.join("\n"));
+    assert.ok(before.details.some((d) => d.startsWith("not-a-symlink: ") && d.includes("/runtime/state.db -> ")), before.details.join("\n"));
+
+    const dry = f.remediate("--dry-run");
+    assert.equal(dry.status, 0, dry.result.details.join("\n"));
+    assert.ok(dry.result.details.some((d) => d.startsWith("would move store ") && d.includes("/runtime/state.db home to ")), dry.result.details.join("\n"));
+    assert.ok(dry.result.details.some((d) => d.startsWith("would park stale ") && d.includes("state.db-wal")), dry.result.details.join("\n"));
+    assert.ok(lstatSync(join(f.profile, "state.db")).isSymbolicLink(), "a dry run moves nothing");
+    assert.equal(readFileSync(join(f.profile, "state.db-wal"), "utf8"), "stale wal\n");
+
+    const { status, result } = f.remediate();
+    assert.equal(status, 0, result.details.join("\n"));
+    assert.equal(result.status, "applied");
+    const store = lstatSync(join(f.profile, "state.db"));
+    assert.ok(store.isFile() && !store.isSymbolicLink(), "the store is a real file in the profile");
+    assert.equal(readFileSync(join(f.profile, "state.db"), "utf8"), "the real store\n");
+    assert.equal(readFileSync(join(f.profile, "state.db-wal"), "utf8"), "live wal\n", "the live WAL travels with its store");
+    assert.equal(readFileSync(join(f.profile, "state.db-shm"), "utf8"), "live shm\n");
+    assert.equal(readFileSync(join(f.profile, "state.db-wal.pre-homing"), "utf8"), "stale wal\n", "the stale WAL is parked, never deleted");
+    assert.equal(readFileSync(join(f.profile, "state.db-shm.pre-homing"), "utf8"), "stale shm\n");
+    assert.equal(readlinkSync(join(f.runtime, "state.db")), join(f.profile, "state.db"), "the runtime links back to the profile");
+    assert.ok(!existsSync(join(f.runtime, "state.db-wal")) && !existsSync(join(f.runtime, "state.db.pre-singleton")));
+
+    const after = f.audit();
+    assert.equal(after.finding.status, "pass", after.finding.details.join("\n"));
+    assert.equal(f.remediate().result.status, "noop", "migrate is idempotent");
+  }
+
+  // 13. A profile store link to anywhere but this runtime is not flume's shape: blocked, nothing moved.
+  {
+    const f = fixture();
+    const elsewhere = join(f.home, "elsewhere.db");
+    writeFileSync(elsewhere, "someone else's store\n");
+    symlinkSync(elsewhere, join(f.profile, "state.db"));
+    const { status, result } = f.remediate();
+    assert.equal(status, 1);
+    assert.ok(result.details.some((d) => d.startsWith("blocked: ") && d.includes("/profiles/demo-pm/state.db links to ")), result.details.join("\n"));
+    assert.equal(readlinkSync(join(f.profile, "state.db")), elsewhere, "the link is left alone");
+    assert.equal(readFileSync(elsewhere, "utf8"), "someone else's store\n");
+  }
+
+  // 14. A dangling profile store link (a desk linked the old way that never ran) is removed, so sqlite creates the store at home.
+  {
+    const f = fixture();
+    for (const dir of DIRS) mkdirSync(join(f.runtime, dir), { recursive: true });
+    unlinkSync(join(f.runtime, "state.db"));
+    symlinkSync(join(f.runtime, "state.db"), join(f.profile, "state.db"));
+    assert.equal(f.remediate().result.status, "applied");
+    assert.ok(!lstatIfPresentSafe(join(f.profile, "state.db")), "the dangling link is gone");
+    assert.equal(readlinkSync(join(f.runtime, "state.db")), join(f.profile, "state.db"));
+    assert.equal(f.audit().finding.status, "pass");
+  }
+
+  // 15. Two real stores: blocked, nothing parked or moved (the generic park would strand the runtime store's -wal).
+  {
+    const f = fixture();
+    for (const dir of DIRS) mkdirSync(join(f.runtime, dir), { recursive: true });
+    unlinkSync(join(f.runtime, "state.db"));
+    writeFileSync(join(f.runtime, "state.db"), "old store\n");
+    writeFileSync(join(f.runtime, "state.db-wal"), "old wal\n");
+    writeFileSync(join(f.profile, "state.db"), "fresh store\n");
+    const dry = f.remediate("--dry-run");
+    assert.ok(dry.result.details.some((d) => d.startsWith("blocked: ") && d.includes("two real stores")), dry.result.details.join("\n"));
+    const { status, result } = f.remediate();
+    assert.equal(status, 1);
+    assert.equal(result.status, "blocked");
+    assert.equal(readFileSync(join(f.runtime, "state.db"), "utf8"), "old store\n");
+    assert.equal(readFileSync(join(f.runtime, "state.db-wal"), "utf8"), "old wal\n");
+    assert.equal(readFileSync(join(f.profile, "state.db"), "utf8"), "fresh store\n");
+    assert.ok(!existsSync(join(f.runtime, "state.db.pre-singleton")), "nothing is parked");
+  }
+
+  // 16. Dry run and apply agree when only a dangling profile link has to go (the runtime link is already right).
+  {
+    const f = fixture();
+    for (const dir of DIRS) mkdirSync(join(f.runtime, dir), { recursive: true });
+    symlinkSync(join(f.home, "nowhere.db"), join(f.profile, "state.db"));
+    const dry = f.remediate("--dry-run").result.details;
+    assert.ok(dry.some((d) => d.startsWith("would remove dangling store link ")), dry.join("\n"));
+    assert.ok(!dry.some((d) => d.startsWith("link ") && d.includes("/runtime/state.db ")), `no runtime link is planned:\n${dry.join("\n")}`);
+    const real = f.remediate().result.details;
+    assert.ok(!real.some((d) => d.startsWith("link ") && d.includes("/runtime/state.db ")), real.join("\n"));
+    assert.equal(f.audit().finding.status, "pass");
   }
 } finally {
   for (const dir of tmpRoots) rmSync(dir, { recursive: true, force: true });

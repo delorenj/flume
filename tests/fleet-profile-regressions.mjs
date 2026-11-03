@@ -985,15 +985,15 @@ try {
     assert.equal(noproj.healthy, true, "a warn is not a proven failure");
   });
 
-  check("a correct link into a runtime whose target is missing is a missing-target path fail (the re-hire case); a dangling state.db is not", () => {
+  check("a correct link into a runtime whose target is missing is a missing-target path fail (the re-hire case); a dangling kanban.db is not", () => {
     // The link points INTO this agent's runtime, so containment passes; the
     // target is gone because the runtime was re-created. Hermes will not create
-    // the target of a link, so the profile cannot initialize. state.db is created
+    // the target of a link, so the profile cannot initialize. kanban.db is created
     // lazily by sqlite through the link and must never be a finding.
     const runtime = RUNTIMES["marker-pm"];
-    const stateLink = join(profilesRoot, "marker-pm", "state.db");
+    const stateLink = join(profilesRoot, "marker-pm", "kanban.db");
     rmSync(join(runtime, "memories"), { recursive: true });
-    symlinkSync(join(runtime, "state.db"), stateLink);
+    symlinkSync(join(runtime, "kanban.db"), stateLink);
     try {
       const agent = agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm");
       const path = fieldOf(agent, FIELDS.path);
@@ -1007,6 +1007,30 @@ try {
     }
     const healed = fieldOf(agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm"), FIELDS.path);
     assert.equal(healed.state, "pass", "restoring the target clears the finding");
+  });
+
+  check("a profile state.db that is a link is a misowned linked-store, even into its own runtime (Hermes refuses a store outside the profile)", () => {
+    const runtime = RUNTIMES["marker-pm"];
+    const storeLink = join(profilesRoot, "marker-pm", "state.db");
+    writeFileSync(join(runtime, "state.db"), "");
+    symlinkSync(join(runtime, "state.db"), storeLink);
+    try {
+      const agent = agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm");
+      const path = fieldOf(agent, FIELDS.path);
+      assert.equal(path.state, "fail");
+      assert.deepEqual(itemsOf(path).map((item) => [item.path, item.kind, item.detail]), [["state.db", "misowned-link", "linked-store:state.db"]]);
+      assert.equal(agent.profile.path.code, "misowned-link");
+    } finally {
+      rmSync(storeLink);
+      rmSync(join(runtime, "state.db"));
+    }
+    writeFileSync(storeLink, "");
+    try {
+      const real = fieldOf(agentNamed(status(cliAt(mainRoot, STATUS_ARGS)), "marker-pm"), FIELDS.path);
+      assert.equal(real.state, "pass", "a real store in the profile is the healthy shape");
+    } finally {
+      rmSync(storeLink);
+    }
   });
 
   // -- AC2: the generated config through the canonical renderer ------------
