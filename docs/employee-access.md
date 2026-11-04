@@ -456,11 +456,11 @@ when that file exists its reference is the running one (`ref_source: generated`)
 produce it: its own delta, then the fleet base (`delta`, `base`). The consumer is the reference's last segment, and only for the
 FLUME-39 shape `op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/<consumer>`; any other shape is `unverified` (`gateway-ref-shape`).
 
-*Drift.* `gateway-member-tokens.py --apply` edits the delta and re-renders only with `--render`, and a running gateway keeps the old
-key until restarted. A generated config that disagrees with what its delta (or the base it inherits) would render, or that cannot be
+*Drift.* `gateway-member-tokens.py --apply` edits the delta and re-renders only with `--render`, and the running host gateway keeps the old
+key until restarted (`hermes-gateway-restart`). A generated config that disagrees with what its delta (or the base it inherits) would render, or that cannot be
 read, is DRIFT: the running key's rows stay (sharing is judged on the running key) plus an `unverified` `gateway-ref-drift` row for
 the key the next render would run. A drifted desk never reports a `revoked` gateway row, a named `--revoke gateway` is the blocker
-`gateway-ref-drift`, and `--revoke all` skips it. Re-render the desk and restart its gateway, then re-run.
+`gateway-ref-drift`, and `--revoke all` skips it. Re-render the desk and restart the host gateway with `hermes-gateway-restart --reason "<why>"` (never raw systemctl), then re-run.
 
 *Shared.* A running reference equal to the fleet base, or a consumer another desk maps (in the config it runs or the one its next
 render produces), is a SHARED consumer: its row is `shared_consumer: true` and `static-usable` (`manual-action-required` on retire)

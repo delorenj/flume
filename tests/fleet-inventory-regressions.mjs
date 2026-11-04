@@ -437,7 +437,7 @@ try {
   check("expected unit names are reported as expectations, never as observations", () => {
     const data = inventory(cli(["roster", "--json"]));
     const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
-    const patterns = Object.values(contract.service_model.per_agent);
+    const patterns = [contract.service_model.host.gateway_unit];
     for (const row of data.rows) {
       if (row.expected_units.value === null) continue;
       assert.equal(row.expected_units.state, "unobserved", "systemd is not probed by this story");
@@ -1085,9 +1085,9 @@ try {
     // from the contract's patterns are f(agent_id) and can only collide when the
     // ids do, which `agents.{agent_id}` already reports.
     const [first, second] = liveIds;
+    const shared = "hermes-shared-custom-gateway.service";
     const registry = mutatedRegistry("dup-gateway-unit", REAL_AGENT_REGISTRY, (document) => {
-      const shared = document.getIn(["agents", first, "systemd", "gateway_unit"]);
-      assert.ok(shared, "the real registry must carry a stored gateway unit to duplicate");
+      document.setIn(["agents", first, "systemd", "gateway_unit"], shared);
       document.setIn(["agents", second, "systemd", "gateway_unit"], shared);
     });
     const data = inventory(cli(["roster", "--agent-registry", registry, "--json"]));
@@ -1099,6 +1099,25 @@ try {
       const row = data.rows.find((item) => item.agent_id.value === id);
       assert.equal(row.gateway_unit.state, "conflicted", "the contested field is the one that is stamped");
       assert.ok(row.conflicts.includes(group.id));
+    }
+  });
+
+  checkWithAgents(2, "agents naming the ONE host gateway unit are not a conflict: it is shared by design", () => {
+    // `service_model.host.gateway_unit` is one name for every profile. A row that still STORES it
+    // is a retired-key drift to strip, never a 33-way unit conflict.
+    const [first, second] = liveIds;
+    const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
+    const host = contract.service_model.host.gateway_unit;
+    const registry = mutatedRegistry("host-gateway-unit", REAL_AGENT_REGISTRY, (document) => {
+      document.setIn(["agents", first, "systemd", "gateway_unit"], host);
+      document.setIn(["agents", second, "systemd", "gateway_unit"], host);
+    });
+    const data = inventory(cli(["roster", "--agent-registry", registry, "--json"]));
+    assert.equal(data.conflicts.some((item) => item.field === "agents.{agent_id}.systemd.gateway_unit"), false, "the host unit is not a conflict");
+    for (const id of [first, second]) {
+      const row = data.rows.find((item) => item.agent_id.value === id);
+      assert.ok(row.findings.includes("systemd-unit-name-drift"), "a stored gateway_unit is a retired key");
+      assert.deepEqual(row.expected_units.value, [host], "every agent expects the same one unit");
     }
   });
 
@@ -1439,7 +1458,7 @@ try {
     assert.equal(health.healthy, false);
   });
 
-  checkWithAgents(1, "a retired heartbeat timer in the gateway registry field remains gateway drift", () => {
+  checkWithAgents(1, "a retired heartbeat timer in the retired gateway registry field remains drift", () => {
     const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
     const timerPattern = contract.service_manifest.unregistered.retired_candidates.find((p) => p.endsWith("-heartbeat.timer"));
     assert.ok(timerPattern, "the handbook declares the retired timer candidate");
@@ -1449,7 +1468,7 @@ try {
     });
     const data = inventory(cli(["roster", "--agent-registry", swapped, "--agent", victim, "--json"]));
     const row = data.rows[0];
-    assert.deepEqual(row.expected_units.value, [contract.service_model.per_agent.gateway_unit.replaceAll("{agent_id}", victim)]);
+    assert.deepEqual(row.expected_units.value, [contract.service_model.host.gateway_unit]);
     assert.ok(row.findings.includes("systemd-unit-name-drift"), "a retired timer cannot satisfy the gateway field");
   });
 

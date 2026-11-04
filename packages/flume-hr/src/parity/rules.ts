@@ -369,13 +369,38 @@ function registryPath(homeDir: string): string {
 }
 
 
-// Retired per-agent command-ingress contract. The fleet-shared Bloodbank
-// gateway owns command routing (registry `gateways.bloodbank`, routed by
-// data.target_agent_id); per-agent consumer units and checkpoint timers are
-// legacy. This constant is the ONLY place the legacy key names may appear —
+// Retired per-agent systemd contract. Since 2026-10-11 ONE host gateway
+// (hermes-gateway.service, `hermes gateway run`, HERMES_HOME=~/.hermes) serves
+// every profile, and the fleet command lane (registry `gateways.bloodbank`,
+// routed by data.target_agent_id) rides on it. An agent has no unit of its own:
+// per-agent consumer units, checkpoint timers and the per-agent `gateway_unit`
+// are legacy. This constant is the ONLY place the legacy key names may appear —
 // tests/fleet-shared-bloodbank-regressions.mjs enforces that scoping so the
 // legacy contract can be detected and cleaned but never provisioned again.
-const LEGACY_SYSTEMD_KEYS = ["consumer_unit", "checkpoint_timer"] as const;
+const LEGACY_SYSTEMD_KEYS = ["consumer_unit", "checkpoint_timer", "gateway_unit"] as const;
+
+/**
+ * The one host gateway unit. It serves every profile and is NEVER a per-agent
+ * artifact: nothing in this file may enable, disable, stop, restart or remove it
+ * (restarts go through `hermes-gateway-restart --reason "<why>"` only).
+ */
+const HOST_GATEWAY_UNIT = "hermes-gateway.service";
+/** The only sanctioned way to restart the host gateway. */
+const HOST_GATEWAY_RESTART = "hermes-gateway-restart";
+
+/**
+ * The retired per-agent gateway unit name for an agent id. Used ONLY to detect and
+ * disable a leftover: a loaded one can hijack the host role, and is a conflict. The
+ * host unit can never be produced by this, but the guard is explicit anyway.
+ */
+function retiredAgentGatewayUnit(agentId: string): string {
+  return `hermes-${agentId}-gateway.service`;
+}
+
+/** True for the host gateway unit, which no per-agent code path may touch. */
+function isHostGatewayUnit(unit: string): boolean {
+  return unit === HOST_GATEWAY_UNIT;
+}
 
 
 /** A provider-verified native Plane user, as the employee's definition records it. */
@@ -1341,7 +1366,7 @@ function upsertRegistryEntry(role: RoleMeta, homeDir: string, changedFiles: stri
   const identityBlock = role.identity.state === "named"
     ? `    identity: ${role.identity.name}\n    hindsight:\n      write_bank: ${role.identity.writeBank}\n      recall_banks:\n${role.identity.recallBanks.map((bank) => `        - ${bank}\n`).join("")}`
     : "";
-  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n${identityBlock}    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n    systemd:\n      gateway_unit: hermes-${role.agentId}-gateway.service\n`;
+  const block = `  ${role.agentId}:\n    repo: ${role.repo}\n    role: ${role.role}\n    type: hermes\n    display_name: ${JSON.stringify(role.displayName || role.agentId)}\n    project_path: ${ctxEscape(role.roleDir ? dirname(dirname(dirname(role.roleDir))) : "")}\n    role_dir: ${ctxEscape(role.roleDir)}\n    profile_name: ${role.profileName || role.agentId}\n    telegram:\n      bot_username: ${ctxEscape(role.botHandle)}\n    plane:\n      workspace: ${ctxEscape(role.planeWorkspace)}\n      project_id: ${ctxEscape(role.ticketProviderBoardId)}\n      identifier: ${ctxEscape(role.ticketProviderIdentifier)}\n    runtime_repo: ${ctxEscape(role.runtimeRepo)}\n${identityBlock}    bloodbank:\n      enabled: ${enabled ? "true" : "false"}\n      gateway_scope: fleet\n      target_agent_id: ${role.agentId}\n`;
   const next = current.includes("agents: {}") ? current.replace("agents: {}", `agents:\n${block}`) : `${current.replace(/\s*$/, "\n")}${block}`;
   changedFiles.push(path);
   if (!dryRun) writeText(path, next);
@@ -1514,20 +1539,104 @@ function persistRoleServiceState(
 }
 
 
+/**
+ * What this host knows about a role's RETIRED per-agent gateway unit
+ * (hermes-<agentId>-gateway.service). Since 2026-10-11 an agent has no unit of its
+ * own: the one host gateway serves every profile, so any such unit that is still
+ * around is a leftover that can hijack the host role. Read-only.
+ */
+function legacyAgentGatewayState(homeDir: string, agentId: string): {
+  unit: string; path: string; fileExists: boolean; enabled: boolean; active: boolean; loaded: boolean;
+} {
+  const unit = retiredAgentGatewayUnit(agentId);
+  const path = join(homeDir, ".config", "systemd", "user", unit);
+  // The host unit is never a per-agent artifact, whatever an agent id spells.
+  if (isHostGatewayUnit(unit)) return { unit, path, fileExists: false, enabled: false, active: false, loaded: false };
+  const fileExists = existsSync(path);
+  const { enabled, active } = checkUnit(unit);
+  return { unit, path, fileExists, enabled, active, loaded: fileExists || enabled || active };
+}
+
+/** `systemctl --user show -p MainPID`, or 0 when the unit is not running or cannot be read. */
+function unitMainPid(unit: string): number {
+  const shown = systemctlUser(["show", "--no-pager", "-p", "MainPID", "--value", unit]);
+  if (!shown.ok) return 0;
+  const pid = Number.parseInt(shown.stdout.trim(), 10);
+  return Number.isInteger(pid) && pid > 0 ? pid : 0;
+}
+
+/**
+ * Retire one leftover per-agent gateway unit: disable it, confirm it is disabled and
+ * inactive, then remove its unit file. This is the ONLY unit mutation flume makes for a
+ * gateway. It refuses the host unit by name, and when the leftover's process IS the live
+ * host gateway (a hijack) it disables the unit but does not stop it: stopping would take
+ * every profile down, so the operator is told to hand the gateway over with
+ * `hermes-gateway-restart`.
+ */
+function retireLegacyAgentGateway(
+  ctx: Context,
+  legacy: ReturnType<typeof legacyAgentGatewayState>,
+  changedFiles: string[],
+  details: string[],
+): boolean {
+  const { unit } = legacy;
+  if (isHostGatewayUnit(unit)) {
+    details.push(`script failed: refusing to touch ${HOST_GATEWAY_UNIT}; it is the host gateway and only ${HOST_GATEWAY_RESTART} may restart it`);
+    return false;
+  }
+  if (ctx.dryRun) {
+    details.push(`would run: systemctl --user disable --now ${unit} (retired per-agent gateway unit)`);
+    if (legacy.fileExists) details.push(`would remove retired unit file ${legacy.path}`);
+    return true;
+  }
+  const hostPid = unitMainPid(HOST_GATEWAY_UNIT);
+  const hijacker = hostPid > 0 && unitMainPid(unit) === hostPid;
+  const disabled = systemctlUser(hijacker ? ["disable", unit] : ["disable", "--now", unit]);
+  if (!disabled.ok) {
+    details.push(`script failed: could not disable retired ${unit}: ${disabled.stderr || disabled.stdout || "unknown error"}`);
+    return false;
+  }
+  if (hijacker) {
+    details.push(`script failed: retired ${unit} is the live host gateway process (pid ${hostPid}); disabled but NOT stopped. Hand the gateway over with: ${HOST_GATEWAY_RESTART} --reason "retire ${unit}"`);
+    return false;
+  }
+  const after = checkUnit(unit);
+  if (after.enabled || after.active) {
+    details.push(`script failed: retired ${unit} did not become disabled+inactive after systemctl reported success`);
+    return false;
+  }
+  if (legacy.fileExists) {
+    rmSync(legacy.path, { force: true });
+    changedFiles.push(legacy.path);
+    details.push(`removed retired per-agent gateway unit ${legacy.path}`);
+    systemctlUser(["daemon-reload"]);
+    systemctlUser(["reset-failed", unit]);
+  }
+  details.push(`retired ${unit} (disabled+inactive); ${HOST_GATEWAY_UNIT} serves this profile`);
+  return true;
+}
+
+/**
+ * Reconcile one role against the single-host-gateway model. flume never enables a
+ * per-agent gateway unit and never touches hermes-gateway.service: it retires a leftover
+ * per-agent unit, then (for a role that is meant to be served) VERIFIES the host unit is
+ * enabled+active and records `service_state.gateway: active` only on that evidence.
+ */
 function reconcileHermesRoleUnits(
   ctx: Context,
   role: RoleMeta,
   changedFiles: string[],
   details: string[],
 ): boolean {
-  const gatewayUnit = `hermes-${role.agentId}-gateway.service`;
   const gatewayDeferred = role.serviceStateGateway === "deferred";
   const stateUpdates: Partial<Record<"gateway", "active" | "deferred">> = {};
   if (!gatewayDeferred && role.serviceStateGateway !== "active") stateUpdates.gateway = "active";
 
   if (ctx.dryRun) {
     details.push("would run: systemctl --user daemon-reload");
-    details.push(`would run: systemctl --user ${gatewayDeferred ? "disable" : "enable"} --now ${gatewayUnit}`);
+    const legacy = legacyAgentGatewayState(ctx.homeDir, role.agentId);
+    if (legacy.loaded) retireLegacyAgentGateway(ctx, legacy, changedFiles, details);
+    if (!gatewayDeferred) details.push(`would verify ${HOST_GATEWAY_UNIT} is enabled+active (read-only)`);
     if (Object.keys(stateUpdates).length) {
       if (!changedFiles.includes(role.roleYamlPath)) changedFiles.push(role.roleYamlPath);
       details.push(`would atomically record verified service_state in ${relative(ctx.repoRoot, role.roleYamlPath)}`);
@@ -1540,20 +1649,16 @@ function reconcileHermesRoleUnits(
     details.push(`script failed: systemctl --user daemon-reload: ${reload.stderr || reload.stdout || "unknown error"}`);
     return false;
   }
-  const gateway = systemctlUser([gatewayDeferred ? "disable" : "enable", "--now", gatewayUnit]);
-  if (!gateway.ok) {
-    details.push(`script failed: could not ${gatewayDeferred ? "disable" : "enable"} ${gatewayUnit}: ${gateway.stderr || gateway.stdout || "unknown error"}`);
-  }
-  if (!gateway.ok) return false;
+  const legacy = legacyAgentGatewayState(ctx.homeDir, role.agentId);
+  if (legacy.loaded && !retireLegacyAgentGateway(ctx, legacy, changedFiles, details)) return false;
 
-  const gatewayState = checkUnit(gatewayUnit);
-  const gatewayHealthy = gatewayDeferred
-    ? !gatewayState.enabled && !gatewayState.active
-    : gatewayState.enabled && gatewayState.active;
-  if (!gatewayHealthy) {
-    details.push(`script failed: ${gatewayUnit} did not become ${gatewayDeferred ? "disabled+inactive" : "enabled+active"} after systemctl reported success`);
+  if (!gatewayDeferred) {
+    const host = checkUnit(HOST_GATEWAY_UNIT);
+    if (!host.enabled || !host.active) {
+      details.push(`script failed: ${HOST_GATEWAY_UNIT} is not enabled+active, so ${role.agentId} is not served. flume never starts it; restart the host gateway with: ${HOST_GATEWAY_RESTART} --reason "serve ${role.agentId}"`);
+      return false;
+    }
   }
-  if (!gatewayHealthy) return false;
 
   const persisted = persistRoleServiceState(role, stateUpdates);
   if (persisted.error) {
@@ -1564,7 +1669,9 @@ function reconcileHermesRoleUnits(
     if (!changedFiles.includes(role.roleYamlPath)) changedFiles.push(role.roleYamlPath);
     details.push(`atomically recorded verified service_state in ${relative(ctx.repoRoot, role.roleYamlPath)}`);
   }
-  details.push(`verified ${gatewayUnit} ${gatewayDeferred ? "disabled+inactive" : "enabled+active"}`);
+  details.push(gatewayDeferred
+    ? `verified ${role.agentId} gateway deferred; no per-agent unit remains`
+    : `verified ${HOST_GATEWAY_UNIT} enabled+active serving ${role.agentId}`);
   return true;
 }
 
@@ -2504,9 +2611,10 @@ function realOrSelf(path: string): string {
 
 
 // Employee wiring excludes retired heartbeat units; the retirement sweep owns them.
+// The per-agent gateway unit is retired (one host gateway serves every profile), so it is
+// not wired here: the sentinel flags a leftover and the retirement path removes it.
 function profileUnits(role: RoleMeta): string[] {
   return [
-    `hermes-${role.agentId}-gateway.service`,
     `hermes-${role.agentId}-checkpoint.service`,
   ];
 }
@@ -2772,8 +2880,9 @@ function skillexCutoverHint(profile: string, project = "<repo>"): string {
  * against, so EVERY catalog commit leaves every strict desk "sync pending"
  * (`skillex profile show` exits 6 with one write-receipt change) and turns
  * hermes.runtime-singleton red until each desk is strict-synced. Since
- * 2026-10-02 two systemd user units do that: a path unit (the catalog's HEAD
- * moved) and a 15-minute timer, both running the resync script, which records
+ * 2026-10-02 a systemd path unit (the catalog's HEAD moved) and a 15-minute
+ * clock run the resync script (the clock is the `skillex-hermes-resync` Candybar
+ * since 2026-10; the systemd .timer is retired), which records
  * every real run in `$XDG_STATE_HOME/skillex/hermes-resync.last.json` (schema 1;
  * a `busy` run and a dry run never replace it).
  *
@@ -2782,8 +2891,14 @@ function skillexCutoverHint(profile: string, project = "<repo>"): string {
  * notices, and a desk the script refuses (foreign content in a strict desk) is
  * left alone ON PURPOSE and reported only in the script's own record.
  */
-const RESYNC_UNITS = ["skillex-hermes-resync.timer", "skillex-hermes-resync.path"] as const;
-/** The timer fires every 15 minutes, so two hours is eight missed runs. */
+const RESYNC_UNITS = ["skillex-hermes-resync.path"] as const;
+/**
+ * The schedule is a Candybar manifest, not a systemd timer (the .timer is retired
+ * 2026-10; Candybar is the single clock). Registered + enabled is read from
+ * `GET <CANDYBAR_API_URL or http://127.0.0.1:8700>/candybars`, read-only.
+ */
+const RESYNC_CANDYBAR = "skillex-hermes-resync";
+/** Candybar fires the resync every 15 minutes, so two hours is eight missed runs. */
 const RESYNC_STALE_MS = 2 * 60 * 60 * 1000;
 const RESYNC_INSTALL = "~/code/skillex/scripts/install-hermes-resync.sh install";
 const RESYNC_STATUS = "~/code/skillex/scripts/install-hermes-resync.sh status";
@@ -2861,6 +2976,29 @@ function readResyncUnit(unit: string, platform: NodeJS.Platform = hostPlatform()
     else if (active !== "active") problems.push(`is not active (ActiveState=${active || "unset"}, SubState=${properties.SubState || "unset"})`);
   }
   return { unit, problems };
+}
+
+/**
+ * The resync's Candybar, observed read-only through the Candybar API. `unobservable`
+ * means the API could not answer, which is a statement about the observer and not
+ * about the schedule.
+ */
+async function readResyncCandybar(platform: NodeJS.Platform): Promise<{ problems: string[]; unobservable?: string }> {
+  if (isLaunchdHost(platform)) return { problems: [], unobservable: `candybar ${RESYNC_CANDYBAR}: macOS has no Candybar, launchd owns the schedule` };
+  const base = (process.env.CANDYBAR_API_URL?.trim() || "http://127.0.0.1:8700").replace(/\/+$/u, "");
+  let body: unknown;
+  try {
+    const response = await fetch(`${base}/candybars`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return { problems: [], unobservable: `GET ${base}/candybars answered ${response.status}` };
+    body = await response.json();
+  } catch (err) {
+    return { problems: [], unobservable: `GET ${base}/candybars failed: ${(err as Error).message}` };
+  }
+  if (!Array.isArray(body)) return { problems: [], unobservable: `GET ${base}/candybars did not answer a list` };
+  const candybar = body.find((entry) => isPlainObject(entry) && entry.name === RESYNC_CANDYBAR);
+  if (!isPlainObject(candybar)) return { problems: [`candybar ${RESYNC_CANDYBAR} is not registered`] };
+  if (candybar.enabled !== true) return { problems: [`candybar ${RESYNC_CANDYBAR} is registered but not enabled`] };
+  return { problems: [] };
 }
 
 /** `3 min`, `47 min`, `2 h`, `2 h 5 min`: coarse on purpose, the limit is hours. */
@@ -3233,19 +3371,18 @@ return [
       if (!probe.ok && !/running|degraded|starting|maintenance/.test(`${probe.stdout} ${probe.stderr}`)) {
         const sysDir = join(ctx.homeDir, ".config", "systemd", "user");
         const details: string[] = [];
-        // The per-agent heartbeat timer is NOT required. hermes-agent-template
-        // 63466a8 retired it — every agent got a 1-minute oneshot whose
-        // reconciliation pass was gated on a role.yaml flag that was true in one
-        // repo fleet-wide, so ~20,000 no-op invocations a day is all it did. The
-        // template stopped writing the unit; requiring it here made every freshly
-        // provisioned agent fail its own systemd parity immediately. Liveness is
-        // the gateway unit's job (Restart=on-failure) and scheduling is
-        // Bloodbank's. Retired units still SHOW UP in fleet status as topology —
-        // observing one is not the same as demanding it.
+        // One host gateway serves every profile (since 2026-10-11), so no per-agent
+        // unit is required: the host unit must be installed, and a leftover per-agent
+        // gateway unit is a conflict. The per-agent heartbeat timer is retired too
+        // (hermes-agent-template 63466a8); observing a retired unit is not demanding it.
+        if (requiredRoles.some((role) => role.serviceStateGateway !== "deferred") && !existsSync(join(sysDir, HOST_GATEWAY_UNIT))) {
+          details.push(`${HOST_GATEWAY_UNIT} should be installed (the one host gateway that serves every profile)`);
+        }
         for (const role of requiredRoles) {
           const gateway = role.serviceStateGateway || "active";
-          if (!existsSync(join(sysDir, `hermes-${role.agentId}-gateway.service`))) {
-            details.push(`hermes-${role.agentId}-gateway.service should be installed`);
+          const legacyUnit = retiredAgentGatewayUnit(role.agentId);
+          if (!isHostGatewayUnit(legacyUnit) && existsSync(join(sysDir, legacyUnit))) {
+            details.push(`${legacyUnit} is retired and should be removed (the host gateway serves ${role.agentId}); a loaded per-agent gateway unit can hijack the host role`);
           }
           if (gateway !== "installed" && gateway !== "deferred") details.push(`${role.agentId} gateway should record installed or deferred while systemd --user is unavailable (got ${gateway})`);
         }
@@ -3259,19 +3396,25 @@ return [
         };
       }
       const details: string[] = [];
-      const sysDir = join(ctx.homeDir, ".config", "systemd", "user");
+      // The one host gateway serves every profile: it must be enabled+active whenever any
+      // role is meant to be served. flume only OBSERVES it here; it never starts it.
+      if (requiredRoles.some((role) => role.serviceStateGateway !== "deferred")) {
+        const host = checkUnit(HOST_GATEWAY_UNIT);
+        if (!host.enabled || !host.active) {
+          details.push(`${HOST_GATEWAY_UNIT} should be enabled+active (the one host gateway that serves every profile; restart only via ${HOST_GATEWAY_RESTART})`);
+        }
+      }
       for (const role of requiredRoles) {
-        // Gateway only — see the note above: the heartbeat timer was retired in
-        // the template, so requiring it here fails every agent provisioned from
-        // the current pin.
-        const gatewayUnit = `hermes-${role.agentId}-gateway.service`;
+        // No per-agent unit is expected. A LOADED retired per-agent gateway unit (file on
+        // disk, enabled or active) is a conflict: it can hijack the host role.
+        const legacy = legacyAgentGatewayState(ctx.homeDir, role.agentId);
+        if (legacy.loaded) {
+          const state = legacy.active ? "active" : legacy.enabled ? "enabled" : "present";
+          details.push(`${legacy.unit} is retired but still ${state}: it conflicts with ${HOST_GATEWAY_UNIT} (one host gateway serves every profile) and should be disabled and removed`);
+        }
         const gatewayState = role.serviceStateGateway || "active";
-        if (!existsSync(join(sysDir, gatewayUnit))) details.push(`${gatewayUnit} should be installed`);
-        const gateway = checkUnit(gatewayUnit);
-        if (gatewayState === "deferred") {
-          if (gateway.enabled || gateway.active) details.push(`${gatewayUnit} is deferred and should be disabled+inactive`);
-        } else if (gatewayState !== "active" || !gateway.enabled || !gateway.active) {
-          details.push(`${gatewayUnit} should be enabled+active (manifest: ${gatewayState || "missing"})`);
+        if (gatewayState !== "active" && gatewayState !== "deferred") {
+          details.push(`${role.agentId} gateway should be recorded active or deferred (manifest: ${gatewayState || "missing"})`);
         }
       }
       return {
@@ -3305,46 +3448,41 @@ return [
         return { id: finding.id, title: finding.title, status: "blocked", summary: "systemd --user unavailable on this host", changedFiles, details };
       }
       for (const role of roles) {
-        const sysDir = join(ctx.homeDir, ".config", "systemd", "user");
-        const units = [`hermes-${role.agentId}-gateway.service`];
-        const allUnitsPresent = units.every((unit) => existsSync(join(sysDir, unit)));
-        // Existing units can still point at the checkout's former location.
-        // In that case enabling them again preserves the stale ExecStart path,
-        // so regenerate them from the role's current provisioning script.
-        const unitsStale = units.some((unit) => {
-          const text = safeReadText(join(sysDir, unit));
-          if (text === null) return true;
-          return text.includes("/agents/hermes/") && !text.includes(role.roleDir);
-        });
+        // No per-agent unit is installed, enabled or restarted here. A leftover retired
+        // gateway unit (or a manifest still pending) goes through the template's
+        // 70-systemd.sh, which retires it and attaches the profile to the host gateway;
+        // reconcileHermesRoleUnits then retires any remainder and verifies the host unit.
+        const legacy = legacyAgentGatewayState(ctx.homeDir, role.agentId);
         const manifestNeedsReconcile = [role.serviceStateGateway]
           .some((state) => state === "pending" || state === "error");
-        if (allUnitsPresent && !unitsStale && !manifestNeedsReconcile) {
+        if (!legacy.loaded && !manifestNeedsReconcile) {
           reconcileHermesRoleUnits(ctx, role, changedFiles, details);
           continue;
         }
         let regenerated = false;
-        for (const script of [join(role.roleDir, ".scripts", "70-systemd.sh")]) {
-          if (!existsSync(script)) {
-            details.push(`script failed: missing ${script}`);
-            continue;
-          }
-          if (ctx.dryRun) {
-            details.push(`would run: FORCE_SYSTEMD=1 bash ${script}`);
+        const script = join(role.roleDir, ".scripts", "70-systemd.sh");
+        if (!existsSync(script)) {
+          details.push(`${script} not present; retiring ${legacy.unit} directly`);
+          regenerated = true;
+        } else if (ctx.dryRun) {
+          details.push(`would run: FORCE_SYSTEMD=1 bash ${script}`);
+        } else {
+          const result = spawnSync("bash", [script], {
+            cwd: role.roleDir,
+            encoding: "utf8",
+            env: { ...process.env, FORCE_SYSTEMD: "1" },
+          });
+          if (result.status !== 0) {
+            details.push(`script failed: ${script}: ${result.stderr.trim() || result.stdout.trim()}`);
           } else {
-            const result = spawnSync("bash", [script], {
-              cwd: role.roleDir,
-              encoding: "utf8",
-              env: { ...process.env, FORCE_SYSTEMD: "1" },
-            });
-            if (result.status !== 0) {
-              details.push(`script failed: ${script}: ${result.stderr.trim() || result.stdout.trim()}`);
-            } else {
-              regenerated = true;
-              details.push(`regenerated systemd units for ${role.agentId} from ${role.roleDir}`);
-            }
+            regenerated = true;
+            details.push(`ran 70-systemd.sh for ${role.agentId} from ${role.roleDir} (retires per-agent units, attaches the host gateway)`);
           }
         }
-        if (ctx.dryRun) continue;
+        if (ctx.dryRun) {
+          reconcileHermesRoleUnits(ctx, role, changedFiles, details);
+          continue;
+        }
         if (regenerated) {
           const refreshed = discoverRoles(ctx.repoRoot).find((candidate) => candidate.agentId === role.agentId);
           if (!refreshed) {
@@ -3918,7 +4056,7 @@ return [
       changedFiles: [],
       details: [
         ...finding.details,
-        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so no auxiliary call walks provider discovery, any pinned auxiliary.<task> and its fallback_chain on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart its gateway and fleet-bloodbank-gateway.`,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so no auxiliary call walks provider discovery, any pinned auxiliary.<task> and its fallback_chain on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart the one host gateway with hermes-gateway-restart --reason 'gateway routing' (never a raw systemctl restart).`,
       ],
     }),
   },
@@ -4102,8 +4240,8 @@ return [
     //
     // A Skillex receipt records the all-skills commit it was written against,
     // so every catalog commit leaves each Skillex-only desk "sync pending" and
-    // turns hermes.runtime-singleton red. Two systemd user units (a path unit on
-    // the catalog's HEAD, a 15-minute timer) strict-sync the desks within
+    // turns hermes.runtime-singleton red. A systemd path unit on the catalog's
+    // HEAD plus the 15-minute `skillex-hermes-resync` Candybar strict-sync the desks within
     // seconds, and nothing else notices when that automation is uninstalled,
     // stopped, tripped (a failed path unit stops watching the catalog), starved
     // of completed runs, or refusing a desk: the desks just stay pending.
@@ -4116,7 +4254,7 @@ return [
     title: "Skillex-only desks resync themselves after a catalog commit",
     // Host-scoped: the user systemd manager, $HOME/.hermes/profiles/*, $XDG_STATE_HOME/skillex.
     scope: "host",
-    audit: (ctx) => {
+    audit: async (ctx) => {
       const id = "hermes.skillex-resync";
       const title = "Skillex-only desks resync themselves after a catalog commit";
       const roles = discoverRoles(ctx.repoRoot);
@@ -4145,8 +4283,15 @@ return [
       const unhealthy = readings.filter((reading) => reading.problems.length).map((reading) => reading.unit);
       if (unhealthy.length) {
         aspects.push(`${unhealthy.join(" and ")} must be installed, enabled and active (run ${RESYNC_INSTALL})`);
-        failures.push(`${RESYNC_INSTALL} links both units, enables them and starts a run; it is idempotent and resets a failed unit, and ${RESYNC_STATUS} shows the units and the last run`);
+        failures.push(`${RESYNC_INSTALL} links the path unit, enables it and starts a run; it is idempotent and resets a failed unit, and ${RESYNC_STATUS} shows the unit and the last run`);
       }
+      // The schedule: a Candybar manifest registered and enabled (the .timer is retired).
+      const candybar = await readResyncCandybar(ctxPlatform(ctx));
+      if (candybar.problems.length) {
+        failures.push(...candybar.problems.map((problem) => `${problem}; commit its manifest (33GOD/candybar deploy/migration/ledger.yaml) and read back GET /candybars`));
+        aspects.push(`candybar ${RESYNC_CANDYBAR} must be registered and enabled (it is the 15-minute clock)`);
+      }
+      if (candybar.unobservable) unassessed.push(candybar.unobservable);
 
       // 2. The last run: recorded, recent and clean.
       const recordPath = resyncRecordPath(ctx);
@@ -4173,7 +4318,7 @@ return [
           last = `${status || "unknown"} ${resyncAge(age)} ago`;
           if (age > RESYNC_STALE_MS) {
             aspects.push(`the last run finished ${resyncAge(age)} ago (limit ${resyncAge(RESYNC_STALE_MS)})`);
-            failures.push(`${recordPath}: the last run finished ${String(data.finished_at)} (${resyncAge(age)} ago), over the ${resyncAge(RESYNC_STALE_MS)} limit; the 15-minute timer is not firing or no run completes (a run that finds a peer holding ~/.hermes/.skillex-resync.lock records nothing), so read ${RESYNC_JOURNAL}, and ${RESYNC_RUN} runs one now`);
+            failures.push(`${recordPath}: the last run finished ${String(data.finished_at)} (${resyncAge(age)} ago), over the ${resyncAge(RESYNC_STALE_MS)} limit; the Candybar is not firing or no run completes (a run that finds a peer holding ~/.hermes/.skillex-resync.lock records nothing), so read ${RESYNC_JOURNAL}, and ${RESYNC_RUN} runs one now`);
           }
         }
         // ok and partial (a desk was busy; the next run retries it) are clean.
@@ -4197,7 +4342,7 @@ return [
           ? `${desks} are not kept in sync automatically: ${aspects.join("; ")}`
           : verdict === "warn"
             ? `${desks}: the auto-resync could not be fully assessed (${unassessed.length} observation(s) unavailable)`
-            : `${desks} resync automatically (timer and path units active, last run ${last})`,
+            : `${desks} resync automatically (path unit active, candybar ${RESYNC_CANDYBAR} enabled, last run ${last})`,
         details: [...failures, ...unassessed],
         // Host install state: the operator runs the installer or the cutover.
         fixable: false,
@@ -4453,7 +4598,7 @@ return [
       }
       if (unitsTouched && !ctx.dryRun && !isLaunchdHost(ctxPlatform(ctx))) {
         systemctlUser(["daemon-reload"]);
-        details.push("systemctl --user daemon-reload (restart units to pick up the new HERMES_HOME)");
+        details.push("systemctl --user daemon-reload (units pick up the new HERMES_HOME when they next start)");
       }
       return {
         id: finding.id,
@@ -4560,7 +4705,9 @@ return [
         const systemd = (entry.systemd ?? {}) as Record<string, unknown>;
         for (const key of LEGACY_SYSTEMD_KEYS) {
           if (systemd[key] !== undefined) {
-            details.push(`registry entry for ${role.agentId} carries retired systemd.${key}; the fleet-shared Bloodbank gateway owns command ingress`);
+            details.push(key === "gateway_unit"
+              ? `registry entry for ${role.agentId} carries retired systemd.gateway_unit; one host gateway (${HOST_GATEWAY_UNIT}) serves every profile and an agent has no unit of its own`
+              : `registry entry for ${role.agentId} carries retired systemd.${key}; the fleet-shared Bloodbank gateway owns command ingress`);
           }
         }
         const legacyUnit = legacyConsumerUnitPath(ctx.homeDir, role.agentId);
@@ -4727,6 +4874,8 @@ return [
               dirty = true;
             }
           }
+          // A block the cleanup emptied is itself a retired shape: drop it.
+          if (Object.keys(systemd).length === 0) delete entry.systemd;
         }
         const legacyUnit = legacyConsumerUnitPath(ctx.homeDir, role.agentId);
         if (existsSync(legacyUnit)) {

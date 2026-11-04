@@ -479,7 +479,6 @@ function agentRow(name, overrides = {}) {
     provisioned_at: "2026-01-01T00:00:00.000Z",
     plane: { workspace: "suite", project_id: `board-${slug}`, identifier: slug.toUpperCase() },
     bloodbank: { enabled: false, gateway_scope: "fleet", target_agent_id: name },
-    systemd: { gateway_unit: `hermes-${name}-gateway.service` },
     hermes: {
       bin: join(scratchHome, ".local", "share", "hermes-agent", "releases", "abc", "bin", "hermes"),
       repo: join(scratchHome, ".local", "share", "hermes-agent", "releases", "abc"),

@@ -15,9 +15,13 @@ assert.doesNotMatch(summary, /consumer\.service/);
 // The retired per-agent key names may appear ONLY in the LEGACY_SYSTEMD_KEYS
 // constant that scopes detection/cleanup. Anywhere else means the legacy
 // contract is being provisioned or recorded again.
-assert.match(parity, /const LEGACY_SYSTEMD_KEYS = \["consumer_unit", "checkpoint_timer"\] as const;/);
+assert.match(parity, /const LEGACY_SYSTEMD_KEYS = \["consumer_unit", "checkpoint_timer", "gateway_unit"\] as const;/);
 assert.equal((parity.match(/consumer_unit/g) ?? []).length, 1, "consumer_unit may appear only inside LEGACY_SYSTEMD_KEYS");
 assert.equal((parity.match(/checkpoint_timer/g) ?? []).length, 1, "checkpoint_timer may appear only inside LEGACY_SYSTEMD_KEYS");
+// One host gateway serves every profile: the registry upsert never writes a per-agent gateway_unit
+// again, and the key is only ever named where it is detected and stripped.
+assert.doesNotMatch(parity, /systemd:\\n\s+gateway_unit:/, "upsertRegistryEntry must not emit a systemd.gateway_unit block");
+assert.doesNotMatch(parity, /\$\{role\.agentId\}-gateway\.service/, "no per-agent gateway unit name is derived from a role's agent id in an emitted block");
 assert.doesNotMatch(parity, /bloodbank-consumer\.py/);
 assert.match(parity, /gateway_scope:\s*fleet/);
 assert.match(parity, /target_agent_id:/);

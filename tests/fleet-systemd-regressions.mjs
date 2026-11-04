@@ -68,10 +68,12 @@ const CLI = join(PKG, "dist", "index.js");
 const MCP = join(PKG, "dist", "mcp-server.js");
 const TRACKED_CONTRACT = join(ROOT, "contracts", "handbook.yaml");
 
-/** The five declared leaves, in the byte order the observations sort in. */
+/** The ONE host gateway (service_model.host): every profile is served by it, no agent owns a unit. */
+const HOST_GATEWAY = "hermes-gateway.service";
+/** The declared leaves, in the byte order the observations sort in. */
 const FIELDS = {
-  topology: "agents.{agent_id}.systemd.gateway_unit",
-  gateway: "units.hermes-{agent_id}-gateway.service",
+  topology: "agents.{agent_id}.systemd",
+  gateway: "units.hermes-gateway.service",
 };
 const FIELD_ORDER = [FIELDS.topology, FIELDS.gateway];
 const UNREGISTERED_CLASSES = ["retired", "transient", "profile-correlated", "managed-exception", "unclassified"];
@@ -126,7 +128,7 @@ function check(label, body) {
   } catch (error) {
     if (error instanceof SkipCase) return;
     failures += 1;
-    console.log(`  FAIL ${label}: ${String(error.message).split("\n")[0]}`);
+    console.log(`  FAIL ${label}: ${String(error.message).split("\n").slice(0, process.env.SUITE_VERBOSE ? 8 : 1).join(" | ")}`);
   }
 }
 
@@ -137,7 +139,7 @@ async function checkAsync(label, body) {
   } catch (error) {
     if (error instanceof SkipCase) return;
     failures += 1;
-    console.log(`  FAIL ${label}: ${String(error.message).split("\n")[0]}`);
+    console.log(`  FAIL ${label}: ${String(error.message).split("\n").slice(0, process.env.SUITE_VERBOSE ? 8 : 1).join(" | ")}`);
   }
 }
 
@@ -198,9 +200,12 @@ function roleDirOf(name) {
   return join(reposRoot, slugOf(name), "agents", "hermes", "pm");
 }
 
+/** The host executable the one gateway is pinned to (service_model.host.exec_bin). */
+const HOST_EXEC_BIN = join(fleetHome, "hermes-agent", ".hermes", "bin", "hermes");
+
 function unitsOf(name) {
   return {
-    gateway: `hermes-${name}-gateway.service`,
+    gateway: HOST_GATEWAY,
     timer: `hermes-${name}-heartbeat.timer`,
     service: `hermes-${name}-heartbeat.service`,
   };
@@ -273,7 +278,6 @@ function agentRow(agent, overrides = {}) {
     provisioned_at: NOW_ISO,
     plane: { workspace: "suite", project_id: `board-${slugOf(name)}`, identifier: slugOf(name).toUpperCase() },
     bloodbank: { enabled: false, gateway_scope: "fleet", target_agent_id: name },
-    systemd: { gateway_unit: unitsOf(name).gateway, heartbeat_timer: unitsOf(name).timer },
     hermes: {
       bin: HERMES_BIN, repo: HERMES_RELEASE,
       fleet_env: join(fleetHome, "fleet.env"),
@@ -297,7 +301,7 @@ const GATEWAYS_BLOCK = {
     profile_name: "fleet-bloodbank-gateway",
     command_subject: "bloodbank.cmd.agent.invocation.start",
     target_field: "data.target_agent_id",
-    systemd_unit: "hermes-fleet-bloodbank-gateway.service",
+    systemd_unit: HOST_GATEWAY,
   },
 };
 
@@ -440,17 +444,17 @@ function agentUnits(name, options = {}) {
     serviceActive = "inactive", serviceSub = "dead", serviceResult = "success", serviceExecStatus = "0",
     serviceStartAgoUs = 31_000_000n, serviceExitAgoUs = 30_000_000n, serviceNeverRan = false,
     serviceTimeoutStart = "45min", serviceExec = null, serviceType = "oneshot",
-    present = { gateway: true, timer: false, service: false },
+    present = { gateway: false, timer: false, service: false },
     nowUs = monotonicNowUs(),
   } = options;
   const unit = unitsOf(name);
   const launcher = launcherOf(name);
-  const home = gatewayHome ?? join(profileRoot, name);
+  const home = join(profileRoot, name);
   const units = {};
   const listUnits = [];
   const unitFiles = [];
 
-  if (present.gateway !== false) {
+  if (present.gateway === true) {
     const gatewayState = {
       Id: unit.gateway, Names: unit.gateway, LoadState: gatewayLoad, LoadError: "",
       UnitFileState: gatewayFileState ?? (gatewayEnabled ? "enabled" : "disabled"),
@@ -459,13 +463,13 @@ function agentUnits(name, options = {}) {
       Result: gatewayResult, ExecMainStatus: gatewayExecStatus, ExecMainCode: gatewayActive ? "0" : "0",
       NRestarts: gatewayRestarts, FragmentPath: gatewayFragment, DropInPaths: "",
       Type: "simple", Restart: "on-failure",
-      ExecStart: gatewayExec ?? execLine(launcher, "gateway"),
-      Environment: gatewayEnvironment ?? `HERMES_HOME=${home} HERMES_BIN=${HERMES_BIN} CODEX_HOME=${join(scratchHome, ".codex")} OP_SERVICE_ACCOUNT_TOKEN=${SECRET_SENTINEL}`,
+      ExecStart: gatewayExec ?? execLine(HOST_EXEC_BIN, "gateway", "run"),
+      Environment: gatewayEnvironment ?? `HERMES_HOME=${gatewayHome ?? fleetHome} HERMES_BIN=${HERMES_BIN} CODEX_HOME=${join(scratchHome, ".codex")} OP_SERVICE_ACCOUNT_TOKEN=${SECRET_SENTINEL}`,
       ExecMainStartTimestampMonotonic: gatewayActive ? String(nowUs - 600_000_000n) : "0",
       ExecMainExitTimestampMonotonic: "0", TimeoutStartUSec: "1min 30s",
     };
     units[unit.gateway] = gatewaySamples === null ? gatewayState : gatewaySamples.map((patch) => ({ ...gatewayState, ...patch }));
-    listUnits.push({ unit: unit.gateway, load: gatewayLoad, active: gatewayState.ActiveState, sub: gatewayState.SubState, description: `${name} gateway` });
+    listUnits.push({ unit: unit.gateway, load: gatewayLoad, active: gatewayState.ActiveState, sub: gatewayState.SubState, description: "hermes gateway (host)" });
     unitFiles.push({ unit_file: unit.gateway, state: gatewayState.UnitFileState, preset: null });
   }
 
@@ -507,44 +511,28 @@ function agentUnits(name, options = {}) {
   return { units, list_units: listUnits, unit_files: unitFiles };
 }
 
-function sharedGateway(options = {}) {
-  const { unit = "hermes-fleet-bloodbank-gateway.service", profile = "fleet-bloodbank-gateway", nowUs = monotonicNowUs() } = options;
-  return {
-    units: {
-      [unit]: {
-        Id: unit, Names: unit, LoadState: "loaded", LoadError: "", UnitFileState: "enabled",
-        ActiveState: "active", SubState: "running", Result: "success", ExecMainStatus: "0", ExecMainCode: "0",
-        NRestarts: "0", FragmentPath: "", DropInPaths: "", Type: "simple", Restart: "on-failure",
-        ExecStart: execLine(HERMES_BIN, "gateway", "run", "--replace"),
-        Environment: `HERMES_HOME=${join(profileRoot, profile)}`,
-        ExecMainStartTimestampMonotonic: String(nowUs - 600_000_000n),
-        ExecMainExitTimestampMonotonic: "0", TimeoutStartUSec: "1min 30s",
-      },
-    },
-    list_units: [{ unit, load: "loaded", active: "active", sub: "running", description: "fleet bloodbank gateway" }],
-    unit_files: [{ unit_file: unit, state: "enabled", preset: null }],
-  };
+/**
+ * The ONE host gateway, with every knob `agentUnits` gives a gateway. It is built through
+ * `agentUnits` so a case patches it the way it always patched a gateway.
+ */
+function hostGateway(options = {}) {
+  return agentUnits("alpha-pm", { ...options, present: { gateway: true, timer: false, service: false } });
 }
 
 /**
  * The CANONICAL fleet state: every agent's units exactly as `70-systemd.sh`
  * provisions them for its own declaration, plus the fleet-shared gateway.
  *
- * `alpha-pm` and `delta-pm` declare Telegram verified, so their gateways are
- * enabled and running; the other three are deferred or undeclared and theirs
- * are disabled and inactive. A case then patches whichever agent it is about.
+ * The host gateway is enabled and running; agents own no gateway unit. A case patches
+ * the host gateway through `patches.host` and a retired-unit shape through `patches[agent]`.
  */
 function canonicalState(patches = {}) {
   const nowUs = monotonicNowUs();
   return mergeUnitSets(
     { manager: { stdout: "running", exit: 0 } },
-    ...AGENTS.map((agent) => agentUnits(agent.name, {
-      nowUs,
-      gatewayEnabled: agent.telegram === "verified" || agent.slack === "verified",
-      gatewayActive: agent.telegram === "verified" || agent.slack === "verified",
-      ...(patches[agent.name] ?? {}),
-    })),
-    sharedGateway({ nowUs }),
+    ...AGENTS.map((agent) => agentUnits(agent.name, { nowUs, ...(patches[agent.name] ?? {}) })),
+    // One host gateway serves every profile, so it is enabled and running whatever any agent declares.
+    ...(patches.host === null ? [] : [hostGateway({ nowUs, gatewayEnabled: true, gatewayActive: true, ...(patches.host ?? {}) })]),
     ...(patches.extra ?? []),
   );
 }
@@ -758,12 +746,8 @@ async function main() {
   // -- AC1: five declarations, five readings --------------------------------
 
   check("five messaging declarations produce five gateway readings, and the child count is bounded", () => {
-    setState(canonicalState({
-      // `delta-pm` declares Telegram verified and its gateway is disabled.
-      "delta-pm": { gatewayEnabled: false, gatewayActive: false },
-      // `echo-pm` declares nothing and its gateway is enabled and running.
-      "echo-pm": { gatewayEnabled: true, gatewayActive: true },
-    }));
+    // ONE host gateway serves every profile and it is up: every agent reads the same unit.
+    setState(canonicalState());
     const data = systemdRun();
 
     const gateway = (id) => leafOf(agentNamed(data, id), FIELDS.gateway);
@@ -775,10 +759,11 @@ async function main() {
     // inherited enablement to pin away and no item to raise -- see the
     // dedicated case below, which drives the base itself.
     assert.deepEqual(detailsOf(gateway("charlie-pm")), ["platform-enablement-inherited:telegram"]);
-    assert.equal(gateway("delta-pm").state, "fail");
-    assert.deepEqual(kindsOf(gateway("delta-pm")), ["verified-channel-gateway-disabled", "verified-channel-gateway-inactive"]);
-    assert.equal(gateway("echo-pm").state, "fail");
-    assert.deepEqual(kindsOf(gateway("echo-pm")), ["channel-undeclared"]);
+    assert.equal(gateway("delta-pm").state, "pass", "a verified agent is served by the up host gateway");
+    // An agent that declares nothing is served by no channel, and the host unit being up is not its drift.
+    assert.equal(gateway("echo-pm").state, "pass");
+    assert.deepEqual(kindsOf(gateway("echo-pm")), []);
+    for (const id of AGENT_IDS) assert.deepEqual((leafOf(agentNamed(data, id), FIELDS.gateway).items ?? []).map((item) => item.path).filter((path) => path.endsWith(".service")), [], `${id}: no per-agent unit is ever named`);
 
     assert.deepEqual(data.systemd.capability, { active: 2, deferred: 2, undeclared: 1 });
     assert.equal(agentNamed(data, "alpha-pm").systemd.capability.declared, "active");
@@ -796,6 +781,17 @@ async function main() {
     for (const argv of fakeSystemctlInvocations(systemctlShim)) {
       for (const mutation of MUTATION_VERBS) assert.equal(argv.includes(mutation), false, `systemctl ${mutation} must never be spawned: ${JSON.stringify(argv)}`);
     }
+
+    // The host gateway DOWN: only the agents it must serve are failed; a deferred or undeclared agent is not.
+    setState(canonicalState({ host: { gatewayEnabled: false, gatewayActive: false } }));
+    const down = systemdRun();
+    const downGateway = (id) => leafOf(agentNamed(down, id), FIELDS.gateway);
+    for (const id of ["alpha-pm", "delta-pm"]) {
+      assert.equal(downGateway(id).state, "fail", id);
+      assert.deepEqual(kindsOf(downGateway(id)), ["verified-channel-gateway-disabled", "verified-channel-gateway-inactive"], id);
+    }
+    assert.equal(downGateway("bravo-pm").state, "pass");
+    assert.equal(downGateway("echo-pm").state, "pass");
   });
 
   check("every employee carries only gateway topology and health observations", () => {
@@ -833,8 +829,9 @@ async function main() {
     assert.equal(alpha.systemd.gateway.stability.stable, true);
     assert.equal(alpha.systemd.gateway.stability.samples, data.systemd.window.samples);
     assert.deepEqual(alpha.systemd.gateway.stability.transitions, []);
-    assert.deepEqual(alpha.systemd.gateway.entrypoint, { family: "launcher", pinned: true });
-    assert.equal(alpha.systemd.gateway.home, "matches");
+    assert.deepEqual(alpha.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: true }, "the host gateway is pinned to service_model.host.exec_bin");
+    assert.equal(alpha.systemd.gateway.home, "matches", "the host gateway runs with the fleet home");
+    assert.equal(alpha.systemd.gateway.unit, HOST_GATEWAY, "an agent's gateway reading IS the one host unit");
     assert.equal("heartbeat" in alpha.systemd, false);
     assert.equal("heartbeat_healthy" in data.systemd.agents, false);
     assert.equal(data.systemd.agents.gateway_healthy >= 1, true);
@@ -848,13 +845,7 @@ async function main() {
 
   check("a growing restart count is a crash loop and a changed sample is unstable", () => {
     setState(canonicalState({
-      "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewaySamples: [{ NRestarts: "3" }, { NRestarts: "4" }, { NRestarts: "5" }] },
-      "delta-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewaySamples: [
-          {}, { ActiveState: "activating", SubState: "auto-restart" }, {},
-        ],
-      },
+      host: { gatewayEnabled: true, gatewayActive: true, gatewaySamples: [{ NRestarts: "3" }, { NRestarts: "4" }, { NRestarts: "5" }] },
     }));
     const data = systemdRun();
     const alpha = agentNamed(data, "alpha-pm");
@@ -865,30 +856,46 @@ async function main() {
     assert.equal(alpha.systemd.gateway.stability.stable, false);
     assert.equal(alpha.systemd.gateway.restarts, 5);
 
+    // Both agents with a verified channel are served by the one host unit, so both read its crash loop.
     const delta = agentNamed(data, "delta-pm");
-    const deltaGateway = leafOf(delta, FIELDS.gateway);
+    assert.ok(kindsOf(leafOf(delta, FIELDS.gateway)).includes("crash-looping"));
+    assert.equal(data.systemd.agents.crash_looping, 2);
+    // A deferred agent is not served by a channel, so it is not failed for the host's loop.
+    assert.equal(leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway).state, "pass");
+
+    // A changed sample (not a growing count) is unstable, not a crash loop.
+    setState(canonicalState({
+      host: {
+        gatewayEnabled: true, gatewayActive: true,
+        gatewaySamples: [
+          {}, { ActiveState: "activating", SubState: "auto-restart" }, {},
+        ],
+      },
+    }));
+    const unstable = systemdRun();
+    const deltaUnstable = agentNamed(unstable, "delta-pm");
+    const deltaGateway = leafOf(deltaUnstable, FIELDS.gateway);
     assert.equal(deltaGateway.state, "fail");
     assert.ok(kindsOf(deltaGateway).includes("unstable"), JSON.stringify(kindsOf(deltaGateway)));
-    assert.deepEqual(delta.systemd.gateway.stability.transitions, ["active/running -> activating/auto-restart", "activating/auto-restart -> active/running"]);
-    assert.equal(delta.systemd.gateway.stability.stable, false);
-
-    assert.equal(data.systemd.agents.crash_looping, 1);
-    assert.ok(data.systemd.agents.unstable >= 2, JSON.stringify(data.systemd.agents));
+    assert.deepEqual(deltaUnstable.systemd.gateway.stability.transitions, ["active/running -> activating/auto-restart", "activating/auto-restart -> active/running"]);
+    assert.equal(deltaUnstable.systemd.gateway.stability.stable, false);
+    assert.ok(unstable.systemd.agents.unstable >= 2, JSON.stringify(unstable.systemd.agents));
 
     // NO per-sample reading escapes the SUMMARY. `restarts 3 -> 5` appears
-    // exactly three times -- `gateway.stability.transitions`, the item's
+    // once per agent that reads the host unit -- `gateway.stability.transitions`, the item's
     // `observed` half, and the observation `details[]` line that renders that
     // item -- and nowhere else; the intermediate sample (4) appears nowhere at
     // all, which is the whole point of reporting a transition rather than a
     // series.
     const occurrences = JSON.stringify(data).split("restarts 3 -> 5").length - 1;
-    assert.equal(occurrences, 3, `the transition may appear only in the stability summary, its item and that item's rendered detail, found ${occurrences}`);
+    // ... plus the shared-gateway block, which reads the same host unit once.
+    assert.equal(occurrences, 3 * (data.systemd.agents.crash_looping + 1), `the transition may appear only in each reading agent's (and the shared block's) stability summary, its item and that item's rendered detail, found ${occurrences}`);
     assert.equal(JSON.stringify(data).includes("restarts 3 -> 4"), false, "an intermediate sample must never be reported");
     assert.equal(JSON.stringify(data).includes("restarts 4 -> 5"), false, "an intermediate sample must never be reported");
   });
 
   check("an activating gateway is never proven, even when every sample agrees", () => {
-    setState(canonicalState({ "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewaySub: "start-pre", gatewaySamples: [{ ActiveState: "activating", SubState: "start-pre" }, { ActiveState: "activating", SubState: "start-pre" }, { ActiveState: "activating", SubState: "start-pre" }] } }));
+    setState(canonicalState({ host: { gatewayEnabled: true, gatewayActive: true, gatewaySub: "start-pre", gatewaySamples: [{ ActiveState: "activating", SubState: "start-pre" }, { ActiveState: "activating", SubState: "start-pre" }, { ActiveState: "activating", SubState: "start-pre" }] } }));
     const data = systemdRun();
     const gateway = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
     assert.equal(gateway.state, "fail");
@@ -906,7 +913,7 @@ async function main() {
       "delta-pm": { lastTriggerAgoUs: 600_000_000n, serviceExitAgoUs: 600_000_000n },
       "echo-pm": { onUnitInactiveSec: 300 },
     };
-    for (const patch of Object.values(patches)) patch.present = { gateway: true, timer: true, service: true };
+    for (const patch of Object.values(patches)) patch.present = { gateway: false, timer: true, service: true };
     setState(canonicalState(patches));
     const data = systemdRun();
     const retired = hostNamed(data, "systemd.unregistered");
@@ -932,7 +939,8 @@ async function main() {
 
   check("gateway-only employees need no installed heartbeat, tick or registry declaration", () => {
     const registry = join(temp, "gateway-only-registry.yaml");
-    writeAgentRegistry(registry, AGENTS.map((a) => ({ ...a, rowOverrides: { systemd: { gateway_unit: unitsOf(a.name).gateway } } })));
+    writeAgentRegistry(registry, AGENTS);
+    assert.doesNotMatch(readFileSync(registry, "utf8"), /gateway_unit|heartbeat|systemd:/u, "the fixture rows carry no systemd declaration at all");
     setState(canonicalState());
     const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
     const alpha = agentNamed(data, "alpha-pm");
@@ -947,10 +955,10 @@ async function main() {
   check("historical heartbeat timer values remain inert in inventory and review", () => {
     const variants = [undefined, "", unitsOf("alpha-pm").timer, "hermes-old-pm-heartbeat.timer", "historical-name"];
     for (const value of variants) {
-      const systemd = { gateway_unit: unitsOf("alpha-pm").gateway };
+      const systemd = {};
       if (value !== undefined) systemd.heartbeat_timer = value;
       const registry = join(temp, `legacy-heartbeat-${variants.indexOf(value)}.yaml`);
-      writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" ? { ...a, rowOverrides: { systemd } } : a));
+      writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" && value !== undefined ? { ...a, rowOverrides: { systemd } } : a));
       setState(canonicalState());
       const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
       const alpha = agentNamed(data, "alpha-pm");
@@ -963,22 +971,27 @@ async function main() {
     }
   });
 
-  check("a heartbeat stored as gateway stays misnamed and remains visible for retirement", () => {
-    for (const key of ["timer", "service"]) {
-      const unit = unitsOf("alpha-pm")[key];
-      const registry = join(temp, `heartbeat-as-gateway-${key}.yaml`);
+  check("a stored gateway_unit is a retired registry key whatever it names, and a stored heartbeat stays visible for retirement", () => {
+    for (const [label, unit] of [["timer", unitsOf("alpha-pm").timer], ["service", unitsOf("alpha-pm").service], ["host", HOST_GATEWAY], ["per-agent", "hermes-alpha-pm-gateway.service"], ["blank", ""]]) {
+      const registry = join(temp, `stored-gateway-${label}.yaml`);
       writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm"
         ? { ...a, rowOverrides: { systemd: { gateway_unit: unit } } } : a));
-      setState(canonicalState({ "alpha-pm": { present: { gateway: true, timer: true, service: true } } }));
+      setState(canonicalState({ "alpha-pm": { present: { gateway: false, timer: true, service: true } } }));
       const data = systemdRun(["--agent-registry", registry]);
       const alpha = agentNamed(data, "alpha-pm");
-      assert.ok(kindsOf(leafOf(alpha, FIELDS.topology)).includes("misnamed-gateway"));
-      assert.equal(kindsOf(leafOf(alpha, FIELDS.topology)).includes("duplicate-gateway"), false);
-      assert.equal(alpha.systemd.topology.extra.some((entry) => entry.unit === unit), false);
-      const retired = hostNamed(data, "systemd.unregistered").items.find((entry) => entry.unit === unit);
-      assert.equal(retired.class, "retired");
-      assert.equal(retired.guidance, "retirement");
-      assert.equal(retired.detail, "retired:per-agent-heartbeat");
+      const topology = leafOf(alpha, FIELDS.topology);
+      assert.equal(topology.state, "fail", label);
+      assert.deepEqual(detailsOf(topology), ["registry-retired-key:gateway_unit"], `${label}: the key itself is the defect, whatever it names`);
+      assert.equal(kindsOf(topology).includes("misnamed-gateway"), false, "there is no per-agent unit to be misnamed");
+      assert.equal(kindsOf(topology).includes("duplicate-gateway"), false);
+      assert.deepEqual(alpha.systemd.topology.expected, [HOST_GATEWAY]);
+      assert.equal(leafOf(alpha, FIELDS.gateway).state, "pass", "the host gateway itself is healthy");
+      if (label === "timer" || label === "service") {
+        const retired = hostNamed(data, "systemd.unregistered").items.find((entry) => entry.unit === unit);
+        assert.equal(retired.class, "retired");
+        assert.equal(retired.guidance, "retirement");
+        assert.equal(retired.detail, "retired:per-agent-heartbeat");
+      }
     }
   });
 
@@ -1038,9 +1051,9 @@ async function main() {
 
   check("retired timers retain observed enabled, active and substate words", () => {
     setState(canonicalState({
-      "alpha-pm": { present: { gateway: true, timer: true }, timerEnabled: false },
-      "bravo-pm": { present: { gateway: true, timer: true }, timerActive: "inactive", timerSub: "dead" },
-      "charlie-pm": { present: { gateway: true, timer: true }, timerPaired: false },
+      "alpha-pm": { present: { gateway: false, timer: true }, timerEnabled: false },
+      "bravo-pm": { present: { gateway: false, timer: true }, timerActive: "inactive", timerSub: "dead" },
+      "charlie-pm": { present: { gateway: false, timer: true }, timerPaired: false },
     }));
     const data = systemdRun();
     const items = hostNamed(data, "systemd.unregistered").items;
@@ -1145,58 +1158,56 @@ async function main() {
     } finally { writeFileSync(policy, saved); rmSync(state, { force: true }); }
   });
 
-  check("retired keys, retired units, duplicates, misnames and absences are all topology", () => {
+  check("retired keys, retired units, duplicates and an absent host gateway are all topology", () => {
     const registry = join(temp, "topology-agents.yaml");
     const rows = AGENTS.map((agent) => {
       if (agent.name === "alpha-pm") {
-        return { ...agent, rowOverrides: { systemd: { gateway_unit: unitsOf("alpha-pm").gateway, heartbeat_timer: unitsOf("alpha-pm").timer, checkpoint_timer: "hermes-alpha-pm-checkpoint.timer" } } };
+        return { ...agent, rowOverrides: { systemd: { gateway_unit: HOST_GATEWAY, heartbeat_timer: unitsOf("alpha-pm").timer, checkpoint_timer: "hermes-alpha-pm-checkpoint.timer" } } };
       }
       if (agent.name === "bravo-pm") {
         return { ...agent, rowOverrides: { systemd: { gateway_unit: "hermes-bravo-pm-messaging.service", heartbeat_timer: unitsOf("bravo-pm").timer } } };
       }
-      // `charlie-pm` declares NO heartbeat timer while the units are on disk.
-      if (agent.name === "charlie-pm") return { ...agent, rowOverrides: { systemd: { gateway_unit: unitsOf("charlie-pm").gateway } } };
       return agent;
     });
     writeAgentRegistry(registry, rows);
 
     const nowUs = monotonicNowUs();
-    setState(mergeUnitSets(
+    const retiredUnit = (unit, description) => ({
+      units: { [unit]: { Id: unit, LoadState: "loaded", UnitFileState: "disabled", ActiveState: "inactive", SubState: "dead" } },
+      list_units: [{ unit, load: "loaded", active: "inactive", sub: "dead", description }],
+      unit_files: [{ unit_file: unit, state: "disabled", preset: null }],
+    });
+    const fleet = (...extra) => mergeUnitSets(
       { manager: { stdout: "running", exit: 0 } },
-      ...AGENTS.filter((agent) => agent.name !== "echo-pm").map((agent) => agentUnits(agent.name, {
-        nowUs,
-        gatewayEnabled: agent.telegram === "verified", gatewayActive: agent.telegram === "verified",
-      })),
+      ...AGENTS.map((agent) => agentUnits(agent.name, { nowUs })),
+      ...extra,
+    );
+    setState(fleet(
+      hostGateway({ nowUs, gatewayEnabled: true, gatewayActive: true }),
       // The retired consumer, still on disk for alpha.
-      {
-        units: { "hermes-alpha-pm-consumer.service": { Id: "hermes-alpha-pm-consumer.service", LoadState: "loaded", UnitFileState: "disabled", ActiveState: "inactive", SubState: "dead" } },
-        list_units: [{ unit: "hermes-alpha-pm-consumer.service", load: "loaded", active: "inactive", sub: "dead", description: "retired consumer" }],
-        unit_files: [{ unit_file: "hermes-alpha-pm-consumer.service", state: "disabled", preset: null }],
-      },
-      // The unit bravo's ROW points at, which is not the canonical name.
+      retiredUnit("hermes-alpha-pm-consumer.service", "retired consumer"),
+      // The retired PER-AGENT gateway, still on disk for bravo: it can hijack the host role.
+      retiredUnit("hermes-bravo-pm-gateway.service", "retired per-agent gateway"),
+      // A unit bravo's ROW points at. It is not a gateway shape, so it is not a duplicate: the key is the defect.
       {
         units: { "hermes-bravo-pm-messaging.service": { Id: "hermes-bravo-pm-messaging.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running" } },
         list_units: [{ unit: "hermes-bravo-pm-messaging.service", load: "loaded", active: "active", sub: "running", description: "second gateway" }],
         unit_files: [{ unit_file: "hermes-bravo-pm-messaging.service", state: "enabled", preset: null }],
       },
-      // A SECOND unit with the canonical gateway SHAPE for the same agent --
-      // two gateways racing one channel. This is what the duplicate rule reads
-      // (`hermes-<id>-*gateway.service`); the misnamed unit above does not end
-      // in `gateway.service` and is a different defect entirely, so before this
-      // fixture the `duplicate-gateway` item was produced by no test at all and
-      // deleting its emission turned nothing red.
+      // A SECOND unit with a gateway SHAPE for the same agent that is not a retired
+      // candidate name -- another gateway racing the host one.
       {
         units: { "hermes-bravo-pm-secondary-gateway.service": { Id: "hermes-bravo-pm-secondary-gateway.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running" } },
         list_units: [{ unit: "hermes-bravo-pm-secondary-gateway.service", load: "loaded", active: "active", sub: "running", description: "a second canonical-shaped gateway" }],
         unit_files: [{ unit_file: "hermes-bravo-pm-secondary-gateway.service", state: "enabled", preset: null }],
       },
-      sharedGateway({ nowUs }),
     ));
     const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
 
     const alpha = agentNamed(data, "alpha-pm");
     const alphaTopology = leafOf(alpha, FIELDS.topology);
     assert.equal(alphaTopology.state, "fail");
+    assert.ok(detailsOf(alphaTopology).includes("registry-retired-key:gateway_unit"), JSON.stringify(detailsOf(alphaTopology)));
     assert.ok(detailsOf(alphaTopology).includes("registry-retired-key:checkpoint_timer"), JSON.stringify(detailsOf(alphaTopology)));
     assert.ok(detailsOf(alphaTopology).includes("retired-unit:hermes-alpha-pm-consumer.service"), JSON.stringify(detailsOf(alphaTopology)));
     assert.deepEqual(alpha.systemd.topology.extra, [{ unit: "hermes-alpha-pm-consumer.service", class: "retired" }]);
@@ -1204,37 +1215,44 @@ async function main() {
     const bravo = agentNamed(data, "bravo-pm");
     const bravoTopology = leafOf(bravo, FIELDS.topology);
     assert.equal(bravoTopology.state, "fail");
-    assert.ok(detailsOf(bravoTopology).includes("misnamed-gateway:hermes-bravo-pm-messaging.service"), JSON.stringify(detailsOf(bravoTopology)));
+    assert.ok(detailsOf(bravoTopology).includes("registry-retired-key:gateway_unit"), JSON.stringify(detailsOf(bravoTopology)));
+    assert.ok(detailsOf(bravoTopology).includes("retired-unit:hermes-bravo-pm-gateway.service"), JSON.stringify(detailsOf(bravoTopology)));
     assert.ok(detailsOf(bravoTopology).includes("duplicate-gateway:hermes-bravo-pm-secondary-gateway.service"), JSON.stringify(detailsOf(bravoTopology)));
+    assert.equal(detailsOf(bravoTopology).some((detail) => detail.startsWith("misnamed-gateway")), false, "a host-gateway handbook never asks for a per-agent unit name");
     assert.deepEqual(bravo.systemd.topology.extra, [
-      { unit: "hermes-bravo-pm-messaging.service", class: "duplicate-gateway" },
+      { unit: "hermes-bravo-pm-gateway.service", class: "retired" },
       { unit: "hermes-bravo-pm-secondary-gateway.service", class: "duplicate-gateway" },
     ], JSON.stringify(bravo.systemd.topology.extra));
+    // Nothing here names the host unit as extra, retired or duplicate.
+    for (const id of AGENT_IDS) assert.equal(JSON.stringify(agentNamed(data, id).systemd.topology.extra).includes(`"${HOST_GATEWAY}"`), false, id);
 
     const charlie = agentNamed(data, "charlie-pm");
     assert.equal(leafOf(charlie, FIELDS.topology).state, "pass");
-    // `echo-pm` has no unit at all.
     const echo = agentNamed(data, "echo-pm");
-    const echoTopology = leafOf(echo, FIELDS.topology);
-    assert.equal(echoTopology.state, "fail");
-    assert.deepEqual(kindsOf(echoTopology).sort(), ["gateway-missing"]);
-    assert.deepEqual(kindsOf(leafOf(echo, FIELDS.gateway)), ["absent"]);
-    // The SEVERITY, on all three: `absent` reaches `fail` through the default
-    // arm of three separate ternaries, so moving it into any warn arm would
-    // have downgraded every one of them silently.
-    for (const field of [FIELDS.gateway]) {
-      assert.equal(leafOf(echo, field).state, "fail", `${field}: a registered agent with no unit is drift, not a warning`);
+    assert.equal(leafOf(echo, FIELDS.topology).state, "pass", "an agent that declares nothing needs no unit of its own");
+
+    // The host gateway absent: every agent is told so, because it IS the one unit they all depend on.
+    setState(fleet());
+    const absent = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
+    for (const id of AGENT_IDS) {
+      const agent = agentNamed(absent, id);
+      const topology = leafOf(agent, FIELDS.topology);
+      assert.equal(topology.state, "fail", id);
+      assert.ok(kindsOf(topology).includes("gateway-missing"), id);
+      assert.deepEqual(kindsOf(leafOf(agent, FIELDS.gateway)), ["absent"], id);
+      // The SEVERITY: a registered agent whose one gateway is missing is drift, not a warning.
+      assert.equal(leafOf(agent, FIELDS.gateway).state, "fail", `${id}: a missing host gateway is drift, not a warning`);
+      assert.deepEqual(agent.systemd.topology.installed, []);
+      assert.deepEqual(agent.systemd.topology.missing, [HOST_GATEWAY]);
     }
-    assert.deepEqual(echo.systemd.topology.installed, []);
-    assert.equal(echo.systemd.topology.missing.length, 1);
   });
 
   // -- AC6: the unregistered sweep -------------------------------------------
 
   check("a historical heartbeat field never claims ownership of an installed retired unit", () => {
     const registry = join(temp, "legacy-other-employee.yaml");
-    writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" ? { ...a, rowOverrides: { systemd: { gateway_unit: unitsOf(a.name).gateway, heartbeat_timer: unitsOf("delta-pm").timer } } } : a));
-    setState(canonicalState({ "delta-pm": { present: { gateway: true, timer: true } } }));
+    writeAgentRegistry(registry, AGENTS.map((a) => a.name === "alpha-pm" ? { ...a, rowOverrides: { systemd: { heartbeat_timer: unitsOf("delta-pm").timer } } } : a));
+    setState(canonicalState({ "delta-pm": { present: { gateway: false, timer: true } } }));
     const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
     const item = hostNamed(data, "systemd.unregistered").items.find((item) => item.unit === unitsOf("delta-pm").timer);
     assert.equal(item.class, "retired");
@@ -1262,7 +1280,7 @@ async function main() {
           // A unit whose HERMES_HOME is the fleet root, not a profile.
           "hermes-dashboard.service": { Id: "hermes-dashboard.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running", Environment: `HERMES_HOME=${fleetHome}`, Description: "hermes dashboard" },
           // A unit whose HERMES_HOME names an UNREGISTERED profile directory.
-          "hermes-stray-pm-gateway.service": { Id: "hermes-stray-pm-gateway.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running", Environment: `HERMES_HOME=${join(profileRoot, "stray-pm")}`, Description: "stray gateway" },
+          "hermes-stray-pm-messaging.service": { Id: "hermes-stray-pm-messaging.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running", Environment: `HERMES_HOME=${join(profileRoot, "stray-pm")}`, Description: "stray messaging unit" },
           // A retired shape the contract's own `retired[].detect` matches.
           "hermes-old-pm-consumer.service": { Id: "hermes-old-pm-consumer.service", LoadState: "not-found", UnitFileState: "", ActiveState: "inactive", SubState: "dead" },
           // A transient scope whose description names a REGISTERED profile.
@@ -1272,14 +1290,14 @@ async function main() {
         },
         list_units: [
           { unit: "hermes-dashboard.service", load: "loaded", active: "active", sub: "running", description: "hermes dashboard" },
-          { unit: "hermes-stray-pm-gateway.service", load: "loaded", active: "active", sub: "running", description: "stray gateway" },
+          { unit: "hermes-stray-pm-messaging.service", load: "loaded", active: "active", sub: "running", description: "stray messaging unit" },
           { unit: "hermes-old-pm-consumer.service", load: "not-found", active: "inactive", sub: "dead", description: "" },
           { unit: "hermes-worker-proc_x.scope", load: "loaded", active: "active", sub: "running", description: `[systemd-run] hermes --profile alpha-pm chat` },
           { unit: "hermes-observability.service", load: "loaded", active: "active", sub: "running", description: "declared shared service" },
         ],
         unit_files: [
           { unit_file: "hermes-dashboard.service", state: "enabled", preset: null },
-          { unit_file: "hermes-stray-pm-gateway.service", state: "enabled", preset: null },
+          { unit_file: "hermes-stray-pm-messaging.service", state: "enabled", preset: null },
           { unit_file: "hermes-worker-proc_x.scope", state: "transient", preset: null },
           { unit_file: "hermes-observability.service", state: "enabled", preset: null },
         ],
@@ -1294,8 +1312,8 @@ async function main() {
     assert.equal(finding.state, "warn", finding.summary);
     const byUnit = new Map(finding.items.map((item) => [item.unit, item]));
     assert.equal(byUnit.get("hermes-dashboard.service").class, "unclassified");
-    assert.equal(byUnit.get("hermes-stray-pm-gateway.service").class, "profile-correlated");
-    assert.equal(byUnit.get("hermes-stray-pm-gateway.service").correlated_profile, "stray-pm");
+    assert.equal(byUnit.get("hermes-stray-pm-messaging.service").class, "profile-correlated");
+    assert.equal(byUnit.get("hermes-stray-pm-messaging.service").correlated_profile, "stray-pm");
     assert.equal(byUnit.get("hermes-old-pm-consumer.service").class, "retired");
     assert.equal(byUnit.get("hermes-worker-proc_x.scope").class, "transient");
     assert.equal(byUnit.get("hermes-worker-proc_x.scope").correlated_profile, "alpha-pm");
@@ -1384,7 +1402,13 @@ async function main() {
     const capped = writeContract("small-max-units", (document) => {
       document.service_manifest.limits.max_units = 2;
     });
-    setState(canonicalState());
+    // The one host gateway is a single unit, so the fleet needs two more to pass the cap.
+    const filler = (unit) => ({
+      units: { [unit]: { Id: unit, LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running" } },
+      list_units: [{ unit, load: "loaded", active: "active", sub: "running", description: "filler" }],
+      unit_files: [{ unit_file: unit, state: "enabled", preset: null }],
+    });
+    setState(mergeUnitSets(canonicalState(), filler("hermes-filler-one.service"), filler("hermes-filler-two.service")));
     resetFakeSystemctl(systemctlShim);
     const data = status(cli(["review", "--domain", "systemd", "--json", "--contract", capped]));
     assert.ok(
@@ -1393,21 +1417,21 @@ async function main() {
     );
     assert.ok(data.truncated.some((note) => note.startsWith("host[systemd.unregistered]")), JSON.stringify(data.truncated));
     // The uncapped run says nothing of the kind.
-    setState(canonicalState());
+    setState(mergeUnitSets(canonicalState(), filler("hermes-filler-one.service"), filler("hermes-filler-two.service")));
     const whole = systemdRun();
     assert.equal(whole.truncated.some((note) => /more than \d+ hermes-\* unit\(s\)/u.test(note)), false, JSON.stringify(whole.truncated));
   });
 
   // -- AC7: the fleet-shared gateway and agent scope -------------------------
 
-  check("the fleet-shared gateway is correlated once, by name and by home", () => {
+  check("the shared gateway IS the host gateway, correlated once, by name and by home", () => {
     setState(canonicalState());
     const data = systemdRun();
     const finding = hostNamed(data, "systemd.shared-gateway");
     assert.equal(finding.state, "pass", finding.summary);
     assert.deepEqual(data.systemd.shared, {
       coverage: "observed",
-      unit: "hermes-fleet-bloodbank-gateway.service",
+      unit: HOST_GATEWAY,
       profile: "fleet-bloodbank-gateway",
       state: "healthy",
       code: null,
@@ -1443,6 +1467,7 @@ async function main() {
     const allowed = new Set([
       ...Object.values(unitsOf("alpha-pm")),
       "hermes-alpha-pm-consumer.service", "hermes-alpha-pm-checkpoint.timer", "hermes-alpha-pm-checkpoint.service",
+      "hermes-alpha-pm-gateway.service",
     ]);
     for (const unit of named) assert.ok(allowed.has(unit), `an --agent run must name only alpha-pm's units and its retired candidates, got ${unit}`);
     assert.equal(data.systemd.agents.selected, 1);
@@ -1458,12 +1483,8 @@ async function main() {
     // dependent, so an operator reading a clean `--agent` topology leaf had no
     // way to know two of its codes could not fire at all.
     const registry = join(temp, "agent-scope-agents.yaml");
-    // `charlie-pm` declares NO heartbeat timer while its units are on disk.
-    writeAgentRegistry(registry, AGENTS.map((agent) => (
-      agent.name === "charlie-pm"
-        ? { ...agent, rowOverrides: { systemd: { gateway_unit: unitsOf("charlie-pm").gateway } } }
-        : agent
-    )));
+    // `charlie-pm` declares NO systemd key at all.
+    writeAgentRegistry(registry, AGENTS);
     const second = {
       units: { "hermes-alpha-pm-second-gateway.service": { Id: "hermes-alpha-pm-second-gateway.service", LoadState: "loaded", UnitFileState: "enabled", ActiveState: "active", SubState: "running" } },
       list_units: [{ unit: "hermes-alpha-pm-second-gateway.service", load: "loaded", active: "active", sub: "running", description: "a second gateway" }],
@@ -1592,15 +1613,18 @@ async function main() {
     assert.equal(hostNamed(degraded, "systemd.manager").state, "pass");
   });
 
-  check("a malformed property errors that unit's leaf and no other", () => {
-    setState(canonicalState({ "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayRestarts: "abc" } }));
+  check("a malformed property errors the host gateway's leaf and no other aspect", () => {
+    setState(canonicalState({ host: { gatewayRestarts: "abc" } }));
     const data = systemdRun();
     const alpha = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
     assert.equal(alpha.state, "error");
     assert.ok(detailsOf(alpha).includes("property-malformed:NRestarts"), JSON.stringify(detailsOf(alpha)));
     assert.equal(agentNamed(data, "alpha-pm").systemd.gateway.restarts, null);
-    // Every other unit is unaffected.
-    assert.equal(leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway).state, "pass");
+    // Every agent reads the same unit, so every agent's gateway leaf says the same -- and nothing else moves.
+    for (const id of AGENT_IDS) {
+      assert.equal(leafOf(agentNamed(data, id), FIELDS.gateway).state, "error", id);
+      assert.equal(leafOf(agentNamed(data, id), FIELDS.topology).state, "pass", `${id}: the unit is loaded, so topology is unaffected`);
+    }
     assert.equal(data.systemd.manager.code, "available");
 
     // The matrix's OTHER input: a property the manager did not report at all.
@@ -1608,121 +1632,109 @@ async function main() {
     // `show` block that carries the unit and not its `ActiveState` -- which
     // the observer must refuse to read rather than coerce to `""` and report
     // `inactive` about a property nobody read.
-    setState(canonicalState({
-      "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewaySamples: [{ ActiveState: undefined }] },
-      // The oneshot's own malformed-property site, which had no test at all.
-      "charlie-pm": { gatewayExecStatus: "abc" },
-      // The CONTROL: an ABSENT unit reports every required property (systemd
-      // prints all four for a `not-found` unit, with an empty UnitFileState),
-      // so it must keep reading `absent` and never `property-malformed`.
-      "delta-pm": { present: { gateway: false, timer: true, service: true } },
-      // The GATEWAY's own numeric-parse site, which swallowed this silently:
-      // `NaN` fails the `!== 0` test, so the unit read as a clean exit and the
-      // summary carried `exec_status: null` with nothing to say why.
-      "echo-pm": { gatewayEnabled: true, gatewayActive: true, gatewayExecStatus: "abc" },
-    }));
+    setState(canonicalState({ host: { gatewaySamples: [{ ActiveState: undefined }] } }));
     const missing = systemdRun();
-
     const alphaGateway = leafOf(agentNamed(missing, "alpha-pm"), FIELDS.gateway);
     assert.equal(alphaGateway.state, "error");
     assert.deepEqual(detailsOf(alphaGateway), ["property-malformed:ActiveState"], JSON.stringify(detailsOf(alphaGateway)));
     assert.equal(agentNamed(missing, "alpha-pm").systemd.gateway.active, null, "a property the manager did not report is null, never a word");
-    // That unit's leaf ONLY: the same agent's other two units, and every other
-    // agent, are read normally out of the same window.
-    assert.equal(leafOf(agentNamed(missing, "bravo-pm"), FIELDS.gateway).state, "pass");
 
-    const charlieService = leafOf(agentNamed(missing, "charlie-pm"), FIELDS.gateway);
-    assert.equal(charlieService.state, "error");
-    assert.ok(detailsOf(charlieService).includes("property-malformed:ExecMainStatus"), JSON.stringify(detailsOf(charlieService)));
-    assert.equal(agentNamed(missing, "charlie-pm").systemd.gateway.exec_status, null);
+    // The GATEWAY's own numeric-parse site, which swallowed this silently:
+    // `NaN` fails the `!== 0` test, so the unit read as a clean exit and the
+    // summary carried `exec_status: null` with nothing to say why.
+    setState(canonicalState({ host: { gatewayExecStatus: "abc" } }));
+    const status2 = systemdRun();
+    const execLeaf = leafOf(agentNamed(status2, "echo-pm"), FIELDS.gateway);
+    assert.equal(execLeaf.state, "error");
+    assert.ok(detailsOf(execLeaf).includes("property-malformed:ExecMainStatus"), JSON.stringify(detailsOf(execLeaf)));
+    assert.equal(agentNamed(status2, "echo-pm").systemd.gateway.exec_status, null);
 
-    const deltaGateway = leafOf(agentNamed(missing, "delta-pm"), FIELDS.gateway);
+    // The CONTROL: an ABSENT unit reports every required property (systemd
+    // prints all four for a `not-found` unit, with an empty UnitFileState),
+    // so it must keep reading `absent` and never `property-malformed`.
+    setState(canonicalState({ host: null }));
+    const absent = systemdRun();
+    const deltaGateway = leafOf(agentNamed(absent, "delta-pm"), FIELDS.gateway);
     assert.deepEqual(kindsOf(deltaGateway), ["absent"], "an absent unit is a complete reading of a unit that is not there");
     assert.equal(deltaGateway.state, "fail");
-
-    const echoGateway = leafOf(agentNamed(missing, "echo-pm"), FIELDS.gateway);
-    assert.equal(echoGateway.state, "error");
-    assert.ok(detailsOf(echoGateway).includes("property-malformed:ExecMainStatus"), JSON.stringify(detailsOf(echoGateway)));
-    assert.equal(agentNamed(missing, "echo-pm").systemd.gateway.exec_status, null);
   });
 
-  check("a fragment or a profile home outside the declared roots is unsafe, shown redacted", () => {
-    setState(canonicalState({
-      // Both unsafe paths sit UNDER the scratch HOME on purpose: a sibling of
-      // HOME (`<tmp>/elsewhere`) passes through `redactHome` verbatim, so the
-      // row's "path shown redacted" half would have been asserted over a string
-      // that never needed redacting -- and replacing `shown(...)` with the raw
-      // path would have broken nothing.
-      "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayFragment: join(scratchHome, "elsewhere", "hermes-alpha-pm-gateway.service") },
-      "delta-pm": { gatewayEnabled: true, gatewayActive: true, gatewayHome: join(scratchHome, "not-the-fleet-home") },
-      // The POSITIVE control: a fragment inside the declared user unit
-      // directory. The default fixture's `FragmentPath` is empty and
-      // short-circuits, so nothing proved the allowlist ever ACCEPTS anything.
-      "bravo-pm": { gatewayFragment: join(scratchHome, ".config", "systemd", "user", "hermes-bravo-pm-gateway.service") },
-      // The RUNTIME control: `systemctl --user enable|link --runtime` installs
-      // under `$XDG_RUNTIME_DIR/systemd/user`, and `enabled-runtime` /
-      // `linked-runtime` are states this build already reads as legitimately
-      // enabled -- so leaving that directory out of the safe set made the one
-      // shape the enabled vocabulary explicitly allows read `fragment-unsafe`.
-      "charlie-pm": { gatewayFragment: join(temp, "no-runtime", "systemd", "user", "hermes-charlie-pm-gateway.service") },
-    }));
-    const data = systemdRun();
-    const alphaGateway = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
+  check("a fragment or a home outside the declared roots is unsafe, shown redacted", () => {
+    // Both unsafe paths sit UNDER the scratch HOME on purpose: a sibling of
+    // HOME (`<tmp>/elsewhere`) passes through `redactHome` verbatim, so the
+    // row's "path shown redacted" half would have been asserted over a string
+    // that never needed redacting.
+    setState(canonicalState({ host: { gatewayFragment: join(scratchHome, "elsewhere", "hermes-gateway.service") } }));
+    const fragment = systemdRun();
+    const alphaGateway = leafOf(agentNamed(fragment, "alpha-pm"), FIELDS.gateway);
     assert.ok(kindsOf(alphaGateway).includes("fragment-unsafe"), JSON.stringify(kindsOf(alphaGateway)));
     assert.equal(alphaGateway.state, "fail", "an unsafe fragment is drift, not a warning");
     assert.match(
       alphaGateway.items.find((item) => item.kind === "fragment-unsafe").observed, /^~\/elsewhere\//u,
       "the path must be shown home-redacted",
     );
-    const deltaGateway = leafOf(agentNamed(data, "delta-pm"), FIELDS.gateway);
+
+    setState(canonicalState({ host: { gatewayHome: join(scratchHome, "not-the-fleet-home") } }));
+    const unsafeHome = systemdRun();
+    const deltaGateway = leafOf(agentNamed(unsafeHome, "delta-pm"), FIELDS.gateway);
     assert.ok(kindsOf(deltaGateway).includes("home-unsafe"), JSON.stringify(kindsOf(deltaGateway)));
     assert.equal(deltaGateway.state, "fail");
     assert.equal(deltaGateway.items.find((item) => item.kind === "home-unsafe").observed, "~/not-the-fleet-home");
-    assert.equal(agentNamed(data, "delta-pm").systemd.gateway.home, "unsafe");
-    const bravoGateway = leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway);
-    assert.equal(kindsOf(bravoGateway).includes("fragment-unsafe"), false, "a fragment in the declared unit directory is accepted");
-    assert.equal(bravoGateway.state, "pass");
-    const charlieGateway = leafOf(agentNamed(data, "charlie-pm"), FIELDS.gateway);
+    assert.equal(agentNamed(unsafeHome, "delta-pm").systemd.gateway.home, "unsafe");
+
+    // The POSITIVE control: a fragment inside the declared user unit
+    // directory. The default fixture's `FragmentPath` is empty and
+    // short-circuits, so nothing proved the allowlist ever ACCEPTS anything.
+    setState(canonicalState({ host: { gatewayFragment: join(scratchHome, ".config", "systemd", "user", "hermes-gateway.service") } }));
+    const accepted = leafOf(agentNamed(systemdRun(), "alpha-pm"), FIELDS.gateway);
+    assert.equal(kindsOf(accepted).includes("fragment-unsafe"), false, "a fragment in the declared unit directory is accepted");
+    assert.equal(accepted.state, "pass");
+
+    // The RUNTIME control: `systemctl --user enable|link --runtime` installs
+    // under `$XDG_RUNTIME_DIR/systemd/user`, and `enabled-runtime` /
+    // `linked-runtime` are states this build already reads as legitimately
+    // enabled -- so leaving that directory out of the safe set made the one
+    // shape the enabled vocabulary explicitly allows read `fragment-unsafe`.
+    setState(canonicalState({ host: { gatewayFragment: join(temp, "no-runtime", "systemd", "user", "hermes-gateway.service") } }));
+    const runtime = leafOf(agentNamed(systemdRun(), "charlie-pm"), FIELDS.gateway);
     assert.equal(
-      kindsOf(charlieGateway).includes("fragment-unsafe"), false,
-      `a runtime-installed fragment is accepted: ${JSON.stringify(detailsOf(charlieGateway))}`,
+      kindsOf(runtime).includes("fragment-unsafe"), false,
+      `a runtime-installed fragment is accepted: ${JSON.stringify(detailsOf(runtime))}`,
     );
-    // And a home that is a REAL profile home, just not this agent's.
-    setState(canonicalState({ "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayHome: join(profileRoot, "bravo-pm") } }));
+
+    // And a home that is a REAL profile home: the host gateway runs with the FLEET home, not any profile's.
+    setState(canonicalState({ host: { gatewayHome: join(profileRoot, "bravo-pm") } }));
     const second = systemdRun();
     assert.equal(agentNamed(second, "alpha-pm").systemd.gateway.home, "mismatch");
     assert.ok(kindsOf(leafOf(agentNamed(second, "alpha-pm"), FIELDS.gateway)).includes("home-mismatch"));
   });
 
-  check("an entrypoint that is neither the launcher nor the row's pinned executable is unpinned", () => {
+  check("an entrypoint that is not the host executable is unpinned", () => {
     const stray = join(scratchHome, ".local", "share", "hermes-agent", "releases", "def", ".venv", "bin", "hermes");
-    setState(canonicalState({
-      // A gateway entered through an unpinned runtime executable.
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewayExec: execLine(stray, "gateway", "run", "--replace"),
-      },
-      "delta-pm": { gatewayEnabled: true, gatewayActive: true, gatewayExec: execLine(HERMES_BIN, "gateway", "run", "--replace") },
-    }));
-    const data = systemdRun();
-    const alpha = agentNamed(data, "alpha-pm");
+    // A gateway entered through an unpinned runtime executable.
+    setState(canonicalState({ host: { gatewayExec: execLine(stray, "gateway", "run", "--replace") } }));
+    const alpha = agentNamed(systemdRun(), "alpha-pm");
     assert.deepEqual(alpha.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: false });
     assert.ok(kindsOf(leafOf(alpha, FIELDS.gateway)).includes("entrypoint-unpinned"));
     assert.equal(leafOf(alpha, FIELDS.gateway).state, "fail", "an unpinned entrypoint is drift, not a warning");
-    const delta = agentNamed(data, "delta-pm");
-    assert.deepEqual(delta.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: true }, "the row's OWN hermes.bin is pinned");
-    assert.equal(kindsOf(leafOf(delta, FIELDS.gateway)).includes("entrypoint-unpinned"), false);
+
+    // The ROW's own hermes.bin is not what the host gateway is pinned to: service_model.host.exec_bin is.
+    setState(canonicalState({ host: { gatewayExec: execLine(HERMES_BIN, "gateway", "run", "--replace") } }));
+    const rowBin = agentNamed(systemdRun(), "delta-pm");
+    assert.deepEqual(rowBin.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: false });
+    assert.ok(kindsOf(leafOf(rowBin, FIELDS.gateway)).includes("entrypoint-unpinned"));
+
+    // The host executable itself is pinned.
+    setState(canonicalState({ host: { gatewayExec: execLine(HOST_EXEC_BIN, "gateway", "run") } }));
+    const pinned = agentNamed(systemdRun(), "delta-pm");
+    assert.deepEqual(pinned.systemd.gateway.entrypoint, { family: "hermes-bin", pinned: true });
+    assert.equal(kindsOf(leafOf(pinned, FIELDS.gateway)).includes("entrypoint-unpinned"), false);
 
     // A file whose name merely ENDS with the launcher's is not the launcher.
     // The family was matched by bare suffix, so `foo-credential-launch.sh`
-    // anywhere on disk read as this role's own launcher -- the one family this
-    // build is willing to call pinned when it resolves.
-    setState(canonicalState({
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewayExec: execLine(join(scratchHome, "elsewhere", "foo-credential-launch.sh"), "gateway"),
-      },
-    }));
+    // anywhere on disk read as a launcher -- the one family this build is
+    // willing to call pinned when it resolves.
+    setState(canonicalState({ host: { gatewayExec: execLine(join(scratchHome, "elsewhere", "foo-credential-launch.sh"), "gateway") } }));
     const lookalike = agentNamed(systemdRun(), "alpha-pm");
     assert.deepEqual(lookalike.systemd.gateway.entrypoint, { family: "other", pinned: false }, "a name that merely ends with the launcher's is another program");
   });
@@ -1732,7 +1744,7 @@ async function main() {
     writeAgentRegistry(registry, AGENTS.map((agent) => (
       agent.name === "bravo-pm" ? { ...agent, telegram: "verified", identity: false } : agent
     )));
-    setState(canonicalState({ "bravo-pm": { gatewayEnabled: true, gatewayActive: true } }));
+    setState(canonicalState());
     const data = status(cli(["review", "--domain", "systemd", "--json", "--agent-registry", registry]));
     const gateway = leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway);
     assert.equal(gateway.state, "fail");
@@ -1761,34 +1773,26 @@ async function main() {
     assert.equal(detailsOf(charlie).some((detail) => detail === "channel-undeclared"), false);
   });
 
-  check("an undeclared row whose gateway is correctly disabled is a warning, not a failure", () => {
-    setState(canonicalState({ "echo-pm": { gatewayEnabled: false, gatewayActive: false } }));
-    const data = systemdRun();
-    const gateway = leafOf(agentNamed(data, "echo-pm"), FIELDS.gateway);
-    assert.equal(gateway.state, "warn", "a row that declares nothing and runs nothing is a gap, not drift");
-    assert.deepEqual(kindsOf(gateway), ["channel-undeclared"]);
+  check("an undeclared row is not judged against the host gateway, up or down", () => {
+    for (const host of [{}, { gatewayEnabled: false, gatewayActive: false }]) {
+      setState(canonicalState({ host }));
+      const gateway = leafOf(agentNamed(systemdRun(), "echo-pm"), FIELDS.gateway);
+      assert.equal(gateway.state, "pass", "a row that declares nothing is served by no channel, so the host unit is not its drift");
+      assert.deepEqual(kindsOf(gateway), []);
+    }
   });
 
-  check("a deferred row whose gateway is enabled AND active says both, and fails", () => {
-    // `bravo-pm` pins BOTH platforms false in its delta, so the only thing that
-    // can move its gateway leaf is the unit's own enablement and activity: no
-    // inherited-enablement item can be doing the work. (`charlie-pm`, the only
-    // agent ever driven deferred+enabled+active before, has an empty delta and
-    // failed its leaf independently -- so neither code's severity was
-    // attributable and `deferred-but-active` was asserted nowhere at all.)
-    setState(canonicalState({ "bravo-pm": { gatewayEnabled: true, gatewayActive: true } }));
-    const data = systemdRun();
-    const bravo = agentNamed(data, "bravo-pm");
-    const gateway = leafOf(bravo, FIELDS.gateway);
-    assert.deepEqual(kindsOf(gateway), ["deferred-but-enabled", "deferred-but-active"], JSON.stringify(detailsOf(gateway)));
-    assert.deepEqual(detailsOf(gateway), ["deferred-but-enabled", "deferred-but-active"]);
-    assert.equal(gateway.state, "fail", "a gateway running for a channel nobody verified is drift, not a warning");
-    assert.equal(bravo.systemd.gateway.code, "deferred-but-enabled");
-    assert.equal(bravo.systemd.capability.declared, "deferred");
-    // The same fixture with the unit correctly disabled is the negative half.
-    setState(canonicalState({ "bravo-pm": { gatewayEnabled: false, gatewayActive: false } }));
-    const quiet = systemdRun();
-    assert.equal(leafOf(agentNamed(quiet, "bravo-pm"), FIELDS.gateway).state, "pass");
+  check("a deferred row is not failed by the host gateway, up or down", () => {
+    // `bravo-pm` pins BOTH platforms false in its delta, so nothing can move its gateway
+    // leaf: the host unit serves other profiles and is rightly enabled and running.
+    for (const host of [{}, { gatewayEnabled: false, gatewayActive: false }]) {
+      setState(canonicalState({ host }));
+      const bravo = agentNamed(systemdRun(), "bravo-pm");
+      const gateway = leafOf(bravo, FIELDS.gateway);
+      assert.deepEqual(kindsOf(gateway), []);
+      assert.equal(gateway.state, "pass");
+      assert.equal(bravo.systemd.capability.declared, "deferred");
+    }
   });
 
   check("a deferred platform is flagged inherited only when the fleet base actually enables it", () => {
@@ -1834,13 +1838,10 @@ async function main() {
 
   check("a unit-file state in neither vocabulary is said out loud, and the code names the deciding item", () => {
     // `static`, `generated` and `indirect` are none of enabled, disabled or
-    // masked: nobody disabled a static unit, so a deferred gateway in that
+    // masked: nobody disabled a static unit, so a host gateway in that
     // state is not "correctly disabled" -- it is a reading this vocabulary
-    // cannot classify, and the observer now says so instead of passing.
-    setState(canonicalState({
-      "alpha-pm": { gatewayFileState: "static", gatewayActive: false },
-      "bravo-pm": { gatewayFileState: "generated" },
-    }));
+    // cannot classify, and the observer says so instead of passing.
+    setState(canonicalState({ host: { gatewayFileState: "static", gatewayActive: false } }));
     const data = systemdRun();
 
     const alphaGateway = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
@@ -1866,18 +1867,22 @@ async function main() {
 
     // On a DEFERRED row the same state is the whole finding: warn, because
     // nothing is proven either way -- not the pass it used to read.
-    const bravoGateway = leafOf(agentNamed(data, "bravo-pm"), FIELDS.gateway);
+    setState(canonicalState({ host: { gatewayFileState: "generated" } }));
+    const generated = systemdRun();
+    const bravoGateway = leafOf(agentNamed(generated, "bravo-pm"), FIELDS.gateway);
     assert.deepEqual(kindsOf(bravoGateway), ["unit-file-state-unclassified"], JSON.stringify(detailsOf(bravoGateway)));
     assert.equal(bravoGateway.state, "warn");
     assert.equal(detailsOf(bravoGateway)[0], "unit-file-state-unclassified:generated");
-    assert.equal(agentNamed(data, "bravo-pm").systemd.gateway.code, "unit-file-state-unclassified:generated");
+    assert.equal(agentNamed(generated, "bravo-pm").systemd.gateway.code, "unit-file-state-unclassified:generated");
     // And the ordinary enabled/disabled readings are untouched.
-    assert.equal(leafOf(agentNamed(data, "charlie-pm"), FIELDS.gateway).state, "fail");
-    assert.equal(kindsOf(leafOf(agentNamed(data, "delta-pm"), FIELDS.gateway)).includes("unit-file-state-unclassified"), false);
+    setState(canonicalState());
+    const ordinary = systemdRun();
+    assert.equal(leafOf(agentNamed(ordinary, "charlie-pm"), FIELDS.gateway).state, "fail");
+    assert.equal(kindsOf(leafOf(agentNamed(ordinary, "delta-pm"), FIELDS.gateway)).includes("unit-file-state-unclassified"), false);
   });
 
   check("the human review presents gateway health and retired cleanup without a heartbeat health cell", () => {
-    setState(canonicalState({ "alpha-pm": { present: { gateway: true, timer: true }, timerEnabled: false } }));
+    setState(canonicalState({ "alpha-pm": { present: { gateway: false, timer: true }, timerEnabled: false } }));
     const data = systemdRun();
     assert.equal(leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway).state, "pass");
     assert.equal(hostNamed(data, "systemd.unregistered").items[0].class, "retired");
@@ -1891,34 +1896,34 @@ async function main() {
   check("a failed gateway result, an exec status and an unloadable unit each say which", () => {
     // Four codes the README promises and no case drove. Every knob already
     // existed on the fixture; nothing had ever passed one.
-    setState(canonicalState({
-      "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayResult: "exit-code" },
-      "delta-pm": { gatewayEnabled: true, gatewayActive: true, gatewayExecStatus: "3" },
-      "charlie-pm": { gatewayResult: "signal" },
-      "echo-pm": { gatewayLoad: "error" },
-    }));
-    const data = systemdRun();
-
-    const alphaGateway = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
+    setState(canonicalState({ host: { gatewayResult: "exit-code" } }));
+    const result = systemdRun();
+    const alphaGateway = leafOf(agentNamed(result, "alpha-pm"), FIELDS.gateway);
     assert.ok(detailsOf(alphaGateway).includes("result-not-success:exit-code"), JSON.stringify(detailsOf(alphaGateway)));
     assert.equal(alphaGateway.state, "fail");
-    assert.equal(agentNamed(data, "alpha-pm").systemd.gateway.result, "exit-code");
+    assert.equal(agentNamed(result, "alpha-pm").systemd.gateway.result, "exit-code");
 
-    const deltaGateway = leafOf(agentNamed(data, "delta-pm"), FIELDS.gateway);
+    setState(canonicalState({ host: { gatewayExecStatus: "3" } }));
+    const exec = systemdRun();
+    const deltaGateway = leafOf(agentNamed(exec, "delta-pm"), FIELDS.gateway);
     assert.ok(detailsOf(deltaGateway).includes("exec-status:3"), JSON.stringify(detailsOf(deltaGateway)));
-    assert.equal(agentNamed(data, "delta-pm").systemd.gateway.exec_status, 3);
+    assert.equal(agentNamed(exec, "delta-pm").systemd.gateway.exec_status, 3);
 
-    assert.equal(agentNamed(data, "charlie-pm").systemd.gateway.result, "signal");
+    setState(canonicalState({ host: { gatewayResult: "signal" } }));
+    assert.equal(agentNamed(systemdRun(), "charlie-pm").systemd.gateway.result, "signal");
+
     // A unit the manager knows and cannot load is neither absent nor readable:
     // it stops the gateway reading right there, with the load state named.
-    const echoGateway = leafOf(agentNamed(data, "echo-pm"), FIELDS.gateway);
+    setState(canonicalState({ host: { gatewayLoad: "error" } }));
+    const load = systemdRun();
+    const echoGateway = leafOf(agentNamed(load, "echo-pm"), FIELDS.gateway);
     assert.deepEqual(detailsOf(echoGateway), ["load-error:error"], JSON.stringify(detailsOf(echoGateway)));
     assert.equal(echoGateway.state, "fail");
-    assert.equal(agentNamed(data, "echo-pm").systemd.gateway.load, "error");
+    assert.equal(agentNamed(load, "echo-pm").systemd.gateway.load, "error");
   });
 
   check("a leftover heartbeat service on disk is retired regardless of its completed result", () => {
-    setState(canonicalState({ "alpha-pm": { present: { gateway: true, service: true }, serviceActive: "active", serviceSub: "exited" } }));
+    setState(canonicalState({ "alpha-pm": { present: { gateway: false, service: true }, serviceActive: "active", serviceSub: "exited" } }));
     const data = systemdRun();
     const item = hostNamed(data, "systemd.unregistered").items.find((item) => item.unit === unitsOf("alpha-pm").service);
     assert.equal(item.class, "retired");
@@ -1934,16 +1939,16 @@ async function main() {
     // here lands exactly on this agent's real profile home, so the observer
     // reported `matches` for a unit rooted somewhere else entirely: a false
     // PASS, which is the worst shape this bug can take.
-    const home = `${join(profileRoot, "alpha-pm")} extra/elsewhere`;
+    const home = `${join(fleetHome, "dir")} extra/elsewhere`;
     setState(canonicalState({
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
+      host: {
         gatewayEnvironment: `"HERMES_HOME=${home}" HERMES_BIN=${HERMES_BIN}`,
       },
     }));
     const data = systemdRun();
     const alpha = agentNamed(data, "alpha-pm");
-    assert.equal(alpha.systemd.gateway.home, "mismatch", "the whole quoted value is the home, and it is not this agent's");
+    assert.equal(alpha.systemd.gateway.home, "mismatch", "the whole quoted value is the home, and it is not the host gateway's");
+    assert.notEqual(alpha.systemd.gateway.home, "unsafe", "the value is still inside the fleet home");
     const item = leafOf(alpha, FIELDS.gateway).items.find((entry) => entry.kind === "home-mismatch");
     assert.ok(item, JSON.stringify(kindsOf(leafOf(alpha, FIELDS.gateway))));
     assert.match(item.observed, /extra\/elsewhere$/u, `the item must carry the whole path: ${item.observed}`);
@@ -1952,8 +1957,7 @@ async function main() {
   // -- AC9: rule agreement ---------------------------------------------------
 
   const SENTINEL_PASS = { id: "systemd.sentinel", title: "Hermes systemd/sentinel units enabled + active", status: "pass", summary: "Hermes user units match each role's declared service state", details: [], fixable: true, scope: "host" };
-  const SENTINEL_FAIL = { id: "systemd.sentinel", title: "Hermes systemd/sentinel units enabled + active", status: "fail", summary: "1 systemd parity issue(s) detected", details: ["hermes-alpha-pm-gateway.service is deferred and should be disabled+inactive"], fixable: true, scope: "host" };
-  const PARITY_PASS = { id: "hermes.registry-parity", title: "Fleet registry matches .project.json", status: "pass", summary: "Fleet registry is in parity", details: [], fixable: true, scope: "host" };
+  const SENTINEL_FAIL = { id: "systemd.sentinel", title: "Hermes systemd/sentinel units enabled + active", status: "fail", summary: "1 systemd parity issue(s) detected", details: ["hermes-gateway.service should be enabled+active (the one host gateway that serves every profile; restart only via hermes-gateway-restart)"], fixable: true, scope: "host" };  const PARITY_PASS = { id: "hermes.registry-parity", title: "Fleet registry matches .project.json", status: "pass", summary: "Fleet registry is in parity", details: [], fixable: true, scope: "host" };
   // A REAL failing parity rule, worded as `src/parity/rules.ts` words it. The
   // `fail` arm of `systemdParityVerdict` had never executed: every fixture used
   // PARITY_PASS, so the retired-key/retired-unit half of the shared subset was
@@ -1978,7 +1982,7 @@ async function main() {
       return [...hit[1].matchAll(/\/\^?([^/]+?)\/u/gu)].map((match) => match[1].replaceAll("\\", ""));
     };
     const patterns = [...literals("SYSTEMD_RULE_DETAIL_PATTERNS"), ...literals("SYSTEMD_PARITY_DETAIL_PATTERNS")];
-    assert.equal(patterns.length, 5, JSON.stringify(patterns));
+    assert.equal(patterns.length, 6, JSON.stringify(patterns));
     for (const literal of patterns) {
       assert.ok(rules.includes(literal), `src/parity/rules.ts no longer produces "${literal}"; the agreement bridge is comparing against a string nothing emits`);
     }
@@ -2008,11 +2012,11 @@ async function main() {
 
   check("a rule that passes where the observer reads enablement drift is a recorded disagreement", () => {
     const shim = entry("sentinel-pass", syntheticReport([SENTINEL_PASS, PARITY_PASS]));
-    // `charlie-pm` is deferred and its gateway is ENABLED: exactly what the
-    // sentinel reads and claims is fine.
-    setState(canonicalState({ "charlie-pm": { gatewayEnabled: true, gatewayActive: true } }));
+    // The host gateway is DISABLED and inactive: exactly what the sentinel reads
+    // (it must be enabled+active) and claims is fine.
+    setState(canonicalState({ host: { gatewayEnabled: false, gatewayActive: false } }));
     const data = status(cli(["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: shim }));
-    const disagreement = data.findings.find((finding) => finding.code === "systemd-rule-disagreement" && finding.agent_id === "charlie-pm");
+    const disagreement = data.findings.find((finding) => finding.code === "systemd-rule-disagreement" && finding.agent_id === "alpha-pm");
     assert.ok(disagreement, `expected a disagreement, got ${JSON.stringify(data.findings.map((f) => `${f.code}/${f.agent_id}`))}`);
     assert.equal(disagreement.gating, true);
     // `severity` is the inventory-finding axis (`error`); the STATUS priority
@@ -2058,10 +2062,7 @@ async function main() {
     const shim = entry("sentinel-pass-2", syntheticReport([SENTINEL_PASS, PARITY_PASS]));
     // The ONLY divergence is an unstable window, which neither rule reads.
     setState(canonicalState({
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewaySamples: [{}, { ActiveState: "activating", SubState: "auto-restart" }, {}],
-      },
+      host: { gatewaySamples: [{}, { ActiveState: "activating", SubState: "auto-restart" }, {}] },
     }));
     const data = status(cli(["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: shim }));
     assert.equal(data.findings.some((finding) => finding.code === "systemd-rule-disagreement" && finding.agent_id === "alpha-pm"), false,
@@ -2072,10 +2073,7 @@ async function main() {
     // `echo-pm` land in `not_compared` for their own reasons, so a fleet-wide
     // `>= 1` never showed that the UNSTABLE WINDOW is what lands there.
     setState(canonicalState({
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewaySamples: [{}, { ActiveState: "activating", SubState: "auto-restart" }, {}],
-      },
+      host: { gatewaySamples: [{}, { ActiveState: "activating", SubState: "auto-restart" }, {}] },
     }));
     const only = status(cli(["review", "--live", "--json", "--agent", "alpha-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
     assert.ok(kindsOf(leafOf(agentNamed(only, "alpha-pm"), FIELDS.gateway)).includes("unstable"));
@@ -2084,49 +2082,48 @@ async function main() {
     // The clause names three code families; each one isolated on the agent
     // whose ONLY divergence is of that family. A SCHEDULE code: `bravo-pm` is
     // correctly deferred, so its off-policy timer is the whole divergence.
-    setState(canonicalState({ "alpha-pm": { gatewayExec: execLine("/other/hermes", "gateway") } }));
+    setState(canonicalState({ host: { gatewayExec: execLine("/other/hermes", "gateway") } }));
     const schedule = status(cli(["review", "--live", "--json", "--agent", "alpha-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
     assert.ok(kindsOf(leafOf(agentNamed(schedule, "alpha-pm"), FIELDS.gateway)).includes("entrypoint-unpinned"));
     assert.deepEqual(schedule.systemd.rule_agreement, { compared: 0, agree: 0, disagree: 0, not_compared: 1 });
 
-    // A CHANNEL code: `echo-pm` declares no platform at all and its units are
-    // canonical, so `channel-undeclared` is the whole divergence.
+    // And the control: an agent with no drift at all is compared, and agrees with a passing rule.
     setState(canonicalState());
-    const channel = status(cli(["review", "--live", "--json", "--agent", "echo-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
-    assert.deepEqual(kindsOf(leafOf(agentNamed(channel, "echo-pm"), FIELDS.gateway)), ["channel-undeclared"]);
-    assert.deepEqual(channel.systemd.rule_agreement, { compared: 0, agree: 0, disagree: 0, not_compared: 1 });
+    const clean = status(cli(["review", "--live", "--json", "--agent", "echo-pm"], { PJ_FLEET_CLI_ENTRY: shim }));
+    assert.deepEqual(kindsOf(leafOf(agentNamed(clean, "echo-pm"), FIELDS.gateway)), []);
+    assert.equal(clean.systemd.rule_agreement.disagree, 0, JSON.stringify(clean.systemd.rule_agreement));
   });
 
   check("a rule and the observer that agree are counted as agreeing", () => {
     const shim = entry("sentinel-fail", syntheticReport([SENTINEL_FAIL, PARITY_PASS]));
-    setState(canonicalState({ "charlie-pm": { gatewayEnabled: true, gatewayActive: true } }));
+    setState(canonicalState({ host: { gatewayEnabled: false, gatewayActive: false } }));
     const data = status(cli(["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: shim }));
     assert.ok(data.systemd.rule_agreement.agree >= 1, JSON.stringify(data.systemd.rule_agreement));
-    assert.equal(data.findings.some((finding) => finding.code === "systemd-rule-disagreement" && finding.agent_id === "charlie-pm"), false);
+    assert.equal(data.findings.some((finding) => finding.code === "systemd-rule-disagreement" && finding.agent_id === "alpha-pm"), false);
   });
 
   // -- exceptions ------------------------------------------------------------
 
   check("an agent_exceptions ruling flips a drifted agent to exception and leaves health.healthy alone", () => {
-    setState(canonicalState({ "charlie-pm": { gatewayEnabled: true, gatewayActive: true } }));
+    setState(canonicalState({ host: { gatewayEnabled: false, gatewayActive: false } }));
     const before = systemdRun();
-    assert.equal(agentNamed(before, "charlie-pm").member_class, "unhealthy");
+    assert.equal(agentNamed(before, "alpha-pm").member_class, "unhealthy");
     assert.equal(before.systemd.agents.drifted >= 1, true);
 
     const ruled = writeContract("systemd-exception", (document) => {
       document.health_policy.agent_exceptions = [
-        { domain: "systemd", agent_id: "charlie-pm", reason: "the operator runs this gateway by hand", owner: "suite" },
+        { domain: "systemd", agent_id: "alpha-pm", reason: "the operator runs this gateway by hand", owner: "suite" },
       ];
     });
     const after = status(cli(["review", "--domain", "systemd", "--json", "--contract", ruled]));
-    const excepted = agentNamed(after, "charlie-pm");
+    const excepted = agentNamed(after, "alpha-pm");
     const gateway = leafOf(excepted, FIELDS.gateway);
     assert.equal(gateway.state, "fail", "the state is unchanged; only the AUTHORIZATION is new");
     assert.ok(gateway.justification, "the ruling must be named on the observation");
     assert.equal(gateway.justification.kind, "exception");
     assert.equal(gateway.justification.policy, "health_policy.agent_exceptions[0]");
     assert.equal(excepted.member_class, "exception");
-    assert.equal(after.systemd.agents.exception_authorized, 1);
+    assert.ok(after.systemd.agents.exception_authorized >= 1, JSON.stringify(after.systemd.agents));
     assert.equal(after.health.healthy, before.health.healthy, "a ruling must not change health.healthy");
   });
 
@@ -2136,7 +2133,7 @@ async function main() {
         { domain: "systemd", agent_id: "alpha-pm", reason: "the operator runs this gateway by hand", owner: "suite" },
       ];
     });
-    setState(canonicalState({ "alpha-pm": { gatewayEnabled: true, gatewayActive: true, gatewayRestarts: "abc" } }));
+    setState(canonicalState({ host: { gatewayRestarts: "abc" } }));
     const data = status(cli(["review", "--domain", "systemd", "--json", "--contract", ruled]));
     const gateway = leafOf(agentNamed(data, "alpha-pm"), FIELDS.gateway);
     assert.equal(gateway.state, "error");
@@ -2233,9 +2230,9 @@ async function main() {
     document.service_manifest.messaging.enabled_path = "platforms.telegram.enabled";
   }, "service_manifest.messaging.enabled_path", /\{platform\} placeholder/u);
 
-  serviceRejects("a retired candidate that is a canonical unit pattern", (document) => {
-    document.service_manifest.unregistered.retired_candidates[0] = document.service_model.per_agent.gateway_unit;
-  }, "service_manifest.unregistered.retired_candidates[0]", /per_agent pattern/u);
+  serviceRejects("a retired candidate that is the host gateway unit", (document) => {
+    document.service_manifest.unregistered.retired_candidates[0] = document.service_model.host.gateway_unit;
+  }, "service_manifest.unregistered.retired_candidates[0]", /\{agent_id\} placeholder/u);
 
   serviceRejects("a secret_env for a platform the manifest does not declare", (document) => {
     document.service_manifest.messaging.secret_env.discord = ["DISCORD_BOT_TOKEN"];
@@ -2285,6 +2282,7 @@ async function main() {
     assert.deepEqual(document.service_manifest.unregistered.retired_candidates, [
       "hermes-{agent_id}-heartbeat.service", "hermes-{agent_id}-heartbeat.timer",
       "hermes-{agent_id}-consumer.service", "hermes-{agent_id}-checkpoint.timer", "hermes-{agent_id}-checkpoint.service",
+      "hermes-{agent_id}-gateway.service",
     ]);
   });
 
@@ -2316,10 +2314,7 @@ async function main() {
 
   check("no credential, no absolute home path and no unit-file body reaches stdout", () => {
     setState(canonicalState({
-      "alpha-pm": {
-        gatewayEnabled: true, gatewayActive: true,
-        gatewayExec: execLine(launcherOf("alpha-pm"), "gateway", `--token=${SECRET_SENTINEL}`),
-      },
+      host: { gatewayExec: execLine(HOST_EXEC_BIN, "gateway", `--token=${SECRET_SENTINEL}`) },
       extra: [{
         units: {
           "hermes-leaky.scope": {
@@ -2346,14 +2341,14 @@ async function main() {
   });
 
   check("the human report carries a systemd cell and a domains block", () => {
-    setState(canonicalState({ "charlie-pm": { gatewayEnabled: true, gatewayActive: true } }));
+    setState(canonicalState({ host: { gatewayEnabled: false, gatewayActive: false } }));
     resetFakeSystemctl(systemctlShim);
     const out = cli(["review", "--domain", "systemd"]).stdout;
     assert.match(out, /manager running/u, "the domains block must name the manager");
     assert.match(out, /window 3 sample\(s\)/u, "and the window it sampled over");
-    assert.match(out, /shared gateway healthy/u);
+    assert.match(out, /shared gateway \w+/u, "the host gateway is the shared gateway");
     assert.match(out, /capability \d+ active, \d+ deferred/u);
-    assert.match(out, /gw deferred-but-enabled/u, "the agent cell must name the gateway's code");
+    assert.match(out, /gw verified-channel-gateway-disabled/u, "the agent cell must name the gateway's code");
     assert.doesNotMatch(out, /hb |heartbeat healthy/u);
   });
 

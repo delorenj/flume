@@ -33,8 +33,9 @@ import { hostPlatform, isLaunchdHost, launchdGatewayTarget, observeLaunchdGatewa
  * disabled, and a bot stuck in the reconnect queue is skipped. So a re-scan alone leaves a parked
  * bot connected, or leaves a rotated bot un-started. The least disruptive thing that does the job is
  * the gateway's own per-profile control verbs, `unserve-profile` then `serve-profile`: they stop and
- * rebuild THIS profile's adapters and nobody else's. A full `systemctl --user reload` (drain and
- * restart of every profile) is the fallback when the control socket does not answer.
+ * rebuild THIS profile's adapters and nobody else's. When the control socket does not answer, the
+ * fallback is `hermes-gateway-restart --reason "<why>"` (drain and restart of every profile); a raw
+ * `systemctl --user reload|restart hermes-gateway` is never issued from here.
  */
 
 export const OFFLINE_STATUS = CHANNEL_PARKED_STATUS;
@@ -72,7 +73,7 @@ export interface ChannelOptions {
 
 export interface GatewayPickup {
   /** `restart` is the launchd fallback: `hermes gateway restart`, else `launchctl kickstart -k`. */
-  action: "none" | "skipped" | "profile-cycle" | "reload" | "restart";
+  action: "none" | "skipped" | "profile-cycle" | "restart";
   confirmed: boolean;
   detail: string;
   /** What gateway_state.json says about the channel afterwards, or null when it has no entry. */
@@ -221,6 +222,9 @@ function controlRequest(socketPath: string, verb: string, params: Record<string,
   });
 }
 
+/** The only sanctioned way to restart the one host gateway (hermes-gateway.service); never raw systemctl. */
+const GATEWAY_RESTART_COMMAND = "hermes-gateway-restart";
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** Wait for gateway_state.json to show the state the change should produce. */
@@ -265,18 +269,22 @@ async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offl
     }
   } else detail = "no gateway control socket";
   if (isLaunchdHost(hostPlatform())) {
-    // A launchd host has no `hermes-gateway` unit to reload. Hermes restarts its own LaunchAgent;
+    // A launchd host has no `hermes-gateway` unit. Hermes restarts its own LaunchAgent;
     // a bare kickstart of the label is the fallback when the CLI is not on PATH or refuses.
     const restarted = restartLaunchdGateway();
     if (!restarted.ok) return { action: "restart", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${detail}; ${restarted.detail}` };
     const seen = await confirmState(key, want, since, options.confirmMs ?? (Number(process.env.FLUME_CHANNEL_CONFIRM_MS) || 90_000));
     return { action: "restart", confirmed: seen.confirmed, state: seen.state, detail: `${detail}; ${restarted.detail} (every profile drains and restarts)` };
   }
-  const reload = spawnSync("systemctl", ["--user", "reload", "hermes-gateway"], { encoding: "utf8", timeout: 30_000 });
-  if (reload.status !== 0) return { action: "reload", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${detail}; systemctl --user reload hermes-gateway failed: ${(reload.stderr || reload.error?.message || `exit ${reload.status}`).trim()}` };
-  // A reload drains and restarts every profile; give it room unless the caller bounded the wait.
+  // No control socket. The only sanctioned way to cycle the host gateway is hermes-gateway-restart
+  // (it waits for the gateway to go idle, coalesces concurrent callers and pauses the watchdog);
+  // never a raw systemctl reload/restart, which cuts every in-flight turn for every profile.
+  const reason = `channel ${want} ${employee.id}`;
+  const restart = spawnSync(GATEWAY_RESTART_COMMAND, ["--reason", reason], { encoding: "utf8", timeout: 30_000 });
+  if (restart.error || restart.status !== 0) return { action: "restart", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${detail}; ${GATEWAY_RESTART_COMMAND} --reason "${reason}" failed: ${(restart.stderr || restart.error?.message || `exit ${restart.status}`).trim()}` };
+  // A restart drains and restarts every profile; give it room unless the caller bounded the wait.
   const seen = await confirmState(key, want, since, options.confirmMs ?? (Number(process.env.FLUME_CHANNEL_CONFIRM_MS) || 90_000));
-  return { action: "reload", confirmed: seen.confirmed, state: seen.state, detail: `${detail}; reloaded hermes-gateway (SIGUSR1: every profile drains and restarts)` };
+  return { action: "restart", confirmed: seen.confirmed, state: seen.state, detail: `${detail}; asked ${GATEWAY_RESTART_COMMAND} to cycle the host gateway (every profile drains and restarts)` };
 }
 
 /** The launchd gateway restart: `hermes gateway restart`, then `launchctl kickstart -k gui/<uid>/ai.hermes.gateway`. */

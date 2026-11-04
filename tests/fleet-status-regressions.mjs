@@ -286,10 +286,6 @@ function agentRow(slug) {
     provisioned_at: "2026-01-01T00:00:00.000Z",
     plane: { workspace: "suite", project_id: `board-${slug}`, identifier: slug.toUpperCase() },
     bloodbank: { enabled: false, gateway_scope: "fleet", target_agent_id: `${slug}-pm` },
-    systemd: {
-      gateway_unit: `hermes-${slug}-pm-gateway.service`,
-      heartbeat_timer: `hermes-${slug}-pm-heartbeat.timer`,
-    },
     // The canonical DEFERRED declaration (story 1.8): the shape most of the
     // live fleet has, and the one that is healthy without a channel credential.
     // Without it every fixture row would read `channel-undeclared` -- true, but
@@ -310,7 +306,7 @@ function agentRow(slug) {
 /** A registry YAML file in `temp`, built from a list of agent slugs. */
 // The fleet-shared Bloodbank gateway block the live registry carries. Story 1.8
 // correlates `gateways.bloodbank.systemd_unit` against the contract's
-// `service_model.fleet_shared.bloodbank_gateway_unit`, and a registry that
+// `service_model.host.gateway_unit`, and a registry that
 // names no unit is `registry-undeclared` -- a true reading, and one about the
 // fixture rather than about what any case here tests.
 const GATEWAYS_BLOCK = {
@@ -319,7 +315,7 @@ const GATEWAYS_BLOCK = {
     profile_name: "fleet-bloodbank-gateway",
     command_subject: "bloodbank.cmd.agent.invocation.start",
     target_field: "data.target_agent_id",
-    systemd_unit: "hermes-fleet-bloodbank-gateway.service",
+    systemd_unit: "hermes-gateway.service",
   },
 };
 
@@ -1038,7 +1034,7 @@ try {
       assert.equal(agent.systemd.capability.declared, "deferred");
       assert.equal(agent.systemd.gateway.state, "pass", `${agent.agent_id}: ${JSON.stringify(agent.systemd.gateway)}`);
       assert.equal("heartbeat" in agent.systemd, false);
-      assert.deepEqual(agent.systemd.topology.expected, [`hermes-${agent.agent_id}-gateway.service`]);
+      assert.deepEqual(agent.systemd.topology.expected, ["hermes-gateway.service"], "one host gateway serves every agent");
       assert.equal(agent.systemd.topology.state, "pass");
     }
     // The manager, the two listings, three samples, and nothing else. AC1's
@@ -1603,7 +1599,7 @@ process.stdout.write("\\n");
     // is deliberately not first.
     const shim = entry("host-disagree", `${RECORD_PREAMBLE}
 const host = REPO.endsWith("/theta")
-  ? { id: "systemd.sentinel", title: "systemd sentinel", status: "fail", summary: "a unit is missing on this host", details: ["hermes-theta-pm-gateway.service not found"], fixable: false, scope: "host" }
+  ? { id: "systemd.sentinel", title: "systemd sentinel", status: "fail", summary: "a unit is missing on this host", details: ["hermes-gateway.service not found"], fixable: false, scope: "host" }
   : { id: "systemd.sentinel", title: "systemd sentinel", status: "pass", summary: "units match", details: [], fixable: false, scope: "host" };
 const rules = [host];
 const report = { repo: REPO, ok: true, hostOk: host.status === "pass", auditedAt: new Date().toISOString(), rules };
@@ -1820,7 +1816,9 @@ process.exit(0);
       .flatMap((classification) => classification.entries ?? [])
       .flatMap((entry) => entry.policy_domains ?? []);
     assert.ok(policy.length > 0, "the contract must declare policy_domains for this case to mean anything");
-    assert.deepEqual([...new Set(policy)].sort(), ["bloodbank", "profile", "systemd"], "the contract's axis is the three-value one");
+    // project-registry joined with the shared-board classification (TOLT); it is a
+    // contract axis, not one of the nine status domains.
+    assert.deepEqual([...new Set(policy)].sort(), ["bloodbank", "profile", "project-registry", "systemd"], "the contract's axis is the declared policy-domain set");
     // The story HALTS rather than widening the contract, so the tracked file
     // must still not know about the six status domains that are not policy ones.
     for (const domain of DOMAINS) {

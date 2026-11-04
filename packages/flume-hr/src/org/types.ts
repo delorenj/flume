@@ -226,7 +226,13 @@ export interface FleetClassification {
 }
 
 export interface FleetServiceModel {
-  per_agent: Record<string, unknown>;
+  /**
+   * The ONE host gateway (contract >= 1.8): `gateway_unit`, `restart_command`, and
+   * the optional `exec_bin` / `home` patterns it is pinned against. No per-agent unit exists.
+   */
+  host?: Record<string, unknown>;
+  /** Retired in 1.8 (per-agent gateway unit pattern); read only from older handbooks. */
+  per_agent?: Record<string, unknown>;
   fleet_shared: Record<string, unknown>;
   profile_layout: Record<string, unknown>;
   [key: string]: unknown;
@@ -2279,13 +2285,14 @@ export const FLEET_SYSTEMD_ITEM_KINDS = [
   // A launchd host (macOS): there is no user manager and no per-agent unit, so every leaf is
   // `unsupported` -- unable to assess -- never an error that reads as a broken agent.
   "launchd-host",
-  // Topology (agents.{agent_id}.systemd.gateway_unit): the canonical gateway
-  // against what the manager loads and what the registry row records.
+  // Topology (agents.{agent_id}.systemd): the one host gateway against what the manager
+  // loads, any retired per-agent unit it still loads, and what the registry row records
+  // (`misnamed-gateway` only for handbooks older than 1.8, which derived a unit per agent).
   "gateway-missing", "misnamed-gateway", "duplicate-gateway",
   "retired-unit", "registry-retired-key",
   // Any unit leaf.
   "absent", "load-error", "fragment-unsafe", "unit-file-state-unclassified",
-  // The gateway (units.hermes-{agent_id}-gateway.service).
+  // The gateway (units.hermes-gateway.service, the one host gateway).
   "deferred-but-enabled", "deferred-but-active", "verified-channel-gateway-disabled", "verified-channel-gateway-inactive",
   "channel-undeclared", "channel-identity-incomplete", "channel-secret-unreferenced", "platform-enablement-inherited",
   "unstable", "crash-looping", "result-not-success", "entrypoint-unpinned", "home-mismatch", "home-absent", "home-unsafe",

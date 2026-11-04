@@ -554,6 +554,34 @@ function derive(pattern: unknown, agentId: string): string | null {
   return UNIT_NAME.test(name) ? name : null;
 }
 
+/**
+ * The ONE host gateway the contract declares (`service_model.host`, contract >= 1.8):
+ * the unit that serves every profile, the executable it is pinned to and the home it
+ * runs with. `null` for an older handbook, which still derives a per-agent unit.
+ * Read only: nothing in this module starts, stops or restarts it.
+ */
+function hostGatewayOf(ctx: FleetSystemdContext): { unit: string; execBin: string | null; home: string } | null {
+  const host = ctx.serviceModel?.host;
+  if (typeof host !== "object" || host === null || Array.isArray(host)) return null;
+  const unit = (host as Record<string, unknown>).gateway_unit;
+  if (typeof unit !== "string" || !UNIT_NAME.test(unit)) return null;
+  const expand = (value: unknown): string | null => (
+    typeof value === "string" && value !== "" ? resolve(value.replaceAll("{HERMES_FLEET_HOME}", ctx.fleetHome)) : null
+  );
+  return {
+    unit,
+    execBin: expand((host as Record<string, unknown>).exec_bin),
+    home: expand((host as Record<string, unknown>).home) ?? resolve(ctx.fleetHome),
+  };
+}
+
+/** An agent's canonical gateway unit: the one host unit, or (older handbooks) the per-agent derivation. */
+function canonicalGatewayUnit(ctx: FleetSystemdContext, agentId: string): string | null {
+  const host = hostGatewayOf(ctx);
+  if (host !== null) return host.unit;
+  return derive((ctx.serviceModel?.per_agent ?? {}).gateway_unit, agentId);
+}
+
 // ---------------------------------------------------------------------------
 // Phase 1: the manager probe
 // ---------------------------------------------------------------------------
@@ -971,8 +999,8 @@ function emptyAgentResult(
 function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSystemdAgentInput): FleetSystemdAgentResult {
   const { manifest } = ctx;
   const platforms = manifest.messaging.platforms;
-  const perAgent = ctx.serviceModel?.per_agent ?? {};
-  const gatewayUnit = derive(perAgent.gateway_unit, input.agentId);
+  const hostGateway = hostGatewayOf(ctx);
+  const gatewayUnit = canonicalGatewayUnit(ctx, input.agentId);
   const expected = [gatewayUnit].filter((unit): unit is string => unit !== null).sort();
 
   // -- the collection gates, carried onto every leaf --------------------------
@@ -1039,15 +1067,20 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   missing.sort();
   // A stored gateway name that is not the derived one: the row points the
   // provisioner at a unit the contract does not name.
-  if (input.storedGatewayUnit !== null && input.storedGatewayUnit !== "" && input.storedGatewayUnit !== gatewayUnit) {
+  // Under the host model a stored `gateway_unit` is a RETIRED registry key (reported below as
+  // registry-retired-key, to strip), not a misnamed unit to point the provisioner at.
+  if (hostGateway === null && input.storedGatewayUnit !== null && input.storedGatewayUnit !== "" && input.storedGatewayUnit !== gatewayUnit) {
     topologyItems.push({ path: unitWord(input.storedGatewayUnit), kind: "misnamed-gateway", desired: gatewayUnit, observed: unitWord(input.storedGatewayUnit), detail: `misnamed-gateway:${unitWord(input.storedGatewayUnit)}` });
     if (!isRetiredHeartbeat(input.storedGatewayUnit) && loaded(input.storedGatewayUnit)) extra.push({ unit: input.storedGatewayUnit, class: "duplicate-gateway" });
   }
   // A second gateway-named unit for this agent: two gateways racing one channel.
   // SORTED, because the listing arrives in whatever order the manager chose and
   // `data` has to be byte-identical across two runs.
+  // The retired per-agent unit itself is reported once, below, as a retired unit.
+  const retiredNames = new Set(manifest.unregistered.retired_candidates.map((pattern) => derive(pattern, input.agentId)).filter((unit): unit is string => unit !== null));
   for (const unit of [...shared.listing.units.keys()].sort()) {
     if (unit === gatewayUnit || !unit.startsWith(`hermes-${input.agentId}-`) || !unit.endsWith("gateway.service")) continue;
+    if (hostGateway !== null && retiredNames.has(unit)) continue;
     if (extra.some((item) => item.unit === unit)) continue;
     extra.push({ unit, class: "duplicate-gateway" });
     topologyItems.push({ path: unit, kind: "duplicate-gateway", desired: gatewayUnit, observed: unit, detail: `duplicate-gateway:${unit}` });
@@ -1091,8 +1124,13 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
   const gatewayView = unitView(gatewayUnit, gatewaySample);
   const gatewayExec = parseExecStart(one(gatewaySample, "ExecStart"));
   const gatewayEnvironment = parseEnvironment(all(gatewaySample, "Environment"), [manifest.entrypoint.home_env]);
-  const gatewayEntrypoint = classifyEntrypoint(gatewayExec.path, input.roleDir, manifest.entrypoint.launcher, input.hermesBin);
-  const gatewayHome = classifyHome(gatewayEnvironment[manifest.entrypoint.home_env] ?? null, profileHome, fleetHomeReal);
+  // The host gateway is pinned to the host executable and runs with the fleet home; a per-agent unit
+  // (older handbooks) is pinned to the role launcher or the row's own hermes.bin and runs in the profile.
+  const gatewayEntrypoint = hostGateway !== null
+    ? classifyEntrypoint(gatewayExec.path, null, manifest.entrypoint.launcher, hostGateway.execBin)
+    : classifyEntrypoint(gatewayExec.path, input.roleDir, manifest.entrypoint.launcher, input.hermesBin);
+  const expectedHome = hostGateway !== null ? hostGateway.home : profileHome;
+  const gatewayHome = classifyHome(gatewayEnvironment[manifest.entrypoint.home_env] ?? null, expectedHome, fleetHomeReal);
   const gatewayResult = one(gatewaySample, "Result") ?? null;
   const gatewayStatus = numeric(gatewaySample, "ExecMainStatus");
   const unitFileState = one(gatewaySample, "UnitFileState") ?? "";
@@ -1192,8 +1230,10 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
         }
       }
     } else if (capability === "deferred") {
-      if (isEnabled) gatewayItems.push({ path: gatewayUnit, kind: "deferred-but-enabled", desired: "disabled", observed: word(unitFileState), detail: "deferred-but-enabled" });
-      if (isActive) gatewayItems.push({ path: gatewayUnit, kind: "deferred-but-active", desired: "inactive", observed: word(activeState), detail: "deferred-but-active" });
+      // A deferred AGENT is one the host gateway does not serve; the host unit itself stays up for
+      // every other profile, so only a per-agent unit (older handbooks) is judged disabled+inactive.
+      if (hostGateway === null && isEnabled) gatewayItems.push({ path: gatewayUnit, kind: "deferred-but-enabled", desired: "disabled", observed: word(unitFileState), detail: "deferred-but-enabled" });
+      if (hostGateway === null && isActive) gatewayItems.push({ path: gatewayUnit, kind: "deferred-but-active", desired: "inactive", observed: word(activeState), detail: "deferred-but-active" });
       for (const platform of platforms) {
         if (declaredPlatforms[platform] !== "deferred") continue;
         // The EFFECTIVE enablement the renderer produces: the delta's pin when
@@ -1214,7 +1254,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
           });
         }
       }
-    } else {
+    } else if (hostGateway === null) {
       gatewayItems.push({
         path: gatewayUnit, kind: "channel-undeclared",
         desired: `${manifest.messaging.status_field} on at least one declared platform`,
@@ -1224,7 +1264,7 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
     }
     // Stability is judged only where the gateway is meant to be running: a
     // deferred gateway that is correctly inactive has no window to be unstable in.
-    if (capability === "active" || isActive) {
+    if (capability === "active" || (hostGateway === null && isActive)) {
       if (gatewayStability.crashLooping) {
         gatewayItems.push({ path: gatewayUnit, kind: "crash-looping", desired: "a constant restart count", observed: gatewayStability.transitions.join("; "), detail: "crash-looping" });
       } else if (!gatewayStability.stable) {
@@ -1235,9 +1275,9 @@ function inspectAgent(ctx: FleetSystemdContext, shared: Shared, input: FleetSyst
       if (!gatewayEntrypoint.pinned) {
         gatewayItems.push({ path: gatewayUnit, kind: "entrypoint-unpinned", desired: "the role launcher or the executable the row pins", observed: gatewayEntrypoint.family, detail: "entrypoint-unpinned" });
       }
-      if (gatewayHome === "absent") gatewayItems.push({ path: gatewayUnit, kind: "home-absent", desired: profileHome === null ? "a profile home" : ctx.shown(profileHome), observed: "absent", detail: "home-absent" });
+      if (gatewayHome === "absent") gatewayItems.push({ path: gatewayUnit, kind: "home-absent", desired: expectedHome === null ? "a profile home" : ctx.shown(expectedHome), observed: "absent", detail: "home-absent" });
       else if (gatewayHome === "unsafe") gatewayItems.push({ path: gatewayUnit, kind: "home-unsafe", desired: "a home under the fleet home", observed: ctx.shown(gatewayEnvironment[manifest.entrypoint.home_env] ?? ""), detail: "home-unsafe" });
-      else if (gatewayHome === "mismatch") gatewayItems.push({ path: gatewayUnit, kind: "home-mismatch", desired: profileHome === null ? "this agent's profile directory" : ctx.shown(profileHome), observed: ctx.shown(gatewayEnvironment[manifest.entrypoint.home_env] ?? ""), detail: "home-mismatch" });
+      else if (gatewayHome === "mismatch") gatewayItems.push({ path: gatewayUnit, kind: "home-mismatch", desired: expectedHome === null ? "this agent's profile directory" : ctx.shown(expectedHome), observed: ctx.shown(gatewayEnvironment[manifest.entrypoint.home_env] ?? ""), detail: "home-mismatch" });
     }
   }
 
@@ -1293,7 +1333,7 @@ function inspectShared(ctx: FleetSystemdContext, shared: Shared): FleetSystemdSh
     return { ...base, state: "error", code: shared.manager.code, detail: `the fleet-shared gateway could not be observed: ${shared.manager.detail}` };
   }
   if (unit === null) {
-    return { ...base, state: "registry-undeclared", code: "contract-undeclared", detail: "the contract declares no service_model.fleet_shared.bloodbank_gateway_unit, so there is no shared gateway to correlate" };
+    return { ...base, state: "registry-undeclared", code: "contract-undeclared", detail: "the contract declares no service_model.host.gateway_unit, so there is no host gateway to correlate" };
   }
   if (ctx.sharedGateway.registryUnit === null) {
     return { ...base, state: "registry-undeclared", code: "registry-undeclared", detail: `the registry's gateways.bloodbank block names no systemd_unit; the contract derives ${unit}` };
@@ -1309,7 +1349,11 @@ function inspectShared(ctx: FleetSystemdContext, shared: Shared): FleetSystemdSh
   const stability = evaluateStability(samples);
   const unitFileState = one(sample, "UnitFileState") ?? "";
   const home = parseEnvironment(all(sample, "Environment"), [ctx.manifest.entrypoint.home_env])[ctx.manifest.entrypoint.home_env] ?? null;
-  const expectedHome = profile !== null && ctx.profileRoot !== null && isSafePathSegment(profile) ? join(ctx.profileRoot, profile) : null;
+  // The host gateway runs with the fleet home; only an older handbook's dedicated unit ran in a profile.
+  const hostGateway = hostGatewayOf(ctx);
+  const expectedHome = hostGateway !== null
+    ? hostGateway.home
+    : profile !== null && ctx.profileRoot !== null && isSafePathSegment(profile) ? join(ctx.profileRoot, profile) : null;
   const homeState = classifyHome(home, expectedHome, resolve(ctx.fleetHome));
   const defects: string[] = [];
   if (!ENABLED_STATES.has(unitFileState)) defects.push("disabled");
@@ -1507,10 +1551,9 @@ async function collectLaunchdHealth(ctx: FleetSystemdContext): Promise<FleetSyst
     outcome: gateway.state === "unobservable" ? (result?.outcome === "timeout" ? "timeout" : result?.outcome === "cancelled" ? "cancelled" : "failed") : "ok",
     reason: gateway.state === "unobservable" ? "launchd-host" : null,
   };
-  const perAgent = ctx.serviceModel?.per_agent ?? {};
   const agents = new Map<string, FleetSystemdAgentResult>();
   for (const input of ctx.agents) {
-    const gatewayUnit = derive(perAgent.gateway_unit, input.agentId);
+    const gatewayUnit = canonicalGatewayUnit(ctx, input.agentId);
     const expected = [gatewayUnit].filter((unit): unit is string => unit !== null).sort();
     agents.set(input.agentId, emptyAgentResult(input, expected, { gateway: gatewayUnit }, (unit) => aspect(
       "unsupported",
@@ -1562,12 +1605,11 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
   probes.push(...listing.probes);
 
   // -- Phase 3: the universe of interest (see the Phase 4 header) ------------
-  const perAgent = ctx.serviceModel?.per_agent ?? {};
   const interest = new Set<string>();
   const owned = new Set<string>();
   for (const agent of ctx.agents) {
-    for (const pattern of [perAgent.gateway_unit]) {
-      const unit = derive(pattern, agent.agentId);
+    {
+      const unit = canonicalGatewayUnit(ctx, agent.agentId);
       if (unit !== null) { interest.add(unit); owned.add(unit); }
     }
     for (const pattern of ctx.manifest.unregistered.retired_candidates) {
@@ -1585,8 +1627,8 @@ export async function collectSystemdHealth(ctx: FleetSystemdContext): Promise<Fl
   // not select them: an `--agent` run must not report another agent's gateway
   // as an unregistered unit, and a fleet-scope sweep must not either.
   for (const agentId of ctx.registeredAgentIds) {
-    for (const pattern of [perAgent.gateway_unit]) {
-      const unit = derive(pattern, agentId);
+    {
+      const unit = canonicalGatewayUnit(ctx, agentId);
       if (unit !== null) owned.add(unit);
     }
     for (const pattern of ctx.manifest.unregistered.retired_candidates) {

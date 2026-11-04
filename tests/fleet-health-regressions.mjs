@@ -403,10 +403,6 @@ function agentRow(slug, overrides = {}) {
     provisioned_at: NOW_ISO,
     plane: { workspace: "suite", project_id: `board-${slug}`, identifier: slug.toUpperCase() },
     bloodbank: { enabled: false, gateway_scope: "fleet", target_agent_id: `${slug}-pm` },
-    systemd: {
-      gateway_unit: `hermes-${slug}-pm-gateway.service`,
-      heartbeat_timer: `hermes-${slug}-pm-heartbeat.timer`,
-    },
     // The canonical DEFERRED declaration (story 1.8): the shape that is healthy
     // without a channel credential, and the one `70-systemd.sh` provisions when
     // no platform is verified.
@@ -434,14 +430,14 @@ function writeAgentRegistry(path, slugs, mutate = () => {}) {
 
 // The fleet-shared Bloodbank gateway block the live registry carries. Story 1.8
 // correlates `gateways.bloodbank.systemd_unit` against the contract's own
-// `service_model.fleet_shared.bloodbank_gateway_unit`.
+// `service_model.host.gateway_unit`.
 const GATEWAYS_BLOCK = {
   bloodbank: {
     scope: "fleet",
     profile_name: "fleet-bloodbank-gateway",
     command_subject: "bloodbank.cmd.agent.invocation.start",
     target_field: "data.target_agent_id",
-    systemd_unit: "hermes-fleet-bloodbank-gateway.service",
+    systemd_unit: "hermes-gateway.service",
   },
 };
 

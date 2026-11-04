@@ -162,7 +162,7 @@ export async function retireFromService(employeeId: string, options: RetireOptio
     result.leftBehind.push(`gateway: per-agent units are not observable on a launchd host; the multiplexed ${LAUNCHD_GATEWAY_LABEL} keeps serving profile ${profileName} until its desk is removed and the gateway restarted (hermes gateway restart)`);
   } else {
     const unit = `hermes-${employeeId}-gateway.service`;
-    if (existsSync(join(homeDir, ".config", "systemd", "user", unit))) result.leftBehind.push(`systemd unit ${unit} (disable it yourself: systemctl --user disable --now ${unit})`);
+    if (existsSync(join(homeDir, ".config", "systemd", "user", unit))) result.leftBehind.push(`retired per-agent gateway unit ${unit} is still on disk: one host gateway serves every profile. Retire it with the role's .scripts/70-systemd.sh (it never stops the live host gateway); if the unit's process IS the host gateway, hand over with ${restart}`);
   }
 
   if (options.apply && needsRegistryWrite) {

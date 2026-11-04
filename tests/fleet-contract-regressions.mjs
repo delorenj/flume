@@ -311,10 +311,11 @@ try {
     for (const klass of ["managed_agent", "managed_shared_service", "intentionally_unmanaged", "retired", "unclassified"]) {
       assert.ok(out.includes(klass), `report must name lifecycle class ${klass}`);
     }
-    assert.ok(out.includes("hermes-{agent_id}-gateway.service"), "report must name the per-agent gateway unit");
+    assert.ok(out.includes("hermes-gateway.service"), "report must name the one host gateway unit");
+    assert.ok(out.includes("per-agent-gateway-unit"), "the retired per-agent gateway is declared");
     assert.doesNotMatch(out, /heartbeat.timer/, "heartbeat is no longer a required employee unit");
     assert.ok(out.includes("per-agent-heartbeat"), "retirement remains declared");
-    assert.ok(out.includes("hermes-fleet-bloodbank-gateway.service"), "report must name the fleet-shared gateway");
+    assert.ok(out.includes("fleet-bloodbank-gateway-unit"), "the retired dedicated Bloodbank gateway unit is declared");
     for (const mode of ["per-agent-bloodbank-consumer", "per-agent-checkpoint-timer", "n8n-owned-truth", "activation-by-discovery", "hard-coded-hermes-checkout-path"]) {
       assert.ok(out.includes(mode), `report must name superseded mode ${mode}`);
     }
@@ -350,7 +351,7 @@ try {
     // project_path -> generated config.yaml terminal.cwd pin.
     assert.equal(parsed.data.projections.length, 7, "envelope must carry exactly the declared projections");
     assert.equal(parsed.data.classifications.length, 5, "envelope must carry five lifecycle classes");
-    assert.equal(parsed.data.retired.length, 6, "envelope must carry exactly the declared retired modes, including heartbeat");
+    assert.equal(parsed.data.retired.length, 8, "envelope must carry exactly the declared retired modes, including heartbeat and the per-agent gateway");
     assert.equal(parsed.data.byte_stable, true, "tracked contract must round-trip byte-stably");
     assert.deepEqual(parsed.data.truncated, [], "the tracked contract must fit the envelope bounds without clipping");
   });
@@ -1164,19 +1165,40 @@ try {
     assert.match(JSON.stringify(parsed.error), /one direction only|already fed by/);
   });
 
-  check("the current gateway pattern must carry the employee placeholder", () => {
-    const path = mutated("gateway-no-placeholder", (doc) => {
-      doc.setIn(["service_model", "per_agent", "gateway_unit"], "hermes-gateway.service");
+  check("the host gateway is ONE unit: an employee placeholder makes it per-agent again", () => {
+    const path = mutated("gateway-with-placeholder", (doc) => {
+      doc.setIn(["service_model", "host", "gateway_unit"], "hermes-{agent_id}-gateway.service");
     });
     const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
     assert.equal(errorCode(parsed), "INVALID_INPUT");
     assert.match(JSON.stringify(parsed.error), /agent_id.*placeholder/);
   });
 
-  check("the current handbook requires only the gateway and explicitly retires heartbeat units", () => {
+  check("the current handbook declares no per-agent unit pattern and the retired detectors never match the host unit", () => {
     const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
-    assert.equal(contract.contract_version, "1.7.0");
-    assert.deepEqual(contract.service_model.per_agent, { gateway_unit: "hermes-{agent_id}-gateway.service" });
+    assert.equal(contract.service_model.host.gateway_unit, "hermes-gateway.service");
+    assert.equal(contract.service_model.host.restart_command, "hermes-gateway-restart");
+    assert.equal("per_agent" in contract.service_model, false, "no per-agent unit pattern is declared");
+    for (const mode of contract.retired) {
+      for (const pattern of mode.detect) assert.equal(new RegExp(pattern).test("hermes-gateway.service"), false, `${mode.id} detect ${pattern} must never match the host unit`);
+    }
+    const perAgent = contract.retired.find((mode) => mode.id === "per-agent-gateway-unit");
+    assert.ok(perAgent.detect.some((pattern) => new RegExp(pattern).test("hermes-alpha-pm-gateway.service")), "a per-agent gateway unit is detected");
+  });
+
+  check("declaring a per-agent gateway unit healthy fails as RETIRED_MODE", () => {
+    const path = mutated("per-agent-gateway-declared", (doc) => {
+      doc.setIn(["service_model", "per_agent", "gateway_unit"], "hermes-{agent_id}-gateway.service");
+    });
+    const parsed = envelope(cli(["handbook", "validate", "--contract", path, "--json"]));
+    assert.equal(errorCode(parsed), "RETIRED_MODE", JSON.stringify(parsed.error));
+    assert.match(JSON.stringify(parsed.error), /per-agent-gateway-unit/);
+  });
+
+  check("the current handbook requires only the host gateway and explicitly retires heartbeat units", () => {
+    const contract = YAML.parse(readFileSync(TRACKED_CONTRACT, "utf8"));
+    assert.equal(contract.contract_version, "1.8.0");
+    assert.equal(contract.service_model.host.gateway_unit, "hermes-gateway.service");
     assert.equal("heartbeat" in contract.service_manifest, false);
     assert.equal(contract.authorities.systemd_lifecycle.writable_fields.some((field) => field.includes("heartbeat")), false);
     for (const suffix of ["service", "timer"]) assert.ok(contract.service_manifest.unregistered.retired_candidates.includes(`hermes-{agent_id}-heartbeat.${suffix}`));

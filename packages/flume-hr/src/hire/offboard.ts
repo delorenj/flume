@@ -78,7 +78,7 @@ export function offboardEmployee(employeeId: string, options: OffboardOptions = 
   } else {
     const units = join(homeDir, ".config", "systemd", "user");
     for (const unit of [`hermes-${employeeId}-gateway.service`]) {
-      if (existsSync(join(units, unit))) leftBehind.push(`systemd unit ${unit} (disable it yourself: systemctl --user disable --now ${unit})`);
+      if (existsSync(join(units, unit))) leftBehind.push(`retired per-agent gateway unit ${unit} is still on disk: one host gateway serves every profile. Retire it with the role's .scripts/70-systemd.sh (it never stops the live host gateway); if the unit's process IS the host gateway, hand over with hermes-gateway-restart --reason "offboarded ${employeeId}"`);
     }
   }
 

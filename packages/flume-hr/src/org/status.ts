@@ -313,7 +313,7 @@ const DOMAIN_FIELD: Readonly<Record<FleetStatusDomain, string>> = Object.freeze(
   // that happened.
   profile: "agents.{agent_id}.profile_name",
   runtime: "agents.{agent_id}.role_dir",
-  systemd: "agents.{agent_id}.systemd.gateway_unit",
+  systemd: "units.hermes-gateway.service",
   live_process: "processes.{agent_id}",
   bloodbank: "agents.{agent_id}.bloodbank.gateway_scope",
   release_provenance: "agents.{agent_id}.hermes.bin",
@@ -512,11 +512,13 @@ const SYSTEMD_SHARED_RULE_ID = "systemd.shared-gateway";
 const SYSTEMD_UNREGISTERED_RULE_ID = "systemd.unregistered";
 
 /**
- * Employee topology belongs to the registry gateway field; gateway health
- * belongs to the unit. Both fields resolve a systemd_lifecycle owner.
+ * Employee topology belongs to the (retired) registry `systemd` block and the
+ * retired per-agent units it could name; gateway health belongs to the ONE host
+ * gateway unit that serves every profile. Both fields resolve a systemd_lifecycle
+ * owner. No per-agent unit is observed as a required leaf.
  */
-const SYSTEMD_FIELD_TOPOLOGY = "agents.{agent_id}.systemd.gateway_unit";
-const SYSTEMD_FIELD_GATEWAY = "units.hermes-{agent_id}-gateway.service";
+const SYSTEMD_FIELD_TOPOLOGY = "agents.{agent_id}.systemd";
+const SYSTEMD_FIELD_GATEWAY = "units.hermes-gateway.service";
 const SYSTEMD_FIELDS = [
   SYSTEMD_FIELD_TOPOLOGY, SYSTEMD_FIELD_GATEWAY,
 ] as const;
@@ -538,8 +540,9 @@ const SYSTEMD_FIELDS = [
  */
 const SYSTEMD_RULE_DETAIL_PATTERNS: readonly RegExp[] = [
   /should be enabled\+active/u,
-  /is deferred and should be disabled\+inactive/u,
   /should be installed/u,
+  /is retired but still /u,
+  /is retired and should be removed/u,
 ];
 const SYSTEMD_PARITY_DETAIL_PATTERNS: readonly RegExp[] = [
   /carries retired systemd\./u,
@@ -2791,7 +2794,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   //
   // Story 1.8. The user manager is sampled ONCE for the whole fleet over the
   // window `service_manifest.stabilization` declares, each selected agent's
-  // canonical unit set is derived from `service_model.per_agent`, and the
+  // canonical unit set is the one host gateway of `service_model.host`, and the
   // DESIRED gateway state is derived from the row's own messaging declaration
   // rather than read back from the unit. Gated on the domain exactly as the
   // scaffold and profile observers are.
@@ -2805,6 +2808,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     const layout = resolveProfileLayout(contract, env, home);
     const profileLayout = isRecord(contract.service_model?.profile_layout) ? contract.service_model.profile_layout : {};
     const fleetShared = isRecord(contract.service_model?.fleet_shared) ? contract.service_model.fleet_shared : {};
+    const hostBlock = isRecord(contract.service_model?.host) ? contract.service_model.host : {};
     // The fleet-shared gateways block, from the SAME parse the agent rows came
     // from: never a second read of the registry.
     const gateways = isRecord(agentRaw.siblings.gateways) ? agentRaw.siblings.gateways : {};
@@ -2822,7 +2826,8 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
       retired: contract.retired,
       classifications: contract.classifications,
       sharedGateway: {
-        unit: nonEmptyString(fleetShared.bloodbank_gateway_unit),
+        // The one host gateway carries the Bloodbank lane; an older handbook named a dedicated unit.
+        unit: nonEmptyString(hostBlock.gateway_unit) ?? nonEmptyString(fleetShared.bloodbank_gateway_unit),
         profile: nonEmptyString(fleetShared.bloodbank_gateway_profile),
         registryUnit: bloodbank === null ? null : nonEmptyString(bloodbank.systemd_unit),
       },

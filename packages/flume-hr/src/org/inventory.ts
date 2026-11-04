@@ -685,8 +685,10 @@ interface InventoryContext {
   profilePathTemplate: string | null;
   /** `service_model.per_agent` patterns, in declared key order. */
   unitPatterns: string[];
-  /** `service_model.per_agent.gateway_unit` alone, for the drift comparison. */
+  /** `service_model.per_agent.gateway_unit` alone, for the drift comparison. Null under the host model. */
   gatewayPattern: string | null;
+  /** `service_model.host.gateway_unit`: the one unit every agent shares. Null for a handbook older than 1.8. */
+  hostGatewayUnit: string | null;
   activationField: string;
   activationOwner: string | null;
   projectsByRepoPath: Map<string, ProjectIndexEntry>;
@@ -748,8 +750,20 @@ export function resolveProfileLayout(contract: FleetContract, env: NodeJS.Proces
   return { root: template.slice(0, marker).replace(/\/+$/u, ""), template };
 }
 
-/** The per-agent unit-name patterns the contract declares. Never re-hardcoded here. */
+/** The ONE host gateway unit the contract declares (`service_model.host.gateway_unit`, contract >= 1.8). */
+function hostGatewayUnitFrom(contract: FleetContract): string | null {
+  const host = contract.service_model?.host;
+  return isRecord(host) ? nonEmptyString(host.gateway_unit) : null;
+}
+
+/**
+ * The unit names every row EXPECTS, declared by the contract and never re-hardcoded here: the
+ * one host gateway unit (no placeholder, so every agent expects the same unit), or -- for a
+ * handbook older than 1.8 -- the per-agent patterns.
+ */
 function unitPatternsFrom(contract: FleetContract): string[] {
+  const hostUnit = hostGatewayUnitFrom(contract);
+  if (hostUnit !== null) return [hostUnit];
   const perAgent = contract.service_model?.per_agent;
   if (!isRecord(perAgent)) return [];
   return Object.keys(perAgent)
@@ -760,6 +774,8 @@ function unitPatternsFrom(contract: FleetContract): string[] {
 
 /** The gateway pattern that the registry's systemd.gateway_unit must name. */
 function gatewayPatternFrom(contract: FleetContract): string | null {
+  // Under the host model no registry key names a unit: a stored one is a retired key.
+  if (hostGatewayUnitFrom(contract) !== null) return null;
   const perAgent = contract.service_model?.per_agent;
   if (!isRecord(perAgent)) return null;
   return nonEmptyString(perAgent.gateway_unit);
@@ -981,7 +997,9 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     : unresolved<string>(profileOwner);
 
   // -- expected owned unit names (EXPECTED, never probed) --------------------
-  const unitOwner = own.ownerOf("agents.{agent_id}.systemd.gateway_unit");
+  const unitOwner = ctx.hostGatewayUnit !== null
+    ? (own.ownerOf(`units.${ctx.hostGatewayUnit}`) ?? own.ownerOf("agents.{agent_id}.systemd"))
+    : own.ownerOf("agents.{agent_id}.systemd.gateway_unit");
   let expectedUnits: FleetFieldValue<string[]>;
   if (portable) expectedUnits = field([], employment.source, "resolved");
   else if (idSafe && ctx.unitPatterns.length) {
@@ -996,7 +1014,12 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
   const expectedGateway = idSafe && ctx.gatewayPattern
     ? bounded(ctx.gatewayPattern.replaceAll("{agent_id}", agentId))
     : null;
-  if (storedGateway && expectedGateway && bounded(storedGateway) !== expectedGateway) {
+  if (storedGateway && ctx.hostGatewayUnit !== null) {
+    // Retired: one host gateway serves every profile, so a row naming a unit is drift to STRIP
+    // (hermes.registry-parity), never a missing unit to install.
+    note("systemd-unit-name-drift", "agents.{agent_id}.systemd.gateway_unit", unitOwner, "warn",
+      `stored gateway unit ${bounded(storedGateway)} is a retired registry key: ${ctx.hostGatewayUnit} serves every profile and an agent has no unit of its own`);
+  } else if (storedGateway && expectedGateway && bounded(storedGateway) !== expectedGateway) {
     note("systemd-unit-name-drift", "agents.{agent_id}.systemd.gateway_unit", unitOwner, "warn",
       `stored gateway unit ${bounded(storedGateway)} is not ${expectedGateway}, the name the contract's service model derives`);
   }
@@ -1327,6 +1350,7 @@ export function matchException(group: FleetConflictGroup, contract: FleetContrac
 
 export function detectConflicts(input: ConflictInput): FleetConflictGroup[] {
   const buckets = new Map<string, { dimension: Dimension; value: string; participants: Set<string> }>();
+  const hostUnit = hostGatewayUnitFrom(input.contract);
 
   const claim = (dimension: Dimension, rawValue: unknown, participant: string): void => {
     const value = nonEmptyString(rawValue);
@@ -1363,7 +1387,9 @@ export function detectConflicts(input: ConflictInput): FleetConflictGroup[] {
     claim(DIMENSIONS.profileName, row.profile_name.value, agentId);
     claim(DIMENSIONS.boardIdentifier, row.board.value?.identifier ?? null, agentId);
     claim(DIMENSIONS.bloodbankTarget, row.bloodbank_target.value, agentId);
-    claim(DIMENSIONS.gatewayUnit, row.gateway_unit.value, agentId);
+    // Under the host model the shared unit is one name for every row BY DESIGN; a conflict on it
+    // would be a 33-way false group. Only a unit the contract does not declare shared can conflict.
+    if (row.gateway_unit.value !== hostUnit) claim(DIMENSIONS.gatewayUnit, row.gateway_unit.value, agentId);
     claim(DIMENSIONS.projectId, row.project_id.value, agentId);
   }
 
@@ -1560,6 +1586,7 @@ export function collectFleetInventory(options: FleetInventoryOptions = {}): Flee
     profilePathTemplate: layout.template,
     unitPatterns: unitPatternsFrom(contract),
     gatewayPattern: gatewayPatternFrom(contract),
+    hostGatewayUnit: hostGatewayUnitFrom(contract),
     activationField,
     activationOwner,
     projectsByRepoPath,
@@ -1651,11 +1678,11 @@ export function collectFleetInventory(options: FleetInventoryOptions = {}): Flee
   if (ctx.unitPatterns.length === 0) {
     addFinding(ctx, {
       code: "service-model-undeclared",
-      field: "service_model.per_agent",
+      field: "service_model.host",
       agent_id: null,
-      source: authority.ownerOf("agents.{agent_id}.systemd.gateway_unit"),
+      source: authority.ownerOf("agents.{agent_id}.systemd.gateway_unit") ?? authority.ownerOf("agents.{agent_id}.systemd"),
       severity: "error",
-      detail: "the contract declares no per-agent unit-name patterns; no expected unit name can be derived",
+      detail: "the contract declares no host gateway unit (service_model.host.gateway_unit) and no per-agent unit-name patterns; no expected unit name can be derived",
     });
   }
 

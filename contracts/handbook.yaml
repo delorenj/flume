@@ -23,11 +23,17 @@
 #                 `scaffold.sentinel.prompt.md` means `.scripts/sentinel.prompt.md`
 #                 -- the leaves name owned asset GROUPS, not store keys.
 #   units.*       systemd user units. Each leaf names ONE unit of the user
-#                 manager, with `{agent_id}` substituted: `units.hermes-{agent_id}-gateway.service`
-#                 is that agent's messaging gateway. The systemd observer samples
-#                 the manager itself (`systemctl --user show`) and reports every
-#                 leaf as an observation; `service_manifest` says how each is
-#                 proven and what the desired state is derived from.
+#                 manager. Since 2026-10-11 there is exactly ONE gateway unit:
+#                 `units.hermes-gateway.service`, the host gateway that serves
+#                 EVERY profile (and carries the Bloodbank command lane). An
+#                 agent has no unit of its own: `hermes-{agent_id}-gateway.service`
+#                 and `hermes-fleet-bloodbank-gateway.service` are retired and a
+#                 loaded one is drift (it can hijack the host role). The systemd
+#                 observer samples the manager itself (`systemctl --user show`)
+#                 and reports every leaf as an observation; `service_manifest`
+#                 says how each is proven and what the desired state is derived
+#                 from. The host unit is restarted ONLY through
+#                 `service_model.host.restart_command`.
 #   processes.*   observed Hermes processes (read-only)
 #
 # Namespaced `x-` keys at any depth round-trip verbatim and are never
@@ -39,7 +45,7 @@
 # very drift this contract exists to name.
 
 schema_version: 5
-contract_version: 1.7.0
+contract_version: 1.8.0
 
 compatibility:
   min_schema_version: 1
@@ -292,21 +298,27 @@ authorities:
     store_env:
       - XDG_CONFIG_HOME
     notes:
-      - Unit files and the registry rows that name them are written by the
-        provisioner, not by registry editing paths.
+      - >-
+        ONE host gateway (`service_model.host.gateway_unit`,
+        hermes-gateway.service) serves every profile; the control socket
+        attaches and detaches profiles. No per-agent gateway unit exists, so no
+        per-agent unit and no `systemd.gateway_unit` registry key is writable:
+        the provisioner retires a leftover per-agent unit and strips the key.
       - >-
         Every leaf below is OBSERVED by the systemd observer (story 1.8): the
-        per-agent gateway is sampled from the user manager over the window
-        `service_manifest.stabilization` declares, the gateway registry field is
-        compared against the name the contract derives, and the fleet-shared
-        gateway is correlated once per fleet-scope run. The DESIRED gateway
-        state is derived from the row's messaging declaration
-        (`telegram.provisioning_status` / `slack.provisioning_status`), never
-        read back from the unit.
+        host gateway is sampled from the user manager over the window
+        `service_manifest.stabilization` declares and correlated with each
+        agent's messaging declaration; a loaded retired per-agent unit, or a
+        registry key naming one, is reported as drift to strip, never as a
+        missing unit to install. The DESIRED gateway state is derived from the
+        row's messaging declaration (`telegram.provisioning_status` /
+        `slack.provisioning_status`), never read back from the unit.
+      - >-
+        `agents.{agent_id}.systemd` is listed only so the retired registry block
+        has an owner for its drift findings. Nothing may write a key under it.
     writable_fields:
-      - units.hermes-{agent_id}-gateway.service
-      - units.hermes-fleet-bloodbank-gateway.service
-      - agents.{agent_id}.systemd.gateway_unit
+      - units.hermes-gateway.service
+      - agents.{agent_id}.systemd
 
   bloodbank_activation:
     owner: agent-registry
@@ -404,7 +416,7 @@ classifications:
         owner: runtime-template
         source: gateways.bloodbank
         lifecycle_state: managed
-        rationale: One shared gateway owns Bloodbank command ingress fleet-wide.
+        rationale: The one host gateway carries Bloodbank command ingress fleet-wide.
         policy_domains:
           - systemd
           - bloodbank
@@ -536,10 +548,16 @@ classifications:
     entries: []
 
 service_model:
-  per_agent:
-    gateway_unit: hermes-{agent_id}-gateway.service
+  # The ONE host gateway (since 2026-10-11): `hermes gateway run`,
+  # HERMES_HOME={HERMES_FLEET_HOME}, serving every profile through the control
+  # socket (serve-profile / unserve-profile). An agent has no unit of its own.
+  # Restarts go ONLY through `restart_command`, never raw systemctl.
+  host:
+    gateway_unit: hermes-gateway.service
+    restart_command: hermes-gateway-restart
+    exec_bin: "{HERMES_FLEET_HOME}/hermes-agent/.hermes/bin/hermes"
+    home: "{HERMES_FLEET_HOME}"
   fleet_shared:
-    bloodbank_gateway_unit: hermes-fleet-bloodbank-gateway.service
     bloodbank_gateway_profile: fleet-bloodbank-gateway
     command_subject: bloodbank.cmd.agent.invocation.start
     target_field: data.target_agent_id
@@ -905,6 +923,7 @@ service_manifest:
       - "hermes-{agent_id}-consumer.service"
       - "hermes-{agent_id}-checkpoint.timer"
       - "hermes-{agent_id}-checkpoint.service"
+      - "hermes-{agent_id}-gateway.service"
   limits:
     max_units: 1000
     max_unregistered_units: 200
@@ -937,23 +956,39 @@ retired:
     reason: Gateway restart owns runtime liveness; Candybar owns recurring schedules
       (firing Bloodbank commands and Hermes invocations) and Krebs leases own
       persistence. Per-employee heartbeat ticks are retired.
-    superseded_by: service_model.per_agent.gateway_unit
+    superseded_by: service_model.host.gateway_unit
     detect:
       - '-heartbeat\.(?:service|timer)$'
       - 'heartbeat_service'
       - 'heartbeat_timer'
   - id: per-agent-bloodbank-consumer
     reason: A per-agent consumer races the shared gateway and duplicates work.
-    superseded_by: service_model.fleet_shared.bloodbank_gateway_unit
+    superseded_by: service_model.host.gateway_unit
     detect:
       - '-consumer\.service'
       - 'consumer_unit'
   - id: per-agent-checkpoint-timer
     reason: Checkpoint-only ticks proved liveness without proving health.
-    superseded_by: service_model.per_agent.gateway_unit
+    superseded_by: service_model.host.gateway_unit
     detect:
       - '-checkpoint\.timer'
       - 'checkpoint_timer'
+  - id: per-agent-gateway-unit
+    reason: Retired 2026-10-11. One host gateway serves every profile; a per-agent
+      gateway unit that starts can hijack the host role. The pattern is anchored
+      so the host unit itself never matches.
+    superseded_by: service_model.host.gateway_unit
+    detect:
+      - '^hermes-[a-z0-9][a-z0-9_-]*-gateway\.service$'
+      - '^per_agent$'
+  - id: fleet-bloodbank-gateway-unit
+    reason: Retired 2026-10-11. The Bloodbank command lane is a durable consumer on
+      the one host gateway; the dedicated unit name is gone (the
+      fleet-bloodbank-gateway PROFILE remains).
+    superseded_by: service_model.host.gateway_unit
+    detect:
+      - '^hermes-fleet-bloodbank-gateway\.service$'
+      - 'bloodbank_gateway_unit'
   - id: n8n-owned-truth
     reason: Orchestration may consume fleet APIs but may not own fleet truth.
     superseded_by: authorities.agent_operational_records

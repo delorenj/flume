@@ -124,42 +124,29 @@ export function fakeSystemctlChildEnvs(dir) {
 }
 
 /**
- * The canonical unit triple of ONE deferred agent, exactly as `70-systemd.sh`
- * provisions it and the template's own health helpers would read it healthy.
- *
- * Deferred rather than active because it is the shape most of the live fleet
- * actually has and because it needs no channel credential to be correct: the
- * gateway is disabled and inactive, the timer fires on policy, and the oneshot
- * completed its last tick.
+ * What ONE deferred agent owns in the user manager: nothing. One host gateway
+ * (`hermes-gateway.service`, see `hostGatewayUnits`) serves every profile, so an
+ * agent has no unit of its own -- no gateway, and no heartbeat. The function stays
+ * so a suite folds "this agent's units" into its state without caring, and so a case
+ * that wants a LEFTOVER retired unit adds one explicitly.
  */
-export function deferredAgentUnits({ agentId, profileName, profileRoot, roleDir, hermesBin = null, nowUs = monotonicNowUs() }) {
-  const gateway = `hermes-${agentId}-gateway.service`;
-  const launcher = roleDir === null ? (hermesBin ?? "/nonexistent/hermes") : join(roleDir, ".scripts", "credential-launch.sh");
-  const home = join(profileRoot, profileName ?? agentId);
-  const exec = (path, ...args) => `{ path=${path} ; argv[]=${[path, ...args].join(" ")} ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }`;
-  return {
-    units: {
-      [gateway]: {
-        Id: gateway, Names: gateway, LoadState: "loaded", LoadError: "", UnitFileState: "disabled",
-        ActiveState: "inactive", SubState: "dead", Result: "success", ExecMainStatus: "0", ExecMainCode: "0",
-        NRestarts: "0", FragmentPath: "", DropInPaths: "", Type: "simple", Restart: "on-failure",
-        ExecStart: exec(launcher, "gateway"),
-        Environment: `HERMES_HOME=${home}`,
-        ExecMainStartTimestampMonotonic: "0", ExecMainExitTimestampMonotonic: "0", TimeoutStartUSec: "1min 30s",
-      },
-    },
-    list_units: [
-      { unit: gateway, load: "loaded", active: "inactive", sub: "dead", description: `${agentId} gateway` },
-    ],
-    unit_files: [
-      { unit_file: gateway, state: "disabled", preset: null },
-    ],
-  };
+export function deferredAgentUnits() {
+  return { units: {}, list_units: [], unit_files: [] };
 }
 
-/** The fleet-shared Bloodbank gateway, healthy. */
-export function sharedGatewayUnits({ unit = "hermes-fleet-bloodbank-gateway.service", profile = "fleet-bloodbank-gateway", profileRoot, hermesBin, nowUs = monotonicNowUs() }) {
-  const exec = `{ path=${hermesBin} ; argv[]=${hermesBin} gateway run --replace ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }`;
+/** Where the host gateway's executable lives: `service_model.host.exec_bin` under the fleet home. */
+export function hostGatewayExecBin(fleetHome) {
+  return join(fleetHome, "hermes-agent", ".hermes", "bin", "hermes");
+}
+
+/**
+ * The ONE host gateway (`service_model.host`), healthy: enabled, active, running
+ * `hermes gateway run` from the pinned executable with HERMES_HOME the fleet home.
+ * It serves every profile and the Bloodbank command lane.
+ */
+export function hostGatewayUnits({ unit = "hermes-gateway.service", fleetHome, nowUs = monotonicNowUs() }) {
+  const bin = hostGatewayExecBin(fleetHome);
+  const exec = `{ path=${bin} ; argv[]=${bin} gateway run ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }`;
   return {
     units: {
       [unit]: {
@@ -167,14 +154,19 @@ export function sharedGatewayUnits({ unit = "hermes-fleet-bloodbank-gateway.serv
         ActiveState: "active", SubState: "running", Result: "success", ExecMainStatus: "0", ExecMainCode: "0",
         NRestarts: "0", FragmentPath: "", DropInPaths: "", Type: "simple", Restart: "on-failure",
         ExecStart: exec,
-        Environment: `HERMES_HOME=${join(profileRoot, profile)}`,
+        Environment: `HERMES_HOME=${fleetHome}`,
         ExecMainStartTimestampMonotonic: String(nowUs - 600_000_000n),
         ExecMainExitTimestampMonotonic: "0", TimeoutStartUSec: "1min 30s",
       },
     },
-    list_units: [{ unit, load: "loaded", active: "active", sub: "running", description: "fleet bloodbank gateway" }],
+    list_units: [{ unit, load: "loaded", active: "active", sub: "running", description: "hermes gateway (host)" }],
     unit_files: [{ unit_file: unit, state: "enabled", preset: null }],
   };
+}
+
+/** The host gateway under its older name: the Bloodbank lane is a consumer on it, not a unit of its own. */
+export function sharedGatewayUnits({ profileRoot, nowUs = monotonicNowUs() }) {
+  return hostGatewayUnits({ fleetHome: dirname(profileRoot), nowUs });
 }
 
 /** Fold several unit sets into one fake state. Later sets win on a name collision. */

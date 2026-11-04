@@ -87,6 +87,18 @@ function heartbeatRetirementRequired(version: unknown): boolean {
   return major! > 1 || (major === 1 && minor! >= 5);
 }
 
+/**
+ * The single-host-gateway service model arrived in 1.8: ONE host unit
+ * (`service_model.host.gateway_unit`) serves every profile, there is no per-agent
+ * gateway unit, and `service_model.per_agent` / `fleet_shared.bloodbank_gateway_unit`
+ * are retired. Older supported handbooks keep their grammar.
+ */
+export function hostGatewayModelRequired(version: unknown): boolean {
+  if (typeof version !== "string" || !SEMVER.test(version)) return false;
+  const [major, minor] = version.split(".").map(Number);
+  return major! > 1 || (major === 1 && minor! >= 8);
+}
+
 /** Match the same safe employee ID at every placeholder, as derive() substitutes it. */
 export function matchesRetiredCandidate(pattern: string, unit: string): boolean {
   const parts = pattern.split("{agent_id}").map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"));
@@ -554,17 +566,34 @@ function validateStructure(policy: Record<string, unknown>, extensions: readonly
   const service = policy.service_model;
   if (!isRecord(service)) fail("service_model", "service_model must be a mapping");
   else {
-    for (const key of ["per_agent", "fleet_shared", "profile_layout"] as const) {
+    const hostModel = hostGatewayModelRequired(policy.contract_version);
+    for (const key of [hostModel ? "host" : "per_agent", "fleet_shared", "profile_layout"] as const) {
       if (!isRecord(service[key])) fail(`service_model.${key}`, `${key} must be a mapping`);
     }
-    const perAgent = isRecord(service.per_agent) ? service.per_agent : {};
-    for (const key of ["gateway_unit"] as const) {
-      const value = perAgent[key];
-      if (typeof value !== "string" || value.length === 0) fail(`service_model.per_agent.${key}`, `${key} must be a unit name pattern`);
-      else if (!value.includes("{agent_id}")) fail(`service_model.per_agent.${key}`, "a per-agent unit pattern must carry the {agent_id} placeholder");
+    if (hostModel) {
+      const host = isRecord(service.host) ? service.host : {};
+      const unit = host.gateway_unit;
+      if (typeof unit !== "string" || unit.length === 0) fail("service_model.host.gateway_unit", "gateway_unit must be the host gateway's unit name");
+      // The host unit is ONE unit. A placeholder would make it per-agent again.
+      else if (unit.includes("{agent_id}")) fail("service_model.host.gateway_unit", "the host gateway is one unit for every profile and may not carry the {agent_id} placeholder");
+      else if (!/^[A-Za-z0-9@._-]+\.service$/u.test(unit)) fail("service_model.host.gateway_unit", "gateway_unit must be a .service unit name");
+      const restart = host.restart_command;
+      if (typeof restart !== "string" || restart.length === 0) fail("service_model.host.restart_command", "restart_command must name the only sanctioned way to restart the host gateway");
+      else if (/\s|\//u.test(restart)) fail("service_model.host.restart_command", "restart_command must be a bare command name");
+      for (const key of ["exec_bin", "home"] as const) {
+        const value = host[key];
+        if (value !== undefined && (typeof value !== "string" || value.length === 0)) fail(`service_model.host.${key}`, `${key} must be a non-empty path pattern when declared`);
+      }
+    } else {
+      const perAgent = isRecord(service.per_agent) ? service.per_agent : {};
+      for (const key of ["gateway_unit"] as const) {
+        const value = perAgent[key];
+        if (typeof value !== "string" || value.length === 0) fail(`service_model.per_agent.${key}`, `${key} must be a unit name pattern`);
+        else if (!value.includes("{agent_id}")) fail(`service_model.per_agent.${key}`, "a per-agent unit pattern must carry the {agent_id} placeholder");
+      }
     }
     const shared = isRecord(service.fleet_shared) ? service.fleet_shared : {};
-    for (const key of ["bloodbank_gateway_unit", "bloodbank_gateway_profile", "command_subject", "target_field"] as const) {
+    for (const key of [...(hostModel ? [] : ["bloodbank_gateway_unit"] as const), "bloodbank_gateway_profile", "command_subject", "target_field"] as const) {
       const value = shared[key];
       if (typeof value !== "string" || value.length === 0) fail(`service_model.fleet_shared.${key}`, `${key} must be a non-empty string`);
     }
@@ -1469,7 +1498,12 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
   const perAgent = service && isRecord(service.per_agent) ? service.per_agent : {};
   const shared = service && isRecord(service.fleet_shared) ? service.fleet_shared : {};
   const perAgentPatterns = Object.values(perAgent).filter((value): value is string => typeof value === "string" && value.length > 0);
-  const sharedUnit = typeof shared.bloodbank_gateway_unit === "string" ? shared.bloodbank_gateway_unit : null;
+  const hostModel = hostGatewayModelRequired(policy.contract_version);
+  const host = service && isRecord(service.host) ? service.host : {};
+  const hostUnit = typeof host.gateway_unit === "string" && host.gateway_unit.length > 0 ? host.gateway_unit : null;
+  const sharedUnit = hostModel
+    ? hostUnit
+    : typeof shared.bloodbank_gateway_unit === "string" ? shared.bloodbank_gateway_unit : null;
 
   // -- stabilization ----------------------------------------------------------
   const stabilization = block.stabilization;
@@ -1591,7 +1625,7 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
       else if (!item.includes("{agent_id}")) fail(where, "a retired candidate must carry the {agent_id} placeholder");
       // A retired shape that IS a canonical pattern would retire the canon.
       else if (perAgentPatterns.includes(item)) fail(where, `${item} is a service_model.per_agent pattern, not a retired shape`);
-      else if (sharedUnit !== null && item === sharedUnit) fail(where, `${item} is the fleet-shared gateway, not a retired shape`);
+      else if (sharedUnit !== null && item === sharedUnit) fail(where, `${item} is the ${hostModel ? "host" : "fleet-shared"} gateway, not a retired shape`);
       else if (unitGlob !== null && !unitGlob.test(item.replaceAll("{agent_id}", "x"))) fail(where, `${item} falls outside unit_glob, so the sweep could never see it`);
     });
   }
@@ -1613,7 +1647,8 @@ function validateServiceManifest(policy: Record<string, unknown>): FleetDiagnost
   // The current gateway observations each resolve an authority owner.
   for (const pattern of perAgentPatterns) requireDeclared(`units.${pattern}`, "service_manifest");
   if (sharedUnit !== null) requireDeclared(`units.${sharedUnit}`, "service_manifest");
-  requireDeclared("agents.{agent_id}.systemd.gateway_unit", "service_manifest");
+  // The host model owns the retired registry block as a namespace; the legacy model owned the key.
+  requireDeclared(hostModel ? "agents.{agent_id}.systemd" : "agents.{agent_id}.systemd.gateway_unit", "service_manifest");
 
   return findings;
 }

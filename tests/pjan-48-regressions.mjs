@@ -225,7 +225,8 @@ try {
     assert.equal(migrated.result.status, 0, migrated.result.stderr);
     assert.equal(migrationResult(migrated.json, "hermes.registry-parity").status, "applied");
     const row = YAML.parse(readFileSync(registryPath, "utf8")).agents[agentId];
-    assert.deepEqual(row.systemd, { gateway_unit: `hermes-${agentId}-gateway.service` });
+    assert.equal(row.systemd, undefined, "a new row never carries a per-agent gateway_unit: one host gateway serves every profile");
+    assert.doesNotMatch(readFileSync(registryPath, "utf8"), /gateway_unit/);
     const post = jsonCommand(["audit", repo, "--json"], { cwd: repo, home }).json;
     assert.equal(finding(post, "hermes.registry-parity").status, "pass");
   }
@@ -239,8 +240,10 @@ try {
     const unitDir = join(home, ".config", "systemd", "user");
     mkdirSync(unitDir, { recursive: true });
     writeFileSync(join(role, "hermes"), `#!/usr/bin/env bash\nHERMES_HOME="${profile}"\n`);
-    const gateway = join(unitDir, `hermes-${agentId}-gateway.service`);
-    writeFileSync(gateway, `[Service]\nEnvironment=HERMES_HOME=${profile}\n`);
+    // The per-agent gateway unit is retired: profile wiring no longer reads or rewrites it. The
+    // checkpoint unit (still a per-agent artifact) is the one whose environment is wired.
+    const checkpoint = join(unitDir, `hermes-${agentId}-checkpoint.service`);
+    writeFileSync(checkpoint, `[Service]\nEnvironment=HERMES_HOME=${profile}\n`);
     const retired = ["service", "timer"].map((suffix) => join(unitDir, `hermes-${agentId}-heartbeat.${suffix}`));
     const stale = "[Service]\nEnvironment=HERMES_HOME=/old/retired/profile\nEnvironment=HERMES_OAUTH_FILE=/old/retired/auth\n";
     for (const path of retired) writeFileSync(path, stale);
@@ -249,10 +252,16 @@ try {
     const migration = jsonCommand(["remediate", "hermes.profile-wiring", repo, "--json"], { cwd: repo, home }).json;
     assert.deepEqual(migrationResult(migration, "hermes.profile-wiring").changedFiles, []);
     for (const path of retired) assert.equal(readFileSync(path, "utf8"), stale);
+    // A leftover per-agent GATEWAY unit is not wired either (systemd.sentinel flags it as a conflict).
+    const gateway = join(unitDir, `hermes-${agentId}-gateway.service`);
     writeFileSync(gateway, stale);
+    assert.equal(audit().status, "pass", "a retired per-agent gateway unit is not profile wiring");
+    assert.equal(readFileSync(gateway, "utf8"), stale);
+    rmSync(gateway);
+    writeFileSync(checkpoint, stale);
     const failure = audit();
-    assert.equal(failure.status, "fail", "the current gateway still requires correct wiring");
-    assert.ok(failure.details.some((detail) => detail.includes(`hermes-${agentId}-gateway.service`)));
+    assert.equal(failure.status, "fail", "the per-agent units that remain still require correct wiring");
+    assert.ok(failure.details.some((detail) => detail.includes(`hermes-${agentId}-checkpoint.service`)));
     assert.equal(failure.details.some((detail) => detail.includes("heartbeat")), false);
   }
 
@@ -274,8 +283,18 @@ try {
       writeFileSync(join(sysDir, unit), "ExecStart=/old/location/pjangler/agents/hermes/pm/runtime/bin/hermes\n");
     }
 
+    // A scripted user manager: everything succeeds, but the RETIRED per-agent unit reads
+    // disabled+inactive (it was just disabled) while the one host gateway reads enabled+active.
+    const sysLog = join(home, "systemctl.log");
     const fakeSystemctl = join(fakeBin, "systemctl");
-    writeFileSync(fakeSystemctl, "#!/usr/bin/env bash\nprintf 'running\\n'\nexit 0\n");
+    writeFileSync(fakeSystemctl, `#!/usr/bin/env bash
+echo "$@" >> "${sysLog}"
+case "$*" in
+  *is-system-running*) printf 'running\\n'; exit 0 ;;
+  *is-enabled*${agentId}*|*is-active*${agentId}*) exit 1 ;;
+esac
+exit 0
+`);
     chmodSync(fakeSystemctl, 0o755);
     const provision = join(roleDir, ".scripts", "70-systemd.sh");
     writeFileSync(
@@ -295,6 +314,49 @@ try {
     assert.equal(migrationResult(migrated, "systemd.sentinel").status, "applied");
     assert.equal(existsSync(forceRecord), true, "stale unit paths must force regeneration");
     assert.equal(readFileSync(forceRecord, "utf8"), "1", "systemd provisioning must receive FORCE_SYSTEMD=1");
+    // One host gateway serves every profile: the retired per-agent unit is disabled and removed,
+    // never enabled, and the host unit is only observed.
+    const verbs = readFileSync(sysLog, "utf8");
+    assert.match(verbs, new RegExp(`disable --now hermes-${agentId}-gateway\\.service`), "the retired per-agent unit is disabled");
+    assert.doesNotMatch(verbs, /(^|\s)enable\s/m, "no unit is ever enabled");
+    assert.doesNotMatch(verbs, /(disable|stop|restart|reload|kill|mask)[^\n]*hermes-gateway\.service/, "the host gateway is never touched");
+    assert.equal(existsSync(join(sysDir, `hermes-${agentId}-gateway.service`)), false, "the retired per-agent unit file is removed");
+  }
+
+  {
+    // The sentinel is satisfied by the ONE host gateway alone: no per-agent unit exists, none is
+    // demanded, and a loaded leftover per-agent unit is a conflict (never a missing install).
+    const repo = makeRepo("sentinel-host-only");
+    const home = makeHome("sentinel-host-only");
+    const agentId = "pjan48-hostonly-pm";
+    makeRole(repo, agentId);
+    const sysDir = join(home, ".config", "systemd", "user");
+    const fakeBin = join(home, "bin");
+    mkdirSync(sysDir, { recursive: true });
+    mkdirSync(fakeBin, { recursive: true });
+    writeFileSync(join(sysDir, "hermes-gateway.service"), "[Service]\nExecStart=/bin/true\n");
+    const sysLog = join(home, "systemctl.log");
+    writeFileSync(join(fakeBin, "systemctl"), `#!/usr/bin/env bash
+echo "$@" >> "${sysLog}"
+case "$*" in
+  *is-system-running*) printf 'running\\n'; exit 0 ;;
+  *is-enabled*${agentId}*|*is-active*${agentId}*) exit 1 ;;
+esac
+exit 0
+`);
+    chmodSync(join(fakeBin, "systemctl"), 0o755);
+    const env = { PATH: `${fakeBin}:${process.env.PATH}` };
+    const audit = () => finding(jsonCommand(["audit", repo, "--json", "--rules", "systemd.sentinel"], { cwd: repo, home, extraEnv: env }).json, "systemd.sentinel");
+    const clean = audit();
+    assert.equal(clean.status, "pass", JSON.stringify(clean));
+    assert.equal(existsSync(join(sysDir, `hermes-${agentId}-gateway.service`)), false);
+    assert.doesNotMatch(readFileSync(sysLog, "utf8"), /(^|\s)(enable|disable|stop|restart|reload|kill|mask)\s/m, "an audit only observes");
+
+    writeFileSync(join(sysDir, `hermes-${agentId}-gateway.service`), "[Service]\nExecStart=/bin/true\n");
+    const conflict = audit();
+    assert.equal(conflict.status, "fail", "a loaded retired per-agent unit conflicts with the host gateway");
+    assert.ok(conflict.details.some((detail) => detail.includes(`hermes-${agentId}-gateway.service`) && /retired/.test(detail)), JSON.stringify(conflict.details));
+    assert.equal(conflict.details.some((detail) => detail.includes("hermes-gateway.service")  && /retired/.test(detail) && !detail.includes("conflicts with")), false, "the host unit is never named as retired");
   }
 
   {

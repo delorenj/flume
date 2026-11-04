@@ -142,10 +142,11 @@ own fails the same way instead of being dropped.
 
 A desk's explicit override of the shared chain (a primary `model:` of its own, or its
 own `fallback_providers`) survives hire/onboard and is reported as an override. It is
-honoured only where it is read: a desk's own Telegram/Slack gateway reads the desk's
+honoured only where it is read: a desk's own Telegram/Slack channel reads the desk's
 fallback chain, while multiplexed Bloodbank turns refresh fallbacks from the shared
-`fleet-bloodbank-gateway` process's own config (the target desk's primary `model:` is
-read per target). Do not claim a desk-level fallback chain for Bloodbank turns. The
+`fleet-bloodbank-gateway` profile's config on the one host gateway (`hermes-gateway.service`;
+the separate `hermes-fleet-bloodbank-gateway.service` unit is retired 2026-10-11; the target
+desk's primary `model:` is read per target). Do not claim a desk-level fallback chain for Bloodbank turns. The
 fallback entries do not carry the provider's `extra_body` effort either, so record the
 ledger's actual effort rather than the configured one.
 

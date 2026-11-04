@@ -85,12 +85,17 @@ if (value === undefined) { process.stderr.write("[ERROR] not found\\n"); process
 process.stdout.write(value);
 `);
 writeFileSync(join(BIN, "systemctl"), `#!/bin/sh\necho "$@" >> "$SYSTEMCTL_LOG"\nexit 0\n`);
+// The sanctioned way to cycle the one host gateway. Logged so a test can prove it was (or was not) asked.
+writeFileSync(join(BIN, "hermes-gateway-restart"), `#!/bin/sh\necho "$@" >> "$RESTART_LOG"\nexit 0\n`);
+chmodSync(join(BIN, "hermes-gateway-restart"), 0o755);
 chmodSync(join(BIN, "op"), 0o755);
 chmodSync(join(BIN, "systemctl"), 0o755);
 const OPLOG = join(work, "op.log");
 const SYSLOG = join(work, "systemctl.log");
+const RESTART_LOG = join(work, "gateway-restart.log");
 writeFileSync(OPLOG, "");
 writeFileSync(SYSLOG, "");
+writeFileSync(RESTART_LOG, "");
 
 // ---- the fake Telegram / Slack ----------------------------------------------------------------
 const apiCalls = [];
@@ -202,7 +207,7 @@ function flume(args, env = {}) {
       env: {
         PATH: `${BIN}:${process.env.PATH}`, HOME, NO_COLOR: "1", TMPDIR: "/tmp",
         HERMES_FLEET_HOME: FLEET, HERMES_AGENTS_REGISTRY: REG, FLUME_TELEGRAM_API_BASE: API, FLUME_SLACK_API_BASE: `${API}/slack`,
-        FLUME_CHANNEL_CONFIRM_MS: "4000", OP_MAP: OPMAP, OP_LOG: OPLOG, SYSTEMCTL_LOG: SYSLOG, ...env,
+        FLUME_CHANNEL_CONFIRM_MS: "4000", OP_MAP: OPMAP, OP_LOG: OPLOG, SYSTEMCTL_LOG: SYSLOG, RESTART_LOG, ...env,
       },
     });
     let stdout = "";
@@ -446,15 +451,16 @@ await check("--no-reload writes the change and says honestly that the gateway wa
   assert.equal(registry().agents["bob-pm"].telegram.provisioning_status, "verified");
 });
 
-await check("without a control socket the gateway is reloaded, and an unconfirmed result is reported as such", async () => {
+await check("without a control socket the host gateway is restarted through hermes-gateway-restart, never raw systemctl", async () => {
   socketServer.close();
   rmSync(SOCK, { force: true });
   const { body, status } = await json(["channel", "offline", "ada-pm", "--apply"], { FLUME_CHANNEL_CONFIRM_MS: "1200" });
   assert.equal(status, 0);
-  assert.equal(body.gateway.action, "reload");
+  assert.equal(body.gateway.action, "restart");
   assert.equal(body.gateway.confirmed, false);
   assert.match(body.gateway.detail, /no gateway control socket/u);
-  assert.match(readFileSync(SYSLOG, "utf8"), /--user reload hermes-gateway/u);
+  assert.match(readFileSync(RESTART_LOG, "utf8"), /^--reason channel offline ada-pm-?\S*$/mu);
+  assert.doesNotMatch(readFileSync(SYSLOG, "utf8"), /hermes-gateway|reload|restart/u, "raw systemctl is never used on the host gateway");
   await startSocket();
   await json(["channel", "online", "ada-pm", "--apply"]);
 });
@@ -487,15 +493,16 @@ await check("on a launchd host the fallback is hermes gateway restart, then laun
   await startSocket();
 });
 
-await check("a gateway that refuses to serve the profile falls back to a reload", async () => {
+await check("a gateway that refuses to serve the profile falls back to hermes-gateway-restart", async () => {
   socketServer.close();
   rmSync(SOCK, { force: true });
   await startSocket({ failServe: true });
   writeFileSync(SYSLOG, "");
   const { body } = await json(["channel", "offline", "bob-pm", "--apply"], { FLUME_CHANNEL_CONFIRM_MS: "1200" });
-  assert.equal(body.gateway.action, "reload");
+  assert.equal(body.gateway.action, "restart");
   assert.match(body.gateway.detail, /serve-profile: .*parked/u);
-  assert.match(readFileSync(SYSLOG, "utf8"), /reload hermes-gateway/u);
+  assert.match(readFileSync(RESTART_LOG, "utf8"), /^--reason channel offline /mu);
+  assert.doesNotMatch(readFileSync(SYSLOG, "utf8"), /hermes-gateway/u, "raw systemctl is never used on the host gateway");
   socketServer.close();
   rmSync(SOCK, { force: true });
   await startSocket();
