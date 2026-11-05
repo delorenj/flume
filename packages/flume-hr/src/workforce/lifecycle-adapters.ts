@@ -24,13 +24,13 @@
 //     its own row, `unverified` while the vault item exists, because nothing proves it is the desk's consumer.
 // Nothing here ever holds, returns or logs a secret value: rows carry IDs, `op://` references and codes.
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { accessStateDir } from "./access";
+import { consumerOf, deskRefs, fleetBaseGatewayRef, GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
 import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
@@ -713,9 +713,8 @@ export const planeAdapter: LifecycleAdapter = {
 // gateway (FLUME-39 owns minting and rotation; revocation here is `gateway-tokens.py revoke`)
 // ---------------------------------------------------------------------------
 
-/** The FLUME-39 shared item: `scripts/gateway-member-tokens.py` writes each consumer's token as one field of it. */
-export const GATEWAY_TOKENS_ITEM = "yeurk5dpqkaarspvsn3cjtmkki";
-const GATEWAY_REF = new RegExp(`^op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/([A-Za-z0-9][A-Za-z0-9_-]{0,39})$`, "u");
+// The desk's reference resolution (readRef, deskRefs, consumerOf) lives in gateway-desk.ts, shared with the registry projection.
+export { GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
 
 function gatewayBin(env: NodeJS.ProcessEnv): string {
   return env.FLUME_GATEWAY_TOKENS_BIN || join(env.HOME || homedir(), "docker", "stacks", "ai", "newapi", "ops", "gateway-tokens.py");
@@ -728,51 +727,6 @@ export function gatewayLink(env: NodeJS.ProcessEnv = process.env) {
 
 function fleetHome(census: IdentityCensus, env: NodeJS.ProcessEnv): string {
   return env.HERMES_FLEET_HOME || join(census.home, ".hermes");
-}
-
-/** What one desk config file says about the gateway key. A symlink, a non-file or bad YAML is `unreadable`, never "no key". */
-type RefRead = { exists: false } | { exists: true; ref?: string; unreadable?: true };
-
-function readRef(path: string): RefRead {
-  let info;
-  try { info = lstatSync(path); }
-  catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT" ? { exists: false } : { exists: true, unreadable: true }; }
-  if (info.isSymbolicLink() || !info.isFile()) return { exists: true, unreadable: true };
-  try {
-    const doc = YAML.parse(readFileSync(path, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, unknown> } } } | null;
-    const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
-    return { exists: true, ...(typeof ref === "string" ? { ref } : {}) };
-  } catch { return { exists: true, unreadable: true }; }
-}
-
-const refIn = (path: string): string | undefined => { const read = readRef(path); return read.exists ? read.ref : undefined; };
-const consumerOf = (ref: string | undefined): string | undefined => (ref ? GATEWAY_REF.exec(ref)?.[1] : undefined);
-
-export type GatewayRefSource = "delta" | "generated" | "base" | "launcher";
-
-interface DeskRefs {
-  /** The reference the desk RUNS with. */
-  running: { ref?: string; source?: GatewayRefSource };
-  /** The reference a render of the desk would produce: its delta's, else the fleet base's. */
-  predicted: { ref?: string; source?: "delta" | "base" };
-  drift: boolean;
-  unreadable: boolean;
-}
-
-/**
- * Hermes runs a profile's GENERATED `config.yaml`, which is `deep_merge(<fleet>/config.yaml, <profile>/config.delta.yaml)` for a
- * post's desk and a specialist's alike. When that file exists its reference is the one that runs, whatever the delta says now:
- * `gateway-member-tokens.py --apply` edits the delta and re-renders only with `--render`, and a running gateway keeps the old
- * key until restarted. Without a generated config the desk would be rendered from its delta, then the base. A generated config
- * that disagrees with that render, or cannot be read, is DRIFT: neither key is provably the only one the desk uses.
- */
-function deskRefs(fleet: string, profile: string | null, baseRef: string | undefined): DeskRefs {
-  const delta = profile ? refIn(join(fleet, "profiles", profile, "config.delta.yaml")) : undefined;
-  const predicted: DeskRefs["predicted"] = delta ? { ref: delta, source: "delta" } : baseRef ? { ref: baseRef, source: "base" } : {};
-  const generated: RefRead = profile ? readRef(join(fleet, "profiles", profile, "config.yaml")) : { exists: false };
-  if (!generated.exists) return { running: predicted, predicted, drift: false, unreadable: false };
-  const unreadable = Boolean(generated.unreadable);
-  return { running: generated.ref ? { ref: generated.ref, source: "generated" } : {}, predicted, drift: unreadable || generated.ref !== predicted.ref, unreadable };
 }
 
 interface GatewayDesk {
@@ -792,7 +746,7 @@ const launcherRef = (target: IdentityDefinition, profile: string | null): string
 
 function gatewayDesk(ctx: Pick<LifecycleContext, "census" | "target" | "env">): GatewayDesk {
   const fleet = fleetHome(ctx.census, ctx.env);
-  const baseRef = refIn(join(fleet, "config.yaml"));
+  const baseRef = fleetBaseGatewayRef(fleet);
   const profile = deskProfileOf(ctx.census, ctx.target);
   const refs = deskRefs(fleet, profile, baseRef);
   const pending = consumerOf(refs.predicted.ref);

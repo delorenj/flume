@@ -85,6 +85,7 @@ const SUITES = [
   "tests/employee-access-github-regressions.mjs",
   "tests/employee-access-github-comments-regressions.mjs",
   "tests/company-identity-registry-plane-regressions.mjs",
+  "tests/registry-lifecycle-projection-regressions.mjs",
   "tests/company-identity-plane-regressions.mjs",
   "tests/identity-provision-regressions.mjs",
   "tests/company-identity-lifecycle-regressions.mjs",

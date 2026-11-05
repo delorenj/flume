@@ -62,3 +62,7 @@ they are never written to receipts, logs, stdout or definitions.
   rotation is deliberate (`flume identity rotate`), not a hire side-effect.
 - The facade worker reads the allowlist from KV (`allowlist/<address>` keys),
   so hiring never redeploys it.
+- Enrollment, suspension and retirement change what the fleet registry should
+  project for the employee. `flume remediate hermes.registry-parity` re-projects
+  `company_identity` (and each desk's `gateway_consumer`) onto every registry
+  row; see "Registry projection for the lifecycle" in `docs/employee-access.md`.

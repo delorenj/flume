@@ -125,7 +125,9 @@ ${Object.entries(plane).map(([key, value]) => `      ${key}: "${value}"`).join("
   assert.equal(row().plane.workspace, before.plane.workspace, "board identity is project-registry's, never rewritten here");
   assert.equal(row().plane.project_id, before.plane.project_id);
   assert.equal(row().plane.identifier, before.plane.identifier);
-  assert.deepEqual({ ...row(), plane: null }, { ...before, plane: null }, "only the plane identity changed");
+  // company_identity is the lifecycle projection of the same definition (tests/registry-lifecycle-projection-regressions.mjs).
+  assert.deepEqual(row().company_identity.plane, { attribution_mode: "native", native_actor_id: NATIVE });
+  assert.deepEqual({ ...row(), plane: null, company_identity: null }, { ...before, plane: null, company_identity: null }, "only the plane identity (and its lifecycle projection) changed");
   assert.deepEqual(planeDrift(parity()), []);
 
   // 4. idempotent, and the registry holds references only.

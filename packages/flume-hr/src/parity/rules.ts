@@ -2,10 +2,13 @@ import { constants as fsConstants, existsSync, lstatSync, statSync, mkdirSync, m
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
-import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration } from "../workforce/role";
+import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration, withRegistryLock } from "../workforce/role";
+import { applyLifecycle, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
+import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
@@ -489,6 +492,48 @@ function registryIdentityDrift(role: RoleMeta, entry: Record<string, unknown>): 
     out.push(`registry names ${role.agentId} "${rowIdentity}" but ${role.role}/role.yaml declares no identity`);
   }
   return out;
+}
+
+
+/**
+ * How the registry's lifecycle projection (`company_identity`, `gateway_consumer`) disagrees with each row's
+ * owning definition and desk config. Every row, not only this repository's: see workforce/registry-lifecycle.ts.
+ */
+function registryLifecycleDrift(registry: Record<string, unknown>, fleet: string): string[] {
+  const out: string[] = [];
+  for (const [agentId, entry] of Object.entries(registry)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    out.push(...lifecycleDrift(row, rowLifecycle(agentId, row, fleet)));
+  }
+  return out;
+}
+
+
+/**
+ * Apply the JS-side delta (before -> after) onto an already-parsed YAML Document, node by node.
+ *
+ * YAML.stringify on the plain JS object would re-render every scalar and lose quoting the operators
+ * and other tools depend on (an ISO timestamp left quoted on disk must stay a string, not become a
+ * plain scalar that PyYAML reads as a datetime). Only paths that actually changed are touched;
+ * comments and untouched styles survive. `before` must be the value of `path` parsed from the same
+ * source text the Document came from.
+ */
+function patchYamlNode(document: ReturnType<typeof YAML.parseDocument>, path: (string | number)[], before: unknown, after: unknown): void {
+  if (isDeepStrictEqual(before, after)) return;
+  const isPlain = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  if (isPlain(before) && isPlain(after) && YAML.isMap(document.getIn(path, true))) {
+    for (const key of Object.keys(before)) {
+      if (!(key in after)) document.deleteIn([...path, key]);
+    }
+    for (const [key, value] of Object.entries(after)) {
+      patchYamlNode(document, [...path, key], before[key], value);
+    }
+    return;
+  }
+  if (after === undefined) document.deleteIn(path);
+  else document.setIn(path, document.createNode(after));
 }
 
 
@@ -4715,6 +4760,10 @@ return [
           details.push(`retired per-agent consumer unit still on disk: ${legacyUnit}`);
         }
       }
+      // Registry projection for the ticket lifecycle (workforce/registry-lifecycle.ts): EVERY row's
+      // company_identity and gateway_consumer, whichever repository runs this host-scoped rule. A portable
+      // specialist has no repository of its own, and the n8n Fleet node reads the whole registry.
+      details.push(...registryLifecycleDrift(registry, fleetHome(ctx)));
       return {
         id: "hermes.registry-parity",
         title: "Fleet registry matches .project.json (no duplicate or stale agents)",
@@ -4724,7 +4773,7 @@ return [
         fixable: !malformedRoleGate,
       };
     },
-    migrate: (ctx, finding) => {
+    migrate: async (ctx, finding) => {
       const changedFiles: string[] = [];
       const details: string[] = [];
       const registryPath = resolveAgentRegistryPath(process.env, ctx.homeDir);
@@ -4928,11 +4977,35 @@ return [
         }
       }
 
+      // Registry projection for the ticket lifecycle: every row, as the audit reports it.
+      const fleet = fleetHome(ctx);
+      for (const [agentId, entry] of Object.entries(agents)) {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+        const changes = applyLifecycle(entry, rowLifecycle(agentId, entry, fleet));
+        if (changes.length) {
+          details.push(...changes);
+          dirty = true;
+        }
+      }
+
       if (dirty) {
         changedFiles.push(registryPath);
         if (!ctx.dryRun) {
-          doc.agents = agents;
-          writeText(registryPath, YAML.stringify(doc));
+          // Every row is now in scope, so the write is compare-and-swap under the fleet registry lock
+          // (the one 80-registry.sh, specialist onboarding and `flume identity` take): a row another
+          // writer changed since this run read the file is never overwritten with the stale copy.
+          // The write itself patches only the changed paths in the parsed Document, so quoting,
+          // comments and untouched rows survive byte-for-byte (see patchYamlNode).
+          const read = raw;
+          const originalAgents = ((YAML.parse(read) ?? {}) as { agents?: Record<string, unknown> }).agents ?? {};
+          const raced = await withRegistryLock(registryPath, async () => {
+            if (safeReadText(registryPath) !== read) return true;
+            updateRegistryDocumentUnlocked(registryPath, (document) => patchYamlNode(document, ["agents"], originalAgents, agents));
+            return false;
+          });
+          if (raced) {
+            return { id: finding.id, title: finding.title, status: "blocked", summary: "The fleet registry changed while it was being repaired; nothing was written to it, re-run the remediation", changedFiles: changedFiles.filter((file) => file !== registryPath), details };
+          }
         }
       }
       return {

@@ -522,6 +522,45 @@ proof is `unverified`, reason `shared-consumer`). The live canary procedure is
 `_bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md`; `employee_lifecycle_canary` stays `unproven` in `flume identity readiness`
 until the supervisor runs it.
 
+## Registry projection for the lifecycle
+
+The ticket-lifecycle machinery reads the fleet registry, not Flume. The **n8n Fleet node** (n8n-nodes-bloodbank) attributes
+a lane failure or a dispatch to a company identity, and stamps `company_identity` onto `workflow.task.failed`, from
+`~/.hermes/agents-registry.yaml` alone. So `flume remediate hermes.registry-parity` projects two things onto **every**
+row, whichever repository runs it (a portable specialist has no repository of its own):
+
+```yaml
+agents:
+  33god-pm:
+    company_identity:            # ENROLLED employees only, from the owning definition (the SSOT)
+      subject: 1dcd3567-...      # the immutable company subject: the join key
+      handle: grolf
+      email: grolf@agents.delo.sh
+      status: active             # active | suspended | retired, as the definition records it
+      plane:                     # only for a VERIFIED native binding (native_actor_id == principal)
+        attribution_mode: native
+        native_actor_id: 292ac356-...
+    gateway_consumer: hermes-33god-pm
+```
+
+- **`company_identity`** comes from the definition the row points at: a post's `<role_dir>/role.yaml`, a specialist's
+  `definition_path` (agent.yaml). An un-enrolled definition (or a row that points at none) gets no block, and a stale
+  one is removed. Nothing else is copied: no `enrolled_at`, no bindings, no `credential_ref`. The Plane key stays
+  where FLUME-52 put it (`plane.key_ref`).
+- **`gateway_consumer`** is the AutomaticAI gateway consumer the row's desk **runs**, by the gateway adapter's own
+  resolution (`workforce/gateway-desk.ts`): `profiles/<profile_name>/config.yaml`, else its `config.delta.yaml`, else
+  the fleet base `~/.hermes/config.yaml`, whose consumer is `hermes`, the fleet's shared base consumer. Only the
+  FLUME-39 reference shape (`op://DeLoSecrets/<tokens item>/<consumer>`) names a consumer. A desk mapping another shape
+  (a specialist launcher reference), or a row with no desk directory, gets no key. Absent means unknown.
+- **Held, never guessed.** A definition whose `company_identity` is malformed, or a desk config that cannot be read,
+  leaves that row's key as it is, and `flume audit` reports it (`cannot be projected (left as is)`).
+- **Drift** is reported by `flume audit` under `hermes.registry-parity` (host scope) like the identity and Plane
+  projections. After `flume identity enroll|status|suspend|restore|retire|adopt-actor`, or a FLUME-39 token change,
+  re-run `flume remediate hermes.registry-parity` from any repository with a Hermes role to refresh the rows.
+- The registry write is compare-and-swap under the fleet registry lock. Readers that do not know the keys ignore them:
+  the host gateway's `ProfileResolver` (re-read on every command, so no restart), the n8n Bloodbank nodes, the
+  template's `80-registry.sh` / `channel-transaction.py` / `fleet-sync.sh` (merge, never drop), and Flume's own audits.
+
 ## The trusted launcher
 
 `flume launch <employee>` (Hermes) and `flume access run <employee> -- <command>`
