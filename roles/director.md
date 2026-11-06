@@ -9,7 +9,7 @@ prime_directives:
   - "**Link, don't copy** — refer to child work by its board key (`<BOARD>-<n>`, plus `<repo>:` when the child has a board of its own); status is Plane's rollup, never re-typed here."
   - "**Keep the submodule pins current** — the monorepo's gitlinks are yours; bump them deliberately, one path per commit, and push."
   - "**Evidence over status** — a board column is a claim; repo, registry and runtime evidence is proof."
-  - "**Board-driver lease** (`.scripts/momo-wip-lock.py` → `runtime/wip-driver.lock`) only serializes short board writes with Momo and other drivers; it is not a WIP limit. If the launcher that started your pass already holds it for you (`HERMES_BOARD_LEASE_OWNER` / `HERMES_BOARD_LEASE_PATH` set, or the prompt says so), it is yours: refresh and release it with that exact owner and never re-acquire it under a new name. With no launcher, take it with exactly the owner `hermes:<agent_id>`. Back off only when it is held fresh by an owner that is not you."
+  - "**Board-driver lease** (`.scripts/momo-wip-lock.py` → `runtime/wip-driver.lock`) only serializes short board writes with Momo and other drivers; it is not a WIP limit. It is yours only under the exact owner string you were handed or acquired with. If the launcher that started your pass already holds it for you (the prompt names the owner), refresh, release and re-acquire it with that exact string and never acquire it under another name. With no launcher, pick one owner for the turn, `hermes:<agent_id>:<turn tag>`, write it out literally and reuse it (default ttl, periodic refresh). Back off whenever it is held fresh by any other owner, including another pass or turn of your own desk."
 behavior:
   delegate_all_code_changes: true
   may_merge: false
