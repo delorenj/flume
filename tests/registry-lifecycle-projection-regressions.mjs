@@ -12,14 +12,19 @@
 //      and a desk reference that is not the FLUME-39 shape names no consumer;
 //   5. the generated config.yaml (what the desk RUNS) wins over its delta, exactly as the gateway adapter resolves it;
 //   6. an unreadable desk config holds the row's value as it is and says so; it is never guessed either way;
+//   8. a row that NAMES a definition which is missing (moved checkout, dangling link) holds its company_identity and
+//      says so; only a row that names none, or an existing definition that enrolls nobody, drops it. A finding made
+//      only of held keys is not fixable, so audit and remediate converge;
+//   9. the write is compare-and-swap: a registry that changed while the run waited for the lock is never overwritten
+//      (status "blocked"), and a successful write keeps comments and quoted timestamps byte-for-byte.
 //   7. --dry-run writes nothing; a second remediation is a no-op; only the two keys change; no credential reference
 //      or secret is ever projected.
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -260,6 +265,101 @@ ${postRow("named-pm", roles["named-pm"])}${postRow("plain-director", roles["plai
   assert.equal(registry().agents["plain-director"].company_identity.status, "suspended", "a malformed definition never strips or rewrites the projection");
   writeFileSync(directorYaml, directorText);
   assert.equal(parity().status, "pass");
+
+  // 8. a definition that is MISSING is unreadable, not "not enrolled": the identity is held, never dropped.
+  const specAgent = join(specDesk, "agent.yaml");
+  const specIdentity = () => registry().agents.spec.company_identity;
+  assert.equal(specIdentity().handle, "spec");
+  const heldLine = /company_identity for spec cannot be projected \(left as is\): .*does not exist/u;
+  const checkHeld = (why) => {
+    audit = parity();
+    assert.equal(audit.status, "fail", `${why}: ${JSON.stringify(audit.details)}`);
+    assert.ok(lifecycleLines(audit).some((line) => heldLine.test(line)), `${why}: ${JSON.stringify(audit.details)}`);
+    // Nothing left to remediate: a held key cannot be fixed, so the finding must not claim it can.
+    assert.equal(audit.fixable, false, `${why}: a held-only finding is not fixable`);
+    const before = readFileSync(registryPath, "utf8");
+    // The migration changes nothing; the engine's postcondition audit then says the held key is still unresolved.
+    const held = remediate().json.results.find((rule) => rule.id === "hermes.registry-parity");
+    assert.equal(held.status, "partial", why);
+    assert.deepEqual(held.changedFiles, [], why);
+    assert.equal(readFileSync(registryPath, "utf8"), before, `${why}: a held identity is never rewritten`);
+    assert.equal(specIdentity().handle, "spec", `${why}: the identity survives`);
+  };
+  renameSync(specAgent, `${specAgent}.moved`);
+  checkHeld("definition moved away");
+  symlinkSync(join(work, "nowhere", "agent.yaml"), specAgent);
+  checkHeld("dangling definition link");
+  // Real drift beside a held key stays fixable, and fixing it still leaves the held key alone.
+  writeFileSync(registryPath, `${readFileSync(registryPath, "utf8")}    gateway_consumer: hermes-spec\n`);
+  audit = parity();
+  assert.equal(audit.fixable, true, "a fixable drift next to a held key keeps the finding fixable");
+  remediate();
+  assert.equal("gateway_consumer" in registry().agents.spec, false);
+  assert.equal(specIdentity().handle, "spec");
+  checkHeld("after the beside-drift was fixed");
+  rmSync(specAgent);
+  renameSync(`${specAgent}.moved`, specAgent);
+  assert.equal(parity().status, "pass");
+  // A row that names NO definition, and a definition that exists and enrolls nobody, still drop a stale identity.
+  writeFileSync(registryPath, `${readFileSync(registryPath, "utf8")}  orphan:
+    employment: portable-specialist
+    profile_name: orphan
+    type: hermes
+    company_identity:
+      subject: ${GROLF}
+      handle: ghost
+      email: ghost@agents.delo.sh
+      status: active
+`);
+  audit = parity();
+  assert.ok(lifecycleLines(audit).some((line) => /company_identity for orphan is .* but the row's definition is not enrolled/u.test(line)), JSON.stringify(audit.details));
+  remediate();
+  assert.equal("company_identity" in registry().agents.orphan, false, "a row with no definition reference drops it");
+  assert.equal(parity().status, "pass");
+
+  // 9. format preservation: a comment and a quoted ISO timestamp elsewhere in the file survive a real write.
+  const marked = readFileSync(registryPath, "utf8")
+    .replace("schema_version: 1\n", "# keep this comment\nschema_version: 1\n")
+    .replace("    profile_name: plain-director\n", '    profile_name: plain-director\n    seen_at: "2026-10-13T09:14:09.584Z" # keep this too\n')
+    + "    gateway_consumer: hermes-orphan\n";
+  writeFileSync(registryPath, marked);
+  assert.ok(lifecycleLines(parity()).some((line) => /gateway_consumer for orphan/u.test(line)));
+  assert.equal(remediate().json.results.find((rule) => rule.id === "hermes.registry-parity").status, "applied");
+  const kept = readFileSync(registryPath, "utf8");
+  assert.ok(kept.startsWith("# keep this comment\nschema_version: 1\n"), "the leading comment survives");
+  assert.ok(kept.includes('    seen_at: "2026-10-13T09:14:09.584Z" # keep this too\n'), "the quoted timestamp and its comment survive");
+  assert.equal(kept, marked.replace("    gateway_consumer: hermes-orphan\n", ""), "only the drifted key changed, byte-for-byte");
+
+  // 9. compare-and-swap: the registry changes while the run waits for the fleet lock, so nothing is written.
+  const lockPath = `${registryPath}.lock`;
+  const racedBase = readFileSync(registryPath, "utf8");
+  writeFileSync(registryPath, `${racedBase}    gateway_consumer: hermes-orphan\n`);
+  const holder = spawn("python3", ["-c", `import fcntl,sys\nf=open(${JSON.stringify(lockPath)},"a")\nfcntl.flock(f,fcntl.LOCK_EX)\nprint("locked",flush=True)\nsys.stdin.read()`], { stdio: ["pipe", "pipe", "inherit"] });
+  await new Promise((done, fail) => { holder.stdout.once("data", done); holder.once("error", fail); });
+  const racing = spawn("node", [cli, "remediate", "hermes.registry-parity", repo, "--json"], { cwd: repo, env: { ...env, HOME: home, XDG_CACHE_HOME: join(home, ".cache") }, stdio: ["ignore", "pipe", "pipe"] });
+  let out = "";
+  racing.stdout.on("data", (chunk) => { out += chunk; });
+  racing.stderr.on("data", (chunk) => { out += chunk; });
+  const exited = new Promise((done) => racing.once("close", done));
+  // Release only once the run is queued on the lock (a waiter shows up in /proc/locks), i.e. after it read the file.
+  const inode = statSync(lockPath).ino;
+  for (let waited = 0; waited < 200; waited += 1) {
+    let locks = "";
+    try { locks = readFileSync("/proc/locks", "utf8"); } catch { await new Promise((done) => setTimeout(done, 3000)); break; }
+    if (locks.split("\n").some((line) => line.includes("->") && line.endsWith(`:${inode} 0 EOF`) || (line.includes("->") && line.includes(`:${inode} `)))) break;
+    await new Promise((done) => setTimeout(done, 100));
+  }
+  const intruder = `${readFileSync(registryPath, "utf8")}# another writer was here\n`;
+  writeFileSync(registryPath, intruder);
+  holder.stdin.end();
+  await exited;
+  const raced = JSON.parse(out.slice(out.indexOf("{"))).results.find((rule) => rule.id === "hermes.registry-parity");
+  assert.equal(raced.status, "blocked", out);
+  assert.match(raced.summary, /changed while it was being repaired/u);
+  assert.equal(readFileSync(registryPath, "utf8"), intruder, "the stale copy never overwrites what the other writer wrote");
+  assert.equal(remediate().json.results.find((rule) => rule.id === "hermes.registry-parity").status, "applied", "re-running after the race converges");
+  assert.equal("gateway_consumer" in registry().agents.orphan, false);
+  assert.ok(readFileSync(registryPath, "utf8").includes("# another writer was here"));
 
   console.log("registry lifecycle projection regressions: all assertions passed");
 } finally {

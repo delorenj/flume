@@ -16,7 +16,9 @@
 //                                           resolution the FLUME-53 gateway adapter uses (generated config.yaml, else
 //                                           config.delta.yaml, else the fleet base -> `hermes`, the shared base consumer)
 //
-// Absent means "not enrolled" / "unknown". A row whose definition is not enrolled loses a stale `company_identity`; a
+// Absent means "not enrolled" / "unknown". A row whose definition EXISTS and is not enrolled, or a row that names no
+// definition at all, loses a stale `company_identity`. A row naming a definition that is missing holds it (a moved
+// checkout must never wipe identities fleet-wide); a
 // desk whose key is not the FLUME-39 shape, or a row with no desk directory, has no `gateway_consumer`. Nothing beyond
 // these fields is projected: no credential reference, no binding principal other than the verified Plane actor
 // (plane.key_ref stays where FLUME-52 put it). Only a definition or desk config that cannot be READ holds its key as it
@@ -80,9 +82,16 @@ export function registryCompanyIdentity(definitionText: string): RegistryCompany
   return projected;
 }
 
-function companyFor(definition: string | null): Projected<RegistryCompanyIdentity> {
-  // A row that points at no definition, or at one that does not exist, is not an enrolled employee.
-  if (!definition || !existsSync(definition)) return { state: "decided" };
+function companyFor(definition: string | null, row: Record<string, unknown>): Projected<RegistryCompanyIdentity> {
+  // A row that points at no definition at all is not an enrolled employee.
+  if (!definition) return { state: "decided" };
+  // A row that NAMES a definition which is not there (a moved checkout, a dangling link) is not "not enrolled": the
+  // definition is unreadable. Only an identity the row already carries is at risk, so only then is it held.
+  if (!existsSync(definition)) {
+    return row.company_identity === undefined
+      ? { state: "decided" }
+      : { state: "held", reason: `${definition} does not exist (moved checkout or dangling link?), so whether it enrolls this row is unknown` };
+  }
   let body: string;
   try {
     if (!statSync(definition).isFile()) return { state: "held", reason: `${definition} is not a regular file` };
@@ -112,10 +121,15 @@ function gatewayFor(fleet: string, profile: string): Projected<string> {
 /** What one registry row should carry for the lifecycle. `fleet` is the Hermes fleet home (`~/.hermes`). */
 export function rowLifecycle(agentId: string, row: Record<string, unknown>, fleet: string): RowLifecycle {
   const definition = rowDefinitionPath(row);
-  return { agentId, definition, company: companyFor(definition), gateway: gatewayFor(fleet, text(row.profile_name)?.trim() ?? agentId) };
+  return { agentId, definition, company: companyFor(definition, row), gateway: gatewayFor(fleet, text(row.profile_name)?.trim() ?? agentId) };
 }
 
 const show = (value: unknown): string => (value === undefined ? "absent" : JSON.stringify(value));
+
+/** True for a drift line that only reports a held (unresolvable) key: no remediation can resolve it. */
+export function isHeldDrift(line: string): boolean {
+  return / cannot be projected \(left as is\): /u.test(line);
+}
 
 /** How a row disagrees with its projection; one line per key. A held key is reported once, as held. */
 export function lifecycleDrift(row: Record<string, unknown>, expected: RowLifecycle): string[] {

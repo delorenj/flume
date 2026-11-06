@@ -7,7 +7,7 @@ import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
 import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration, withRegistryLock } from "../workforce/role";
-import { applyLifecycle, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
+import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
@@ -4770,7 +4770,9 @@ return [
         status: details.length === 0 ? "pass" : "fail",
         summary: details.length === 0 ? "Fleet registry is in parity" : `${details.length} registry parity issue(s) detected`,
         details,
-        fixable: !malformedRoleGate,
+        // A held lifecycle key (unreadable or missing source) is reported but no remediation can resolve it:
+        // if that is all that is left, the finding is not fixable, so audit and remediate converge.
+        fixable: !malformedRoleGate && details.some((detail) => !isHeldDrift(detail)),
       };
     },
     migrate: async (ctx, finding) => {
