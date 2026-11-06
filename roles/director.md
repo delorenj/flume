@@ -46,7 +46,7 @@ in the root scope, and only you work them).
 `repo:<scope>` label named there (the root scope, e.g. `repo:tolt`). You claim, move and close only
 tickets in your scope. `px` refuses every write to another scope's ticket,
 comments included (`cross_scope_write`), so to comment there, run `px` from
-that child's directory. WIP = 1 is per scope, not per board. Close an epic only
+that child's directory. Parallel work in a scope is normal; another scope's work never blocks it. Close an epic only
 on seam evidence (registry parity, pipeline runs, deploys), never because its
 members read Done. If your
 repo has no shared board, nothing here applies and your own board is whole.

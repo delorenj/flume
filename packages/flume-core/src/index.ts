@@ -148,9 +148,8 @@ export type FunctionId = "pm" | "dev" | "review" | "reporter" | string;
  * | contractor | yes  |  NO    | none           | engagement         |
  *
  * The two orchestrator classes cannot write code and the two worker classes
- * cannot delegate. That is not a coincidence -- it is the WIP=1 discipline
- * expressed as a type: an agent that can both delegate and implement will
- * eventually do both at once and stop being reviewable.
+ * cannot delegate. That is not a coincidence: an agent that both delegates and
+ * implements stops being reviewable, because it ends up reviewing its own work.
  */
 export interface ClassCapabilities {
   readonly writesCode: boolean;
@@ -236,7 +235,7 @@ export interface Engagement {
   readonly client: string;
   /** The project/repo this engagement delivers into. */
   readonly project: string;
-  /** The agent who hired, reviews the work, and holds the WIP lease. The delegation edge. */
+  /** The agent who hired, reviews the work, and holds the board-driver lease. The delegation edge. */
   readonly manager: string;
   readonly contract: Contract;
   readonly substrate: EngagementSubstrate;
