@@ -1,0 +1,100 @@
+{
+  "schema": "flume.i9.agent-message-coordination.v1",
+  "ticket": "FLUME-76",
+  "scope": "coordination-only; Hermes Fleet owns agent.message contract and mutation",
+  "original_invocation": {
+    "command_id": "149134bb-3c88-4ebf-8ecf-98610e054933",
+    "correlation_id": "f9126f02-14cf-4fae-8a5c-00026336cefa",
+    "thread_id": "i9-agent-message-planning:f9126f02-14cf-4fae-8a5c-00026336cefa",
+    "target": "flume-pm",
+    "subject": "bloodbank.cmd.agent.invocation.start",
+    "stream": "BLOODBANK_COMMANDS",
+    "sequence": 160790,
+    "stored_at": "2026-11-08T09:59:07.11897492Z",
+    "observer_expires_at": "2026-11-08T10:13:53.579009Z",
+    "last_snapshot_at": "2026-11-08T10:14:20.883733Z",
+    "latest_scoped_journal_read": "no execution row for exact command_id (read-only SQLite mode=ro)",
+    "owner_response": "PENDING",
+    "interpretation": "Stored and observer expired; no correlated reply or terminal rejection. Never resend, replay or cross-route."
+  },
+  "owner_binding": {
+    "coordination": "flume-pm on FLUME, accepted coordination-only",
+    "contract_owner": "Hermes Fleet",
+    "catalog_owner_key": "hermes-agent (proposal only; not a dispatch address)",
+    "fleet_component_source": "33god-platform/components/hermes-fleet.yaml -> ../hermes-agent-template",
+    "template_revision": "5715dbc4228a0aa8c8f91424ade092b9e448f26b",
+    "implementation_home": null,
+    "implementation_ticket": null,
+    "blocker": "Fleet card identifies a shared template and ~/.hermes/hermes-agent is an install; neither establishes native Adapter source/contract writer, enrolled Fleet board/PM or implementation ticket. The parent planning response remains pending."
+  },
+  "candidate": {
+    "cohort": "selected pane-bound local-Linux Claude process/native-session incarnation only",
+    "predicate": "SUPPORTED only if a Fleet owner declares a versioned external schema and public/owned invocation; selected live pane and canonical namespace/boot/PID/start/native UUID are corroborated with the connected peer; a tested invariant or final fence covers all asynchronous ingress; an independent receiver-side input-acceptance observable correlates attempt/body/incarnation. Otherwise UNSUPPORTED and zero native submit.",
+    "current": "UNSUPPORTED_FOR_SUBMISSION",
+    "installed_executable": "/home/delorenj/.local/share/claude/versions/2.1.319",
+    "installed_executable_sha256": "dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed",
+    "installed_inspection": "Connected peer PID/UID/start validation and optional pre-await session filter observed; no committed external compatibility, final async fence, or independent acceptance observable established. Digest is evidence, not a deployment pin."
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "owner": "Hermes Fleet",
+      "question": "Can the declared external schema and version capability address exactly this cohort?",
+      "cases": ["compatible request retains attempt correlation", "unknown/incompatible schema and missing identity yield zero native user frames", "changed executable/config requires fresh compatibility proof"],
+      "acceptance": "Owner-supported external framing/results and discriminator; exact executable/config revision plus complete native-submit trace and independent compatibility observation for all cases.",
+      "status": "BLOCKED_NOT_RUN",
+      "missing_invocation": "No owner-supported external native-message entrypoint/argv or schema/version capability table established.",
+      "unsupported_consequence": "zero submit; no terminal fallback"
+    },
+    {
+      "id": "G2",
+      "owner": "Hermes Fleet",
+      "question": "Can only the connected expected process/native-session incarnation accept through asynchronous ingress?",
+      "cases": ["stable endpoint accepts only expected incarnation", "replacement before submit yields zero submit", "session change across each async boundary cannot enter replacement incarnation", "pathname substitution after connect cannot retarget"],
+      "acceptance": "Independently corroborated peer PID/UID/start and native UUID; complete async boundary map, controlled replacement trace and receiver identity observation, or a tested native invariant excluding the transition.",
+      "status": "BLOCKED_NOT_RUN",
+      "missing_invocation": "No owner-supported ingress-boundary exercise/observer or proven final generation fence; optional pre-await check is insufficient.",
+      "unsupported_consequence": "zero new submit; if submit already possible, preserve outcome-unknown fence"
+    },
+    {
+      "id": "G3",
+      "owner": "Hermes Fleet",
+      "question": "Does independent receiving-input acceptance identify attempt, body and incarnation?",
+      "cases": ["intended native input accepted exactly for expected incarnation", "held/refused/timeout remains distinct from accepted", "wrong/unsupported receiver gets no unintended acceptance"],
+      "acceptance": "Independent receiver-side event or established queue admission semantics with complete coverage and correlation of attempt marker, body digest and process/native UUID; sender status alone never qualifies.",
+      "status": "BLOCKED_NOT_RUN",
+      "missing_invocation": "No supported independent receiver acceptance event/schema/collection method demonstrated; internal delivered/held release is not sufficient.",
+      "unsupported_consequence": "zero submit and no FR-6 behavioral PASS"
+    }
+  ],
+  "later_validation_manifest": {
+    "status": "BLOCKED_NOT_RUN",
+    "entrypoint_argv": null,
+    "source_revision": null,
+    "executable_digest": "candidate evidence only: dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed",
+    "disposable_resources": "Later authorization only: disposable real local-Linux Claude session in isolated Zellij; isolated throwaway Redis on explicit non-production port ONLY if integrated ASM/crank proof needs it after BB-32 verification. No production Redis.",
+    "inputs": "Later authorization only: selected pane/namespace/boot/PID/start/native UUID; stable occurrence, attempt marker/body digest; compatible and incompatible build/schema; neighbor/replacement/held/refused cases.",
+    "independent_observer": null,
+    "expected_events": "Separate native submit, receiving-input acceptance, held/refused/unknown, and independently corroborated destination/incarnation; G1/G2/G3 require their own binary case outcomes.",
+    "evidence_path": "Owner must select test-owned evidence paths before execution; FLUME-76 records planning only.",
+    "teardown": "Owner must specify disposable session/socket cleanup and exact bounded coverage interval; no FLUSH* or production mutation.",
+    "stop_conditions": "Missing schema, authority, observer, incarnation fence, coverage, or unexpected destination/input => no send or stop; unknown persists across re-opt-in/rebind/takeover until decisive corroboration."
+  },
+  "next_true_owner_brief": {
+    "state": "BLOCKED_SOURCE_SELECTION",
+    "ticket": null,
+    "worker": null,
+    "instruction": "After exact planning reply and Fleet source/board/authority evidence, create at most one bounded Fleet-owner implementation ticket to produce an owned contract and runnable G1-G3 manifest or evidenced unsupported result. No worker can be assigned to an unselected code home.",
+    "allowed_files": "Only verified Fleet-owned contract/validation files in the selected actual repository; choose paths after enrollment/source proof.",
+    "forbidden_files": "Flume runtime/identity/registry/credentials/config writers, parent features.toml, PJAN-202, BB-32/BB-33 code, crank runtime/admission, terminal-driver input, operator panes and Hermes installed profile as invented source.",
+    "dependencies": "BB-32 isolated real Redis check precedes BB-33 ASM session repair; PJAN-202 is provisional read-only discovery; terminal-driver owns topology/actions, ASM owns identity/freshness, Crank owns uninterrupted final admission/attempts/unknown fence and C3 integrated cases. Hub/workflow, scoped FR-6, full I-8 are independent verdicts."
+  },
+  "sources": [
+    {"path": "/home/delorenj/.claude/tmp/i9-flume-stored-command-receipt.json", "sha256": "e5b1ce26762831bb005fd8584d5fcc60a3e792a8c89f0a0565279b74beeaffae"},
+    {"path": "/home/delorenj/.claude/tmp/i9-flume-observer-expiry-evidence.json", "sha256": "906478a2d18e5bfb0ecee46653370bd7db6d9f67a41e51865309c3752cfc4035"},
+    {"path": "/home/delorenj/code/33GOD/33god-platform/components/hermes-fleet.yaml", "sha256": "23627b9dc9bc8ab943606179e3a22a01d0fa9d11ceb0dfe1c83d39d5355a7df4"},
+    {"path": "/home/delorenj/code/33GOD/_bmad-output/specs/spec-i9-agent-message-owner-handoff/SPEC.md", "sha256": "3b386c035dbd77af2e5a9cafb32943e548c9a37d7d0979bdf33ba9a432fa9691"},
+    {"path": "/home/delorenj/code/33GOD/_bmad-output/specs/spec-i9-agent-message-owner-handoff/acceptance-contract.md", "sha256": "e113f6fbf5542f50da8ec70211a95c5710868eb296c1c5fca4f7d24ed211b0b4"},
+    {"path": "/home/delorenj/code/33GOD/_bmad-output/specs/spec-i9-agent-message-owner-handoff/resume.md", "sha256": "d2711d43f38e9bc0b4808822d09a5d383f6dbaa4496b04ca2db9657105f5c1b4"}
+  ]
+}
