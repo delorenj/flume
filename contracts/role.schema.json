@@ -11,6 +11,7 @@
     "memory": {"$ref": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/named-agent.schema.json#/$defs/memory"},
     "department": {"type": "string", "minLength": 1},
     "reports_to": {"type": "string", "minLength": 1},
+    "board_scope": {"type": "string", "enum": ["advisory"]},
     "chain": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^automaticai/[a-z0-9_-]+/[a-z0-9._-]+$"}}
   }
 }

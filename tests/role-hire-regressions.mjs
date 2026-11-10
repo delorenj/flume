@@ -258,6 +258,26 @@ try {
     }
   }
 
+  const advisoryFixture=await fixture('advisory',{set:'dev-set'});
+  const target=join(advisoryFixture.hermes,'tracked-org.yaml');
+  writeFileSync(target,'# owned org chart\nceo: {id: ceo}\ndepartments:\n  - id: launch # preserve comment\n    members: []\n');
+  rmSync(advisoryFixture.org);symlinkSync(target,advisoryFixture.org);
+  writeFileSync(join(advisoryFixture.dir,'declarations/roles/dev.md'),
+    '---\n'+YAML.stringify({role:'dev',skills:{set:'dev-set'},department:'launch',reports_to:'ceo',board_scope:'advisory'})+'---\nFixture role\n');
+  const preview=advisoryFixture.run('hire','dev','--yes','--skip-telegram','--skip-plane','--local','--dry-run');
+  succeeded(preview);
+  assert.equal(YAML.parse(readFileSync(target,'utf8')).departments[0].members.length,0);
+  succeeded(hire(advisoryFixture));
+  const advisoryRole=YAML.parse(readFileSync(join(advisoryFixture.roleDir,'role.yaml'),'utf8'));
+  assert.equal(advisoryRole.board_scope,'advisory');assert.equal(advisoryRole.reconcile.enabled,false);
+  assert.equal(realpathSync(advisoryFixture.org),target);
+  assert.deepEqual(YAML.parse(readFileSync(target,'utf8')).departments[0].members,['demo-dev']);
+  assert.match(readFileSync(target,'utf8'),/# preserve comment/);
+  const advisoryRow=YAML.parse(readFileSync(advisoryFixture.registry,'utf8')).agents['demo-dev'];
+  assert.equal(advisoryRow.board_scope,'advisory');assert.equal(advisoryRow.reports_to,'ceo');
+  assert.equal(advisoryRow.plane?.project_id,undefined);assert.equal(advisoryRow.plane?.board_id,undefined);
+  pass('actual advisory hire preview/apply: CEO symlink, no registry claim at Copier or final projection');
+
   for(const [label,skills,needle] of [
     ['missing-set',{set:'no-such-set'},/no-such-set/],
     ['incompatible-packs',{packs:['dev','ops']},/2 packs \(dev, ops\).*exclusive complete loadout/],

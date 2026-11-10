@@ -10,6 +10,7 @@ import { Command, type InvokeResult } from "../engine/Command";
 import { HERMES_AGENT_TEMPLATE, deriveAgentId, deriveProfileName, type HermesAgentContext } from "./types";
 import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../kernel/paths";
 import { composeSoul, projectBankFor, soulIsReplaceable, soulRolesDir } from "../parity/rules";
+import { readRoleDeclaration } from "../workforce/role";
 import { verifyTrustedCopierIdentity } from "../kernel/preflight";
 import { existingRoleRefusal } from "./ValidateHermesOptions";
 import { copierRegistryPath, preserveCopierRegistryComments } from "./PreserveRegistryComments";
@@ -140,6 +141,8 @@ export class RunCopierTemplate extends Command {
     }
 
     const safeRole = normalizeAgentRole(role);
+    const advisory = readRoleDeclaration(process.env.FLUME_ROLES_ROOT ?? resolveFlumeRoot(), safeRole,
+      ctx.agentId ?? deriveAgentId(targetRepo, safeRole), profileName ?? "").board_scope === "advisory";
     ctx.role = safeRole;
     const roleDir = resolveContainedPath(
       ctx.targetDir,
@@ -223,6 +226,9 @@ export class RunCopierTemplate extends Command {
       SKIP_BLOODBANK: "1",
       SKIP_SYSTEMD: ctx.deferredExternalEffects ? "1" : ctx.skipSystemd ? "1" : "0",
     };
+    // The template reads board_scope from role.yaml at its registry step;
+    // this env pin also guards scripts run during the Copier task sequence.
+    if (advisory) env.BOARD_SCOPE = "advisory";
     if (ctx.deferredExternalEffects) scrubInteractiveChannelCredentials(env);
     if (ctx.deferredExternalEffects || ctx.skipPlane) scrubTicketProviderCredentials(env);
     if (ctx.trustedCopier) {
@@ -265,6 +271,10 @@ export class RunCopierTemplate extends Command {
       "--data", `profile_name=${profileName ?? ""}`,
       "--data", `soul_tone=${soulTone ?? "direct"}`,
       "--data", `ticket_provider=${ticketProvider}`,
+      // Copier runs 80-registry inside its task list. Tell the template BEFORE
+      // any tasks start; a later registry cleanup would already have stolen a ticket.
+      "--data", `board_scope=${advisory ? "advisory" : "owner"}`,
+      ...(advisory ? ["--data", "reconcile_enabled=false"] : []),
       "--trust",
       "--vcs-ref=HEAD",
     ];

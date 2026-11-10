@@ -120,6 +120,8 @@ export interface RoleDeclaration {
   memory?: NamedAgentContract["memory"];
   department?: string;
   reports_to?: string;
+  /** Advisory employees may read/file against the board but never claim ticket routing. */
+  board_scope?: "advisory";
   chain?: string[];
   [key: string]: unknown;
 }

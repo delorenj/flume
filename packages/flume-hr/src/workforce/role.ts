@@ -1,4 +1,4 @@
-import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync} from "node:fs";
+import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync, realpathSync} from "node:fs";
 import {join, dirname, resolve} from "node:path";
 import {homedir} from "node:os";
 import {spawnSync} from "node:child_process";
@@ -60,14 +60,15 @@ export function gatewayCatalog(options:RoleProjectionOptions={}): Set<string> {
   return new Set((raw.routes ?? raw).map((r:any)=>typeof r==="string"?r:r.id));
 }
 export function declarationProblems(role:RoleDeclaration, employee:string, options:RoleProjectionOptions={}): string[] {
-  const {registry,org}=paths(options), agents=read(registry).agents ?? {}, departments=read(org).departments ?? [];
+  const {registry,org}=paths(options), agents=read(registry).agents ?? {}, chart=read(org), departments=chart.departments ?? [];
+  const ceo=chart.ceo?.id;
   const problems:string[]=[];
   if(!role.department) problems.push(`${employee}: no department declared`);
   const department=departments.find((d:any)=>d.id===role.department);
   if(role.department && !department) problems.push(`${employee}: department ${role.department} absent from org.yaml`);
   const superior=role.reports_to ?? department?.manager;
   if(!superior) problems.push(`${employee}: reports_to absent and department ${role.department} has no manager`);
-  else if(!(superior in agents)) problems.push(`${employee}: reports_to ${superior} absent from registry`);
+  else if(superior!==ceo && !(superior in agents)) problems.push(`${employee}: reports_to ${superior} absent from registry or org CEO`);
   const edges={...Object.fromEntries(Object.entries(agents).map(([id,row])=>[id,(row as any).reports_to])),[employee]:superior};
   const seen=new Set<string>(); let cursor:string|undefined=employee;
   while(cursor) {if(seen.has(cursor)){problems.push(`${employee}: reporting cycle ${[...seen,cursor].join(" -> ")}`);break;}seen.add(cursor);cursor=edges[cursor];}
@@ -78,8 +79,15 @@ export function declarationProblems(role:RoleDeclaration, employee:string, optio
   }
   return problems;
 }
-function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocument>)=>void) {
-  if(existsSync(path)&&lstatSync(path).isSymbolicLink()) throw new Error(`Refusing source symlink ${path}`);
+function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocument>)=>void, allowOrgLink=false) {
+  // The fleet org chart is deliberately a link into flume/org/org.yaml. Resolve
+  // only that documented link; write the target in place so the link and YAML
+  // comments survive. Every other projection still refuses a source symlink.
+  if(existsSync(path)&&lstatSync(path).isSymbolicLink()) {
+    if(!allowOrgLink) throw new Error(`Refusing source symlink ${path}`);
+    path=realpathSync(path);
+    if(!lstatSync(path).isFile()) throw new Error(`Org symlink target must be a regular file: ${path}`);
+  }
   const before=existsSync(path)?readFileSync(path,"utf8"):"";
   const doc=YAML.parseDocument(before||"{}\n",{uniqueKeys:true});
   if(doc.errors.length) throw new Error(doc.errors[0]!.message);
@@ -141,6 +149,6 @@ async function projectUnlocked(input:unknown, employee:string, profile:string, o
         if(item.get("id")===role.department&&item.get("manager")!==employee&&!members.items.some(x=>String(x)===employee)) members.add(employee);
       }
     }
-  });
+  },true);
   return {department:role.department,reports_to:superior,skills,selection,...JSON.parse(configured.stdout)};
 }

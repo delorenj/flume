@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {existsSync,mkdirSync,mkdtempSync,writeFileSync,readFileSync,readdirSync,realpathSync,rmSync} from 'node:fs';
+import {existsSync,mkdirSync,mkdtempSync,writeFileSync,readFileSync,readdirSync,realpathSync,rmSync,symlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import YAML from 'yaml';
@@ -19,7 +19,7 @@ try {
   mkdirSync(join(skillex,'packs','dev'),{recursive:true});writeFileSync(join(skillex,'packs','dev','pack.toml'),'[pack]\nname="dev"\nversion="1.0.0"\n[freeform]\nskills=["build","review"]\n');
   mkdirSync(desk,{recursive:true});
   const base=YAML.parse(readFileSync('/home/delorenj/.hermes/config.yaml','utf8'));
-  const chain=[base.model.default,...base.fallback_providers.map(x=>x.model)];
+  const chain=['automaticai/personal/kimi-2.8','automaticai/personal/glm-5.3'];
   writeFileSync(join(fleet,'config.yaml'),YAML.stringify({model:base.model,fallback_providers:base.fallback_providers,providers:base.providers}));
   writeFileSync(registry,'agents:\n  boss: {role: director, department: engineering}\n  unrelated: {role: reporter, department: editorial}\n');
   const original='# precious top comment\ncompany: {name: Fixture}\ndepartments:\n  - id: engineering # department comment\n    manager: boss\n    members: []\n  - id: editorial\n    members: [unrelated] # precious other employee\n';
@@ -67,7 +67,7 @@ try {
   const secondDesk=join(fleet,'profiles','second-dev');mkdirSync(secondDesk,{recursive:true});
   await api.projectRoleDeclaration(inherited,'second-dev','second-dev',{...options,deskPath:secondDesk});
   const inheritedCfg=YAML.parse(readFileSync(join(secondDesk,'config.yaml'),'utf8'));
-  assert.deepEqual([inheritedCfg.model.default,...inheritedCfg.fallback_providers.map(x=>x.model)],chain);
+  assert.deepEqual([inheritedCfg.model.default,...inheritedCfg.fallback_providers.map(x=>x.model)],[base.model.default,...base.fallback_providers.map(x=>x.model)]);
   assert.equal(YAML.parse(readFileSync(registry,'utf8')).agents['second-dev'].reports_to,'boss');
   writeFileSync(join(secondDesk,'config.delta.yaml'),'model: {provider: openai-codex, default: explicit-override}\n');
   const override=await api.projectRoleDeclaration(role,'second-dev','second-dev',{...options,deskPath:secondDesk});
@@ -88,4 +88,22 @@ try {
   assert.equal(readFileSync(join(desk,'config.yaml'),'utf8'),beforeCfg);
   assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
   console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
+  // The actual fleet exposes a symlinked org file and the CEO is not a registry row.
+  const chartTarget=join(fleet,'tracked-org.yaml');
+  writeFileSync(chartTarget,'# link target comment\nceo: {id: ceo}\ndepartments:\n  - id: launch # placement comment\n    members: []\n');
+  rmSync(org);symlinkSync(chartTarget,org);
+  const ceoRole={role:'dev',department:'launch',reports_to:'ceo',board_scope:'advisory'};
+  const ceoDesk=join(fleet,'profiles','ceo-dev');mkdirSync(ceoDesk,{recursive:true});
+  assert.deepEqual(api.declarationProblems(ceoRole,'ceo-dev',options),[]);
+  const preview=await api.projectRoleDeclaration(ceoRole,'ceo-dev','ceo-dev',{...options,deskPath:ceoDesk,dryRun:true});
+  assert.equal(preview.reports_to,'ceo');
+  assert.deepEqual(YAML.parse(readFileSync(chartTarget,'utf8')).departments[0].members,[]);
+  await api.projectRoleDeclaration(ceoRole,'ceo-dev','ceo-dev',{...options,deskPath:ceoDesk});
+  const linked=readFileSync(chartTarget,'utf8');
+  assert.equal(realpathSync(org),chartTarget);assert.match(linked,/# link target comment/);assert.match(linked,/# placement comment/);
+  assert.deepEqual(YAML.parse(linked).departments[0].members,['ceo-dev']);
+  assert.equal(YAML.parse(readFileSync(registry,'utf8')).agents['ceo-dev'].reports_to,'ceo');
+  await api.projectRoleDeclaration(ceoRole,'ceo-dev','ceo-dev',{...options,deskPath:ceoDesk});
+  assert.equal(readFileSync(chartTarget,'utf8'),linked,'second apply preserves link target and comments');
+  console.log('PASS CEO report + symlink org: preview is read-only, apply converges and keeps comments');
 } finally {rmSync(work,{recursive:true,force:true});}

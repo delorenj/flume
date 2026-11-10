@@ -85,6 +85,9 @@ export const roleDeclarationCheck: RecipeOwnedCheck = {
         const row = (YAML.parse(readFileSync(registryPath,"utf8"))?.agents ?? {})[id];
         if (row && !row.department) details.push(`${id}: registered employee has no department`);
         if (row?.reports_to && row.reports_to !== role.reports_to && role.reports_to) details.push(`${id}: registry reports_to ${row.reports_to} differs from declaration ${role.reports_to}`);
+        if (role.board_scope === "advisory" && row && (
+          row.board_scope !== "advisory" || row.plane?.project_id || row.plane?.board_id
+        )) details.push(`${id}: advisory role must have registry board_scope: advisory and no plane.project_id or plane.board_id claim`);
       } catch(error) {details.push(`${entry.name}: ${(error as Error).message}`);}
     }
     return {id: "hermes.role-declaration", title: "Role deployment declaration and reporting references are valid", status: details.length ? "fail" : declarations ? "pass" : "skip",

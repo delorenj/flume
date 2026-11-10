@@ -88,7 +88,8 @@ with none of these keys is charter-only and provisions exactly as it always has.
 | `skills` | one Skillex `set` or `pack` (see below) | the desk's Skillex selection, then `<desk>/skills/` |
 | `chain` | ordered `automaticai/<account>/<model>` routes; the first is the primary `model:`, the rest are `fallback_providers` | the desk's `config.delta.yaml`, rendered into `config.yaml`; omitted means the desk inherits the fleet base at run time |
 | `department` | a department id from `~/.hermes/org.yaml` | `agents.<id>.department` and the department's `members` |
-| `reports_to` | an employee id in the registry; omitted means the department's manager | `agents.<id>.reports_to` (subordinates are derived, never listed) |
+| `reports_to` | an employee id in the registry, or `org.ceo.id` (the CEO is not a registry employee); omitted means the department's manager | `agents.<id>.reports_to` (subordinates are derived, never listed) |
+| `board_scope` | `advisory` for a board reader/filer that must never claim tickets; omitted means the historical owner behavior | `role.yaml.board_scope: advisory`, registry `board_scope: advisory`; `plane.project_id` and `plane.board_id` are absent, while `ticket_provider.board_id` and read-only `plane.workspace`/`identifier` remain |
 
 `identity`/`memory` share their definitions with the named-agent contract
 (`contracts/named-agent.schema.json`), so a role and a named agent cannot disagree
