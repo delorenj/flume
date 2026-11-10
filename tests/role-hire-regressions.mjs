@@ -334,6 +334,12 @@ try {
   assert.equal(existsSync(f.desk),false);assert.equal(existsSync(f.blocked),false);
   pass('real Copier task failure exits nonzero, names the cause and never claims hire completion');
   assert.equal(git(template,['status','--porcelain']),'','the vendored template is untouched');
+  const soulPath=join(advisoryFixture.roleDir,'SOUL.md');
+  writeFileSync(soulPath,readFileSync(soulPath,'utf8')+'\nUnmanaged drift\n');
+  const arbitraryAudit=advisoryFixture.run('audit','--rules','hermes.pm-scaffold','--json');
+  const arbitraryResult=JSON.parse(arbitraryAudit.stdout);
+  assert.ok(arbitraryResult.rules.some(r=>r.id==='hermes.pm-scaffold'&&r.status==='fail'&&r.details.some(d=>d.includes('demo-dev')&&d.includes('soul-drift'))),'non-PM repo roles must actually be audited');
+  pass('arbitrary repo role SOUL drift is detected, not a vacuous PM-only pass');
   assert.equal(git(root,['ls-tree','HEAD','templates/hermes-agent']).match(/^160000 commit ([0-9a-f]{40})\t/)[1],pin);
   console.log(`\n${count} role-hire check groups passed`);
 } finally {rmSync(work,{recursive:true,force:true});}

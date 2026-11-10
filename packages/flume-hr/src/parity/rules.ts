@@ -1228,10 +1228,9 @@ function templateFiles(sourceDir: string, current = sourceDir): string[] {
 
 function managedHermesScaffoldRoles(ctx: Context): { roles: RoleMeta[]; blockers: string[] } {
   const discovered = discoverRoles(ctx.repoRoot);
-  const declared = readDeclaredAgents(ctx)
-    .filter((entry) => entry.role === "pm" || entry.role === "director");
+  const declared = readDeclaredAgents(ctx);
   if (declared.length === 0) {
-    const orchestrators = discovered.filter((role) => role.role === "pm" || role.role === "director");
+    const orchestrators = discovered;
     const blockers = orchestrators
       .filter((role) => roleBloodbankEnabled(role) === null)
       .map((role) => `${relative(ctx.repoRoot, role.roleYamlPath)} bloodbank.enabled must be the strict YAML boolean true or false`);
