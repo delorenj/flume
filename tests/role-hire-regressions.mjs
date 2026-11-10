@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {existsSync,lstatSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,readlinkSync,realpathSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
+import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import YAML from 'yaml';
 import {createSet,addSetSkills,createPack,addPackSkills} from '@delorenj/skillex';
@@ -13,8 +14,7 @@ const cli=join(root,'packages/flume-hr/dist/index.js');
 const skillexCli=join(root,'node_modules/@delorenj/skillex/dist/cli.js');
 const template=join(root,'templates/hermes-agent');
 const renderer=join(template,'scripts/hermes-profile-config.py');
-// Literal /tmp prevents an operator TMPDIR inside a checkout from answering for fixtures.
-const work=mkdtempSync('/tmp/flume32-hire-');
+const work=mkdtempSync(join(tmpdir(),'flume32-hire-'));
 const tool=name=>{
   const result=spawnSync('which',[name],{encoding:'utf8'});
   assert.equal(result.status,0,`${name} is required for the real hire proof: ${result.stderr}`);
@@ -57,10 +57,10 @@ async function fixture(label,skills) {
   for(const [name,members] of [['dev',['build','review']],['ops',['deploy','lint']]]) {
     assert.ok((await createPack(name,'1.0.0',reg)).ok);assert.ok((await addPackSkills(`${name}@1.0.0`,members,reg)).ok);
   }
-  writeFileSync(join(home,'.agents/skills.json'),JSON.stringify({sets:['global-set']}));
+  writeFileSync(join(home,'.agents/skills.json'),JSON.stringify({set:'global-set'}));
   mkdirSync(join(repo,'.agents'),{recursive:true});
   // Step 10 starts with a different selection. The declaration must replace it.
-  writeFileSync(join(repo,'.agents/skills.json'),JSON.stringify({sets:['ops-set'],inherit_global:true}));
+  writeFileSync(join(repo,'.agents/skills.json'),JSON.stringify({set:'ops-set',inherit_global:true}));
   writeFileSync(join(repo,'.project.json'),JSON.stringify({name:'demo',project_dir:repo,ticket_provider:{type:'plane',state:'deferred'},agents:{},fixture:'preserve'}));
   const model='automaticai/personal/kimi-2.8';
   writeFileSync(join(hermes,'config.yaml'),YAML.stringify({
@@ -141,7 +141,7 @@ try {
   assert.equal(git(template,['status','--porcelain']),'','the real template fixture is clean');
 
   for(const [label,skills,manifest] of [
-    ['set',{set:'dev-set'},{inherit_global:false,sets:['dev-set']}],
+    ['set',{set:'dev-set'},{inherit_global:false,set:'dev-set'}],
     ['pack',{pack:'dev@1.0.0'},{inherit_global:false,packs:['dev@1.0.0']}],
   ]) {
     const f=await fixture(label,skills),base=readFileSync(join(f.hermes,'config.yaml'),'utf8');
@@ -289,7 +289,8 @@ try {
 
   for(const [label,skills,needle] of [
     ['missing-set',{set:'no-such-set'},/no-such-set/],
-    ['incompatible-packs',{packs:['dev','ops']},/2 packs \(dev, ops\).*exclusive complete loadout/],
+    ['missing-pack',{pack:'no-such-pack'},/no-such-pack/],
+    ['invalid-set',{set:'bad/set'},/bad\/set|valid Skillex selection/],
   ]) {
     const f=await fixture(label,skills),before={home:tree(f.home),repo:tree(f.repo)};
     const refused=hire(f);assert.notEqual(refused.status,0);assert.match(refused.stdout+refused.stderr,needle);

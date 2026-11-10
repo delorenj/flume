@@ -25,7 +25,7 @@ import type { AgentSkillsBinding, ResolvedSkill } from "./types";
  * global selection and one explicit project selection (`skillex profile sync
  * NAME --project PATH --skillex-only`). A role that declares a loadout therefore
  * owns a small project of its own: `<desk>/.skillex-selection/.agents/skills.json`,
- * generated from the role file and naming exactly the declared set or pack. The
+ * generated from the role file and naming its declared set or additive packs. The
  * desk never receives a second skill core: no `<desk>/.agents/skills` symlink farm
  * and no `skills.external_dirs` entry, both of which a Skillex-only desk refuses.
  *
@@ -39,7 +39,8 @@ export const ROLE_SELECTION_DIR = ".skillex-selection";
 
 export interface RoleSelectionManifest {
   readonly inherit_global: false;
-  readonly sets?: readonly string[];
+  readonly set?: string;
+  /** Packs add individual skills to the selected root; multiple packs compose. */
   readonly packs?: readonly string[];
 }
 
@@ -71,22 +72,19 @@ function selectionError(message: string, field: string, code = "E_ROLE_SELECTION
 }
 
 /**
- * One role loadout is exactly one Skillex selection. A pack is an exclusive
- * complete loadout (a manifest permits at most one, and it leaves every set
- * dormant), so a declaration Skillex cannot express as a single selection is
- * refused by name instead of being flattened or silently narrowed.
+ * Packs add individual skills to the selected root and compose with one another;
+ * a set exclusively selects the role-owned root. To extend a shared set with
+ * a pack, derive a scope-owned set rather than writing through its shared root.
+ * Global skills remain available through the separate global discovery layer.
  */
 export function roleSelectionManifest(binding: AgentSkillsBinding): RoleSelectionManifest {
   const packs = [...new Set([...(binding.pack ? [binding.pack] : []), ...(binding.packs ?? [])])];
-  if (packs.length > 1) {
-    throw selectionError(`skills declares ${packs.length} packs (${packs.join(", ")}): a Skillex pack is an exclusive complete loadout, so a role selects at most one; compose several with a set`, "skills.packs");
+  if (binding.set && packs.length) {
+    throw selectionError(`skills declares set ${binding.set} and pack(s) ${packs.join(", ")}: a Skillex set exclusively replaces the role root; derive a scope-owned set to add packs`, "skills.set");
   }
-  if (packs.length === 1 && binding.set) {
-    throw selectionError(`skills declares pack ${packs[0]} and set ${binding.set}: a Skillex pack is an exclusive complete loadout and would leave the set dormant; declare one of them`, "skills.set");
-  }
-  const manifest: RoleSelectionManifest | undefined = packs.length
-    ? { inherit_global: false, packs }
-    : binding.set ? { inherit_global: false, sets: [binding.set] } : undefined;
+  const manifest: RoleSelectionManifest | undefined = binding.set || packs.length
+    ? { inherit_global: false, ...(binding.set ? { set: binding.set } : {}), ...(packs.length ? { packs } : {}) }
+    : undefined;
   if (!manifest) throw selectionError("skills must declare a Skillex pack or set", "skills");
   try {
     parseManifest(manifest, "role skills declaration");

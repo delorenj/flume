@@ -64,7 +64,7 @@ try {
   const f=await fleet('set');
   const desk=f.deskOf('demo-dev');
   const first=await api.projectRoleDeclaration(roleOf({set:'dev-set'}),'demo-dev','demo-dev',f.options(desk));
-  assert.deepEqual(manifestOf(desk),{inherit_global:false,sets:['dev-set']});
+  assert.deepEqual(manifestOf(desk),{inherit_global:false,set:'dev-set'});
   assert.equal(first.selection.project,project(desk));
   assert.deepEqual(first.skills.map(s=>s.name),['build','review']);
   assert.deepEqual(names(join(desk,'skills')),['build','review']);
@@ -105,7 +105,7 @@ try {
   assert.equal(dry.selection.manifestChange,'none');assert.deepEqual(dry.selection.changes,[]);
   pass('re-projection converges: byte-identical state, a no-op Skillex preview, a no-op dry run');
 
-  // ---- 3. pack loadouts (exclusive complete loadout) ----
+  // ---- 3. packs populate the scoped root and multiple packs compose; a set is exclusive ----
   const g=await fleet('pack');
   const packDesk=g.deskOf('pack-dev'), versioned=g.deskOf('pack-ops');
   await api.projectRoleDeclaration(roleOf({pack:'dev'}),'pack-dev','pack-dev',g.options(packDesk));
@@ -117,10 +117,16 @@ try {
   assert.deepEqual(names(join(versioned,'skills')),['deploy','lint']);
   assert.equal(g.show('pack-ops',project(versioned)).status,0);
   pass('role pack / versioned pack loadouts -> packs[] selection, accepted by skillex profile show');
+  const composedDesk=g.deskOf('composed-dev');
+  await api.projectRoleDeclaration(roleOf({packs:['dev','ops@2.1.0']}),'composed-dev','composed-dev',g.options(composedDesk));
+  assert.deepEqual(manifestOf(composedDesk),{inherit_global:false,packs:['dev','ops@2.1.0']});
+  assert.deepEqual(names(join(composedDesk,'skills')),['build','deploy','lint','review']);
+  assert.equal(g.show('composed-dev',project(composedDesk)).status,0);
+  pass('multiple packs compose without changing the global selection');
 
   // ---- 4. the loadout changes: Skillex prunes what left and links what arrived ----
   await api.projectRoleDeclaration(roleOf({set:'ops-set'}),'demo-dev','demo-dev',f.options(desk));
-  assert.deepEqual(manifestOf(desk),{inherit_global:false,sets:['ops-set']});
+  assert.deepEqual(manifestOf(desk),{inherit_global:false,set:'ops-set'});
   assert.deepEqual(names(join(desk,'skills')),['deploy','lint']);
   assert.equal(f.show('demo-dev',project(desk)).status,0);
   await api.projectRoleDeclaration(roleOf({pack:'dev'}),'demo-dev','demo-dev',f.options(desk));
@@ -136,22 +142,22 @@ try {
   assert.deepEqual(await api.auditRoleSkills('demo-dev',desk,roleOf({set:'dev-set'}),f.options(desk)),[]);
   pass('changed declaration and changed set membership converge through Skillex');
 
-  // ---- 5. declarations Skillex cannot express as ONE selection are refused by name ----
+  // ---- 5. invalid declarations are refused by name before anything is written ----
   const h=await fleet('refused');
   const hdesk=h.deskOf('demo-dev');
   assert.deepEqual(api.roleSelectionManifest({pack:'dev',packs:['dev']}),{inherit_global:false,packs:['dev']},'the same pack named twice is one pack');
   for(const [label,skills,needle] of [
-    ['two packs',{packs:['dev','ops']},/2 packs \(dev, ops\).*exclusive complete loadout/],
-    ['pack + set',{pack:'dev',set:'dev-set'},/pack dev and set dev-set.*exclusive complete loadout/],
+    ['missing pack',{pack:'no-such-pack'},/no-such-pack/],
+    ['invalid set',{set:'bad/set'},/bad\/set|valid Skillex selection/],
+    ['set plus pack',{set:'dev-set',pack:'ops'},/set dev-set and pack\(s\) ops.*exclusively replaces/],
   ]) {
-    const problems=api.declarationProblems(roleOf(skills),'demo-dev',h.options(hdesk));
-    assert.ok(problems.some(x=>needle.test(x)),`${label}: ${problems}`);
+    if(label==='set plus pack') assert.ok(api.declarationProblems(roleOf(skills),'demo-dev',h.options(hdesk)).some(x=>needle.test(x)),'declaration preflight refuses the conflicting selection');
     await assert.rejects(api.projectRoleDeclaration(roleOf(skills),'demo-dev','demo-dev',h.options(hdesk)),needle);
     assert.equal(existsSync(hdesk),false,`${label}: a refused declaration writes nothing`);
   }
   await assert.rejects(api.projectRoleDeclaration(roleOf({set:'no-such-set'}),'demo-dev','demo-dev',h.options(hdesk)),/no-such-set/);
   assert.equal(existsSync(hdesk),false);
-  pass('inexpressible and unresolvable loadouts are refused by name before anything is written');
+  pass('invalid and unresolvable loadouts are refused by name before anything is written');
 
   // ---- 6. a strict desk never adopts or deletes foreign content ----
   const k=await fleet('foreign');
@@ -162,16 +168,26 @@ try {
   assert.equal(existsSync(join(kdesk,'skills','build')),false,'nothing was projected over a refused desk');
   for(const untouched of ['config.delta.yaml','config.yaml','.skillex-only','.skillex-selection']) assert.equal(existsSync(join(kdesk,untouched)),false,`a refused legacy desk is not half converted: ${untouched}`);
   await assert.rejects(api.projectRoleDeclaration(roleOf({set:'dev-set'}),'demo-dev','demo-dev',{...k.options(kdesk),dryRun:true}),/not Skillex-only and holds local skills/,'a dry run reports the refusal a real run would hit');
-  // the same refusal holds when a strict desk is already marked: Skillex itself refuses the unowned entry
+  // A current strict desk admits agent-written skills that do not collide with the selected loadout.
   writeFileSync(join(kdesk,'.skillex-only'),'x\n');writeFileSync(join(kdesk,'.no-bundled-skills'),'x\n');
-  await assert.rejects(api.projectRoleDeclaration(roleOf({set:'dev-set'}),'demo-dev','demo-dev',k.options(kdesk)),/Skillex refused the role selection.*local-note/);
-  assert.ok(existsSync(join(kdesk,'skills','local-note','SKILL.md')),'foreign local content survives a strict refusal too');
-  pass('a desk with foreign local skills is refused before any change, and a strict desk refuses them too');
+  await api.projectRoleDeclaration(roleOf({set:'dev-set'}),'demo-dev','demo-dev',k.options(kdesk));
+  assert.ok(existsSync(join(kdesk,'skills','local-note','SKILL.md')),'agent-written skill survives strict projection');
+  assert.deepEqual(names(join(kdesk,'skills')),['build','local-note','review']);
+  assert.equal(k.show('demo-dev',project(kdesk)).status,0);
+  // The same policy must refuse an agent-written skill whose name collides with the selection.
+  const collision=await fleet('collision'), collisionDesk=collision.deskOf('demo-dev');
+  mkdirSync(join(collisionDesk,'skills','build'),{recursive:true});
+  writeFileSync(join(collisionDesk,'skills','build','SKILL.md'),'---\nname: build\ndescription: operator-owned\n---\n');
+  writeFileSync(join(collisionDesk,'.skillex-only'),'x\n');writeFileSync(join(collisionDesk,'.no-bundled-skills'),'x\n');
+  await assert.rejects(api.projectRoleDeclaration(roleOf({set:'dev-set'}),'demo-dev','demo-dev',collision.options(collisionDesk)),/Skillex refused the role selection.*build/);
+  assert.ok(existsSync(join(collisionDesk,'skills','build','SKILL.md')),'colliding agent-written skill survives refusal');
+  assert.equal(existsSync(join(collisionDesk,'skills','review')),false,'a refused collision installs no selected links');
+  pass('legacy local skills are refused; strict agent-written skills survive unless they collide with the selected loadout');
 
   // ---- 6b. a desk Skillex already synced (not yet strict) becomes strict with the role selection ----
   const u=await fleet('ordinary');
   const udesk=u.deskOf('demo-dev'), uproject=join(u.dir,'owning-repo');
-  mkdirSync(join(uproject,'.agents'),{recursive:true});writeFileSync(join(uproject,'.agents','skills.json'),JSON.stringify({inherit_global:true,sets:['ops-set']}));
+  mkdirSync(join(uproject,'.agents'),{recursive:true});writeFileSync(join(uproject,'.agents','skills.json'),JSON.stringify({inherit_global:true,set:'ops-set'}));
   mkdirSync(udesk,{recursive:true});
   assert.equal(u.skillexCmd('profile','sync','demo-dev','--hermes-root',u.hermes,'--project',uproject).status,0);
   assert.deepEqual(names(join(udesk,'skills')),['deploy','lint']);assert.equal(existsSync(join(udesk,'.skillex-only')),false);
@@ -218,7 +234,7 @@ try {
   await api.projectRoleDeclaration(mrole,'demo-dev','demo-dev',m.options(mdesk));
   assert.deepEqual(await api.auditRoleSkills('demo-dev',mdesk,mrole,m.options(mdesk)),[]);
   const manifestPath=join(project(mdesk),'.agents','skills.json'), original=readFileSync(manifestPath,'utf8');
-  writeFileSync(manifestPath,JSON.stringify({inherit_global:false,sets:['ops-set']}));
+  writeFileSync(manifestPath,JSON.stringify({inherit_global:false,set:'ops-set'}));
   assert.ok((await api.auditRoleSkills('demo-dev',mdesk,mrole,m.options(mdesk))).some(x=>/differs from the declaration/.test(x)));
   rmSync(manifestPath);
   assert.ok((await api.auditRoleSkills('demo-dev',mdesk,mrole,m.options(mdesk))).some(x=>/manifest missing/.test(x)));
@@ -267,13 +283,13 @@ try {
   assert.ok(finding.details.some(x=>/profile skills create/.test(x)),`pending catalog change is reported: ${finding.details}`);
   writeFileSync(join(adesk,'config.delta.yaml'),readFileSync(join(adesk,'config.delta.yaml'),'utf8').replace('external_dirs: []','external_dirs: [/somewhere/else]'));
   assert.equal(audit('hermes.delta-list-override').status,'fail');
-  declare({packs:['dev','ops']});
+  declare({set:'bad/set'});
   finding=audit('hermes.role-declaration');
-  assert.equal(finding.status,'fail');assert.ok(finding.details.some(x=>/exclusive complete loadout/.test(x)),JSON.stringify(finding));
+  assert.equal(finding.status,'fail');assert.ok(finding.details.some(x=>/bad\/set|valid Skillex selection/.test(x)),JSON.stringify(finding));
   declare({set:'no-such-set'});
   finding=audit('hermes.role-declaration');
   assert.equal(finding.status,'fail');assert.ok(finding.details.some(x=>/no-such-set/.test(x)),JSON.stringify(finding));
-  pass('flume audit: green on a converged strict desk; names a pending change, a leaked discovery root, an inexpressible and an unresolvable loadout');
+  pass('flume audit: green on a converged strict desk; names a pending change, a leaked discovery root, an invalid and an unresolvable loadout');
 
   // ---- 11. the real caller: `flume onboard`, twice, against a strict desk ----
   const o=await fleet('onboard');
@@ -305,7 +321,7 @@ try {
   // ---- 12. a desk the template first synced against its repo is re-pointed at the role selection ----
   const t=await fleet('repo-first');
   const tdesk=t.deskOf('demo-dev'), repoProject=join(t.dir,'owning-repo');
-  mkdirSync(join(repoProject,'.agents'),{recursive:true});writeFileSync(join(repoProject,'.agents','skills.json'),JSON.stringify({inherit_global:true,sets:['ops-set']}));
+  mkdirSync(join(repoProject,'.agents'),{recursive:true});writeFileSync(join(repoProject,'.agents','skills.json'),JSON.stringify({inherit_global:true,set:'ops-set'}));
   mkdirSync(tdesk,{recursive:true});writeFileSync(join(tdesk,'config.delta.yaml'),YAML.stringify({skills:{external_dirs:[]}}));
   const stepTen=()=>t.skillexCmd('profile','sync','demo-dev','--hermes-root',t.hermes,'--project',repoProject,'--skillex-only');
   assert.equal(stepTen().status,0);
