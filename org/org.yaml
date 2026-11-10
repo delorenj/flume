@@ -41,88 +41,88 @@ ceo:
 personas:
   green-in-between-launch-director:
     title: "Launch Director — Green In Between"
-    expertise: [launch-readiness, beta-gates, receipts, critical-path, owner-decisions]
+    expertise: [ launch-readiness, beta-gates, receipts, critical-path, owner-decisions ]
   morgan-finance:
     title: "Director of Finance — AutomaticAI"
-    expertise: [milkshake, client-finance, bookkeeping, mercury-reconciliation]
+    expertise: [ milkshake, client-finance, bookkeeping, mercury-reconciliation ]
   joe-pesci:
     title: "Personal Chief of Staff — Portfolio & Ventures"
-    expertise: [portfolio-strategy, business-analysis, prioritization, launch-planning]
+    expertise: [ portfolio-strategy, business-analysis, prioritization, launch-planning ]
   33god-pm:
     title: "Chief of Staff"
-    expertise: [orchestration, platform]
+    expertise: [ orchestration, platform ]
   pjangler-pm:
     title: "Head of Provisioning"
-    expertise: [bootstrap, scaffolding, hiring]
+    expertise: [ bootstrap, scaffolding, hiring ]
   voxxy-pm:
     title: "Voice Lead (TTS)"
-    expertise: [tts, audio]
+    expertise: [ tts, audio ]
   holocene-pm:
     title: "Control-Plane Lead"
-    expertise: [dashboard, observability]
+    expertise: [ dashboard, observability ]
   bloodbank-pm:
     title: "Event Bus Lead"
-    expertise: [nats, events, dapr]
+    expertise: [ nats, events, dapr ]
   candystore-pm:
     title: "Persistence Lead"
-    expertise: [event-store, audit]
+    expertise: [ event-store, audit ]
   skillex-pm:
     title: "Skills Lead"
-    expertise: [agent-skills]
+    expertise: [ agent-skills ]
   nautilus-trader-pm:
     title: "Quant / Trading"
-    expertise: [trading, quant]
+    expertise: [ trading, quant ]
   keepy-money-pm:
     title: "Personal Finance"
-    expertise: [finance, budgeting]
+    expertise: [ finance, budgeting ]
   delonet-director:
     title: "Director of Infrastructure"
-    expertise: [homelab, networking, traefik]
+    expertise: [ homelab, networking, traefik ]
   infra-pm:
     title: "Infrastructure Lead"
-    expertise: [docker, systemd, homelab]
+    expertise: [ docker, systemd, homelab ]
   delonet-company-reporter:
     title: "Company Reporter"
-    expertise: [reporting, daily-journal]
+    expertise: [ reporting, daily-journal ]
   marge-simpson:
     title: "Director of HR"
-    expertise: [hiring, onboarding, identity, skills, org-design]
+    expertise: [ hiring, onboarding, identity, skills, org-design ]
   context-director:
     title: "Director of Context"
-    expertise: [vault, knowledge-management, indexing, searchability, notebooks]
+    expertise: [ vault, knowledge-management, indexing, searchability, notebooks ]
   peter-griffin:
     title: "Token Ops Engineer"
-    expertise: [llm-gateway, routing, token-economics, quotas, cost]
+    expertise: [ llm-gateway, routing, token-economics, quotas, cost ]
   rererere:
     title: "Director of Workflows"
-    expertise: [workflows, n8n, automation, orchestration]
+    expertise: [ workflows, n8n, automation, orchestration ]
   n8n-specialist:
     title: "n8n Workflow Specialist"
-    expertise: [n8n, workflows, webhooks, automation]
+    expertise: [ n8n, workflows, webhooks, automation ]
   infra-specialist:
     title: "Host Infrastructure Specialist"
-    expertise: [big-chungus, systemd, docker, hardware]
+    expertise: [ big-chungus, systemd, docker, hardware ]
   flume-pm:
     title: "Head of Workforce"
-    expertise: [hiring, org-chart, handbook, agent-lifecycle]
+    expertise: [ hiring, org-chart, handbook, agent-lifecycle ]
   monitoring-pm:
     title: "Monitoring Lead"
-    expertise: [observability, synthetic-monitoring, alerting]
+    expertise: [ observability, synthetic-monitoring, alerting ]
   client-portal-pm:
     title: "Portal & Gateway Lead"
-    expertise: [client-portal, llm-gateway, billing-portal]
+    expertise: [ client-portal, llm-gateway, billing-portal ]
   bennett:
     title: "Executive Office Manager — AutomaticAI"
-    expertise: [executive-administration, intake, scheduling, follow-ups, correspondence]
+    expertise: [ executive-administration, intake, scheduling, follow-ups, correspondence ]
   james-brennan-pm:
     title: "IPM Lead (client: James Brennan)"
-    expertise: [ipm, client-delivery]
+    expertise: [ ipm, client-delivery ]
   navi-pm:
     title: "Navi Lead (IPM technician app)"
-    expertise: [ipm, mobile, technician-app]
+    expertise: [ ipm, mobile, technician-app ]
   milkshake-pm:
     title: "Client Billing Lead"
-    expertise: [cost-calculation, invoicing, client-accounts]
+    expertise: [ cost-calculation, invoicing, client-accounts ]
 
 # Departments, in display order. manager + members are agent_ids. A manager is
 # rendered first inside its department; members follow in the order listed.
@@ -182,11 +182,11 @@ departments:
     # into its own repo; the other four IPM products are still inside james-brennan).
     manager: null
     members:
-      - bennett              # Christopher, Executive Office Manager; reports to the CEO, not a project lead.
-      - client-portal-pm     # Shared portal/gateway ownership stays here.
+      - bennett # Christopher, Executive Office Manager; reports to the CEO, not a project lead.
+      - client-portal-pm # Shared portal/gateway ownership stays here.
       - peter-griffin
       - milkshake-pm
-      - morgan-finance      # Finance officer; works with Milkshake and Portal leads.
+      - morgan-finance # Finance officer; works with Milkshake and Portal leads.
 
   - id: finance
     name: "Finance & Trading"
@@ -209,9 +209,9 @@ departments:
       - heyma-pm
       - ssbnk-pm
       - dumply
-      - green-in-between-pm  # "a better game of pool"
-      - pile-of-dumb-things-pm  # tower-of-lost-things, a toddler game
-      - idealscenario-pm     # story discovery for TruthOrDarePics.com
+      - green-in-between-pm # "a better game of pool"
+      - pile-of-dumb-things-pm # tower-of-lost-things, a toddler game
+      - idealscenario-pm # story discovery for TruthOrDarePics.com
 
   - id: people
     name: "People & HR"
@@ -247,12 +247,12 @@ departments:
     order: 12
     # Launch Directors report directly to Jarad (CEO), never to a product PM.
     manager: null
-    members: []
+    members: [ green-in-between-launch-director ]
 
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
 # reads nothing here); `flume org` nests it under the named manager.
-reports_to: {}  # The vacant Brennan portfolio seat has no acting director.
+reports_to: {} # The vacant Brennan portfolio seat has no acting director.
 
 defaults:
   unassigned_department:
