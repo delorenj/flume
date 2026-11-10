@@ -61,7 +61,8 @@ def main():
     change("disposition-gates", ["reconciliation", "disposition", "g1_g2_g3"], "PASS", "reconciliation.disposition: distinct verdicts changed")
     change("recon-record-sha", ["reconciliation", "record_sha256"], "0" * 64, "reconciliation.record: identity or digest changed")
     # Timestamps: stored_at, observer_expires_at and last_snapshot_at are pinned to
-    # exact values. Every probe below is rejected by that exact-value pin, so the
+    # exact values. The three missing-* probes are rejected by record() (missing
+    # fields); every other probe below is rejected by the exact-value pin, so the
     # timestamp-format and stored < expiry <= snapshot ordering checks are not
     # reached by these probes (they cannot fail while the values are pinned).
     change("bad-timestamp", ["original_invocation", "last_snapshot_at"], "not-a-date", "last_snapshot_at: expected")
@@ -119,13 +120,32 @@ def main():
            "No Fleet source verified. Awaiting the owner's answer.", "owner_binding.blocker: stale pending-response claim")
     change("blocker-adoption-colon", ["owner_binding", "blocker"],
            "No Fleet source verified; Fleet contract adoption: accepted.", "owner_binding.blocker: adoption claim")
-    # Accepted variants: directly negated adoption is not an adoption claim (the
-    # former "not adopted" false positive), and the guard leaves it VALID.
+    # FLUME-77 repair: nothing the reviewed 456facc blocker guard rejected may pass
+    # (except across ';'). Each appended sentence is caught by one pattern only,
+    # except the first (patterns 0 and 1): plural "replies" + "outstanding" (1),
+    # "awaited" + plural (2), "not received" + plural (4), "unanswered" (5), and the
+    # 456facc substring form "impending" (0).
     blocker = baseline["owner_binding"]["blocker"]
+    stale = "owner_binding.blocker: stale pending-response claim"
+    change("blocker-responses-pending", ["owner_binding", "blocker"], blocker + " Owner responses are pending.", stale)
+    change("blocker-replies-outstanding", ["owner_binding", "blocker"], blocker + " Owner replies are outstanding.", stale)
+    change("blocker-awaited-replies", ["owner_binding", "blocker"],
+           blocker + " The awaited owner replies are still to come.", stale)
+    change("blocker-responses-not-received", ["owner_binding", "blocker"],
+           blocker + " Owner responses have not been received.", stale)
+    change("blocker-request-unanswered", ["owner_binding", "blocker"],
+           blocker + " The coordination request is unanswered.", stale)
+    change("blocker-reply-impending", ["owner_binding", "blocker"], blocker + " The owner reply is impending.", stale)
+    # Accepted variants: directly negated adoption is not an adoption claim (the
+    # former "not adopted" false positive), and a ';' clause boundary keeps an honest
+    # received-reply clause apart from a pending-selection clause (456facc rejected
+    # it). The guards leave all three VALID.
     change("blocker-not-adopted", ["owner_binding", "blocker"], blocker + " The Fleet contract is not adopted.",
            "VALID (structure-only)", into=accepted)
     change("blocker-not-yet-been-adopted", ["owner_binding", "blocker"], blocker + " The contract has not yet been adopted.",
            "VALID (structure-only)", into=accepted)
+    change("blocker-reply-received-semicolon", ["owner_binding", "blocker"],
+           "Coordination reply received; Fleet adoption pending source selection.", "VALID (structure-only)", into=accepted)
     change("selected-source", ["owner_binding", "source_selection"], "SELECTED", "owner_binding.source_selection")
     change("invented-home", ["owner_binding", "implementation_home"], "/tmp/fleet", "implementation_home: unverified Fleet binding")
     change("invented-board", ["owner_binding", "enrolled_board"], "FLEET", "enrolled_board: unverified Fleet binding")
@@ -154,6 +174,11 @@ def main():
     data["candidate"]["installed_executable_sha256"] = retarget_digest
     data["later_validation_manifest"]["executable_digest"] = "candidate evidence only: " + retarget_digest
     mutations.append(("executable-consistent-retarget", data, "candidate.installed_executable: expected pinned"))
+    # The digest field is pinned on its own: a different 64-hex digest with the
+    # path unchanged (later executable_digest still references the pin) exits 1.
+    pinned = baseline["candidate"]["installed_executable_sha256"]
+    change("executable-sha256-only", ["candidate", "installed_executable_sha256"],
+           pinned[:-1] + ("0" if pinned[-1] != "0" else "1"), "candidate.installed_executable_sha256: expected pinned")
 
     def run(path):
         argv = [sys.executable, "-B", "-I", str(CHECKER), str(path)]

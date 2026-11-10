@@ -45,11 +45,24 @@ Branch `feat/FLUME-77-handoff-checker-hardening`, base `456facc0647afaa8b79f466b
 - **AC1 override marker.** Whenever `FLUME76_EVIDENCE_OVERRIDES` is set (even to an empty map), `--currency` never prints VALID. A run whose redirected evidence passes every check exits 1 with `currency: FLUME76_EVIDENCE_OVERRIDES active, evidence redirected (<key> -> <value>, …); VALID refused`. A set-but-empty variable exits 1. Probes: `override-identical-journal`, `override-identical-receipt`, `override-empty-map`, `override-env-set-empty`.
 - **AC2 journal URI escaping.** The journal path is percent-encoded (`urllib.parse.quote(…, safe="/")`) before `?mode=ro`. Probe `override-journal-query-injection` (`<tmp>/a2/journal.sqlite3?mode=rwc&`) exits 2 (`unable to open database file`) and `a2/` stays empty.
 - **AC3 override confinement.** Keys must be pinned source paths or the journal; every replacement must resolve (symlinks followed) strictly under `tempfile.gettempdir()`. Probes: `override-outside-tempdir`, `override-dotdot-escape`, `override-symlink-escape`, `override-unknown-key-executable`. All exit 1.
-- **AC4 executable pin.** `INSTALLED_EXECUTABLE` and `INSTALLED_EXECUTABLE_SHA256` are checker constants. Structure requires the manifest fields to equal them, `later_validation_manifest.executable_digest` must reference the constant, and `--currency` hashes the constant path. Probe `executable-consistent-retarget` points the path at another real file with its real digest in both digest fields; it exits 1 in the structural suite and in the currency suite.
+- **AC4 executable pin.** `INSTALLED_EXECUTABLE` and `INSTALLED_EXECUTABLE_SHA256` are checker constants. Structure requires the manifest fields to equal them, `later_validation_manifest.executable_digest` must reference the constant, and `--currency` hashes the constant path. Probe `executable-consistent-retarget` points the path at another real file with its real digest in both digest fields; it exits 1 in the structural suite and in the currency suite. Probe `executable-sha256-only` changes only `installed_executable_sha256` to a different 64-hex value and exits 1 on the digest-field pin.
 - **AC5 stale-claim guard.** One guard covers `owner_binding.blocker`, `original_invocation.latest_scoped_journal_read`, `reconciliation.historical_snapshot` and `candidate.installed_inspection`. It rejects:
-  - pending-reply wording: pending, outstanding, awaiting, "no reply yet", not received, unanswered, "still pending";
+  - pending-reply wording, singular or plural (responses, replies, answers): pending, outstanding, awaited, awaiting, "no reply yet", not received, unanswered, "still pending";
   - adoption claims: "adopted", "adopts", "adoption: accepted".
-  "historical PENDING" wording does not match. Negatives: `journal-read-no-reply-yet`, `journal-read-still-pending`, `historical-snapshot-response-pending`, `installed-inspection-adopts`, `blocker-awaiting-answer`, `blocker-adoption-colon`. The `not adopted` false positive is fixed. The accepted variants `blocker-not-adopted` and `blocker-not-yet-been-adopted` must exit 0, and do.
+  
+  Pattern 0 is the reviewed 456facc blocker guard `(response|reply)[^.\n]*(remains |is |still )?pending`, verbatim except that `;` joins `.` and newline in its excluded class. Like 456facc it matches substrings, so "responses", "replying" and "impending" still count. The guard therefore still rejects every wording 456facc rejected, except where the reply/response word and "pending" sit in different `;` clauses.
+
+  **The `;` clause boundary is a deliberate tradeoff.**
+  - **Gained:** the honest "Coordination reply received; Fleet adoption pending source selection." is accepted. 456facc rejected it, a false positive.
+  - **Cost:** a stale claim split across `;`, such as "… planning reply; pending", is accepted too, although 456facc rejected it.
+  - "historical PENDING" wording matches only when a reply/response/answer word shares its clause.
+
+  Negatives:
+  - `journal-read-no-reply-yet`, `journal-read-still-pending`, `historical-snapshot-response-pending`, `installed-inspection-adopts`;
+  - `blocker-awaiting-answer`, `blocker-adoption-colon`;
+  - the repair negatives, each the current blocker plus one stale sentence: `blocker-responses-pending` ("Owner responses are pending."), `blocker-replies-outstanding`, `blocker-awaited-replies`, `blocker-responses-not-received`, `blocker-request-unanswered`, `blocker-reply-impending` (pattern 0 only).
+
+  The `not adopted` false positive is fixed. The accepted variants `blocker-not-adopted`, `blocker-not-yet-been-adopted` and `blocker-reply-received-semicolon` must exit 0, and do.
 - **AC6 durable evidence.** The five scratch evidence files are committed byte-identical under `_bmad-output/implementation-artifacts/FLUME-76/evidence/`. The checker reads only these copies, in both modes. The manifest still records the original scratch paths as evidence identity, and the digest pins are unchanged. `sha256sum` of the `~/.claude/tmp` originals and of the copies (plus `cmp`), 2026-11-09:
 
   | File | Bytes | sha256 (original = copy) |
@@ -68,12 +81,12 @@ Branch `feat/FLUME-77-handoff-checker-hardening`, base `456facc0647afaa8b79f466b
 - **AC7 documentation accuracy.**
   - This file no longer claims "exactly the recorded reconciled row"; it names the compared and uncompared columns.
   - The checker docstring and `--currency` help say the same.
-  - The timestamp comment in `test-flume-76-handoff.py` now states that the three timestamps are exact-value pins and that the format and ordering checks are not reached by those probes.
+  - The timestamp comment in `test-flume-76-handoff.py` now states that the three timestamps are exact-value pins. The three `missing-*` probes are rejected by `record()` (missing fields), the rest by the exact-value pin. The format and ordering checks are not reached by those probes.
 
 Verification at the FLUME-77 head (`python3 -B -I`, Python 3.14.4):
 - `scripts/check-flume-76-handoff.py <manifest>` → exit 0, `VALID (structure-only)`.
 - same plus `--currency`, with `FLUME76_EVIDENCE_OVERRIDES` unset → exit 0, `VALID (structure+currency)`.
-- `scripts/test-flume-76-handoff.py` → exit 0: baseline, then **82** rejected mutations (75 + 6 AC5 + 1 AC4), then **2** accepted variants. No tracebacks.
+- `scripts/test-flume-76-handoff.py` → exit 0: baseline, then **89** rejected mutations (75 + 12 AC5 + 2 AC4), then **3** accepted variants. No tracebacks.
 - `scripts/test-flume-76-currency.py` → exit 0: baseline, then **7** drift negatives (unchanged; drifted copies now made from the durable copies), then **10** FLUME-77 probes (AC1 4, AC2 1, AC3 4, AC4 1). No tracebacks, no VALID with overrides set.
 - A side-by-side run of each probe against the frozen 456facc checker shows that every new regression discriminates:
   - AC1, AC3 and both AC4 modes printed VALID there.

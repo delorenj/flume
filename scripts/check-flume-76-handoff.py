@@ -86,12 +86,23 @@ TERMINAL_EVENTS = [
 # Stale evidence-state claims, matched on lowercased free text. The owner reply
 # was received and reconciled, and Fleet adoption is BLOCKED, so prose saying the
 # reply is still awaited, or that the contract was adopted, contradicts the record.
-# Historical wording ("historical PENDING" snapshot) does not match.
+# Pattern 0 is the reviewed 456facc blocker guard, verbatim (substring match, so
+# "responses", "replying", "impending" still count) except that ';' joins '.' and
+# '\n' as a clause boundary. Patterns 1-6 widen it: plurals, answers,
+# outstanding/awaited, "no reply yet", "not received", "unanswered", "still pending".
+# Clause-boundary tradeoff: a reply/response word and a pending word in different
+# ';' clauses are not linked. That accepts the honest "Coordination reply received;
+# Fleet adoption pending source selection." (456facc rejected it, a false positive)
+# and, as the price, also accepts a stale claim split by ';' such as
+# "... planning reply; pending", which 456facc rejected. Every other wording the
+# 456facc guard rejected is still rejected. "historical PENDING" wording matches
+# only if a reply/response/answer word shares its clause.
 STALE_PENDING = [
-    r"\b(response|reply|answer)\b[^.;\n]*\b(pending|outstanding|awaited|unanswered)\b",
-    r"\b(pending|outstanding|awaiting|waiting (for|on))\b[^.;\n]*\b(response|reply|answer)\b",
+    r"(response|reply)[^.;\n]*(remains |is |still )?pending",
+    r"\b(responses?|repl(?:y|ies)|answers?)\b[^.;\n]*\b(pending|outstanding|awaited|unanswered)\b",
+    r"\b(pending|outstanding|awaited|awaiting|waiting (for|on))\b[^.;\n]*\b(responses?|repl(?:y|ies)|answers?)\b",
     r"\bno\s+(\S+\s+){0,2}(responses?|repl(y|ies)|answers?)\s+(yet|received|recorded)\b",
-    r"\b(response|reply|answer)\s+(has\s+|was\s+)?not\s+(yet\s+)?(been\s+)?(received|recorded|arrived|given|returned)\b",
+    r"\b(responses?|repl(?:y|ies)|answers?)\s+(has\s+|have\s+|was\s+|were\s+)?not\s+(yet\s+)?(been\s+)?(received|recorded|arrived|given|returned)\b",
     r"\bunanswered\b",
     r"\b(still|remains?|currently|now)\s+(pending|outstanding|unanswered|awaiting)\b",
 ]
