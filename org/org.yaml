@@ -39,6 +39,9 @@ ceo:
 
 # Reusable title/expertise per agent_id (optional; fills node title + badges).
 personas:
+  green-in-between-launch-director:
+    title: "Launch Director — Green In Between"
+    expertise: [launch-readiness, beta-gates, receipts, critical-path, owner-decisions]
   morgan-finance:
     title: "Director of Finance — AutomaticAI"
     expertise: [milkshake, client-finance, bookkeeping, mercury-reconciliation]
@@ -238,6 +241,13 @@ departments:
     members:
       - james-brennan-pm
       - navi-pm
+
+  - id: launch
+    name: "Launch"
+    order: 12
+    # Launch Directors report directly to Jarad (CEO), never to a product PM.
+    manager: null
+    members: []
 
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
