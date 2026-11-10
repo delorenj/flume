@@ -1,0 +1,10 @@
+{
+  "stream": "BLOODBANK_COMMANDS",
+  "sequence": 160790,
+  "time": "2026-11-08T09:59:07.11897492Z",
+  "subject": "bloodbank.cmd.agent.invocation.start",
+  "command_id": "149134bb-3c88-4ebf-8ecf-98610e054933",
+  "correlationid": "f9126f02-14cf-4fae-8a5c-00026336cefa",
+  "target_agent_id": "flume-pm",
+  "envelope_id": "6da1f331-34cf-4b3d-9991-6c8719735c53"
+}
