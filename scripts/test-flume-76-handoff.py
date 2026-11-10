@@ -3,7 +3,9 @@
 
 The default structural check never touches the live gateway journal or parent
 repo documents, so every probe here keeps running when that evidence changes.
-The children get -B and -I; temporary copies are removed when the run ends.
+Every mutation must exit 1 with its diagnostic; every accepted variant (wording
+the guards must NOT reject) must exit 0. The children get -B and -I; temporary
+copies are removed when the run ends.
 """
 
 import copy
@@ -23,14 +25,15 @@ def main():
     original = MANIFEST.read_bytes()
     baseline = json.loads(original)
     mutations = []
+    accepted = []
 
-    def change(label, path, value, diagnostic):
+    def change(label, path, value, diagnostic, into=None):
         data = copy.deepcopy(baseline)
         target = data
         for key in path[:-1]:
             target = target[key]
         target[path[-1]] = value
-        mutations.append((label, data, diagnostic))
+        (mutations if into is None else into).append((label, data, diagnostic))
 
     mutations.extend([("root-list", [], "manifest: expected object"),
                       ("root-null", None, "manifest: expected object")])
@@ -57,7 +60,10 @@ def main():
     change("disposition-adoption", ["reconciliation", "disposition", "fleet_contract_adoption"], "ACCEPTED", "reconciliation.disposition: distinct verdicts changed")
     change("disposition-gates", ["reconciliation", "disposition", "g1_g2_g3"], "PASS", "reconciliation.disposition: distinct verdicts changed")
     change("recon-record-sha", ["reconciliation", "record_sha256"], "0" * 64, "reconciliation.record: identity or digest changed")
-    # Timestamps: exact pins plus chronology.
+    # Timestamps: stored_at, observer_expires_at and last_snapshot_at are pinned to
+    # exact values. Every probe below is rejected by that exact-value pin, so the
+    # timestamp-format and stored < expiry <= snapshot ordering checks are not
+    # reached by these probes (they cannot fail while the values are pinned).
     change("bad-timestamp", ["original_invocation", "last_snapshot_at"], "not-a-date", "last_snapshot_at: expected")
     change("future-stored-date", ["original_invocation", "stored_at"], "2099-01-01T00:00:00Z", "original_invocation.stored_at: expected")
     change("past-expiry-date", ["original_invocation", "observer_expires_at"], "1900-01-01T00:00:00Z", "original_invocation.observer_expires_at: expected")
@@ -98,6 +104,28 @@ def main():
            "Neither establishes a Fleet code home. The parent planning response remains pending.", "stale pending-response claim")
     change("adoption-claim-blocker", ["owner_binding", "blocker"],
            "Fleet contract adopted; nothing else missing.", "adoption claim")
+    # FLUME-77 AC5: the stale-claim guard covers every free-text evidence-state field.
+    change("journal-read-no-reply-yet", ["original_invocation", "latest_scoped_journal_read"],
+           "live: no execution row; no reply yet", "original_invocation.latest_scoped_journal_read: stale pending-response claim")
+    change("journal-read-still-pending", ["original_invocation", "latest_scoped_journal_read"],
+           "live: no row, still pending", "original_invocation.latest_scoped_journal_read: stale pending-response claim")
+    change("historical-snapshot-response-pending", ["reconciliation", "historical_snapshot"],
+           "2026-11-08T10:14:20.883733Z expiry evidence is historical PENDING, preserved; the owner response remains pending",
+           "reconciliation.historical_snapshot: stale pending-response claim")
+    change("installed-inspection-adopts", ["candidate", "installed_inspection"],
+           "Peer PID/UID/start validation observed. Fleet adopts this build as the native contract.",
+           "candidate.installed_inspection: adoption claim")
+    change("blocker-awaiting-answer", ["owner_binding", "blocker"],
+           "No Fleet source verified. Awaiting the owner's answer.", "owner_binding.blocker: stale pending-response claim")
+    change("blocker-adoption-colon", ["owner_binding", "blocker"],
+           "No Fleet source verified; Fleet contract adoption: accepted.", "owner_binding.blocker: adoption claim")
+    # Accepted variants: directly negated adoption is not an adoption claim (the
+    # former "not adopted" false positive), and the guard leaves it VALID.
+    blocker = baseline["owner_binding"]["blocker"]
+    change("blocker-not-adopted", ["owner_binding", "blocker"], blocker + " The Fleet contract is not adopted.",
+           "VALID (structure-only)", into=accepted)
+    change("blocker-not-yet-been-adopted", ["owner_binding", "blocker"], blocker + " The contract has not yet been adopted.",
+           "VALID (structure-only)", into=accepted)
     change("selected-source", ["owner_binding", "source_selection"], "SELECTED", "owner_binding.source_selection")
     change("invented-home", ["owner_binding", "implementation_home"], "/tmp/fleet", "implementation_home: unverified Fleet binding")
     change("invented-board", ["owner_binding", "enrolled_board"], "FLEET", "enrolled_board: unverified Fleet binding")
@@ -117,6 +145,15 @@ def main():
     change("changed-source-digest", ["sources", 0, "sha256"], "0" * 64, "sources: digest changed")
     change("changed-source-role", ["sources", 0, "role"], "current_receipt", "sources: role changed")
     change("extra-source", ["sources"], baseline["sources"] + [{"path": "/tmp/x", "sha256": "0" * 64, "role": "x"}], "sources: unexpected path")
+    # FLUME-77 AC4: a consistent retarget (path plus both digest fields agreeing
+    # with the new real file) is still rejected by the pinned constants.
+    retarget = Path(sys.executable).resolve()
+    retarget_digest = hashlib.sha256(retarget.read_bytes()).hexdigest()
+    data = copy.deepcopy(baseline)
+    data["candidate"]["installed_executable"] = str(retarget)
+    data["candidate"]["installed_executable_sha256"] = retarget_digest
+    data["later_validation_manifest"]["executable_digest"] = "candidate evidence only: " + retarget_digest
+    mutations.append(("executable-consistent-retarget", data, "candidate.installed_executable: expected pinned"))
 
     def run(path):
         argv = [sys.executable, "-B", "-I", str(CHECKER), str(path)]
@@ -137,8 +174,14 @@ def main():
             path.write_text(json.dumps(data))
             result = run(path)
             assert result.returncode == 1 and diagnostic in result.stderr and "Traceback" not in result.stderr, label
+        for label, data, verdict in accepted:
+            path = Path(directory) / (label + ".json")
+            path.write_text(json.dumps(data))
+            result = run(path)
+            assert result.returncode == 0 and verdict in result.stdout and not result.stderr, label
     assert MANIFEST.read_bytes() == original, "authored artifact changed"
-    print(f"PASS: structural baseline + {len(mutations)} rejected mutations; temp copies removed; authored artifact unchanged")
+    print(f"PASS: structural baseline + {len(mutations)} rejected mutations + {len(accepted)} accepted variants; "
+          "temp copies removed; authored artifact unchanged")
     return 0
 
 

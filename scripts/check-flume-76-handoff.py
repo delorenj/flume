@@ -2,13 +2,25 @@
 """FLUME-76 handoff check, not native protocol certification.
 
 Default mode validates STRUCTURE only: manifest shape, blocked-state invariants
-and consistency with stable scratch evidence (historical receipt/snapshot and
-the scratch reconciliation record). It never reads the live gateway journal or
-parent repo documents, so those checks keep running when live evidence changes.
+and consistency with the durable evidence copies (historical receipt/snapshot
+and the reconciliation record, committed byte-identical under
+_bmad-output/implementation-artifacts/FLUME-76/evidence/). It never reads the
+live gateway journal or parent repo documents, so those checks keep running
+when live evidence changes.
 
---currency is a separate fail-closed check: every pinned source digest must
-match and the live journal (SQLite URI mode=ro, selected fields only) must hold
-exactly the recorded reconciled row. Any drift, new row or missing row exits 1.
+--currency is a separate fail-closed check. Every pinned source digest must
+match (the five scratch-recorded sources are read from their durable copies),
+the pinned candidate executable must hash to its pinned digest, and the live
+journal (SQLite URI mode=ro, path percent-encoded) must hold exactly one row for
+the original command whose profile, state, outcome, created_at, updated_at,
+rejection_reason, failure_code, detached_at and terminal_events id/type/time
+equal the recorded values. Other columns (lane, rejected_at, started_events,
+envelope_digest, event causation ids) are not compared.
+
+FLUME76_EVIDENCE_OVERRIDES is a default-off test seam (currency mode only). Its
+replacement paths must resolve under tempfile.gettempdir(), and whenever the
+variable is set, --currency never prints VALID: a run whose evidence all checks
+out still exits 1 naming the active overrides.
 
 Exit 1: invalid/inconsistent artifact; exit 2: local evidence unavailable.
 """
@@ -20,16 +32,22 @@ import os
 import re
 import sqlite3
 import sys
+import tempfile
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
 COMMAND = "149134bb-3c88-4ebf-8ecf-98610e054933"
 CORRELATION = "f9126f02-14cf-4fae-8a5c-00026336cefa"
+# Recorded scratch paths: the manifest's evidence identity. They are never read
+# directly; DURABLE maps each to its committed byte-identical copy.
 RECEIPT = "/home/delorenj/.claude/tmp/i9-flume-stored-command-receipt.json"
 SNAPSHOT = "/home/delorenj/.claude/tmp/i9-flume-observer-expiry-evidence.json"
 RECONCILIATION = "/home/delorenj/.claude/tmp/i9-flume-original-request-reconciliation-2026-11-09.json"
 REPLY = "/home/delorenj/.claude/tmp/i9-flume-pm-final-reply-2026-11-08.md"
 EVENTS = "/home/delorenj/.claude/tmp/i9-flume-correlated-events-2026-11-09.json"
+EVIDENCE_DIR = Path(__file__).resolve().parents[1] / "_bmad-output/implementation-artifacts/FLUME-76/evidence"
+DURABLE = {path: EVIDENCE_DIR / Path(path).name for path in (RECEIPT, SNAPSHOT, RECONCILIATION, REPLY, EVENTS)}
 PARENT = "/home/delorenj/code/33GOD"
 RESUME = PARENT + "/_bmad-output/specs/spec-i9-agent-message-owner-handoff/resume.md"
 REQUIRED_SOURCES = {
@@ -43,6 +61,9 @@ REQUIRED_SOURCES = {
     PARENT + "/_bmad-output/specs/spec-i9-agent-message-owner-handoff/acceptance-contract.md": ("parent_acceptance_contract", "e113f6fbf5542f50da8ec70211a95c5710868eb296c1c5fca4f7d24ed211b0b4"),
     RESUME: ("parent_resume", "1562d587187ffe2c65b840514edb6966e9cdc160a95c99cac9ea87676b4f1aaf"),
 }
+# Candidate executable: pinned like REQUIRED_SOURCES, never taken from the manifest.
+INSTALLED_EXECUTABLE = "/home/delorenj/.local/share/claude/versions/2.1.319"
+INSTALLED_EXECUTABLE_SHA256 = "dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed"
 FORBIDDEN_FILES = [
     "FLUME_RUNTIME_IDENTITY_REGISTRY_CREDENTIAL_CONFIG", "PARENT_FEATURES_CATALOG",
     "PJAN_202", "BB_32_33", "CRANK_RUNTIME_ADMISSION", "TERMINAL_DRIVER_INPUT",
@@ -62,6 +83,21 @@ TERMINAL_EVENTS = [
     {"id": "3fe51b58-8ff9-5212-bdf9-e0988bd0d47c", "type": "bloodbank.agent.invocation.completed", "time": "2026-11-08T13:56:46.047623Z"},
     {"id": "d16988b9-1a67-5656-a992-fba0aaa433bb", "type": "bloodbank.conversation.turn.completed", "time": "2026-11-08T13:56:46.047639Z"},
 ]
+# Stale evidence-state claims, matched on lowercased free text. The owner reply
+# was received and reconciled, and Fleet adoption is BLOCKED, so prose saying the
+# reply is still awaited, or that the contract was adopted, contradicts the record.
+# Historical wording ("historical PENDING" snapshot) does not match.
+STALE_PENDING = [
+    r"\b(response|reply|answer)\b[^.;\n]*\b(pending|outstanding|awaited|unanswered)\b",
+    r"\b(pending|outstanding|awaiting|waiting (for|on))\b[^.;\n]*\b(response|reply|answer)\b",
+    r"\bno\s+(\S+\s+){0,2}(responses?|repl(y|ies)|answers?)\s+(yet|received|recorded)\b",
+    r"\b(response|reply|answer)\s+(has\s+|was\s+)?not\s+(yet\s+)?(been\s+)?(received|recorded|arrived|given|returned)\b",
+    r"\bunanswered\b",
+    r"\b(still|remains?|currently|now)\s+(pending|outstanding|unanswered|awaiting)\b",
+]
+ADOPTION_CLAIM = r"\badoption\b\W{0,3}(?:(?:is|was|has|been|now)\s+)*(accepted|complete|completed|done|succeeded|granted|approved)\b"
+# "adopted"/"adopts" is a claim unless directly negated ("not adopted", "has not yet been adopted").
+ADOPTED_WORD = r"\b(?:(not|never|no longer)\s+(?:(?:yet|been|be|being)\s+)*)?(adopted|adopts)\b"
 
 
 class InvalidHandoff(ValueError):
@@ -103,6 +139,16 @@ def timestamp(value, path):
         raise InvalidHandoff(f"{path}: invalid timestamp") from exc
 
 
+def evidence_state(value, path):
+    """Free text that asserts evidence state must not contradict the reconciled record."""
+    text(value, path)
+    lowered = value.lower()
+    for pattern in STALE_PENDING:
+        require(not re.search(pattern, lowered), f"{path}: stale pending-response claim contradicts reconciled reply")
+    claimed = re.search(ADOPTION_CLAIM, lowered) or any(m.group(1) is None for m in re.finditer(ADOPTED_WORD, lowered))
+    require(not claimed, f"{path}: adoption claim contradicts BLOCKED disposition")
+
+
 def load_structure(manifest: Path):
     """Manifest shape and stable-scratch consistency; no journal, no parent docs."""
     data = record(json.loads(manifest.read_text()), "manifest",
@@ -128,7 +174,7 @@ def load_structure(manifest: Path):
         require(invocation[field] == expected, f"original_invocation.{field}: expected {expected}")
     require(type(invocation["sequence"]) is int and invocation["sequence"] == 160790,
             "original_invocation.sequence: expected stored sequence 160790")
-    text(invocation["latest_scoped_journal_read"], "original_invocation.latest_scoped_journal_read")
+    evidence_state(invocation["latest_scoped_journal_read"], "original_invocation.latest_scoped_journal_read")
     policy = record(invocation["dispatch_policy"], "dispatch_policy", "resend replay cross_route")
     require(all(value is False for value in policy.values()), "dispatch_policy: resend/replay/cross_route must all be false")
     stored = timestamp(invocation["stored_at"], "original_invocation.stored_at")
@@ -141,7 +187,7 @@ def load_structure(manifest: Path):
     require(recon["reconciled_at"] == "2026-11-10T00:20:14.138412Z", "reconciliation.reconciled_at: unexpected value")
     require(recon["record"] == RECONCILIATION and recon["record_sha256"] == REQUIRED_SOURCES[RECONCILIATION][1],
             "reconciliation.record: identity or digest changed")
-    text(recon["historical_snapshot"], "reconciliation.historical_snapshot")
+    evidence_state(recon["historical_snapshot"], "reconciliation.historical_snapshot")
     row = record(recon["journal_row"], "reconciliation.journal_row",
                  "profile state outcome created_at updated_at rejection_reason failure_code detached_at")
     require((row["profile"], row["state"], row["outcome"]) == ("flume-pm", "completed", "success"),
@@ -175,11 +221,7 @@ def load_structure(manifest: Path):
         require(owner[field] is None, f"owner_binding.{field}: unverified Fleet binding must remain null")
     for field in ("catalog_owner_key", "fleet_component_source", "blocker"):
         text(owner[field], f"owner_binding.{field}")
-    lowered_blocker = owner["blocker"].lower()
-    require(not re.search(r"(response|reply)[^.\n]*(remains |is |still )?pending", lowered_blocker),
-            "owner_binding.blocker: stale pending-response claim contradicts reconciled reply")
-    require(not re.search(r"\badopted\b|adoption (accepted|complete|done|succeeded)", lowered_blocker),
-            "owner_binding.blocker: adoption claim contradicts BLOCKED disposition")
+    evidence_state(owner["blocker"], "owner_binding.blocker")
     require(bool(re.fullmatch(r"[0-9a-f]{40}", str(owner["template_revision"]))), "owner_binding.template_revision: expected full source SHA")
 
     candidate = record(data["candidate"], "candidate",
@@ -187,6 +229,11 @@ def load_structure(manifest: Path):
     require(candidate["current"] == "UNSUPPORTED_FOR_SUBMISSION", "candidate.current: native submit must remain unsupported")
     for field in ("cohort", "predicate", "installed_executable", "installed_inspection"):
         text(candidate[field], f"candidate.{field}")
+    evidence_state(candidate["installed_inspection"], "candidate.installed_inspection")
+    require(candidate["installed_executable"] == INSTALLED_EXECUTABLE,
+            f"candidate.installed_executable: expected pinned {INSTALLED_EXECUTABLE}")
+    require(candidate["installed_executable_sha256"] == INSTALLED_EXECUTABLE_SHA256,
+            f"candidate.installed_executable_sha256: expected pinned {INSTALLED_EXECUTABLE_SHA256}")
     gates = data["gates"]
     require(type(gates) is list and len(gates) == 3, "gates: expected exactly three gate objects")
     ids = []
@@ -212,7 +259,7 @@ def load_structure(manifest: Path):
         require(later[field] is None, f"later_validation_manifest.{field}: unavailable binding must remain null")
     for field in ("executable_digest", "disposable_resources", "inputs", "expected_events", "evidence_path", "teardown", "stop_conditions"):
         text(later[field], "later_validation_manifest." + field)
-    require(later["executable_digest"] == "candidate evidence only: " + candidate["installed_executable_sha256"],
+    require(later["executable_digest"] == "candidate evidence only: " + INSTALLED_EXECUTABLE_SHA256,
             "later_validation_manifest.executable_digest: must reference candidate evidence only")
 
     brief = record(data["next_true_owner_brief"], "next_true_owner_brief",
@@ -256,10 +303,10 @@ def load_structure(manifest: Path):
         sources[source["path"]] = source["sha256"]
     require(set(sources) == set(REQUIRED_SOURCES), "sources: exact nine reference set required")
 
-    # Stable scratch evidence consistency (no live journal, no parent docs).
-    receipt = json.loads(Path(RECEIPT).read_text())
-    snapshot = json.loads(Path(SNAPSHOT).read_text())
-    recon_record = json.loads(Path(RECONCILIATION).read_text())
+    # Durable evidence consistency (committed copies; no live journal, no parent docs).
+    receipt = json.loads(DURABLE[RECEIPT].read_text())
+    snapshot = json.loads(DURABLE[SNAPSHOT].read_text())
+    recon_record = json.loads(DURABLE[RECONCILIATION].read_text())
     for field, reference in {"command_id": "command_id", "correlation_id": "correlationid", "target": "target_agent_id",
                              "sequence": "sequence", "subject": "subject", "stream": "stream", "stored_at": "time"}.items():
         require(invocation[field] == receipt[reference], f"original_invocation.{field}: differs from stored receipt")
@@ -295,38 +342,56 @@ def load_structure(manifest: Path):
 
 
 JOURNAL = "/home/delorenj/.hermes/bloodbank-hermes-gateway-state.sqlite3"
-JOURNAL_URI = "file:" + JOURNAL + "?mode=ro"
+OVERRIDES_ENV = "FLUME76_EVIDENCE_OVERRIDES"
+
+
+def journal_uri(path):
+    """Read-only SQLite URI; the path is percent-encoded so '?', '#', '&' or '%' cannot alter mode=ro."""
+    return "file:" + urllib.parse.quote(str(Path(path).absolute()), safe="/") + "?mode=ro"
 
 
 def currency_overrides():
-    """Default-off test seam: FLUME76_EVIDENCE_OVERRIDES maps original path -> replacement path.
+    """Default-off test seam: FLUME76_EVIDENCE_OVERRIDES names a JSON map {recorded path: replacement}.
 
-    Only honored in --currency mode so structural checks never see it, and only
-    used to point at scratch copies under a temp dir (never to weaken defaults).
+    Returns None when the variable is unset. When it is set (even to an empty
+    map), check_currency refuses VALID after all checks, so redirected evidence
+    can never yield a currency pass. Keys must be pinned source paths or the
+    journal; replacements must resolve (symlinks followed) under
+    tempfile.gettempdir(). Only honored in --currency mode.
     """
-    env = os.environ.get("FLUME76_EVIDENCE_OVERRIDES")
-    if not env:
-        return {}
-    require(type(json.loads(Path(env).read_text())) is dict, "currency: overrides file must be a JSON object")
-    return {str(k): str(v) for k, v in json.loads(Path(env).read_text()).items()}
+    env = os.environ.get(OVERRIDES_ENV)
+    if env is None:
+        return None
+    require(bool(env.strip()), f"currency: {OVERRIDES_ENV} is set but empty; overrides refused")
+    mapping = json.loads(Path(env).read_text())
+    require(type(mapping) is dict and all(type(k) is str and type(v) is str and v for k, v in mapping.items()),
+            "currency: overrides file must map path strings to nonempty path strings")
+    unknown = sorted(set(mapping) - set(REQUIRED_SOURCES) - {JOURNAL})
+    require(not unknown, f"currency: overrides name unknown evidence paths {unknown}")
+    base = Path(tempfile.gettempdir()).resolve()
+    for key, value in mapping.items():
+        target = Path(value).resolve()
+        require(target != base and target.is_relative_to(base),
+                f"currency: override for {key} resolves outside tempfile.gettempdir() {base}: {target}")
+    return mapping
 
 
 def check_currency(data):
-    """Fail-closed currency: pinned digests and exactly the recorded live row."""
+    """Fail-closed currency: pinned digests, pinned executable and the recorded journal columns."""
     overrides = currency_overrides()
+    active = overrides or {}
     for path, (role, digest) in REQUIRED_SOURCES.items():
-        actual = Path(overrides.get(path, path))
+        actual = Path(active[path]) if path in active else DURABLE.get(path, Path(path))
         require(actual.is_file(), f"currency: missing source {path} ({role})")
         require(hashlib.sha256(actual.read_bytes()).hexdigest() == digest,
                 f"currency: digest drift for {path} ({role})")
-    candidate = data["candidate"]
-    require(hashlib.sha256(Path(candidate["installed_executable"]).read_bytes()).hexdigest() == candidate["installed_executable_sha256"],
+    require(hashlib.sha256(Path(INSTALLED_EXECUTABLE).read_bytes()).hexdigest() == INSTALLED_EXECUTABLE_SHA256,
             "currency: installed executable digest changed")
-    resume = Path(overrides.get(RESUME, RESUME)).read_text()
+    resume = Path(active.get(RESUME, RESUME)).read_text()
     invocation = data["original_invocation"]
     require(invocation["observer_expires_at"] in resume, "currency: observer expiry absent from pinned resume evidence")
     row = data["reconciliation"]["journal_row"]
-    with sqlite3.connect("file:" + overrides.get(JOURNAL, JOURNAL) + "?mode=ro", uri=True) as db:
+    with sqlite3.connect(journal_uri(active.get(JOURNAL, JOURNAL)), uri=True) as db:
         rows = db.execute("SELECT profile, state, outcome, created_at, updated_at, rejection_reason, failure_code, detached_at, terminal_events "
                           "FROM executions WHERE command_id = ?", (COMMAND,)).fetchall()
     require(len(rows) == 1, f"currency: expected exactly one journal row, found {len(rows)}")
@@ -338,12 +403,16 @@ def check_currency(data):
     events = json.loads(terminal)
     require([{"id": e["id"], "type": e["type"], "time": e["time"]} for e in events] == data["reconciliation"]["terminal_events"],
             "currency: terminal events changed")
+    if overrides is not None:
+        named = ", ".join(f"{key} -> {value}" for key, value in sorted(overrides.items())) or "(empty map)"
+        raise InvalidHandoff(f"currency: {OVERRIDES_ENV} active, evidence redirected ({named}); VALID refused")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--currency", action="store_true", help="also verify pinned digests and the exact live journal row")
+    parser.add_argument("--currency", action="store_true",
+                        help="also verify pinned digests, the pinned executable and the recorded journal columns")
     args = parser.parse_args()
     try:
         data = json.loads(args.manifest.read_text())
