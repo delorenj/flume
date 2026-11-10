@@ -67,7 +67,7 @@
     "template_revision": "5715dbc4228a0aa8c8f91424ade092b9e448f26b",
     "implementation_home": null,
     "implementation_ticket": null,
-    "blocker": "Fleet card identifies a shared template and ~/.hermes/hermes-agent is an install; neither establishes native Adapter source/contract writer, enrolled Fleet board/PM or implementation ticket. The parent planning response remains pending."
+    "blocker": "Fleet card identifies a shared template and ~/.hermes/hermes-agent is an install; neither establishes native Adapter source/contract writer, enrolled Fleet board/PM or implementation ticket. Coordination reply received; Fleet contract adoption remains BLOCKED; no Fleet source/board/PM/ticket verified."
   },
   "candidate": {
     "cohort": "selected pane-bound local-Linux Claude process/native-session incarnation only",

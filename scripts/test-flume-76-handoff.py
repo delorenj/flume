@@ -94,6 +94,10 @@ def main():
         change("flume-" + field, ["owner_binding", field], "Flume", "owner_binding." + field)
     change("flume-mutation-coordination", ["owner_binding", "coordination"], "Flume owns native mutation", "owner_binding.coordination")
     change("empty-binding-blocker", ["owner_binding", "blocker"], "", "owner_binding.blocker")
+    change("stale-pending-blocker", ["owner_binding", "blocker"],
+           "Neither establishes a Fleet code home. The parent planning response remains pending.", "stale pending-response claim")
+    change("adoption-claim-blocker", ["owner_binding", "blocker"],
+           "Fleet contract adopted; nothing else missing.", "adoption claim")
     change("selected-source", ["owner_binding", "source_selection"], "SELECTED", "owner_binding.source_selection")
     change("invented-home", ["owner_binding", "implementation_home"], "/tmp/fleet", "implementation_home: unverified Fleet binding")
     change("invented-board", ["owner_binding", "enrolled_board"], "FLEET", "enrolled_board: unverified Fleet binding")

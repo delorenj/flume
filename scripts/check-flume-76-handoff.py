@@ -16,6 +16,7 @@ Exit 1: invalid/inconsistent artifact; exit 2: local evidence unavailable.
 import argparse
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -174,6 +175,11 @@ def load_structure(manifest: Path):
         require(owner[field] is None, f"owner_binding.{field}: unverified Fleet binding must remain null")
     for field in ("catalog_owner_key", "fleet_component_source", "blocker"):
         text(owner[field], f"owner_binding.{field}")
+    lowered_blocker = owner["blocker"].lower()
+    require(not re.search(r"(response|reply)[^.\n]*(remains |is |still )?pending", lowered_blocker),
+            "owner_binding.blocker: stale pending-response claim contradicts reconciled reply")
+    require(not re.search(r"\badopted\b|adoption (accepted|complete|done|succeeded)", lowered_blocker),
+            "owner_binding.blocker: adoption claim contradicts BLOCKED disposition")
     require(bool(re.fullmatch(r"[0-9a-f]{40}", str(owner["template_revision"]))), "owner_binding.template_revision: expected full source SHA")
 
     candidate = record(data["candidate"], "candidate",
@@ -288,20 +294,39 @@ def load_structure(manifest: Path):
             "reconciliation.disposition: differs from reconciliation record")
 
 
+JOURNAL = "/home/delorenj/.hermes/bloodbank-hermes-gateway-state.sqlite3"
+JOURNAL_URI = "file:" + JOURNAL + "?mode=ro"
+
+
+def currency_overrides():
+    """Default-off test seam: FLUME76_EVIDENCE_OVERRIDES maps original path -> replacement path.
+
+    Only honored in --currency mode so structural checks never see it, and only
+    used to point at scratch copies under a temp dir (never to weaken defaults).
+    """
+    env = os.environ.get("FLUME76_EVIDENCE_OVERRIDES")
+    if not env:
+        return {}
+    require(type(json.loads(Path(env).read_text())) is dict, "currency: overrides file must be a JSON object")
+    return {str(k): str(v) for k, v in json.loads(Path(env).read_text()).items()}
+
+
 def check_currency(data):
     """Fail-closed currency: pinned digests and exactly the recorded live row."""
+    overrides = currency_overrides()
     for path, (role, digest) in REQUIRED_SOURCES.items():
-        require(Path(path).is_file(), f"currency: missing source {path} ({role})")
-        require(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest,
+        actual = Path(overrides.get(path, path))
+        require(actual.is_file(), f"currency: missing source {path} ({role})")
+        require(hashlib.sha256(actual.read_bytes()).hexdigest() == digest,
                 f"currency: digest drift for {path} ({role})")
     candidate = data["candidate"]
     require(hashlib.sha256(Path(candidate["installed_executable"]).read_bytes()).hexdigest() == candidate["installed_executable_sha256"],
             "currency: installed executable digest changed")
-    resume = Path(RESUME).read_text()
+    resume = Path(overrides.get(RESUME, RESUME)).read_text()
     invocation = data["original_invocation"]
     require(invocation["observer_expires_at"] in resume, "currency: observer expiry absent from pinned resume evidence")
     row = data["reconciliation"]["journal_row"]
-    with sqlite3.connect("file:/home/delorenj/.hermes/bloodbank-hermes-gateway-state.sqlite3?mode=ro", uri=True) as db:
+    with sqlite3.connect("file:" + overrides.get(JOURNAL, JOURNAL) + "?mode=ro", uri=True) as db:
         rows = db.execute("SELECT profile, state, outcome, created_at, updated_at, rejection_reason, failure_code, detached_at, terminal_events "
                           "FROM executions WHERE command_id = ?", (COMMAND,)).fetchall()
     require(len(rows) == 1, f"currency: expected exactly one journal row, found {len(rows)}")
