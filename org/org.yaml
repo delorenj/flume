@@ -39,6 +39,12 @@ ceo:
 
 # Reusable title/expertise per agent_id (optional; fills node title + badges).
 personas:
+  gruvato-launch-director:
+    title: "Launch Director — Gruvato (product and launch path)"
+    expertise: [ launch-path, acceptance, store-readiness, pricing, critical-path, pm-em-pairing ]
+  gruvato-pm:
+    title: "Engineering Manager — Gruvato (app path)"
+    expertise: [ orchestration, delivery, capacity, mobile-deploy-hub, pm-em-pairing ]
   green-in-between-launch-director:
     title: "Launch Director — Green In Between"
     expertise: [ launch-readiness, beta-gates, receipts, critical-path, owner-decisions ]
@@ -247,7 +253,7 @@ departments:
     order: 12
     # Launch Directors report directly to Jarad (CEO), never to a product PM.
     manager: null
-    members: [ green-in-between-launch-director ]
+    members: [ green-in-between-launch-director, gruvato-launch-director ]
 
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
