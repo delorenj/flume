@@ -6,6 +6,7 @@ import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import YAML from 'yaml';
 import {createSet,addSetSkills,createPack,addPackSkills} from '@delorenj/skillex';
+import {build} from 'esbuild';
 
 const root=resolve(import.meta.dirname,'..');
 const cli=join(root,'packages/flume-hr/dist/index.js');
@@ -19,7 +20,7 @@ const tool=name=>{
   assert.equal(result.status,0,`${name} is required for the real hire proof: ${result.stderr}`);
   return realpathSync(result.stdout.trim());
 };
-const copier=tool('copier'),python=tool('python3');
+const copier=tool('copier'),python='/usr/bin/python3';
 const names=dir=>readdirSync(dir).filter(n=>!n.startsWith('.')).sort();
 const models=[
   'automaticai/personal/sol-6.1','automaticai/personal/sol','automaticai/personal/astra',
@@ -276,6 +277,14 @@ try {
   const advisoryRow=YAML.parse(readFileSync(advisoryFixture.registry,'utf8')).agents['demo-dev'];
   assert.equal(advisoryRow.board_scope,'advisory');assert.equal(advisoryRow.reports_to,'ceo');
   assert.equal(advisoryRow.plane?.project_id,undefined);assert.equal(advisoryRow.plane?.board_id,undefined);
+  // Exercise the same pure claimant resolver that Flume's retire preview uses,
+  // with the PM on the same board and the advisory row's saved registry shape.
+  const routeBundle=join(advisoryFixture.dir,'routing.mjs');
+  await build({entryPoints:[join(root,'packages/flume-hr/src/workforce/board-routing.ts')],outfile:routeBundle,bundle:true,platform:'node',format:'esm',logLevel:'silent'});
+  const routing=await import('file://'+routeBundle);
+  const pm={plane:{project_id:'board-uuid',scope_default:true},profile_name:'demo-pm',bloodbank:{gateway_scope:'fleet',target_agent_id:'demo-pm'}};
+  assert.deepEqual(routing.claimantsOf({'demo-pm':pm,'demo-dev':advisoryRow},'board-uuid').map(x=>x.id),['demo-pm']);
+  assert.equal(routing.boardRouting({'demo-pm':pm,'demo-dev':advisoryRow},'board-uuid').routes.at(-1).owner,'demo-pm');
   pass('actual advisory hire preview/apply: CEO symlink, no registry claim at Copier or final projection');
 
   for(const [label,skills,needle] of [
