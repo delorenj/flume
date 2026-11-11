@@ -41,9 +41,23 @@ ceo:
 personas:
   gruvato-launch-director:
     title: "Launch Director — Gruvato (product and launch path)"
-    expertise: [ launch-path, acceptance, store-readiness, pricing, critical-path, pm-em-pairing ]
+    expertise:
+      [
+        launch-path,
+        acceptance,
+        store-readiness,
+        pricing,
+        critical-path,
+        pm-em-pairing
+      ]
   gruvato-pm:
     title: "Engineering Manager — Gruvato (app path)"
+    expertise: [ orchestration, delivery, capacity, mobile-deploy-hub, pm-em-pairing ]
+  tolt-launch-director:
+    title: "Launch Director — Tower of Lost Things (product and launch path)"
+    expertise: [ launch-path, acceptance, store-readiness, kids-category, coppa, critical-path, pm-em-pairing ]
+  tolt-pm:
+    title: "Engineering Manager — Tower of Lost Things (app path, repo:game)"
     expertise: [ orchestration, delivery, capacity, mobile-deploy-hub, pm-em-pairing ]
   green-in-between-launch-director:
     title: "Launch Director — Green In Between"
@@ -253,7 +267,12 @@ departments:
     order: 12
     # Launch Directors report directly to Jarad (CEO), never to a product PM.
     manager: null
-    members: [ green-in-between-launch-director, gruvato-launch-director ]
+    members:
+      [
+        green-in-between-launch-director,
+        gruvato-launch-director,
+        tolt-launch-director
+      ]
 
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
