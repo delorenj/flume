@@ -13,6 +13,7 @@ import {
 import { spawnSync } from "node:child_process";
 import { basename, join, dirname } from "node:path";
 import { Command, type InvokeResult } from "../engine/Command";
+import { DEFAULT_VAULT_NAME, HostOverlayError, loadHostOverlay, type HostOverlay } from "../kernel/host-overlay";
 import type { HermesAgentContext } from "./types";
 
 const HERMES_GIT_URL = "https://github.com/delorenj/hermes-agent.git";
@@ -56,8 +57,11 @@ function detectHermesInstall(home: string): { bin: string; repo: string; sha: st
   return { bin, repo, sha };
 }
 
-function hostSchema(): ConfigSchema {
-  const home = homedir();
+/**
+ * The schema with big-chungus's values: what this file wrote before host overlays existed, and what it still
+ * writes when no overlay is present. Every path here is derived from `home`; every literal is one host's fact.
+ */
+function defaultHostSchema(home: string): ConfigSchema {
   const hermes = detectHermesInstall(home);
   return [
     {
@@ -88,7 +92,7 @@ function hostSchema(): ConfigSchema {
         ["vox_plugin_dir", quote(join(home, "code", "voxxy", "plugins", "tts", "vox"))],
         ["vox_voice", quote("carlin")],
         ["vox_url", quote("https://vox.delo.sh")],
-        ["onepassword_vault", quote("DeLoSecrets")],
+        ["onepassword_vault", quote(DEFAULT_VAULT_NAME)],
         ["onepassword_item_prefix", quote("hermes-agent")],
       ],
     },
@@ -104,12 +108,81 @@ function hostSchema(): ConfigSchema {
   ];
 }
 
-/** Render the current, pinned template schema with host-derived path values. */
-export function renderHostConfig(): string {
-  const sections = hostSchema()
+/** Keys whose value is a filesystem path: a leading `~/` or `$HOME/` in an overlay means THIS host's home. */
+const PATH_VALUED_KEYS = new Set(["hermes_bin", "hermes_repo", "runtime_scaffold_dir", "vox_plugin_dir"]);
+
+function expandHome(value: string, home: string): string {
+  if (value === "~" || value === "$HOME") return home;
+  if (value.startsWith("~/")) return join(home, value.slice(2));
+  if (value.startsWith("$HOME/")) return join(home, value.slice("$HOME/".length));
+  return value;
+}
+
+/**
+ * Lay a host overlay over the schema. Only keys the schema already has may be named: an overlay that sets
+ * `vox_ulr` must fail, not read as "no override". `vault.name` feeds `fleet.onepassword_vault` so the one
+ * vault name is written once; naming it twice with two different values is a split brain and is refused.
+ */
+function applyHostConfigOverlay(base: ConfigSchema, overlay: HostOverlay, home: string, overlayPath: string): ConfigSchema {
+  const errors: string[] = [];
+  const known = new Map(base.map(({ section, values }) => [section, new Set(values.map(([key]) => key))] as const));
+  const wanted: Record<string, Record<string, string>> = {};
+  for (const [section, keys] of Object.entries(overlay.hostConfig)) {
+    const allowed = known.get(section);
+    if (!allowed) {
+      errors.push(`host_config.${section} is not a section of the host config schema (sections: ${[...known.keys()].join(", ")})`);
+      continue;
+    }
+    for (const [key, value] of Object.entries(keys)) {
+      if (!allowed.has(key)) {
+        errors.push(`host_config.${section}.${key} is not a key of [${section}] (keys: ${[...allowed].join(", ")})`);
+        continue;
+      }
+      (wanted[section] ??= {})[key] = PATH_VALUED_KEYS.has(key) ? expandHome(value, home) : value;
+    }
+  }
+  const explicitVault = wanted.fleet?.onepassword_vault;
+  if (overlay.vault.name !== undefined) {
+    if (explicitVault !== undefined && explicitVault !== overlay.vault.name) {
+      errors.push(`vault.name "${overlay.vault.name}" and host_config.fleet.onepassword_vault "${explicitVault}" disagree; name the vault once`);
+    } else {
+      (wanted.fleet ??= {}).onepassword_vault = overlay.vault.name;
+    }
+  }
+  if (errors.length) throw new HostOverlayError(overlayPath, errors);
+  return base.map(({ section, values }) => ({
+    section,
+    values: values.map(([key, value]) => [key, wanted[section]?.[key] !== undefined ? quote(wanted[section]![key]!) : value] as const),
+  }));
+}
+
+/** The host config schema for this host: big-chungus's values, with this host's overlay laid over them. */
+function hostSchema(env: NodeJS.ProcessEnv = process.env, home = homedir()): ConfigSchema {
+  const base = defaultHostSchema(home);
+  const loaded = loadHostOverlay(env, home);
+  if (loaded.status === "invalid") throw new HostOverlayError(loaded.path, loaded.errors);
+  return loaded.status === "ok" ? applyHostConfigOverlay(base, loaded.overlay, home, loaded.path) : base;
+}
+
+/** Every `[section] key` the pinned host config schema carries, for tooling that validates an overlay against it. */
+export function hostConfigSchemaKeys(home = homedir()): Record<string, string[]> {
+  return Object.fromEntries(defaultHostSchema(home).map(({ section, values }) => [section, values.map(([key]) => key)]));
+}
+
+/**
+ * Render the current, pinned template schema with host-derived path values.
+ *
+ * `env` and `home` default to the live process; they exist so a host other than the one running flume (a fixture
+ * for the Mac, say) can be rendered and inspected. With no overlay present the output is exactly what it was
+ * before overlays existed.
+ */
+export function renderHostConfig(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  const sections = hostSchema(env, home)
     .map(({ section, values }) => `[${section}]\n${values.map(([key, value]) => `${key} = ${value}`).join("\n")}`)
     .join("\n\n");
-  return `# hermes-agent-template — host configuration\n# Bootstrapped by \`flume handbook bootstrap\` for $HOME=${homedir()} (platform=${platform()}).\n# Existing values and additional keys are preserved by \`--force\`; it only adds\n# fields missing from the schema pinned in this flume release.\n# Resolution precedence: env var > ~/.hermes/fleet.env > this file > fallback.\n\n${sections}\n`;
+  const loaded = loadHostOverlay(env, home);
+  const provenance = loaded.status === "ok" ? `# Host overlay: ${loaded.path}${loaded.overlay.host ? ` (host: ${loaded.overlay.host})` : ""}\n` : "";
+  return `# hermes-agent-template — host configuration\n# Bootstrapped by \`flume handbook bootstrap\` for $HOME=${home} (platform=${platform()}).\n# Existing values and additional keys are preserved by \`--force\`; it only adds\n# fields missing from the schema pinned in this flume release.\n# Resolution precedence: env var > ~/.hermes/fleet.env > this file > fallback.\n${provenance}\n${sections}\n`;
 }
 
 export interface TomlTableHeader {
@@ -450,6 +523,11 @@ function assertValidToml(source: string, label: string): void {
  * exact bytes, and the decode that follows is proved lossless before merging.
  */
 export function mergeHostConfig(existingBytes: Buffer): string {
+  return mergeHostConfigFor(existingBytes, process.env, homedir());
+}
+
+/** `mergeHostConfig` for an explicit host (`env`, `home`): the same merge, with that host's overlay laid over the schema. */
+export function mergeHostConfigFor(existingBytes: Buffer, env: NodeJS.ProcessEnv, home: string): string {
   validateTomlBytes(existingBytes, "Existing Hermes template config");
   const existing = existingBytes.toString("utf8");
   if (!Buffer.from(existing, "utf8").equals(existingBytes)) {
@@ -460,7 +538,7 @@ export function mergeHostConfig(existingBytes: Buffer): string {
     throw new Error("Existing Hermes template config is not valid UTF-8");
   }
   let merged = retireSkillConfig(existing);
-  for (const { section, values } of hostSchema()) {
+  for (const { section, values } of hostSchema(env, home)) {
     const tables = parseTomlTableHeaders(merged);
     const matching = tables.filter((table) => table.kind === "table" && table.path.length === 1 && table.path[0] === section);
     if (matching.length > 1) {
@@ -582,9 +660,12 @@ export class EnsureTemplateConfig extends Command {
       return { success: true, outcome: "unchanged", message: `Config present: ${path}` };
     }
 
-    let next = renderHostConfig();
+    let next = "";
     let current = "";
     try {
+      // Inside the try: a broken host overlay must end this command with a reason, never default to
+      // another host's values (see kernel/host-overlay.ts).
+      next = renderHostConfig();
       if (exists) {
         // Bytes, not a lossy "utf8" decode: mergeHostConfig validates the
         // exact file the Python consumer would read and proves the decode is

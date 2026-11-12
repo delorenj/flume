@@ -93,6 +93,7 @@ const SUITES = [
   "tests/channel-offline-regressions.mjs",
   "tests/retire-regressions.mjs",
   "tests/macos-portability-regressions.mjs",
+  "tests/host-overlay-regressions.mjs",
 ];
 
 const args = process.argv.slice(2);
@@ -180,6 +181,9 @@ const HERMETIC_ENV = {
   TRELLO_API_KEY: "",
   TRELLO_TOKEN: "",
   HERMES_FLEET_ENV: join(root, "scripts", "no-such-fleet.env"),
+  // No per-host overlay: a developer's own ~/.config/flume/host-overlay.yaml must not change a suite's outcome.
+  // tests/host-overlay-regressions.mjs sets its own overlay for the processes it spawns.
+  FLUME_HOST_OVERLAY: "none",
 };
 
 const results = [];

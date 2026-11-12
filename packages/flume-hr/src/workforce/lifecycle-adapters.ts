@@ -30,7 +30,8 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { accessStateDir } from "./access";
-import { consumerOf, deskRefs, fleetBaseGatewayRef, GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
+import { consumerOf, deskRefs, fleetBaseGatewayRef, gatewayRefShape, GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
+import { hostVaultName } from "../kernel/host-overlay";
 import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
@@ -742,7 +743,7 @@ interface GatewayDesk {
 }
 
 /** `launchSpecialist` reads this reference (not the FLUME-39 shape) and injects it whatever the desk config says. */
-const launcherRef = (target: IdentityDefinition, profile: string | null): string => `op://DeLoSecrets/hermes-${target.person ?? profile ?? "unknown"}/credential`;
+const launcherRef = (target: IdentityDefinition, profile: string | null): string => `op://${hostVaultName()}/hermes-${target.person ?? profile ?? "unknown"}/credential`;
 
 function gatewayDesk(ctx: Pick<LifecycleContext, "census" | "target" | "env">): GatewayDesk {
   const fleet = fleetHome(ctx.census, ctx.env);
@@ -842,7 +843,7 @@ export const gatewayAdapter: LifecycleAdapter = {
     } else if (desk.shape === "bad") {
       if (desk.ref !== desk.launcher) {
         rows.push({ ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), ...sharedFields, status: "unverified", provider_code: "gateway-ref-shape",
-          next_action: `FLUME-39 owns the gateway reference shape (op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer>)`, ...(desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) });
+          next_action: `FLUME-39 owns the gateway reference shape (${gatewayRefShape()})`, ...(desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) });
       }
     } else {
       const consumer = desk.consumer!;
@@ -905,7 +906,7 @@ export const gatewayAdapter: LifecycleAdapter = {
       // Reached only through `--revoke all`: a named `--revoke gateway` was refused by blockers() before any call.
       steps.push(skipped({ ...target, description: `not revoked: ${refusals.map(r => r.code).join(", ")}` }, refusals[0]!.code, refusals.map(r => r.detail).join("; ")));
     } else if (desk.shape === "bad" && desk.ref !== desk.launcher) {
-      steps.push(skipped({ ...target, description: `not revoked: ${desk.ref} is not the FLUME-39 shape` }, "gateway-ref-shape", `the desk's reference ${desk.ref} is not op://DeLoSecrets/${GATEWAY_TOKENS_ITEM}/<consumer>: no consumer can be named, so nothing can be revoked (FLUME-39 owns the shape)`));
+      steps.push(skipped({ ...target, description: `not revoked: ${desk.ref} is not the FLUME-39 shape` }, "gateway-ref-shape", `the desk's reference ${desk.ref} is not ${gatewayRefShape()}: no consumer can be named, so nothing can be revoked (FLUME-39 owns the shape)`));
     } else if (desk.shape === "ok") {
       const consumer = desk.consumer!;
       steps.push({

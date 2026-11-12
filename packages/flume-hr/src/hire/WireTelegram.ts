@@ -5,13 +5,14 @@ import * as p from "@clack/prompts";
 import { Command, type InvokeResult } from "../engine/Command";
 import type { HermesAgentContext } from "./types";
 import { modernBash } from "../kernel/host-platform";
+import { HostOverlayError, hostVaultName } from "../kernel/host-overlay";
 
 /**
  * BotFather token wire-up for a per-(repo, role) Hermes bot.
  *
  * Token resolution order:
  *   1. $TELEGRAM_BOT_TOKEN
- *   2. op://DeLoSecrets/<vaultTitle>/token
+ *   2. op://<this host's vault>/<vaultTitle>/token (kernel/host-overlay.ts; DeLoSecrets unless the overlay names another)
  *   3. BotFather walkthrough + clack secret prompt, then offer to persist
  *      back to 1Password so future runs skip the prompt entirely.
  *
@@ -43,7 +44,14 @@ export class WireTelegram extends Command {
     const botHandle = `${targetRepo.toLowerCase().replace(/-/g, "_")}_${role.toLowerCase()}_bot`;
     const displayName = `${cap(targetRepo)} ${role.length <= 3 ? role.toUpperCase() : cap(role)}`;
     const vaultTitle = `Telegram-Hermes-${targetRepo.toLowerCase()}-${role.toLowerCase()}`;
-    const vaultRef = `op://DeLoSecrets/${vaultTitle}/token`;
+    let vaultName: string;
+    try {
+      vaultName = hostVaultName();
+    } catch (error) {
+      if (!(error instanceof HostOverlayError)) throw error;
+      return { success: false, outcome: "failed", message: `Cannot wire telegram: ${error.message}` };
+    }
+    const vaultRef = `op://${vaultName}/${vaultTitle}/token`;
 
     let token = process.env.TELEGRAM_BOT_TOKEN;
     let source: "env" | "op" | "prompt" | null = token ? "env" : null;
@@ -97,7 +105,7 @@ export class WireTelegram extends Command {
             "item",
             "create",
             "--category=API Credential",
-            "--vault=DeLoSecrets",
+            `--vault=${vaultName}`,
             `--title=${vaultTitle}`,
             `token=${token}`,
             `bot_handle=${botHandle}`,

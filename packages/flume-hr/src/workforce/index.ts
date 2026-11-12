@@ -20,3 +20,8 @@ export { buildOrgChart } from "../org/tree";
 export * from "../kernel/host-platform";
 export * from "../kernel/file-lock";
 export * from "../kernel/fleet-paths";
+// The per-host overlay: vault refs, gateway routes, host config values and ticket lane names that differ per machine.
+export * from "../kernel/host-overlay";
+export * from "./lanes.js";
+export { consumerOf, gatewayRefShape } from "./gateway-desk.js";
+export { renderHostConfig, mergeHostConfigFor, hostConfigSchemaKeys } from "../hire/EnsureTemplateConfig";

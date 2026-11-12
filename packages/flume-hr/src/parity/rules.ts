@@ -11,6 +11,7 @@ import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../wo
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
+import { gatewayPolicyOf, loadHostOverlay, type GatewayPolicy } from "../kernel/host-overlay";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import { retiredRoutingCheck, roleDeclarationCheck } from "../workforce/audit";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
@@ -1798,23 +1799,10 @@ function fleetHome(ctx: Context): string {
 const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
 // The power a non-PM employee must NOT gain on an unattended turn.
 const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
-// The named provider that carries delegated workers to the AutomaticAI gateway.
-const GATEWAY_PROVIDER = "automaticai";
-const GATEWAY_HOST = "api.automaticai.io";
-const GATEWAY_MODELS = [
-  "automaticai/personal/sol-6.1",
-  "automaticai/personal/sol",
-  "automaticai/personal/astra",
-  "automaticai/personal/claude-opus-5.5",
-  "automaticai/intelliforia/claude-opus-5.5",
-  "automaticai/personal/claude-sonnet-5.5",
-  "automaticai/intelliforia/claude-sonnet-5.5",
-  "automaticai/personal/kimi-k3",
-  "automaticai/personal/kimi-k3s",
-  "automaticai/personal/kimi-2.8",
-  "automaticai/personal/glm-5.3",
-  "automaticai/personal/glm-5.3-flash",
-] as const;
+// The gateway every agent inference path must go through -- provider, host, label and curated routes -- is a
+// fact about the HOST, not a constant of this rule: big-chungus's values are the default (DEFAULT_GATEWAY_POLICY)
+// and a host overlay (kernel/host-overlay.ts `gateway:`) replaces them for another host. Every helper below takes
+// the policy it is judging against; none reaches for a module constant.
 // A PM blocks inside delegate_task until its worker returns, and Hermes bounds
 // every tool call by timeouts.tools.{sequential_call,concurrent_batch}
 // (stock 420 s, 0 disables). A real delegation outlasts that: the call errors,
@@ -1925,12 +1913,12 @@ function blankValue(value: unknown): boolean {
 }
 
 /** `automaticai` and `custom:automaticai` both name the gateway provider. */
-function isGatewayProvider(value: unknown): boolean {
-  return String(value ?? "").trim().toLowerCase().replace(/^custom:/u, "") === GATEWAY_PROVIDER;
+function isGatewayProvider(value: unknown, gw: GatewayPolicy): boolean {
+  return String(value ?? "").trim().toLowerCase().replace(/^custom:/u, "") === gw.provider;
 }
 
-function isGatewayRoute(value: unknown): boolean {
-  return String(value ?? "").trim().startsWith(`${GATEWAY_PROVIDER}/`);
+function isGatewayRoute(value: unknown, gw: GatewayPolicy): boolean {
+  return String(value ?? "").trim().startsWith(`${gw.provider}/`);
 }
 
 /** The host of a configured URL -- never the whole value, which may carry a query token. */
@@ -1942,8 +1930,8 @@ function urlHost(value: unknown): string {
   }
 }
 
-function isGatewayUrl(value: unknown): boolean {
-  return urlHost(value) === GATEWAY_HOST;
+function isGatewayUrl(value: unknown, gw: GatewayPolicy): boolean {
+  return urlHost(value) === gw.host;
 }
 
 /** hermes_cli/config.py `_deep_merge`: dicts merge recursively, a null never replaces a dict, anything else replaces. */
@@ -1996,26 +1984,26 @@ function moaSlot(slot: unknown): { provider: string; model: string; enabled: boo
 }
 
 /** The main agent's own provider, endpoint and route. */
-function mainModelProblems(cfg: any): string[] {
+function mainModelProblems(cfg: any, gw: GatewayPolicy): string[] {
   const model = cfg?.model;
   if (typeof model === "string" && model.trim() !== "") {
-    return [`model is the bare string "${model.trim()}": Hermes auto-detects its provider instead of calling "${GATEWAY_PROVIDER}"; set model.provider: ${GATEWAY_PROVIDER} and model.default to an ${GATEWAY_PROVIDER}/<account>/<model> route`];
+    return [`model is the bare string "${model.trim()}": Hermes auto-detects its provider instead of calling "${gw.provider}"; set model.provider: ${gw.provider} and model.default to an ${gw.provider}/<account>/<model> route`];
   }
   if (!isPlainObject(model)) {
-    return [`model is unset: Hermes auto-detects the main provider instead of calling "${GATEWAY_PROVIDER}"`];
+    return [`model is unset: Hermes auto-detects the main provider instead of calling "${gw.provider}"`];
   }
   const problems: string[] = [];
-  if (!isGatewayProvider(model.provider)) {
-    problems.push(`model.provider is "${model.provider ?? ""}", not "${GATEWAY_PROVIDER}": the main agent calls a provider directly`);
+  if (!isGatewayProvider(model.provider, gw)) {
+    problems.push(`model.provider is "${model.provider ?? ""}", not "${gw.provider}": the main agent calls a provider directly`);
   }
-  if (!blankValue(model.base_url) && !isGatewayUrl(model.base_url)) {
-    problems.push(`model.base_url points at ${urlHost(model.base_url)}, not the ${GATEWAY_HOST} gateway: it overrides the provider's endpoint`);
+  if (!blankValue(model.base_url) && !isGatewayUrl(model.base_url, gw)) {
+    problems.push(`model.base_url points at ${urlHost(model.base_url)}, not the ${gw.host} gateway: it overrides the provider's endpoint`);
   }
-  if (!isGatewayRoute(model.default)) {
-    problems.push(`model.default is "${model.default ?? ""}", not a canonical ${GATEWAY_PROVIDER}/<account>/<model> route`);
+  if (!isGatewayRoute(model.default, gw)) {
+    problems.push(`model.default is "${model.default ?? ""}", not a canonical ${gw.provider}/<account>/<model> route`);
   }
   if (!blankValue(model.api_key)) {
-    problems.push(`model.api_key is set: a key literal in config bypasses the per-profile secret scope; use providers.${GATEWAY_PROVIDER}.key_env`);
+    problems.push(`model.api_key is set: a key literal in config bypasses the per-profile secret scope; use providers.${gw.provider}.key_env`);
   }
   return problems;
 }
@@ -2038,10 +2026,10 @@ function mainModelProblems(cfg: any): string[] {
  * the task's provider, its auxiliary.<task>.fallback_chain, the main model and
  * fallback_providers, so every fallback_chain entry must be a gateway route.
  */
-function auxiliaryProblems(cfg: any): string[] {
+function auxiliaryProblems(cfg: any, gw: GatewayPolicy): string[] {
   const aux = isPlainObject(cfg?.auxiliary) ? cfg.auxiliary : {};
   const model = isPlainObject(cfg?.model) ? cfg.model : null;
-  const mainOnGateway = model !== null && isGatewayProvider(model.provider) && (blankValue(model.base_url) || isGatewayUrl(model.base_url));
+  const mainOnGateway = model !== null && isGatewayProvider(model.provider, gw) && (blankValue(model.base_url) || isGatewayUrl(model.base_url, gw));
   // Hermes deep-merges config.yaml over DEFAULT_CONFIG: free_only defaults false,
   // discovery defaults true. Only the literal YAML booleans close a lane.
   const missingGuard: string[] = [];
@@ -2059,15 +2047,15 @@ function auxiliaryProblems(cfg: any): string[] {
     const provider = entry && !blankValue(entry.provider) ? String(entry.provider).trim() : "";
     if (AUX_INHERITING_PROVIDERS.has(provider.toLowerCase())) {
       if (!mainOnGateway || missingGuard.length) inheriting.push(entry === null ? `${task} (unset = auto)` : `${task} (${provider || "auto"})`);
-    } else if (!isGatewayProvider(provider)) {
+    } else if (!isGatewayProvider(provider, gw)) {
       offGateway.push(`${task} (${provider})`);
     }
     // A model sent to the gateway (pinned, or inherited from a gateway main) must
     // be one of its routes; model "auto" is Hermes' inherit-the-main-model sentinel.
     const ownModel = entry && !blankValue(entry.model) ? String(entry.model).trim() : "";
-    const toGateway = isGatewayProvider(provider) || (AUX_INHERITING_PROVIDERS.has(provider.toLowerCase()) && mainOnGateway);
-    if (toGateway && ownModel && ownModel.toLowerCase() !== "auto" && !isGatewayRoute(ownModel)) offRoute.push(`${task} (${ownModel})`);
-    if (entry && !blankValue(entry.base_url) && !isGatewayUrl(entry.base_url)) offHost.push(`${task} (${urlHost(entry.base_url)})`);
+    const toGateway = isGatewayProvider(provider, gw) || (AUX_INHERITING_PROVIDERS.has(provider.toLowerCase()) && mainOnGateway);
+    if (toGateway && ownModel && ownModel.toLowerCase() !== "auto" && !isGatewayRoute(ownModel, gw)) offRoute.push(`${task} (${ownModel})`);
+    if (entry && !blankValue(entry.base_url) && !isGatewayUrl(entry.base_url, gw)) offHost.push(`${task} (${urlHost(entry.base_url)})`);
     if (entry && !blankValue(entry.api_key)) withKey.push(task);
     // agent/auxiliary_client.py _try_configured_fallback_chain/_resolve_fallback_entry:
     // an entry with no provider or no model is skipped; any other one is called.
@@ -2075,8 +2063,8 @@ function auxiliaryProblems(cfg: any): string[] {
     chain.forEach((fb, i) => {
       if (!isPlainObject(fb) || blankValue(fb.provider) || blankValue(fb.model)) return;
       const fbProvider = String(fb.provider).trim();
-      const onGateway = isGatewayProvider(fbProvider) || (fbProvider.toLowerCase() === "main" && mainOnGateway);
-      if (!onGateway || !isGatewayRoute(fb.model) || (!blankValue(fb.base_url) && !isGatewayUrl(fb.base_url))) {
+      const onGateway = isGatewayProvider(fbProvider, gw) || (fbProvider.toLowerCase() === "main" && mainOnGateway);
+      if (!onGateway || !isGatewayRoute(fb.model, gw) || (!blankValue(fb.base_url) && !isGatewayUrl(fb.base_url, gw))) {
         offChain.push(`${task} fallback_chain[${i}] (${fbProvider}/${String(fb.model).trim()}${blankValue(fb.base_url) ? "" : ` at ${urlHost(fb.base_url)}`})`);
       }
       if (!blankValue(fb.api_key)) withKey.push(`${task} fallback_chain[${i}]`);
@@ -2087,14 +2075,14 @@ function auxiliaryProblems(cfg: any): string[] {
     const guard = missingGuard.length ? missingGuard.join(" and ") : "";
     problems.push(mainOnGateway
       ? `auxiliary task(s) follow the main model ("auto"): ${inheriting.join(", ")} -- the main provider is the gateway, but a failed call falls through Hermes' auxiliary fallbacks (paid OpenRouter, Nous, a custom endpoint and direct-key discovery); set ${guard}`
-      : `auxiliary task(s) follow the main model ("auto"), and the main provider is not the "${GATEWAY_PROVIDER}" gateway: ${inheriting.join(", ")} -- put model.provider on ${GATEWAY_PROVIDER}${guard ? ` and set ${guard}` : ""}, or pin auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route`);
+      : `auxiliary task(s) follow the main model ("auto"), and the main provider is not the "${gw.provider}" gateway: ${inheriting.join(", ")} -- put model.provider on ${gw.provider}${guard ? ` and set ${guard}` : ""}, or pin auxiliary.<task>.provider: ${gw.provider} with an ${gw.provider}/<account>/<model> route`);
   }
   if (offGateway.length) {
-    problems.push(`auxiliary task(s) are pinned to a provider other than "${GATEWAY_PROVIDER}": ${offGateway.join(", ")} -- a pinned provider is called directly; set auxiliary.<task>.provider: ${GATEWAY_PROVIDER} with an ${GATEWAY_PROVIDER}/<account>/<model> route, or drop the pin so the task follows the gateway main model`);
+    problems.push(`auxiliary task(s) are pinned to a provider other than "${gw.provider}": ${offGateway.join(", ")} -- a pinned provider is called directly; set auxiliary.<task>.provider: ${gw.provider} with an ${gw.provider}/<account>/<model> route, or drop the pin so the task follows the gateway main model`);
   }
-  if (offRoute.length) problems.push(`auxiliary task(s) on the gateway name a model that is not an ${GATEWAY_PROVIDER}/<account>/<model> route: ${offRoute.join(", ")}`);
-  if (offHost.length) problems.push(`auxiliary task(s) set a base_url that is not the ${GATEWAY_HOST} gateway, and base_url takes precedence over the provider: ${offHost.join(", ")}`);
-  if (offChain.length) problems.push(`auxiliary fallback_chain entr(ies) leave the gateway: ${offChain.join(", ")} -- a failed task tries its fallback_chain first; every entry needs provider: ${GATEWAY_PROVIDER}, an ${GATEWAY_PROVIDER}/<account>/<model> route and no non-gateway base_url`);
+  if (offRoute.length) problems.push(`auxiliary task(s) on the gateway name a model that is not an ${gw.provider}/<account>/<model> route: ${offRoute.join(", ")}`);
+  if (offHost.length) problems.push(`auxiliary task(s) set a base_url that is not the ${gw.host} gateway, and base_url takes precedence over the provider: ${offHost.join(", ")}`);
+  if (offChain.length) problems.push(`auxiliary fallback_chain entr(ies) leave the gateway: ${offChain.join(", ")} -- a failed task tries its fallback_chain first; every entry needs provider: ${gw.provider}, an ${gw.provider}/<account>/<model> route and no non-gateway base_url`);
   if (withKey.length) problems.push(`auxiliary task(s) carry an api_key in config (a literal bypasses the per-profile secret scope): ${withKey.join(", ")}`);
   // The follow-the-main line above already names the key when any task inherits.
   if (aux.discovery !== false && !inheriting.length) {
@@ -2138,7 +2126,7 @@ function moaReferenceSlots(value: unknown): NonNullable<ReturnType<typeof moaSlo
  * gets the stock openrouter aggregator. So an absent moa block, a presets map
  * without "default", and a flat moa block all leave the stock preset enabled.
  */
-function moaProblems(cfg: any): string[] {
+function moaProblems(cfg: any, gw: GatewayPolicy): string[] {
   const own = cfg?.moa;
   // _deep_merge(DEFAULT_CONFIG, config.yaml): a null or absent moa keeps the stock
   // block; any other non-mapping replaces it, and normalize_moa_config sees {}.
@@ -2167,12 +2155,12 @@ function moaProblems(cfg: any): string[] {
     const bad: string[] = [];
     for (const ref of refs) {
       if (!ref.enabled) continue;
-      if (!isGatewayProvider(ref.provider) || !isGatewayRoute(ref.model)) {
+      if (!isGatewayProvider(ref.provider, gw) || !isGatewayRoute(ref.model, gw)) {
         bad.push(`reference ${ref.provider}/${ref.model}${stockRefs ? " (Hermes' stock slot: no complete reference is configured)" : ""}`);
       }
     }
     const aggregator = moaSlot(preset.aggregator) ?? { ...MOA_STOCK_AGGREGATOR, enabled: true };
-    if (!isGatewayProvider(aggregator.provider) || !isGatewayRoute(aggregator.model)) {
+    if (!isGatewayProvider(aggregator.provider, gw) || !isGatewayRoute(aggregator.model, gw)) {
       const note = written?.aggregator === undefined
         ? " (Hermes' stock slot: no aggregator is configured)"
         : moaSlot(written.aggregator) === null
@@ -2193,7 +2181,7 @@ function moaProblems(cfg: any): string[] {
       : !flat && isPlainObject(own) && own.enabled !== undefined && !moaBool(own.enabled, true)
         ? "; moa.enabled at the top level is ignored when presets exist"
         : "";
-    problems.push(`${where} is enabled and leaves AutomaticAI: ${bad.join(", ")} -- route every slot through ${GATEWAY_PROVIDER} or set ${flat ? "moa.enabled" : `moa.presets.${name}.enabled`}: false${note}`);
+    problems.push(`${where} is enabled and leaves ${gw.label}: ${bad.join(", ")} -- route every slot through ${gw.provider} or set ${flat ? "moa.enabled" : `moa.presets.${name}.enabled`}: false${note}`);
   }
   return problems;
 }
@@ -4003,7 +3991,21 @@ return [
     // Host-scoped: $HOME/.hermes/{config.yaml,agents-registry.yaml,profiles}.
     scope: "host",
     audit: (ctx) => {
-      const title = "All agent inference routes through the AutomaticAI gateway";
+      // The gateway this HOST routes through (kernel/host-overlay.ts): big-chungus's values unless the host overlay
+      // names its own. A broken overlay is a failing finding, never a silent fall back to another host's gateway.
+      const overlay = loadHostOverlay(process.env, ctx.homeDir);
+      const gw = gatewayPolicyOf(overlay);
+      const title = `All agent inference routes through the ${gw.label} gateway`;
+      if (overlay.status === "invalid") {
+        return {
+          id: "hermes.gateway-routing",
+          title,
+          status: "fail",
+          summary: `host overlay is invalid, so the gateway this host routes through is unknown: ${overlay.path}`,
+          details: overlay.errors.map((error) => `host overlay: ${error}`),
+          fixable: false,
+        };
+      }
       const roles = discoverRoles(ctx.repoRoot);
       if (!roles.length) {
         return { id: "hermes.gateway-routing", title, status: "skip", summary: "No Hermes roles present", details: [], fixable: false };
@@ -4029,34 +4031,34 @@ return [
       // What a config's delegation block and gateway provider must look like.
       const routingProblems = (cfg: any): string[] => {
         const problems: string[] = [];
-        const provider = cfg?.providers?.[GATEWAY_PROVIDER];
+        const provider = cfg?.providers?.[gw.provider];
         const keyEnv = provider?.key_env;
         if (!provider || typeof provider !== "object") {
-          problems.push(`no providers.${GATEWAY_PROVIDER} entry`);
+          problems.push(`no providers.${gw.provider} entry`);
         } else {
-          if (!String(provider.api ?? "").includes(GATEWAY_HOST)) problems.push(`providers.${GATEWAY_PROVIDER}.api is "${provider.api ?? ""}", not the ${GATEWAY_HOST} gateway`);
-          if (blank(keyEnv)) problems.push(`providers.${GATEWAY_PROVIDER} has no key_env, so no key reaches the gateway`);
+          if (!String(provider.api ?? "").includes(gw.host)) problems.push(`providers.${gw.provider}.api is "${provider.api ?? ""}", not the ${gw.host} gateway`);
+          if (blank(keyEnv)) problems.push(`providers.${gw.provider} has no key_env, so no key reaches the gateway`);
           const configuredModels = new Set<string>(Array.isArray(provider.models) ? provider.models.map(String) : []);
-          const requiredModels = new Set<string>(GATEWAY_MODELS);
-          const missingModels = GATEWAY_MODELS.filter((model) => !configuredModels.has(model));
+          const requiredModels = new Set<string>(gw.models);
+          const missingModels = gw.models.filter((model) => !configuredModels.has(model));
           const extraModels = [...configuredModels].filter((model) => !requiredModels.has(model));
-          if (missingModels.length) problems.push(`providers.${GATEWAY_PROVIDER}.models omits ${missingModels.join(", ")}`);
-          if (extraModels.length) problems.push(`providers.${GATEWAY_PROVIDER}.models adds uncurated route(s): ${extraModels.join(", ")}`);
+          if (missingModels.length) problems.push(`providers.${gw.provider}.models omits ${missingModels.join(", ")}`);
+          if (extraModels.length) problems.push(`providers.${gw.provider}.models adds uncurated route(s): ${extraModels.join(", ")}`);
           // Hermes sends delegation.reasoning_effort only when the child's provider is literally
           // "custom", and a delegated child gets the configured NAME, so the effort never reaches
           // the gateway and the route default applies (kimi-2.8 = max: the whole budget spent
           // thinking). Provider extra_body is merged into every request and does arrive.
-          if (blank(provider.extra_body?.reasoning_effort)) problems.push(`providers.${GATEWAY_PROVIDER}.extra_body.reasoning_effort is unset: Hermes never sends delegation.reasoning_effort for a named provider, so the route's default effort applies (kimi-2.8 defaults to max)`);
+          if (blank(provider.extra_body?.reasoning_effort)) problems.push(`providers.${gw.provider}.extra_body.reasoning_effort is unset: Hermes never sends delegation.reasoning_effort for a named provider, so the route's default effort applies (kimi-2.8 defaults to max)`);
         }
         const d = cfg?.delegation ?? {};
-        if (d.provider !== GATEWAY_PROVIDER) problems.push(`delegation.provider is "${d.provider ?? ""}", not "${GATEWAY_PROVIDER}": workers call a provider directly`);
-        if (!String(d.model ?? "").startsWith("automaticai/")) problems.push(`delegation.model is "${d.model ?? ""}", not a canonical automaticai/<account>/<model> route`);
+        if (d.provider !== gw.provider) problems.push(`delegation.provider is "${d.provider ?? ""}", not "${gw.provider}": workers call a provider directly`);
+        if (!isGatewayRoute(d.model, gw)) problems.push(`delegation.model is "${d.model ?? ""}", not a canonical ${gw.provider}/<account>/<model> route`);
         if (!blank(d.base_url)) problems.push(`delegation.base_url is set ("${d.base_url}"): it overrides the provider, and with no api_key the child inherits the PARENT's key`);
-        if (!blank(d.api_key)) problems.push(`delegation.api_key is set: a literal or \${VAR} here reads plain os.environ, which never holds a desk's own key in the multiplexed gateway; use providers.${GATEWAY_PROVIDER}.key_env`);
+        if (!blank(d.api_key)) problems.push(`delegation.api_key is set: a literal or \${VAR} here reads plain os.environ, which never holds a desk's own key in the multiplexed gateway; use providers.${gw.provider}.key_env`);
         const routingModels = new Set<string>(Array.isArray(provider?.models) ? provider.models.map(String) : []);
         for (const fallback of fallbackEntries(cfg)) {
-          if (!isGatewayProvider(fallback?.provider) || !routingModels.has(String(fallback?.model ?? ""))) {
-            problems.push(`fallback_providers entry ${fallback?.provider ?? ""}/${fallback?.model ?? ""} leaves AutomaticAI: a failed route must preserve its account and fail rather than switch providers`);
+          if (!isGatewayProvider(fallback?.provider, gw) || !routingModels.has(String(fallback?.model ?? ""))) {
+            problems.push(`fallback_providers entry ${fallback?.provider ?? ""}/${fallback?.model ?? ""} leaves ${gw.label}: a failed route must preserve its account and fail rather than switch providers`);
           }
         }
         const mapped = keyEnv ? cfg?.secrets?.onepassword?.env?.[String(keyEnv)] : undefined;
@@ -4064,7 +4066,7 @@ return [
         else if (!blank(mapped) && !isOpRef(mapped)) problems.push(`secrets.onepassword.env.${keyEnv} is not an op:// reference (a raw key must never be written to config)`);
         // Everything else an agent spends inference on: the main model, every
         // auxiliary side task (absent = "auto"), and Mixture-of-Agents presets.
-        problems.push(...mainModelProblems(cfg), ...auxiliaryProblems(cfg), ...moaProblems(cfg));
+        problems.push(...mainModelProblems(cfg, gw), ...auxiliaryProblems(cfg, gw), ...moaProblems(cfg, gw));
         return problems;
       };
 
@@ -4077,7 +4079,7 @@ return [
       details.push(...scan.details);
       const members = scan.members;
       let onFleetKey = 0;
-      const baseKeyEnv = String(base?.providers?.[GATEWAY_PROVIDER]?.key_env ?? "");
+      const baseKeyEnv = String(base?.providers?.[gw.provider]?.key_env ?? "");
       const fleetRef = baseKeyEnv ? base?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
       for (const cfg of scan.configs.values()) {
         const own = baseKeyEnv ? cfg?.secrets?.onepassword?.env?.[baseKeyEnv] : undefined;
@@ -4096,7 +4098,9 @@ return [
         fixable: false,
       };
     },
-    migrate: (ctx, finding) => ({
+    migrate: (ctx, finding) => {
+      const gw = gatewayPolicyOf(loadHostOverlay(process.env, ctx.homeDir));
+      return {
       id: finding.id,
       title: finding.title,
       status: "blocked",
@@ -4104,9 +4108,10 @@ return [
       changedFiles: [],
       details: [
         ...finding.details,
-        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so no auxiliary call walks provider discovery, any pinned auxiliary.<task> and its fallback_chain on the gateway, moa presets, providers.${GATEWAY_PROVIDER}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart the one host gateway with hermes-gateway-restart --reason 'gateway routing' (never a raw systemctl restart).`,
+        `Edit ${join(fleetHome(ctx), "config.yaml")} (model, auxiliary.free_only: true and auxiliary.discovery: false so no auxiliary call walks provider discovery, any pinned auxiliary.<task> and its fallback_chain on the gateway, moa presets, providers.${gw.provider}, delegation, fallback_providers, secrets.onepassword.env), give members their own token with scripts/gateway-member-tokens.py, then re-render each named desk with hermes-profile-config.py render --profile <name> and restart the one host gateway with hermes-gateway-restart --reason 'gateway routing' (never a raw systemctl restart).`,
       ],
-    }),
+      };
+    },
   },
   {
     // A literal op:// reference in a Hermes .env is sent to providers AS THE KEY.

@@ -27,7 +27,9 @@ import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { retireFromService, formatRetireResult } from "./hire/retire";
 import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
-import { EnsureTemplateConfig } from "./hire/EnsureTemplateConfig";
+import { EnsureTemplateConfig, renderHostConfig } from "./hire/EnsureTemplateConfig";
+import { HOST_OVERLAY_ENV, LANE_BANDS, loadHostOverlay, type LaneBand, type OverlayLoad } from "./kernel/host-overlay";
+import { defaultRoleYamls, formatLaneResolution, resolveRoleLanesAt } from "./workforce/lanes";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
 import { refreshSchedulingPolicy } from "./workforce/policy-refresh";
@@ -44,6 +46,7 @@ import { formatCommentResult, postComment, verifyComments } from "./workforce/co
 import { formatPlaneCommentResult, verifyPlaneComments } from "./workforce/plane";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { homedir } from "node:os";
+import YAML from "yaml";
 import { join } from "node:path";
 
 const program = new Command();
@@ -811,6 +814,111 @@ handbookCmd
     const result = await new EnsureTemplateConfig(ctx).invoke();
     if (result.message) (result.success ? console.log : console.error)(result.message);
     if (!result.success) process.exitCode = 1;
+  });
+
+// ============================================================================
+// THE HOST OVERLAY: what differs per machine (vault refs, gateway routes, host config, lane names)
+// ============================================================================
+
+function overlaySummary(loaded: OverlayLoad): Record<string, unknown> {
+  if (loaded.status !== "ok") return { path: loaded.path, status: loaded.status, ...(loaded.status === "invalid" ? { errors: loaded.errors } : {}) };
+  const overlay = loaded.overlay;
+  return {
+    path: loaded.path,
+    status: "ok",
+    version: overlay.version,
+    ...(overlay.host ? { host: overlay.host } : {}),
+    host_config: Object.fromEntries(Object.entries(overlay.hostConfig).map(([section, keys]) => [section, Object.keys(keys)])),
+    vault: { name: overlay.vault.name ?? "(default)", gateway_tokens_item: overlay.vault.gatewayTokensItem ?? "(default)" },
+    gateway: overlay.gateway ? { provider: overlay.gateway.provider, host: overlay.gateway.host, label: overlay.gateway.label, models: overlay.gateway.models.length } : "(default)",
+    lanes: overlay.lanes.map((rule) => ({ match: rule.match, replace: rule.replace, bands: Object.keys(rule.states) })),
+  };
+}
+
+function useOverlayFile(file: string | undefined): void {
+  if (file) process.env[HOST_OVERLAY_ENV] = resolve(file);
+}
+
+const overlayCmd = program
+  .command("overlay")
+  .description("The per-host overlay: values that differ between flume hosts (vault, gateway routes, host config, lane names)");
+overlayCmd
+  .command("show")
+  .description("Validate and summarize this host's overlay (absent means every default, i.e. big-chungus's values)")
+  .option("--file <path>", `Check this overlay file instead of ${HOST_OVERLAY_ENV} or ~/.config/flume/host-overlay.yaml`)
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (options) => {
+    useOverlayFile(options.file);
+    const loaded = loadHostOverlay(process.env, homedir());
+    const summary = overlaySummary(loaded);
+    if (options.json) await writeStdout(`${JSON.stringify(summary, null, 2)}\n`);
+    else if (loaded.status === "absent") await writeStdout(`No host overlay at ${loaded.path}: every value is the default (big-chungus's).\n`);
+    else if (loaded.status === "invalid") await writeStdout(`Host overlay ${loaded.path} is INVALID:\n${loaded.errors.map((error) => `  - ${error}`).join("\n")}\n`);
+    else await writeStdout(`Host overlay ${loaded.path} is valid.\n${YAML.stringify(summary)}`);
+    if (loaded.status === "invalid") process.exitCode = 1;
+  });
+overlayCmd
+  .command("render-config")
+  .description("Print the host template config (~/.config/hermes-agent-template/config.toml) this host would be bootstrapped with")
+  .option("--file <path>", `Render with this overlay file instead of ${HOST_OVERLAY_ENV} or the default location`)
+  .action(async (options) => {
+    useOverlayFile(options.file);
+    try {
+      await writeStdout(renderHostConfig());
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  });
+
+const lanesCmd = program
+  .command("lanes")
+  .description("The ticket lane names a transition lands in on THIS host: a role.yaml's tracked map under the host overlay");
+lanesCmd
+  .command("show")
+  .argument("[role-yaml...]", "role.yaml files (default: agents/hermes/*/role.yaml of the current repo)")
+  .description("Show the tracked and effective lane map of each role.yaml")
+  .option("--file <path>", `Resolve with this overlay file instead of ${HOST_OVERLAY_ENV} or the default location`)
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (roleYamls: string[], options) => {
+    useOverlayFile(options.file);
+    const paths = (roleYamls.length ? roleYamls : defaultRoleYamls(process.cwd())).map((path) => resolve(path));
+    if (!paths.length) {
+      console.error("No role.yaml given and none found under ./agents/hermes/*/role.yaml");
+      process.exitCode = 1;
+      return;
+    }
+    const loaded = loadHostOverlay(process.env, homedir());
+    try {
+      const rows = paths.map((path) => ({ path, resolution: resolveRoleLanesAt(path, loaded) }));
+      await writeStdout(options.json
+        ? `${JSON.stringify(rows.map(({ path, resolution }) => ({ path, ...resolution })), null, 2)}\n`
+        : `${rows.map(({ path, resolution }) => formatLaneResolution(path, resolution)).join("\n\n")}\n`);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  });
+lanesCmd
+  .command("get")
+  .argument("<role-yaml>", "The role.yaml whose ticket_provider block names the board")
+  .argument("<band>", `One of: ${LANE_BANDS.join(", ")}`)
+  .description("Print one effective lane name (empty when the adapter default applies): the drop-in for a role.yaml `tp_cfg <band>` read")
+  .option("--file <path>", `Resolve with this overlay file instead of ${HOST_OVERLAY_ENV} or the default location`)
+  .action(async (roleYaml: string, band: string, options) => {
+    useOverlayFile(options.file);
+    if (!(LANE_BANDS as readonly string[]).includes(band)) {
+      console.error(`Unknown band "${band}" (allowed: ${LANE_BANDS.join(", ")})`);
+      process.exitCode = 2;
+      return;
+    }
+    try {
+      const resolution = resolveRoleLanesAt(resolve(roleYaml));
+      await writeStdout(`${resolution.effective[band as LaneBand] ?? ""}\n`);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
   });
 
 // ============================================================================

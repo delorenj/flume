@@ -7,6 +7,7 @@ import YAML from "yaml";
 import { isDeepStrictEqual } from "node:util";
 import { ExitCode, showProfile } from "@delorenj/skillex";
 import { resolveFlumeRoot } from "../kernel/paths";
+import { hostVaultName } from "../kernel/host-overlay";
 import { copierFleetPaths, updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { provisionDesk, renderDeskContract, resolveDeskPath } from "./desk";
 import { readRoleIdentity } from "./identity";
@@ -342,7 +343,7 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
       accessSync(runtime, constants.X_OK);
     } catch { throw new Error(`Deployment dependency: declared Hermes runtime unavailable: ${runtime}`); }
   }
-  let reference = `op://DeLoSecrets/hermes-${employee}/credential`;
+  let reference = `op://${hostVaultName()}/hermes-${employee}/credential`;
   try {
     const deltaPath = join(audited.profile, "config.delta.yaml");
     const configPath = join(audited.profile, "config.yaml");
