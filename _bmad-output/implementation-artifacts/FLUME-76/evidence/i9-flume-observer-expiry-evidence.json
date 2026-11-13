@@ -1,0 +1,33 @@
+{
+  "checked_at": "2026-11-08T10:14:20.883733+00:00",
+  "command_id": "149134bb-3c88-4ebf-8ecf-98610e054933",
+  "correlationid": "f9126f02-14cf-4fae-8a5c-00026336cefa",
+  "observer": "expired-no-terminal-receipt",
+  "observed_events": [],
+  "execution": null,
+  "batch": {
+    "name": "bloodbank-hermes-gateway",
+    "num_pending": 7,
+    "num_ack_pending": 4,
+    "num_waiting": 0,
+    "delivered": {
+      "consumer_seq": 1448,
+      "stream_seq": 160027,
+      "last_active": "2026-11-08T10:14:15.36515969Z"
+    },
+    "ack_floor": {
+      "consumer_seq": 1430,
+      "stream_seq": 156065,
+      "last_active": "2026-11-08T08:35:26.077209013Z"
+    },
+    "error": null
+  },
+  "stored_command": {
+    "sequence": 160790,
+    "time": "2026-11-08T09:59:07.11897492Z",
+    "subject": "bloodbank.cmd.agent.invocation.start",
+    "matches": true,
+    "target": "flume-pm"
+  },
+  "durable_events": []
+}

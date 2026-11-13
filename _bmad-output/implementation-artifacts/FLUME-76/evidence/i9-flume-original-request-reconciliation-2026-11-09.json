@@ -1,0 +1,110 @@
+{
+  "kind": "i9-original-request-reconciliation",
+  "reconciled_at": "2026-11-10T00:20:14.138412Z",
+  "reconciled_by": "pjangler orchestrator (claude-code session c2658124-14f1-4b76-9a7a-cc33b2023fd7) under resume.md steps 1-3",
+  "trigger": "independent rooted SPEC reviewer session 1f12659d-48e3-42a1-b8a7-e9e24f766a5c: FLUME-76 checker exit 1 'new selected journal evidence' at check-flume-76-handoff.py:211",
+  "command_id": "149134bb-3c88-4ebf-8ecf-98610e054933",
+  "correlationid": "f9126f02-14cf-4fae-8a5c-00026336cefa",
+  "thread_id": "i9-agent-message-planning:f9126f02-14cf-4fae-8a5c-00026336cefa",
+  "resent_or_replayed": false,
+  "historical_snapshot_preserved": {
+    "path": "/home/delorenj/.claude/tmp/i9-flume-observer-expiry-evidence.json",
+    "checked_at": "2026-11-08T10:14:20.883733Z",
+    "verdict_then": "PENDING; observation expired; stored seq 160790 not yet delivered by durable (delivered 160027)"
+  },
+  "journal": {
+    "path": "/home/delorenj/.hermes/bloodbank-hermes-gateway-state.sqlite3",
+    "open": "SQLite URI mode=ro",
+    "table": "executions",
+    "where": "command_id = <command_id>",
+    "rows": 1,
+    "row": {
+      "profile": "flume-pm",
+      "state": "completed",
+      "outcome": "success",
+      "lane": null,
+      "created_at": "2026-11-08T13:48:40.160176Z",
+      "updated_at": "2026-11-08T13:56:46.047665Z",
+      "rejection_reason": null,
+      "rejected_at": null,
+      "failure_code": null,
+      "detached_at": null,
+      "terminal_events": [
+        {
+          "id": "3fe51b58-8ff9-5212-bdf9-e0988bd0d47c",
+          "type": "bloodbank.agent.invocation.completed",
+          "time": "2026-11-08T13:56:46.047623Z",
+          "causationid": "18091fe1-e21f-571d-aca3-c155d29469a8"
+        },
+        {
+          "id": "d16988b9-1a67-5656-a992-fba0aaa433bb",
+          "type": "bloodbank.conversation.turn.completed",
+          "time": "2026-11-08T13:56:46.047639Z",
+          "causationid": "3fe51b58-8ff9-5212-bdf9-e0988bd0d47c",
+          "data_outcome": "completed"
+        }
+      ]
+    },
+    "note": "lane column not selected in the single bounded query; terminal event data.lane = batch"
+  },
+  "candystore": {
+    "query": "GET http://127.0.0.1:8683/events?correlationid=<correlationid>&limit=50",
+    "saved": "/home/delorenj/.claude/tmp/i9-flume-correlated-events-2026-11-09.json",
+    "saved_sha256": "e00620c988e1b1fd77e480e7b981f4f94181e207a5778291fba55ff63522f6a8",
+    "events": [
+      {
+        "id": "d16988b9-1a67-5656-a992-fba0aaa433bb",
+        "type": "bloodbank.conversation.turn.completed",
+        "time": "2026-11-08T13:56:46.047639Z"
+      },
+      {
+        "id": "3fe51b58-8ff9-5212-bdf9-e0988bd0d47c",
+        "type": "bloodbank.agent.invocation.completed",
+        "time": "2026-11-08T13:56:46.047623Z"
+      },
+      {
+        "id": "18091fe1-e21f-571d-aca3-c155d29469a8",
+        "type": "bloodbank.agent.invocation.started",
+        "time": "2026-11-08T13:48:40.160031Z"
+      },
+      {
+        "id": "64a11b16-114b-559d-a3f7-eeadf3ce02da",
+        "type": "bloodbank.conversation.turn.started",
+        "time": "2026-11-08T13:48:40.160013Z"
+      }
+    ],
+    "reply_text_in_events": false,
+    "note": "turn.completed carries no reply_text/reply_preview; lifecycle completion alone is not the planning disposition"
+  },
+  "owner_reply": {
+    "source": "/home/delorenj/.hermes/profiles/flume-pm/state.db (SQLite URI mode=ro)",
+    "session_id": "20261108_084840_86474df2",
+    "session_key": "agent:flume-pm:bloodbank:dm:i9-agent-message-planning:f9126f02-14cf-4fae-8a5c-00026336cefa",
+    "session_title": "Refine I-9 agent.message owner handoff spec",
+    "session_started_at": "2026-11-08T13:48:40.289319Z",
+    "message_id": 3949,
+    "role": "assistant",
+    "finish_reason": "stop",
+    "message_time": "2026-11-08T13:56:45.783575Z",
+    "length": 13879,
+    "copy": "/home/delorenj/.claude/tmp/i9-flume-pm-final-reply-2026-11-08.md",
+    "sha256": "e779f054f306a7002e1cec6946eea49a10d762917ab63ac7745abcf7c25b5854",
+    "scope": "only the exact correlated session's final assistant message was read; no other transcripts scanned"
+  },
+  "disposition_quoted_from_reply": {
+    "coordination_receipt": "ACCEPTED (coordination-only; one read-only planning turn; no contract/mutation ownership, no code-home selection)",
+    "fleet_contract_adoption": "BLOCKED (Hermes Fleet retains ownership; no owner-supported contract exists to adopt)",
+    "authoritative_agent_message_contract": "ABSENT (no Fleet-authored contract, owner ticket, code home or public API)",
+    "capability_predicate": "UNSUPPORTED as a compatibility contract; Claude 2.1.319 is a capability-gated candidate only; zero native submission",
+    "g1_g2_g3": "BLOCKED / NOT RUN; existing entrypoints are FLUME-76 structural checks only; Fleet adapter/observer entrypoints PROPOSED, none exists",
+    "next_bounded_owner_result": "Hermes Fleet, through its real intake (not FLUME), returns the agent.message contract + G1-G3 run manifest, or its own precise evidenced unsupported statement"
+  },
+  "verdicts_kept_separate": {
+    "transport_execution": "DELIVERED AND EXECUTED: one selected journal row, completed/success; no exactly-once claim",
+    "coordination_planning": "ACCEPTED by flume-pm (coordination-only)",
+    "fleet_adoption": "BLOCKED / not adopted",
+    "api_readiness": "NONE",
+    "native_input": "BLOCKED; unsupported means zero send, no terminal fallback",
+    "behavioral_proof": "G1-G3, scoped FR-6, hub/workflow, full I-8: NOT RUN, independent"
+  }
+}
