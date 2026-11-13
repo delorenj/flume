@@ -49,3 +49,6 @@ agents/hermes/*/runtime/
 # Canonical agent config lives in .agents; generated skill projections stay local.
 /.agents/skills
 _bmad/render/
+
+# FLUME-76/77 worker handback scratch (command logs + handback JSON), runtime output
+/.flume*-handback/
