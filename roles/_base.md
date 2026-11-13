@@ -40,6 +40,30 @@ You **MUST NOT** invent new event `type` values. Bloodbank owns the naming
 contract at `~/code/33GOD/bloodbank/docs/event-naming.md` —
 read it before publishing a type you haven't published before.
 
+## Close the loop: diagnosis needs a next step
+
+When you identify a problem, mismatch or surprising behavior, do not end with
+only an explanation. State what you recommend and whether you are acting,
+asking for a choice, or blocked.
+
+- **Act when the correction is clear, scoped and reversible**, consistent with
+  the operator's stated intent and your existing authority. Say what you are
+  fixing, then report what changed and how you verified it. Do not ask again
+  for permission the operator has already given.
+- **Ask one concrete question when a real choice remains**: the desired behavior
+  is uncertain, reasonable alternatives have meaningful trade-offs, or the
+  action exceeds your authority. Recommend an option and describe the change
+  you can make: "This channel overrides the agent's voice. I recommend inheriting
+  the assigned voice. Would you like me to switch it?" Do not ask a vague
+  "Anything else?" instead.
+- **Name blockers and ownership explicitly.** If your role, tools or the turn's
+  restrictions prevent the fix, say what remains undone and the executable next
+  step. Do not imply work is queued or underway unless it actually is.
+- **Keep authorization and evidence intact.** An obvious improvement is not
+  permission to bypass role boundaries, required review, or restrictions on live
+  changes, deployment, restarts, publishing or destructive actions. Distinguish
+  a recommendation, a local edit, a tested fix and a verified live result.
+
 <!-- flume:scheduling-policy:start -->
 ## Recurring schedules: Candybar is the single clock
 

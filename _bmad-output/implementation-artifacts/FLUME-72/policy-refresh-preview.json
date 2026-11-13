@@ -1,0 +1,825 @@
+{
+  "ok": false,
+  "apply": false,
+  "policy_source": "roles/_base.md",
+  "policy_sha256": "522e5c03619c7b1ad1ef222d0170ac8641b93aecebeaa40ae0b154f711c2b3ec",
+  "audited": 38,
+  "counts": {
+    "changed": 0,
+    "would-change": 27,
+    "current": 0,
+    "refused": 10,
+    "missing": 1
+  },
+  "changed_file_count": 54,
+  "running_sessions_reloaded": false,
+  "runtime_schedules_assessed": false,
+  "rows": [
+    {
+      "id": "dumply",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, lstat '/home/delorenj/.hermes/profiles/dumply/role.yaml'"
+    },
+    {
+      "id": "bloodbank-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+          "before_sha256": "700565677283ccfa092338e46b08392fdf8cd71f6e023b2f146e9b1689c6aa73",
+          "after_sha256": "08ce43ec5c1d2f3a1c0c5cfd27657b3f6d7e6dc4469e2a71a15d7fc73d689505",
+          "readback_sha256": "700565677283ccfa092338e46b08392fdf8cd71f6e023b2f146e9b1689c6aa73",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "700565677283ccfa092338e46b08392fdf8cd71f6e023b2f146e9b1689c6aa73",
+          "after_sha256": "08ce43ec5c1d2f3a1c0c5cfd27657b3f6d7e6dc4469e2a71a15d7fc73d689505",
+          "readback_sha256": "700565677283ccfa092338e46b08392fdf8cd71f6e023b2f146e9b1689c6aa73",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "33god-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/agents/hermes/pm/SOUL.md",
+          "before_sha256": "ca4670fe0d09521f55a477c133c31077255060766effc0a8397b3ac90cecefa3",
+          "after_sha256": "762b0c947df8e1ec230c688f9c22ab13e07e5f44c2506f7622f7d3d72dcc94f3",
+          "readback_sha256": "ca4670fe0d09521f55a477c133c31077255060766effc0a8397b3ac90cecefa3",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "7c476c47f266e397a0a3852eef921ddcb15b1a9d77f34bdb3bfe497c102c9d9d",
+          "after_sha256": "3ee44a9919feb4de4b4c9a2132b2c7dcc80e65b73d395a94f07d1dff2357347e",
+          "readback_sha256": "7c476c47f266e397a0a3852eef921ddcb15b1a9d77f34bdb3bfe497c102c9d9d",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "candystore-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/SOUL.md",
+          "before_sha256": "f15c15c7bfac62ffb7275572b391d3580b48bf518d1ed3236eb86c4a9506f9b9",
+          "after_sha256": "32dd99a3ed8cb55329918df6d2f0fcde12a35de0d613fa40b0b30362d605643f",
+          "readback_sha256": "f15c15c7bfac62ffb7275572b391d3580b48bf518d1ed3236eb86c4a9506f9b9",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "f15c15c7bfac62ffb7275572b391d3580b48bf518d1ed3236eb86c4a9506f9b9",
+          "after_sha256": "32dd99a3ed8cb55329918df6d2f0fcde12a35de0d613fa40b0b30362d605643f",
+          "readback_sha256": "f15c15c7bfac62ffb7275572b391d3580b48bf518d1ed3236eb86c4a9506f9b9",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/candystore-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "nautilus-trader-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+          "before_sha256": "4513e88c7120635e16cb2eaa4ee82b1eb1c3773d610612eb71d998a658c5c90c",
+          "after_sha256": "d07db4aa4beb07b0396fce5d4d4abf63f6446c0269be1bd41f1c13479c0114ea",
+          "readback_sha256": "4513e88c7120635e16cb2eaa4ee82b1eb1c3773d610612eb71d998a658c5c90c",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "4513e88c7120635e16cb2eaa4ee82b1eb1c3773d610612eb71d998a658c5c90c",
+          "after_sha256": "d07db4aa4beb07b0396fce5d4d4abf63f6446c0269be1bd41f1c13479c0114ea",
+          "readback_sha256": "4513e88c7120635e16cb2eaa4ee82b1eb1c3773d610612eb71d998a658c5c90c",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "zshyzsh-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+          "before_sha256": "0cdc1e3d9e7f1c2b928887b089c1f111f6c97f7b27df729af272e02e9db2e60c",
+          "after_sha256": "75ffd844efb5cf751c87e7291baaddf189ec128589ed1b583c5d5cf72309df03",
+          "readback_sha256": "0cdc1e3d9e7f1c2b928887b089c1f111f6c97f7b27df729af272e02e9db2e60c",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "0cdc1e3d9e7f1c2b928887b089c1f111f6c97f7b27df729af272e02e9db2e60c",
+          "after_sha256": "75ffd844efb5cf751c87e7291baaddf189ec128589ed1b583c5d5cf72309df03",
+          "readback_sha256": "0cdc1e3d9e7f1c2b928887b089c1f111f6c97f7b27df729af272e02e9db2e60c",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+      "profile_link": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "holocene-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/SOUL.md",
+          "before_sha256": "99acda00b123c2d1ecb6c55fc38b58c1dbc37eba78356a976c8b548c2a7ee2ed",
+          "after_sha256": "8ef309a70821a6be3a5a4735aa1b38c38e105a5f1cd0ecfed66ec9b5595eb6f0",
+          "readback_sha256": "99acda00b123c2d1ecb6c55fc38b58c1dbc37eba78356a976c8b548c2a7ee2ed",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "99acda00b123c2d1ecb6c55fc38b58c1dbc37eba78356a976c8b548c2a7ee2ed",
+          "after_sha256": "8ef309a70821a6be3a5a4735aa1b38c38e105a5f1cd0ecfed66ec9b5595eb6f0",
+          "readback_sha256": "99acda00b123c2d1ecb6c55fc38b58c1dbc37eba78356a976c8b548c2a7ee2ed",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/holocene-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "skillex-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+          "before_sha256": "401e1e34fc6c7771f8089ae1f5ce08b9b46285424d0dbfc029bc9f49c54e3ebc",
+          "after_sha256": "8a13b051847d1279f35489944832828a7c5e555b1b6f82b7b798e68698d52d55",
+          "readback_sha256": "401e1e34fc6c7771f8089ae1f5ce08b9b46285424d0dbfc029bc9f49c54e3ebc",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "401e1e34fc6c7771f8089ae1f5ce08b9b46285424d0dbfc029bc9f49c54e3ebc",
+          "after_sha256": "8a13b051847d1279f35489944832828a7c5e555b1b6f82b7b798e68698d52d55",
+          "readback_sha256": "401e1e34fc6c7771f8089ae1f5ce08b9b46285424d0dbfc029bc9f49c54e3ebc",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/skillex/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "voxxy-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/voxxy/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/voxxy/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/voxxy/agents/hermes/pm/SOUL.md",
+          "before_sha256": "ff4abd241653a4fe568809f8b41c5ca508962df97c1916fd03a37f15df41327d",
+          "after_sha256": "aca27fae523f1b53a4da8000c3d612ab30ab20d5a5523e6bfd78f6866cdc570b",
+          "readback_sha256": "ff4abd241653a4fe568809f8b41c5ca508962df97c1916fd03a37f15df41327d",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/voxxy/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "ff4abd241653a4fe568809f8b41c5ca508962df97c1916fd03a37f15df41327d",
+          "after_sha256": "aca27fae523f1b53a4da8000c3d612ab30ab20d5a5523e6bfd78f6866cdc570b",
+          "readback_sha256": "ff4abd241653a4fe568809f8b41c5ca508962df97c1916fd03a37f15df41327d",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/voxxy/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/voxxy-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/voxxy/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "gruvato-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+          "before_sha256": "1754b9512bff7233fb495ed256296b39571b8cf484492852d1d4ec7313e2f57b",
+          "after_sha256": "6a0e4e4fb71ef1a7ec2b1723a8f200fb5e2d9db22b02aef3e5c6efb5e8ddcf77",
+          "readback_sha256": "1754b9512bff7233fb495ed256296b39571b8cf484492852d1d4ec7313e2f57b",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "1754b9512bff7233fb495ed256296b39571b8cf484492852d1d4ec7313e2f57b",
+          "after_sha256": "6a0e4e4fb71ef1a7ec2b1723a8f200fb5e2d9db22b02aef3e5c6efb5e8ddcf77",
+          "readback_sha256": "1754b9512bff7233fb495ed256296b39571b8cf484492852d1d4ec7313e2f57b",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/gruvato/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "keepy-money-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+          "before_sha256": "c35c4c33d4298a397c16fd7deb6904234399cb167242fe28a3a794d441c96a27",
+          "after_sha256": "7912f068794201475a195d44340138b03d8564686abb600ed2a4eadd60134e06",
+          "readback_sha256": "c35c4c33d4298a397c16fd7deb6904234399cb167242fe28a3a794d441c96a27",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "c35c4c33d4298a397c16fd7deb6904234399cb167242fe28a3a794d441c96a27",
+          "after_sha256": "7912f068794201475a195d44340138b03d8564686abb600ed2a4eadd60134e06",
+          "readback_sha256": "c35c4c33d4298a397c16fd7deb6904234399cb167242fe28a3a794d441c96a27",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "slowburns-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/slowburns/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/slowburns/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/slowburns/agents/hermes/pm/SOUL.md",
+          "before_sha256": "a704d37858ccfac9c3b04f344febdbdfac11b34c2bdf87581e0cfb3ae4fe5129",
+          "after_sha256": "4fa2f26b7ed645b15217239ab8da7c337cc94cf10888efced4bfcbf70dd15f75",
+          "readback_sha256": "a704d37858ccfac9c3b04f344febdbdfac11b34c2bdf87581e0cfb3ae4fe5129",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/slowburns/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "a704d37858ccfac9c3b04f344febdbdfac11b34c2bdf87581e0cfb3ae4fe5129",
+          "after_sha256": "4fa2f26b7ed645b15217239ab8da7c337cc94cf10888efced4bfcbf70dd15f75",
+          "readback_sha256": "a704d37858ccfac9c3b04f344febdbdfac11b34c2bdf87581e0cfb3ae4fe5129",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/slowburns/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/slowburns-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/slowburns/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "delonet-company-reporter",
+      "status": "missing",
+      "changed_files": [],
+      "files": [],
+      "detail": "Missing profile SOUL; existing FLUME-67 owns provisioning, not policy refresh"
+    },
+    {
+      "id": "james-brennan-pm",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "Handwritten or conflicting composer ownership; owner must reconcile the authored SOUL, not use scaffold remediation"
+    },
+    {
+      "id": "pjangler-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+          "before_sha256": "9f0dbcf813749d8da50ab519d16d0791b4231b2adaf29d5c469b2b7de38d540a",
+          "after_sha256": "83ef3ea7ed09aa8c37b387da010fa8996da356e7db10ebb239ee32baf7ea9f82",
+          "readback_sha256": "9f0dbcf813749d8da50ab519d16d0791b4231b2adaf29d5c469b2b7de38d540a",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "9f0dbcf813749d8da50ab519d16d0791b4231b2adaf29d5c469b2b7de38d540a",
+          "after_sha256": "83ef3ea7ed09aa8c37b387da010fa8996da356e7db10ebb239ee32baf7ea9f82",
+          "readback_sha256": "9f0dbcf813749d8da50ab519d16d0791b4231b2adaf29d5c469b2b7de38d540a",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "heyma-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+          "before_sha256": "e5391c3b9153a0050a0cf2b6c0f648bf594fadf52bc46df828bcfb37f4644d16",
+          "after_sha256": "c5c12f07e9e3692995528c8010cdca359634b9cbeb3e26b06238e7433dab5ced",
+          "readback_sha256": "e5391c3b9153a0050a0cf2b6c0f648bf594fadf52bc46df828bcfb37f4644d16",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "e5391c3b9153a0050a0cf2b6c0f648bf594fadf52bc46df828bcfb37f4644d16",
+          "after_sha256": "c5c12f07e9e3692995528c8010cdca359634b9cbeb3e26b06238e7433dab5ced",
+          "readback_sha256": "e5391c3b9153a0050a0cf2b6c0f648bf594fadf52bc46df828bcfb37f4644d16",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/HeyMa/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+      "profile_link": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "delonet-director",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/delonet-company/agents/hermes/director/SOUL.md",
+        "/home/delorenj/code/delonet-company/agents/hermes/director/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/delonet-company/agents/hermes/director/SOUL.md",
+          "before_sha256": "f233fbadab5b3ce23758e309632e317773b5dcc2a59ba52097428dc5e8b71251",
+          "after_sha256": "5956ed3d19ac7e357b11987da554f4d32dd2325bc30f597ef21d75374d38f6ec",
+          "readback_sha256": "f233fbadab5b3ce23758e309632e317773b5dcc2a59ba52097428dc5e8b71251",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/delonet-company/agents/hermes/director/runtime/SOUL.md",
+          "before_sha256": "f233fbadab5b3ce23758e309632e317773b5dcc2a59ba52097428dc5e8b71251",
+          "after_sha256": "5956ed3d19ac7e357b11987da554f4d32dd2325bc30f597ef21d75374d38f6ec",
+          "readback_sha256": "f233fbadab5b3ce23758e309632e317773b5dcc2a59ba52097428dc5e8b71251",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/delonet-company/agents/hermes/director/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/delonet-director/SOUL.md",
+      "profile_link": "/home/delorenj/code/delonet-company/agents/hermes/director/runtime/SOUL.md"
+    },
+    {
+      "id": "deckard-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/deckard/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/deckard/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/deckard/agents/hermes/pm/SOUL.md",
+          "before_sha256": "d313c7f9f92e13450983c8ade278c3f749fa73d3f941a43f6bdca3e1910953d0",
+          "after_sha256": "cccda742d2e9285799ed4e9abca75a74a1a107ab71e2c04fe925c760cd99b4dd",
+          "readback_sha256": "d313c7f9f92e13450983c8ade278c3f749fa73d3f941a43f6bdca3e1910953d0",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/deckard/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "d313c7f9f92e13450983c8ade278c3f749fa73d3f941a43f6bdca3e1910953d0",
+          "after_sha256": "cccda742d2e9285799ed4e9abca75a74a1a107ab71e2c04fe925c760cd99b4dd",
+          "readback_sha256": "d313c7f9f92e13450983c8ade278c3f749fa73d3f941a43f6bdca3e1910953d0",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/deckard/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/deckard-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/deckard/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "infra-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+          "before_sha256": "6261f68aa7ece8029ed21df393defacc00affd02a7226a5854084789f40f9555",
+          "after_sha256": "311ff323582fe51647d6bb39f5255274ecb0ce4354e4bbaeb2e421f96387bfca",
+          "readback_sha256": "6261f68aa7ece8029ed21df393defacc00affd02a7226a5854084789f40f9555",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "6261f68aa7ece8029ed21df393defacc00affd02a7226a5854084789f40f9555",
+          "after_sha256": "311ff323582fe51647d6bb39f5255274ecb0ce4354e4bbaeb2e421f96387bfca",
+          "readback_sha256": "6261f68aa7ece8029ed21df393defacc00affd02a7226a5854084789f40f9555",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/infra/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "ssbnk-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+          "before_sha256": "1af0e4c92852c51c487b24d97ec1aef225301966a6a865e632e7f0a234c9b5a7",
+          "after_sha256": "39f30df89a92cb28edd76296448a95b1e508661a70ed01f89e2fda0f1c07a54e",
+          "readback_sha256": "1af0e4c92852c51c487b24d97ec1aef225301966a6a865e632e7f0a234c9b5a7",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "1af0e4c92852c51c487b24d97ec1aef225301966a6a865e632e7f0a234c9b5a7",
+          "after_sha256": "39f30df89a92cb28edd76296448a95b1e508661a70ed01f89e2fda0f1c07a54e",
+          "readback_sha256": "1af0e4c92852c51c487b24d97ec1aef225301966a6a865e632e7f0a234c9b5a7",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/ssbnk/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "tonnybox-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/TonnyBox/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/TonnyBox/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/TonnyBox/agents/hermes/pm/SOUL.md",
+          "before_sha256": "6ac4c1c6a61c6a6ac71694e4ba34179905dc07e28bdc6ab2429e1d778f6ce67f",
+          "after_sha256": "22d6cd37a8aca9d0dc4ee459e17b994f0eb3455c0025ebe2c2674cb3e970d4e8",
+          "readback_sha256": "6ac4c1c6a61c6a6ac71694e4ba34179905dc07e28bdc6ab2429e1d778f6ce67f",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/TonnyBox/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "6ac4c1c6a61c6a6ac71694e4ba34179905dc07e28bdc6ab2429e1d778f6ce67f",
+          "after_sha256": "22d6cd37a8aca9d0dc4ee459e17b994f0eb3455c0025ebe2c2674cb3e970d4e8",
+          "readback_sha256": "6ac4c1c6a61c6a6ac71694e4ba34179905dc07e28bdc6ab2429e1d778f6ce67f",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/TonnyBox/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/tonnybox-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/TonnyBox/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "sidepiece-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/sidepiece/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/sidepiece/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/sidepiece/agents/hermes/pm/SOUL.md",
+          "before_sha256": "74b5d9e81b45a5a523edc8bea123c882965a04cadd863f14d0e4c59bf307b0fa",
+          "after_sha256": "5ee7b0c99d8e6aad77cb576db2fcbe779db5da5c965487f864b342a84d73d38b",
+          "readback_sha256": "74b5d9e81b45a5a523edc8bea123c882965a04cadd863f14d0e4c59bf307b0fa",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/sidepiece/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "74b5d9e81b45a5a523edc8bea123c882965a04cadd863f14d0e4c59bf307b0fa",
+          "after_sha256": "5ee7b0c99d8e6aad77cb576db2fcbe779db5da5c965487f864b342a84d73d38b",
+          "readback_sha256": "74b5d9e81b45a5a523edc8bea123c882965a04cadd863f14d0e4c59bf307b0fa",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/sidepiece/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/sidepiece-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/sidepiece/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "client-portal-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/client-portal/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/client-portal/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/client-portal/agents/hermes/pm/SOUL.md",
+          "before_sha256": "9ff08ef084fa23008cae0819a11a7a530fc4ea9a41ed656c27fff6b18fef2c68",
+          "after_sha256": "a0f029fd4cb4d48a395fd46542628da4e6cfd5673ba22bfb46d652dbcc88a9c2",
+          "readback_sha256": "9ff08ef084fa23008cae0819a11a7a530fc4ea9a41ed656c27fff6b18fef2c68",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/client-portal/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "9ff08ef084fa23008cae0819a11a7a530fc4ea9a41ed656c27fff6b18fef2c68",
+          "after_sha256": "a0f029fd4cb4d48a395fd46542628da4e6cfd5673ba22bfb46d652dbcc88a9c2",
+          "readback_sha256": "9ff08ef084fa23008cae0819a11a7a530fc4ea9a41ed656c27fff6b18fef2c68",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/client-portal/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/client-portal-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/client-portal/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "flume-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/flume/agents/hermes/pm/SOUL.md",
+          "before_sha256": "e970283bf360c4678679b3ca9531fb952e7e59f9a94d6684953b3f2a084396ff",
+          "after_sha256": "f0e18797c5b71eace9bb6ac007dbce804da33679766d7b15608a3074b6376327",
+          "readback_sha256": "e970283bf360c4678679b3ca9531fb952e7e59f9a94d6684953b3f2a084396ff",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "e970283bf360c4678679b3ca9531fb952e7e59f9a94d6684953b3f2a084396ff",
+          "after_sha256": "f0e18797c5b71eace9bb6ac007dbce804da33679766d7b15608a3074b6376327",
+          "readback_sha256": "e970283bf360c4678679b3ca9531fb952e7e59f9a94d6684953b3f2a084396ff",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/flume/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/flume-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "pile-of-dumb-things-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/SOUL.md",
+          "before_sha256": "6c012405162236ecbbad8500d1430832c5777de6254a1ef46eef09e6494569c6",
+          "after_sha256": "fb1aba1352ed4fbcbbbf7f64fd10bb40de9adb10e74a60b7f05c6fc3c64a1cee",
+          "readback_sha256": "6c012405162236ecbbad8500d1430832c5777de6254a1ef46eef09e6494569c6",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "85e9509065f6fd9af874b53787db7c764d9dfaa940058580c3d09696ffa4f7ed",
+          "after_sha256": "878c0d19a8c6c3d6a2c1e9a63b440d0818ebef7b1ff80dd922fd822c1950f4a9",
+          "readback_sha256": "85e9509065f6fd9af874b53787db7c764d9dfaa940058580c3d09696ffa4f7ed",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/pile-of-dumb-things-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/tower-of-lost-things/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "green-in-between-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/green-in-between/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/green-in-between/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/green-in-between/agents/hermes/pm/SOUL.md",
+          "before_sha256": "39cdb0297b7b7d85180f8bbf2033eb138eef1bca373c633851b7b7b6c8784426",
+          "after_sha256": "8dd8564f22924f0d1057cac7ebfbeeaf535b572dbf63e69ffeb712306e24c03f",
+          "readback_sha256": "39cdb0297b7b7d85180f8bbf2033eb138eef1bca373c633851b7b7b6c8784426",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/green-in-between/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "39cdb0297b7b7d85180f8bbf2033eb138eef1bca373c633851b7b7b6c8784426",
+          "after_sha256": "8dd8564f22924f0d1057cac7ebfbeeaf535b572dbf63e69ffeb712306e24c03f",
+          "readback_sha256": "39cdb0297b7b7d85180f8bbf2033eb138eef1bca373c633851b7b7b6c8784426",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/green-in-between/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/green-in-between-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/green-in-between/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "infra-specialist",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/infra-specialist/agent.yaml'"
+    },
+    {
+      "id": "n8n-specialist",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/n8n-specialist/agent.yaml'"
+    },
+    {
+      "id": "monitoring-pm",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "Handwritten or conflicting composer ownership; owner must reconcile the authored SOUL, not use scaffold remediation"
+    },
+    {
+      "id": "idealscenario-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/IdealScenario/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/IdealScenario/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/IdealScenario/agents/hermes/pm/SOUL.md",
+          "before_sha256": "a0289956c48ecc7ea3d95ef341d5c8c79ba784cc4a0d01cc8ef816aec0487c00",
+          "after_sha256": "5b3c8f89f8210e3940d993a793f23183da729cd7658b230b4805395ae6b4aa35",
+          "readback_sha256": "a0289956c48ecc7ea3d95ef341d5c8c79ba784cc4a0d01cc8ef816aec0487c00",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/IdealScenario/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "a0289956c48ecc7ea3d95ef341d5c8c79ba784cc4a0d01cc8ef816aec0487c00",
+          "after_sha256": "5b3c8f89f8210e3940d993a793f23183da729cd7658b230b4805395ae6b4aa35",
+          "readback_sha256": "a0289956c48ecc7ea3d95ef341d5c8c79ba784cc4a0d01cc8ef816aec0487c00",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/IdealScenario/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/idealscenario-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/IdealScenario/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "rererere",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/rererere/agent.yaml'"
+    },
+    {
+      "id": "navi-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/navi/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/navi/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/navi/agents/hermes/pm/SOUL.md",
+          "before_sha256": "197b76c240dde486120e5129ebd88e9efdc82afc6b24d1caf98b54a25c66da1a",
+          "after_sha256": "7b9c4eba34313ff49e988413bab3d71b2461e85ff9660b0651a0ecf00dab82c3",
+          "readback_sha256": "197b76c240dde486120e5129ebd88e9efdc82afc6b24d1caf98b54a25c66da1a",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/navi/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "197b76c240dde486120e5129ebd88e9efdc82afc6b24d1caf98b54a25c66da1a",
+          "after_sha256": "7b9c4eba34313ff49e988413bab3d71b2461e85ff9660b0651a0ecf00dab82c3",
+          "readback_sha256": "197b76c240dde486120e5129ebd88e9efdc82afc6b24d1caf98b54a25c66da1a",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/navi/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/navi-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/navi/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "marge-simpson",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/marge-simpson/agent.yaml'"
+    },
+    {
+      "id": "peter-griffin",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/peter-griffin/agent.yaml'"
+    },
+    {
+      "id": "milkshake-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/Milkshake/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/Milkshake/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/Milkshake/agents/hermes/pm/SOUL.md",
+          "before_sha256": "611e0ec6a32afa435fb9f649622246b6302c7b19bb13fcf5d17969bc65508629",
+          "after_sha256": "203018ff9f95ad6015194e2c4b96fad1db06ec5161f52dae9af12142a77c2dd7",
+          "readback_sha256": "611e0ec6a32afa435fb9f649622246b6302c7b19bb13fcf5d17969bc65508629",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/Milkshake/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "611e0ec6a32afa435fb9f649622246b6302c7b19bb13fcf5d17969bc65508629",
+          "after_sha256": "203018ff9f95ad6015194e2c4b96fad1db06ec5161f52dae9af12142a77c2dd7",
+          "readback_sha256": "611e0ec6a32afa435fb9f649622246b6302c7b19bb13fcf5d17969bc65508629",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/Milkshake/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/milkshake-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/Milkshake/agents/hermes/pm/runtime/SOUL.md"
+    },
+    {
+      "id": "context-director",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/context-director/agent.yaml'"
+    },
+    {
+      "id": "bennett",
+      "status": "refused",
+      "changed_files": [],
+      "files": [],
+      "detail": "ENOENT: no such file or directory, open '/home/delorenj/.agents/workforce/bennett/agent.yaml'"
+    },
+    {
+      "id": "pilot-pm",
+      "status": "would-change",
+      "changed_files": [
+        "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/runtime/SOUL.md"
+      ],
+      "files": [
+        {
+          "path": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/SOUL.md",
+          "before_sha256": "9ba07befe7171a3a4f259297cf180ad911e0484ee55c1297973e8b6a9fb46391",
+          "after_sha256": "5780615018641aea2062ee7c2ab280e82c04e1d1c42aefc06a0cb99f16a3b033",
+          "readback_sha256": "9ba07befe7171a3a4f259297cf180ad911e0484ee55c1297973e8b6a9fb46391",
+          "nonpolicy_bytes_preserved": true
+        },
+        {
+          "path": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/runtime/SOUL.md",
+          "before_sha256": "9ba07befe7171a3a4f259297cf180ad911e0484ee55c1297973e8b6a9fb46391",
+          "after_sha256": "5780615018641aea2062ee7c2ab280e82c04e1d1c42aefc06a0cb99f16a3b033",
+          "readback_sha256": "9ba07befe7171a3a4f259297cf180ad911e0484ee55c1297973e8b6a9fb46391",
+          "nonpolicy_bytes_preserved": true
+        }
+      ],
+      "owner_source": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/role.yaml",
+      "profile_soul": "/home/delorenj/.hermes/profiles/pilot-pm/SOUL.md",
+      "profile_link": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/runtime/SOUL.md"
+    }
+  ]
+}
