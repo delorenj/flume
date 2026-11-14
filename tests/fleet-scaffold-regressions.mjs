@@ -46,9 +46,9 @@ const CLI = join(PKG, "dist", "index.js");
 const MCP = join(PKG, "dist", "mcp-server.js");
 const TRACKED_CONTRACT = join(ROOT, "contracts", "handbook.yaml");
 
-/** The eight declared leaves, in the byte order the observations sort in. */
+/** The seven declared leaves, in the byte order the observations sort in. */
 const GROUPS = [
-  "scaffold.SOUL.md", "scaffold.gitignore", "scaffold.hermes", "scaffold.momo",
+  "scaffold.SOUL.md", "scaffold.gitignore", "scaffold.hermes",
   "scaffold.role.yaml", "scaffold.runtime-scaffold", "scaffold.scripts", "scaffold.sentinel.prompt.md",
 ];
 const ITEM_KINDS = ["missing", "stale-content", "locally-modified", "wrong-mode", "wrong-type", "unsafe-symlink", "unexpected-owned", "incomplete"];
@@ -165,7 +165,6 @@ const LOCK_HELPER_BYTES = pinnedBytes("template/.scripts/lib/profile-config-lock
 const SOUL_JINJA = "# {{ display_name }}\n\n{% if soul_tone == \"playful\" -%}\nplayful\n{%- else -%}\ndirect\n{%- endif %}\n";
 const ROLE_YAML_JINJA = "role: {{ role | tojson }}\nagent_id: {{ agent_id | tojson }}\nprovisioned: {{ '%Y' | strftime }}\n";
 const HERMES_JINJA = (version) => `#!/usr/bin/env bash\n# launcher for {{ agent_id }}\necho launcher v${version}\n`;
-const MOMO_JINJA = "#!/usr/bin/env bash\n# momo for {{ target_repo }} ({{ role }})\necho momo\n";
 const GITIGNORE_JINJA = "# {{ role }}\nruntime/\n.scripts/.provision.log\n.scripts/.done-*\n";
 const PROMPT_JINJA = "# {{ display_name }} pass\n\nrepo {{ target_repo }} role {{ role }} provider {{ ticket_provider }}\n";
 const LIB_SH = (version) => `#!/usr/bin/env bash\nlib_version() { echo ${version}; }\n`;
@@ -179,7 +178,6 @@ function templateFiles(version) {
     "SOUL.md.jinja": { mode: 0o644, text: SOUL_JINJA },
     "role.yaml.jinja": { mode: 0o644, text: ROLE_YAML_JINJA },
     "hermes.jinja": { mode: 0o755, text: HERMES_JINJA(version) },
-    "momo.jinja": { mode: 0o755, text: MOMO_JINJA },
     ".gitignore.jinja": { mode: 0o644, text: GITIGNORE_JINJA },
     ".scripts/sentinel.prompt.md.jinja": { mode: 0o644, text: PROMPT_JINJA },
     ".scripts/_lib.sh": { mode: 0o755, text: LIB_SH(version) },
@@ -237,7 +235,7 @@ function seedTemplate() {
   // and every other asset is still compared.
   gitOk(templateSource, ["checkout", "--quiet", COMMIT.v3]);
   gitOk(templateSource, ["checkout", "--quiet", "-b", "unsupported"]);
-  writeFileSync(join(templateSource, "template", "momo.jinja"), "#!/usr/bin/env bash\n{% if role == \"pm\" %}echo pm{% else %}echo other{% endif %}\n", "utf8");
+  writeFileSync(join(templateSource, "template", ".gitignore.jinja"), "# {{ role }}\n{% if role == \"pm\" %}runtime/{% else %}other/{% endif %}\n", "utf8");
   writeFileSync(join(templateSource, "template", "hermes.jinja"), "#!/usr/bin/env bash\n# launcher for {{ agent_id }} ({{ launcher_flavor }})\n", "utf8");
   gitOk(templateSource, ["add", "-A"]);
   gitOk(templateSource, ["commit", "--quiet", "-m", "unsupported"]);
@@ -268,7 +266,6 @@ function cleanRoleFiles(slug, version = 3) {
     "role.yaml": { mode: 0o644, text: "role: pm\n" },
     "SOUL.md": { mode: 0o644, text: "# soul\n" },
     hermes: { mode: 0o755, text: `#!/usr/bin/env bash\n# launcher for ${slug}-pm\necho launcher v${version}\n` },
-    momo: { mode: 0o755, text: `#!/usr/bin/env bash\n# momo for ${slug} (pm)\necho momo\n` },
     ".gitignore": { mode: 0o644, text: "# pm\nruntime/\n.scripts/.provision.log\n.scripts/.done-*\n" },
     ".scripts/sentinel.prompt.md": { mode: 0o644, text: `# ${slug} PM pass\n\nrepo ${slug} role pm provider plane\n` },
     ".scripts/_lib.sh": { mode: 0o755, text: `#!/usr/bin/env bash\nlib_version() { echo ${version}; }\n` },
@@ -384,7 +381,7 @@ function seedFleet() {
   ROLE_DIRS.edited = makeRepo("edited", { drift: (dir, role) => {
     writeFileSync(join(role, "hermes"), `#!/usr/bin/env bash\n# launcher for edited-pm\necho launcher v3\necho ${SECRET_SENTINEL}\n`, "utf8");
   } }).roleDir;
-  ROLE_DIRS.missing = makeRepo("missing", { drift: (dir, role) => { rmSync(join(role, "momo")); } }).roleDir;
+  ROLE_DIRS.missing = makeRepo("missing", { drift: (dir, role) => { rmSync(join(role, ".gitignore")); } }).roleDir;
   ROLE_DIRS.mode = makeRepo("mode", { drift: (dir, role) => { chmodSync(join(role, ".scripts", "heartbeat.sh"), 0o644); } }).roleDir;
   ROLE_DIRS.type = makeRepo("type", { drift: (dir, role) => {
     rmSync(join(role, "hermes"));
@@ -768,7 +765,7 @@ try {
     const data = status(cliAt(mainRoot, STATUS_ARGS));
     const agent = agentNamed(data, "match-pm");
     const groups = agent.observations.filter((item) => item.source === "fleet-scaffold");
-    assert.deepEqual(groups.map((item) => item.field), GROUPS, "eight observations, one per declared leaf, in byte order");
+    assert.deepEqual(groups.map((item) => item.field), GROUPS, "seven observations, one per declared leaf, in byte order");
     for (const group of groups) {
       assert.equal(group.state, "pass", `${group.field} must pass on a clean role: ${JSON.stringify(group.items)}`);
       assert.equal(group.items, undefined, `${group.field} must carry no items key at all on a pass`);
@@ -817,8 +814,8 @@ try {
 
   check("missing, wrong-mode, wrong-type and unsafe-symlink each land on their own group", () => {
     const data = status(cliAt(mainRoot, STATUS_ARGS));
-    assert.deepEqual(itemsOf(groupOf(agentNamed(data, "missing-pm"), "scaffold.momo")), [
-      { path: "momo", kind: "missing", desired: "file", observed: "absent", detail: null, wip: false },
+    assert.deepEqual(itemsOf(groupOf(agentNamed(data, "missing-pm"), "scaffold.gitignore")), [
+      { path: ".gitignore", kind: "missing", desired: "file", observed: "absent", detail: null, wip: false },
     ]);
     assert.deepEqual(itemsOf(groupOf(agentNamed(data, "mode-pm"), "scaffold.scripts")), [
       { path: ".scripts/heartbeat.sh", kind: "wrong-mode", desired: "100755", observed: "100644", detail: null, wip: false },
@@ -829,7 +826,7 @@ try {
     assert.deepEqual(itemsOf(groupOf(agentNamed(data, "link-pm"), "scaffold.hermes")), [
       { path: "hermes", kind: "unsafe-symlink", desired: "file", observed: "symlink", detail: null, wip: false },
     ]);
-    for (const [slug, hit] of [["missing", "scaffold.momo"], ["mode", "scaffold.scripts"], ["type", "scaffold.hermes"], ["link", "scaffold.hermes"]]) {
+    for (const [slug, hit] of [["missing", "scaffold.gitignore"], ["mode", "scaffold.scripts"], ["type", "scaffold.hermes"], ["link", "scaffold.hermes"]]) {
       const agent = agentNamed(data, `${slug}-pm`);
       for (const leaf of GROUPS) {
         assert.equal(groupOf(agent, leaf).state, leaf === hit ? "fail" : "pass", `${slug}-pm ${leaf}`);
@@ -1048,12 +1045,12 @@ try {
   });
 
   check("a rendered path no group owns is manifest-uncovered, by name", () => {
-    const uncovered = policyContract((document) => { delete document.scaffold_manifest.groups["scaffold.momo"]; });
+    const uncovered = policyContract((document) => { delete document.scaffold_manifest.groups["scaffold.gitignore"]; });
     const root = makePackageRoot("pkg-uncovered", YAML.stringify(uncovered, { lineWidth: 0 }));
     const data = status(cliAt(root, [...STATUS_ARGS, "--agent", "match-pm"]));
-    assert.equal(data.scaffold.source.integrity, "manifest-uncovered:momo");
+    assert.equal(data.scaffold.source.integrity, "manifest-uncovered:.gitignore");
     const agent = agentNamed(data, "match-pm");
-    // Seven groups now: the contract declares seven, and each is an error.
+    // Six groups now: the contract declares seven, one deleted, and each is an error.
     const groups = agent.observations.filter((item) => item.source === "fleet-scaffold");
     assert.equal(groups.length, GROUPS.length - 1);
     for (const group of groups) assert.equal(group.state, "error");
@@ -1066,10 +1063,10 @@ try {
     // broken checkout, so it must never hide behind a source-integrity error.
     assert.equal(data.scaffold.source.integrity, "ok", data.scaffold.source.detail);
     const agent = agentNamed(data, "match-pm");
-    const momo = groupOf(agent, "scaffold.momo");
-    assert.equal(momo.state, "error");
-    assert.deepEqual(itemsOf(momo), [
-      { path: "momo", kind: "incomplete", desired: null, observed: "file", detail: "render-unsupported: template uses Jinja constructs beyond simple substitution", wip: false },
+    const gitignore = groupOf(agent, "scaffold.gitignore");
+    assert.equal(gitignore.state, "error");
+    assert.deepEqual(itemsOf(gitignore), [
+      { path: ".gitignore", kind: "incomplete", desired: null, observed: "file", detail: "render-unsupported: template uses Jinja constructs beyond simple substitution", wip: false },
     ]);
     const hermes = groupOf(agent, "scaffold.hermes");
     assert.equal(hermes.state, "error");
@@ -1077,7 +1074,7 @@ try {
       { path: "hermes", kind: "incomplete", desired: null, observed: "file", detail: "render-unsupported: undeclared placeholder launcher_flavor", wip: false },
     ]);
     for (const leaf of GROUPS) {
-      if (leaf === "scaffold.momo" || leaf === "scaffold.hermes") continue;
+      if (leaf === "scaffold.gitignore" || leaf === "scaffold.hermes") continue;
       assert.equal(groupOf(agent, leaf).state, "pass", `${leaf} is unaffected by another asset's unrenderable source`);
     }
     assert.equal(agent.complete, false, "an undecided asset makes the agent incomplete");
@@ -1117,7 +1114,7 @@ try {
     assert.equal(after.health.healthy, false);
     assert.equal(after.health.members.exception, before.health.members.exception + 1);
     // Another agent's identical drift is untouched by a ruling on this one.
-    assert.equal(groupOf(agentNamed(after, "missing-pm"), "scaffold.momo").justification, null);
+    assert.equal(groupOf(agentNamed(after, "missing-pm"), "scaffold.gitignore").justification, null);
   });
 
   // -- AC5: rule agreement under --live ---------------------------------------

@@ -90,7 +90,7 @@ Your `board_scope: advisory` retains the existing board binding for reads,
 `px task create` and `px comment`, but gives you no board-ingress claim. Do not
 claim, assign, move, close or cancel tickets, acquire a board-driver lease,
 dispatch workers, edit product code, or approve/merge changes. File work from
-the owning repo for its PM to pull; do not push it into Todo. Momo and coding
+the owning repo for its PM to pull; do not push it into Todo. Interactive and coding
 sessions have the same boundary. Your recommendations set priority, not a
 second execution lane. Tool availability is not permission.
 

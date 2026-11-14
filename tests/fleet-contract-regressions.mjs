@@ -1474,12 +1474,12 @@ try {
   }, "scaffold_manifest.groups.scaffold.invented", /not declared writable/u);
 
   manifestRejects("a group path that escapes the role", (manifest) => {
-    manifest.get("groups").set("scaffold.momo", "../momo");
-  }, "scaffold_manifest.groups.scaffold.momo", /role-relative/u);
+    manifest.get("groups").set("scaffold.gitignore", "../.gitignore");
+  }, "scaffold_manifest.groups.scaffold.gitignore", /role-relative/u);
 
   manifestRejects("two groups owning one path", (manifest) => {
-    manifest.get("groups").set("scaffold.momo", "hermes");
-  }, "scaffold_manifest.groups.scaffold.momo", /duplicate group path/u);
+    manifest.get("groups").set("scaffold.gitignore", "hermes");
+  }, "scaffold_manifest.groups.scaffold.gitignore", /duplicate group path/u);
 
   manifestRejects("a presence-only path that resolves to no group", (manifest) => {
     manifest.get("presence_only").get(0).set("path", "elsewhere/role.yaml");

@@ -302,7 +302,6 @@ authorities:
       - scaffold.role.yaml
       - scaffold.SOUL.md
       - scaffold.hermes
-      - scaffold.momo
       - scaffold.sentinel.prompt.md
       - scaffold.gitignore
       - scaffold.scripts
@@ -720,13 +719,12 @@ scaffold_manifest:
   # Declared leaf -> the role-relative path it owns. A trailing `/` owns a
   # directory; longest prefix wins, so the rendered sentinel prompt inside the
   # verbatim `.scripts/` tree has its own leaf. Every key is a writable field of
-  # `authorities.tracked_role_scaffold`, which is what makes those eight leaves
+  # `authorities.tracked_role_scaffold`, which is what makes those seven leaves
   # real paths rather than invented ones.
   groups:
     scaffold.role.yaml: role.yaml
     scaffold.SOUL.md: SOUL.md
     scaffold.hermes: hermes
-    scaffold.momo: momo
     scaffold.sentinel.prompt.md: .scripts/sentinel.prompt.md
     scaffold.gitignore: .gitignore
     scaffold.scripts: .scripts/
