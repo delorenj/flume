@@ -45,8 +45,8 @@ gateway:                        # what `hermes.gateway-routing` holds the fleet 
 lanes:                          # per-host ticket lane names, over a tracked role.yaml's `ticket_provider:` map
   - match: { provider: plane, workspace: damian, board_id: <uuid> }   # every key optional; none = every board
     replace: false              # default: lay `states` over the tracked map band by band
-    states:                     # bands: backlog unstarted started in_review completed cancelled awaiting_decision
-      in_review: In Review      #        e2e_testing ready_for_documentation needs_re_evaluation
+    states:                     # bands: backlog unstarted started completed cancelled (the five stock lanes)
+      started: In Progress
 ```
 
 ## Defaults (no overlay)
@@ -61,11 +61,16 @@ lanes:                          # per-host ticket lane names, over a tracked rol
 
 ## Lanes
 
-Plane has no `in_review` state group, so a lane name that does not exist on a board silently lands a transition in the
-wrong place. A tracked `role.yaml` names its *owner's* lanes ("E2E Testing & QA"). For a board that lacks them, set a
-rule with `replace: true`: the tracked names are ignored for matching boards and any band the rule does not name falls
-to the adapter's own default, never to the owner's lane. Without `replace`, the rule's names are laid over the tracked
-map and the rest is kept. Rules apply in file order; a later rule wins per band.
+Krebs lifecycle v2 (`krebs/spec/lifecycle.v2.yaml`, 2026-11-14) gives every Plane board the five stock lanes, one per
+state group: `backlog`, `unstarted`, `started`, `completed`, `cancelled`. What the extra lanes of the retired
+nine-lane layout meant is now a label (`lifecycle:review`, `lifecycle:needs-input`, `lifecycle:blocked`,
+`agent:failed`), so review and holds are not bands and an overlay naming one is refused.
+
+A lane name that does not exist on a board still lands a transition in the wrong place. A tracked `role.yaml` names its
+*owner's* lanes. For a board whose lanes are named differently, set a rule with `replace: true`: the tracked names are
+ignored for matching boards and any band the rule does not name falls to the adapter's own default, never to the
+owner's lane. Without `replace`, the rule's names are laid over the tracked map and the rest is kept. Rules apply in
+file order; a later rule wins per band.
 
 `flume lanes` reads `ticket_provider:` the way the shell adapter does (`providers/plane.sh` `tp_cfg`, a line regex, not
 a YAML parse), so with no overlay the answer is exactly what the adapter reads today. That equivalence is a test.
@@ -106,8 +111,8 @@ lanes:
     states: { backlog: Backlog, unstarted: Todo, started: In Progress, completed: Done, cancelled: Cancelled }
 ```
 
-Bands the rule leaves out (here `in_review`, `awaiting_decision`) resolve to the adapter's defaults (`In Review`,
-`Needs Attention`), never to the owner's "E2E Testing & QA".
+A band the rule leaves out resolves to the adapter's default (the one lane of that state group, or `Done` /
+`Cancelled`), never to the owner's lane name.
 
 ## What reads the overlay
 

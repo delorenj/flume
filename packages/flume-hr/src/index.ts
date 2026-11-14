@@ -28,7 +28,7 @@ import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
 import { retireFromService, formatRetireResult } from "./hire/retire";
 import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
 import { EnsureTemplateConfig, renderHostConfig } from "./hire/EnsureTemplateConfig";
-import { HOST_OVERLAY_ENV, LANE_BANDS, loadHostOverlay, type LaneBand, type OverlayLoad } from "./kernel/host-overlay";
+import { HOST_OVERLAY_ENV, LANE_BANDS, LANE_BANDS_NOTE, loadHostOverlay, type LaneBand, type OverlayLoad } from "./kernel/host-overlay";
 import { defaultRoleYamls, formatLaneResolution, resolveRoleLanesAt } from "./workforce/lanes";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
@@ -908,7 +908,7 @@ lanesCmd
   .action(async (roleYaml: string, band: string, options) => {
     useOverlayFile(options.file);
     if (!(LANE_BANDS as readonly string[]).includes(band)) {
-      console.error(`Unknown band "${band}" (allowed: ${LANE_BANDS.join(", ")})`);
+      console.error(`Unknown band "${band}" (allowed: ${LANE_BANDS.join(", ")}; ${LANE_BANDS_NOTE})`);
       process.exitCode = 2;
       return;
     }

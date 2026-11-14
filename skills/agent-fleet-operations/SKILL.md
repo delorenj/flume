@@ -127,11 +127,12 @@ basename (33god-pm → `33GOD`, delocontainers-pm → `DeLoContainers`).
 The scaffold reads role.yaml scalars through ONE block-scoped walker,
 `.scripts/lib/role-yaml.py` (used by `_lib.sh yaml_get`, `credential-launch.sh`
 and `heartbeat.sh`); it refuses duplicate keys instead of guessing, so never add
-an awk/grep role.yaml reader beside it. Extended ticket states (Awaiting
-Decision, E2E Testing & QA, Ready for Documentation, Needs Re-evaluation) are
-role.yaml `ticket_provider:` config: a role enables one by naming its lane, and
-`tp resolve_state <state>` validates it read-only; without it `tp transition`
-refuses that state.
+an awk/grep role.yaml reader beside it. Plane boards follow Krebs lifecycle v2
+(`~/code/33GOD/krebs/spec/lifecycle.v2.yaml`): five stock lanes, with review and
+holds carried by labels. `tp transition <id> in_review` lands In Progress +
+`lifecycle:review`, `awaiting_decision` adds `lifecycle:needs-input` in place,
+and the retired nine-lane extended targets are refused; `tp resolve_state
+<state>` validates a target read-only.
 
 `pj audit` still exists and owns the PROJECT rules (`mise.*`, `bmad.*`, `sot.*`,
 `secrets.env-op`, `provenance.copier`, `skills.project-manifest`, `notebook.*`,

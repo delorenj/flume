@@ -6,8 +6,9 @@
 //   * hermes.gateway-routing hardcoded the `automaticai` provider, its host and its twelve curated routes;
 //   * the host template config hardcoded the runtime scaffold path, the 1Password vault and the vox URL;
 //   * every flume-composed op:// reference named the first host's vault;
-//   * a tracked role.yaml carries its owner's ticket lane names, and Plane has no `in_review` state group, so a lane
-//     name that does not exist on another host's board silently lands a transition somewhere wrong.
+//   * a tracked role.yaml carries its owner's ticket lane names, so a lane name that does not exist on another host's
+//     board silently lands a transition somewhere wrong. (Krebs lifecycle v2: the lanes are the five stock ones;
+//     review and holds are labels, never a band.)
 //
 // What must hold, and what each section below pins:
 //   A. NO overlay is today's behaviour, byte for byte (the default values, rendered text, audit verdicts).
@@ -380,6 +381,7 @@ function routing(fleet, env) {
   assert.match(parseErrors("version: 1\ngateway:\n  models: [automaticai/a/b, automaticai/a/b]\n"), /listed twice/);
   assert.match(parseErrors("version: 1\ngateway:\n  models: []\n"), /non-empty list/);
   assert.match(parseErrors("version: 1\nlanes:\n  - states: { review: X }\n"), /unknown band "review"/, "a misspelt band must not read as 'not set'");
+  assert.match(parseErrors("version: 1\nlanes:\n  - states: { in_review: X }\n"), /unknown band "in_review".*review and holds are labels/, "lifecycle v2: review is a label, not a lane an overlay can name");
   assert.match(parseErrors("version: 1\nlanes:\n  - match: { workspce: x }\n    states: { started: X }\n"), /unknown key "workspce"/);
   assert.match(parseErrors('version: 1\nlanes:\n  - states: { started: \'a "quoted" lane\' }\n'), /no double quote/, "adapters strip one pair of quotes: a lane name cannot carry one");
   assert.match(parseErrors("version: 1\nlanes:\n  - states: { started: X }\n    replace: yes please\n"), /replace must be true or false/);
@@ -409,11 +411,10 @@ ticket_provider:
   project: "board-1"
   backlog: "" # e.g. "Backlog"
   unstarted: "Todo"
-  started: "In Progress"
-  in_review: "E2E Testing & QA"
+  started: "Working"
+  in_review: "Legacy Review"
   completed: "Done"
-  # needs_re_evaluation: "Not Real"
-  awaiting_decision: "Awaiting Decision"
+  # cancelled: "Not Real"
 reconcile:
   enabled: false
 `;
@@ -422,25 +423,25 @@ const lanes = (overlayText, role = ROLE) => resolveRoleLanes(role, { status: "ok
 {
   const { board, tracked } = readTicketProvider(ROLE);
   assert.deepEqual(board, { provider: "plane", workspace: "ws-a", board_id: "board-1" });
-  assert.deepEqual(tracked, { unstarted: "Todo", started: "In Progress", in_review: "E2E Testing & QA", completed: "Done", awaiting_decision: "Awaiting Decision" },
-    "empty and commented-out lanes are not lanes");
+  assert.deepEqual(tracked, { unstarted: "Todo", started: "Working", completed: "Done" },
+    "empty and commented-out lanes are not lanes, and a retired band (in_review) is not read at all");
   const none = resolveRoleLanes(ROLE, absent);
   assert.deepEqual(none.effective, none.tracked, "no overlay: the tracked map, unchanged");
   assert.deepEqual(none.appliedRules, []);
   assert.equal(none.replaced, false);
 
   // Layer: the overlay's names win band by band; every band it does not name keeps the tracked name.
-  const layered = lanes("version: 1\nlanes:\n  - match: { workspace: ws-a }\n    states: { in_review: In Review }\n");
-  assert.equal(layered.effective.in_review, "In Review", "the overlay corrects the lane that does not exist on this host's board");
-  assert.equal(layered.effective.started, "In Progress", "an unnamed band keeps the tracked name");
+  const layered = lanes("version: 1\nlanes:\n  - match: { workspace: ws-a }\n    states: { started: In Progress }\n");
+  assert.equal(layered.effective.started, "In Progress", "the overlay corrects the lane that does not exist on this host's board");
+  assert.equal(layered.effective.unstarted, "Todo", "an unnamed band keeps the tracked name");
   assert.deepEqual(layered.appliedRules, [0]);
-  assert.equal(layered.tracked.in_review, "E2E Testing & QA", "the tracked map is reported untouched alongside");
+  assert.equal(layered.tracked.started, "Working", "the tracked map is reported untouched alongside");
 
   // Replace: the tracked map names the owner's lanes, and none of them may reach a board that does not have them.
   const replaced = lanes("version: 1\nlanes:\n  - match: { provider: plane, workspace: ws-a }\n    replace: true\n    states: { started: Doing, completed: Shipped }\n");
   assert.deepEqual(replaced.effective, { started: "Doing", completed: "Shipped" }, "replace drops every tracked name it does not restate");
   assert.equal(replaced.replaced, true);
-  assert.equal(replaced.effective.in_review, undefined, "an unnamed band falls to the adapter's own default, not to the owner's lane");
+  assert.equal(replaced.effective.unstarted, undefined, "an unnamed band falls to the adapter's own default, not to the owner's lane");
 
   // Match: a rule applies only to the board it names; every key it names must match; none = every board.
   assert.deepEqual(lanes("version: 1\nlanes:\n  - match: { workspace: ws-b }\n    states: { started: X }\n").effective, none.tracked, "another workspace's rule does not apply");
@@ -452,7 +453,7 @@ const lanes = (overlayText, role = ROLE) => resolveRoleLanes(role, { status: "ok
   assert.deepEqual(lanes("version: 1\nlanes:\n  - states: { started: First, completed: Kept }\n  - replace: true\n    states: { started: Only }\n").effective, { started: "Only" });
   // resolveLaneMap is pure.
   assert.deepEqual(resolveLaneMap({ started: "A" }, { provider: "p", workspace: "w", board_id: "b" }, []).effective, { started: "A" });
-  assert.ok(LANE_BANDS.includes("in_review") && LANE_BANDS.includes("e2e_testing") && LANE_BANDS.length === 10, "the bands are the ones a role.yaml can name");
+  assert.deepEqual([...LANE_BANDS], ["backlog", "unstarted", "started", "completed", "cancelled"], "lifecycle v2: the bands are the five stock lanes");
 
   // A role.yaml with no ticket_provider block resolves to nothing and a board nobody can match except by an empty rule.
   const bare = resolveRoleLanes("repo: demo\n", absent);
@@ -473,7 +474,7 @@ for key in sys.argv[2:]:
     mm = re.search(rf'(?m)^\\s*{re.escape(key)}:\\s*"?([^"\\n]*)"?\\s*$', block)
     print(mm.group(1).strip() if mm else "")
 `;
-  const adapterRole = ROLE.replace('started: "In Progress"', 'started: "In Progress" # trailing note the adapter cannot see');
+  const adapterRole = ROLE.replace('started: "Working"', 'started: "Working" # trailing note the adapter cannot see');
   const dir = tmp("flume-overlay-roles-");
   const files = {
     fixture: join(dir, "fixture.yaml"),
@@ -500,24 +501,27 @@ for key in sys.argv[2:]:
   const roleFile = join(dir, "role.yaml");
   writeFileSync(roleFile, ROLE);
   const overlayFile = join(dir, "overlay.yaml");
-  writeFileSync(overlayFile, "version: 1\nlanes:\n  - match: { workspace: ws-a }\n    states: { in_review: In Review }\n");
+  writeFileSync(overlayFile, "version: 1\nlanes:\n  - match: { workspace: ws-a }\n    states: { started: In Progress }\n");
   const run = (args, env = {}) => spawnSync(process.execPath, [cli, ...args], { encoding: "utf8", env: { ...process.env, ...NONE, ...env } });
 
-  assert.equal(run(["lanes", "get", roleFile, "in_review"]).stdout, "E2E Testing & QA\n", "no overlay: the tracked lane");
-  assert.equal(run(["lanes", "get", roleFile, "in_review", "--file", overlayFile]).stdout, "In Review\n", "--file lays an overlay over it");
-  assert.equal(run(["lanes", "get", roleFile, "in_review"], { [HOST_OVERLAY_ENV]: overlayFile }).stdout, "In Review\n", "so does the environment");
-  assert.equal(run(["lanes", "get", roleFile, "needs_re_evaluation"]).stdout, "\n", "an unnamed lane prints empty: the adapter default applies");
+  assert.equal(run(["lanes", "get", roleFile, "started"]).stdout, "Working\n", "no overlay: the tracked lane");
+  assert.equal(run(["lanes", "get", roleFile, "started", "--file", overlayFile]).stdout, "In Progress\n", "--file lays an overlay over it");
+  assert.equal(run(["lanes", "get", roleFile, "started"], { [HOST_OVERLAY_ENV]: overlayFile }).stdout, "In Progress\n", "so does the environment");
+  assert.equal(run(["lanes", "get", roleFile, "cancelled"]).stdout, "\n", "an unnamed lane prints empty: the adapter default applies");
   assert.equal(run(["lanes", "get", roleFile, "bogus"]).status, 2, "an unknown band is refused");
+  const retired = run(["lanes", "get", roleFile, "in_review"]);
+  assert.equal(retired.status, 2, "lifecycle v2: in_review is no longer a band");
+  assert.match(retired.stderr, /review and holds are labels/, "and the refusal says where review went");
 
   const shown = run(["lanes", "show", roleFile, "--json", "--file", overlayFile]);
   assert.equal(shown.status, 0, shown.stderr);
   const [row] = JSON.parse(shown.stdout);
-  assert.equal(row.effective.in_review, "In Review");
-  assert.equal(row.tracked.in_review, "E2E Testing & QA");
+  assert.equal(row.effective.started, "In Progress");
+  assert.equal(row.tracked.started, "Working");
 
   const badFile = join(dir, "bad.yaml");
   writeFileSync(badFile, "version: 1\nlanes:\n  - states: { nope: X }\n");
-  const refused = run(["lanes", "get", roleFile, "in_review", "--file", badFile]);
+  const refused = run(["lanes", "get", roleFile, "started", "--file", badFile]);
   assert.equal(refused.status, 1, "a broken overlay refuses; it does not answer with the tracked lane");
   assert.equal(refused.stdout, "", "and prints no lane for an adapter to act on");
   assert.match(refused.stderr, /unknown band "nope"/);

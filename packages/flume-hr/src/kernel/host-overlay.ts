@@ -42,7 +42,7 @@
  *   lanes:                              # per-host ticket lane names, over a tracked role.yaml's map
  *     - match: { provider: plane, workspace: ..., board_id: ... }   # every key optional; none = every board
  *       replace: true                     # optional: ignore the tracked map for these boards (default: layer over it)
- *       states: { in_review: "In Review", started: "In Progress", ... }
+ *       states: { started: "In Progress", completed: "Done", ... }   # bands: LANE_BANDS (the five stock lanes)
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -55,20 +55,38 @@ export const HOST_OVERLAY_ENV = "FLUME_HOST_OVERLAY";
 /** The `FLUME_HOST_OVERLAY` value that disables overlays outright. */
 export const HOST_OVERLAY_DISABLED = "none";
 
-/** The normalized ticket states a role.yaml `ticket_provider:` block can name a concrete lane for. */
+/**
+ * The ticket lanes a role.yaml `ticket_provider:` block can name a concrete lane for.
+ *
+ * Krebs lifecycle v2 (krebs/spec/lifecycle.v2.yaml, owner decision 2026-11-14): every Plane board has exactly the
+ * five stock lanes, one per Plane state group. What the extra lanes of the retired nine-lane layout meant now lives in
+ * LIFECYCLE_LABELS, so review and holds are never a lane name to overlay.
+ */
 export const LANE_BANDS = [
   "backlog",
   "unstarted",
   "started",
-  "in_review",
   "completed",
   "cancelled",
-  "awaiting_decision",
-  "e2e_testing",
-  "ready_for_documentation",
-  "needs_re_evaluation",
 ] as const;
 export type LaneBand = (typeof LANE_BANDS)[number];
+
+/** The lifecycle v2 labels every board carries: the meaning the retired lanes used to hold. */
+export const LIFECYCLE_LABELS = Object.freeze({
+  working: "agent:working",
+  triaged: "lifecycle:triaged",
+  /** Handed back, waiting for a verdict. Only valid in In Progress. */
+  review: "lifecycle:review",
+  needsInput: "lifecycle:needs-input",
+  blocked: "lifecycle:blocked",
+  failed: "agent:failed",
+} as const);
+
+/** Labels that take a ticket out of the flow: never dispatched, never holding a slot. */
+export const HOLD_LABELS = Object.freeze([LIFECYCLE_LABELS.needsInput, LIFECYCLE_LABELS.blocked, LIFECYCLE_LABELS.failed] as const);
+
+/** Why a band outside LANE_BANDS is refused: the lane it names was retired into a label. */
+export const LANE_BANDS_NOTE = `lifecycle v2 boards have five stock lanes; review and holds are labels (${LIFECYCLE_LABELS.review}, ${HOLD_LABELS.join(", ")}), not lanes`;
 
 export interface LaneRule {
   match: { provider?: string; workspace?: string; board_id?: string };
@@ -76,7 +94,7 @@ export interface LaneRule {
   /**
    * false (default): `states` is laid over the role.yaml's tracked map, band by band.
    * true: the role.yaml's tracked map is IGNORED for a matching board and only `states` applies. A tracked map names
-   * the owner's lanes ("E2E Testing & QA"); on a board that has no such lane the unnamed bands must fall back to the
+   * the owner's lane names; on a board whose lanes are named differently the unnamed bands must fall back to the
    * adapter's own defaults, not to someone else's lane names.
    */
   replace: boolean;
@@ -348,7 +366,7 @@ function parseLanes(value: unknown, errors: string[]): LaneRule[] {
     } else {
       for (const [band, raw] of Object.entries(entry.states)) {
         if (!(LANE_BANDS as readonly string[]).includes(band)) {
-          errors.push(`${label}.states has unknown band "${band}" (allowed: ${LANE_BANDS.join(", ")})`);
+          errors.push(`${label}.states has unknown band "${band}" (allowed: ${LANE_BANDS.join(", ")}; ${LANE_BANDS_NOTE})`);
           continue;
         }
         const text = cleanString(raw, `${label}.states.${band}`, errors);

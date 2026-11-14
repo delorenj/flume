@@ -1,5 +1,6 @@
 /** Canonical manifests own execution; derived registry fields never activate it. */
-export const EXECUTION_LANES = ['Backlog', 'Needs Re-evaluation', 'Todo', 'In Progress', 'E2E Testing & QA', 'Ready for Documentation', 'Done', 'Needs Attention', 'Cancelled'];
+/** Krebs lifecycle v2: the five stock lanes every board binds (review and holds are labels, not lanes). */
+export const EXECUTION_LANES = ['Backlog', 'Todo', 'In Progress', 'Done', 'Cancelled'];
 export function executionReadiness(manifest: Record<string, any>): string[] {
   const execution = manifest.execution;
   if (!execution || execution.mode === 'legacy') return [];

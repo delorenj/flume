@@ -1,10 +1,11 @@
 // The lane map a ticket adapter lands a transition in, resolved per HOST.
 //
-// A tracked role.yaml carries `ticket_provider:` with the lane NAMES of the board it was written against. Those are
-// the repo owner's names ("E2E Testing & QA"). Plane has no `in_review` state group, so a lane name that does not
-// exist on the board a host actually talks to silently lands the transition somewhere wrong. The tracked map is
-// therefore only the DEFAULT: a host overlay (`lanes:` in kernel/host-overlay.ts) can lay its own names over it, or
-// replace it, for the boards it matches. No overlay = the tracked map unchanged, which is big-chungus's behaviour.
+// A tracked role.yaml carries `ticket_provider:` with the lane NAMES of the board it was written against. Under Krebs
+// lifecycle v2 (krebs/spec/lifecycle.v2.yaml) every Plane board has the five stock lanes, one per state group
+// (LANE_BANDS); review and holds are labels (LIFECYCLE_LABELS), never a lane to name here. A lane name that does not
+// exist on the board a host actually talks to still lands the transition somewhere wrong, so the tracked map is only
+// the DEFAULT: a host overlay (`lanes:` in kernel/host-overlay.ts) can lay its own names over it, or replace it, for
+// the boards it matches. No overlay = the tracked map unchanged, which is big-chungus's behaviour.
 //
 // This module is the one reading of that contract. The legacy shell adapter (hermes-agent-template
 // providers/plane.sh `tp_cfg`) reads role.yaml directly and does not call it yet; `flume lanes get` is the
