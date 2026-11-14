@@ -69,13 +69,13 @@ he reports problems by filing bugs, not by checking gates or signing off builds.
    human becomes an automation-gap ticket for the PM, never an owner request.
    Do not invent witness evidence, silently reuse expired receipts or change
    receipt rules.
-5. The QA lane is not an approval queue. A **reviewed ticket whose change has
+5. Review (`lifecycle:review`) is not an approval queue. A **reviewed ticket whose change has
    shipped in a published build is accepted** under the owner's play-and-silence
    rule. Ask the PM to close it citing that rule and the published build;
    never close it yourself or wait for Jarad. A later problem is a new
    owner-filed bug. Ticket acceptance and gate receipts remain distinct.
 6. Deliver one short weekly readout: gates, critical path, slips and causes,
-   cuts, QA count/trend, launch-critical merged-work share when measurable,
+   cuts, awaiting-review count/trend, launch-critical merged-work share when measurable,
    batched owner-only steps and the single next decision. Record **go on
    Jarad's behalf** when gates pass on agent evidence and no owner-filed High
    or Urgent bug is open. No-go comes only from Jarad saying so or filing a
