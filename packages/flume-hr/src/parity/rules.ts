@@ -1799,6 +1799,8 @@ function fleetHome(ctx: Context): string {
 const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
 // The power a non-PM employee must NOT gain on an unattended turn.
 const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
+// Roles whose Bloodbank turns must be able to delegate, read files and run commands.
+const BLOODBANK_DELEGATING_ROLES = new Set(["pm", "em", "director"]);
 // The gateway every agent inference path must go through -- provider, host, label and curated routes -- is a
 // fact about the HOST, not a constant of this rule: big-chungus's values are the default (DEFAULT_GATEWAY_POLICY)
 // and a host overlay (kernel/host-overlay.ts `gateway:`) replaces them for another host. Every helper below takes
@@ -3915,7 +3917,9 @@ return [
         if ("enabled" in gate && gate.enabled !== true) continue;
 
         const profile = String(entry.profile_name || agentId);
-        const isPm = String(entry.role ?? "") === "pm";
+        // Delegating roles: PMs, engineering managers and directors (Jarad 2026-11-15:
+        // a director needs root tools; this is a homelab, so momentum beats least privilege).
+        const isPm = BLOODBANK_DELEGATING_ROLES.has(String(entry.role ?? ""));
         const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
         let cfg: any = null;
         if (generated !== null) {

@@ -446,8 +446,22 @@ const routable = (role, extra = {}) => ({ role, profile_name: undefined, bloodba
 {
   const fleet = makeFleet({});
   addProfile(fleet, "pinned", withBloodbank([]));
-  writeRegistry(fleet, { pinned: { ...routable("director"), profile_name: "pinned" } });
+  writeRegistry(fleet, { pinned: { ...routable("reporter"), profile_name: "pinned" } });
   assert.doesNotMatch(audit(repo, fleet), /pinned \(role/, "a restricted employee pinned to no toolsets must not be reported");
+}
+// Directors and engineering managers delegate like PMs (2026-11-15): carrying the
+// list is correct, and a director pinned to MCP only is the failure.
+for (const role of ["director", "em"]) {
+  const fleet = makeFleet({});
+  addProfile(fleet, `full-${role}`, withBloodbank(PM_LIST));
+  addProfile(fleet, `bare-${role}`, withBloodbank([]));
+  writeRegistry(fleet, {
+    [`full-${role}`]: { ...routable(role), profile_name: `full-${role}` },
+    [`bare-${role}`]: { ...routable(role), profile_name: `bare-${role}` },
+  });
+  const out = audit(repo, fleet);
+  assert.doesNotMatch(out, new RegExp(`full-${role}`), `a ${role} with the delegation list must not be reported`);
+  assert.match(out, new RegExp(`bare-${role}: platform_toolsets\\.bloodbank is missing delegation`), `a ${role} pinned to MCP only must be reported`);
 }
 
 // 17. The tool deadline. A PM blocks inside delegate_task until its worker
