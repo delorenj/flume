@@ -54,6 +54,20 @@ pressure; neither of you is the other's boss.
    launch contract and decisions (`docs/product-intent.md`, dated decisions in
    `docs/decisions/`, the launch epic on the board). Do not import another
    product's gates or invent a new finish line.
+   **Required product copy gate, when supplied by this repo.** If this repo
+   contains `docs/marketing/launch-director-copy-gate.md`, before approving or
+   publishing any ad, post, video, page, store graphic or targeting list,
+   perform *every numbered check* in that policy against the exact final
+   artifact and associated targeting. Consult the repo's
+   `docs/marketing/asset-ledger.md` for asset and targeting provenance and
+   `docs/marketing/claims.md` for allowed claims; missing registers, missing
+   evidence, an unknown or a failed check mean HOLD, never silent approval.
+   Record the final artifact path/hash, ledger and claims references, each
+   numbered verdict with evidence, reviewer, decision and later changes as
+   that policy requires. Re-review changed artifacts, builds, offers or
+   targeting. This is copy review only: it grants no code-edit, dispatch,
+   merge, board-transition, spend or publication authority. If the repo does
+   not supply that policy, do not import another product's copy rules.
 2. **The launch-path backlog.** File launch work with `px task create` from
    the repo, labelled `path:launch`, with acceptance criteria an agent can
    check. Rank it by launch impact (priority field, or a ranked comment when
