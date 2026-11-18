@@ -57,9 +57,9 @@ const PLACEHOLDER = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/gu;
 const JINJA_DELIMITER = /\{\{|\{%|\{#/u;
 
 /**
- * Render a template that uses ONLY simple `{{ name }}` substitution.
- *
- * Anything else -- a `{% if %}`, a filter, a comment, whitespace control, a
+ * Render a template that uses ONLY simple `{{ name }}` substitution,
+ * plus the string-equality conditionals `resolveConditionals` handles.
+ * Anything else -- an `{% elif %}` or `{% for %}`, a filter, a comment, whitespace control, a
  * placeholder no input declares -- is `render-unsupported`, and a declared input
  * with no value is `input-missing`. Neither is ever rendered "as best it can":
  * a desired byte this build invented would be compared against a deployed file
@@ -70,6 +70,9 @@ const JINJA_DELIMITER = /\{\{|\{%|\{#/u;
  * value" is what separates the two failure reasons.
  */
 export function renderTemplate(source: string, inputs: Readonly<Record<string, string | null>>): ScaffoldRenderResult {
+  const branched = resolveConditionals(source, inputs);
+  if (!branched.ok) return branched;
+  source = branched.text;
   const stripped = source.replace(PLACEHOLDER, "");
   if (JINJA_DELIMITER.test(stripped)) {
     return { ok: false, reason: "render-unsupported", detail: "render-unsupported: template uses Jinja constructs beyond simple substitution" };
@@ -89,6 +92,48 @@ export function renderTemplate(source: string, inputs: Readonly<Record<string, s
     return { ok: false, reason: "input-missing", detail: `input-missing: ${[...missing].sort().join(", ")}` };
   }
   return { ok: true, text };
+}
+
+/**
+ * `{% if name == "literal" %}` / `{% if name != "literal" %}`, `{% else %}`,
+ * `{% endif %}`: the one control construct the hermes-agent template uses
+ * (the sentinel prompt branches on `ticket_provider`). Copier renders with
+ * Jinja's defaults (no trim_blocks, no lstrip_blocks), so a tag is removed and
+ * every byte around it -- newlines included -- is kept, which is exactly what
+ * this does. Any other `{% ... %}` (elif, filters in the test, whitespace
+ * control `{%-`) is left in place and so is still `render-unsupported`.
+ */
+const CONDITIONAL_TAG = /\{%\s*(?:if\s+([A-Za-z_][A-Za-z0-9_]*)\s*(==|!=)\s*"([^"\\{}%]*)"|(else)|(endif))\s*%\}/gu;
+
+function resolveConditionals(source: string, inputs: Readonly<Record<string, string | null>>): ScaffoldRenderResult {
+  // One frame per open `if`: is its current branch taken, and has it seen `else`.
+  const stack: { taken: boolean; sawElse: boolean }[] = [];
+  const live = () => stack.every((frame) => frame.taken);
+  let text = "";
+  let cursor = 0;
+  for (const match of source.matchAll(CONDITIONAL_TAG)) {
+    if (live()) text += source.slice(cursor, match.index);
+    cursor = match.index + match[0].length;
+    const [, name, op, literal, isElse, isEndif] = match;
+    if (name !== undefined) {
+      if (!Object.prototype.hasOwnProperty.call(inputs, name)) {
+        return { ok: false, reason: "render-unsupported", detail: `render-unsupported: undeclared placeholder ${name}` };
+      }
+      const value = inputs[name];
+      if (value === null || value === undefined) return { ok: false, reason: "input-missing", detail: `input-missing: ${name}` };
+      stack.push({ taken: (value === literal) === (op === "=="), sawElse: false });
+    } else if (isElse !== undefined) {
+      const frame = stack.at(-1);
+      if (!frame || frame.sawElse) return { ok: false, reason: "render-unsupported", detail: "render-unsupported: unbalanced {% else %}" };
+      frame.taken = !frame.taken;
+      frame.sawElse = true;
+    } else if (isEndif !== undefined) {
+      if (!stack.pop()) return { ok: false, reason: "render-unsupported", detail: "render-unsupported: unbalanced {% endif %}" };
+    }
+  }
+  if (stack.length > 0) return { ok: false, reason: "render-unsupported", detail: "render-unsupported: unclosed {% if %}" };
+  if (cursor === 0) return { ok: true, text: source };
+  return { ok: true, text: text + source.slice(cursor) };
 }
 
 /** The git blob id of some bytes: `sha1("blob <len>\0" + bytes)`. The one digest notion, everywhere. */

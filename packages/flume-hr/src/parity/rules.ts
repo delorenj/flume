@@ -3270,6 +3270,12 @@ return [
         }
         writeIfDifferent(join(role.roleDir, ".scripts", "sentinel.prompt.md"), renderSentinelPrompt(role, templateRoleDir), ctx.dryRun, changedFiles);
         if (scriptsOnly) continue;
+        // The desk now carries this template's scaffold, so its manifest says
+        // which one -- unless a preserved local edit means it does not.
+        if (!preserved.some((line) => line.startsWith(`${prefix}: `))) {
+          const stamp = stampTemplateRev(join(role.roleDir, "role.yaml"), join(ctx.pjanglerRoot, "templates", "hermes-agent"), ctx.dryRun, changedFiles);
+          if (stamp) details.push(`${prefix}: ${stamp}`);
+        }
         const profileMetaUpdated = upsertInheritedProfileMeta(join(role.roleDir, "runtime", "profile.yaml"), changedFiles, ctx.dryRun);
         if (profileMetaUpdated) details.push(`updated ${profileMetaUpdated}`);
         const registryUpdated = upsertRegistryEntry(role, ctx.homeDir, changedFiles, ctx.dryRun);
@@ -5053,6 +5059,36 @@ return [
 ];
 }
 
+
+const TEMPLATE_REV_COMMENT = [
+  "# The template commit this role was rendered from; `flume remediate",
+  "# hermes.pm-scaffold` moves it when it refreshes the scaffold to a newer pin.",
+  "# The pjangler shell prompt shows it as the PM's manifest version.",
+];
+
+/**
+ * Record in a role manifest the template commit its scaffold was just
+ * refreshed from. Only a clean template worktree names a commit truthfully;
+ * a dirty one is reported and the manifest left alone.
+ */
+export function stampTemplateRev(rolePath: string, templateRoot: string, dryRun: boolean, changedFiles: string[]): string | undefined {
+  const text = safeReadText(rolePath);
+  if (text === null) return undefined;
+  const git = (args: string[]) => spawnSync("git", ["--no-optional-locks", "-C", templateRoot, ...args], { encoding: "utf8", timeout: 10_000 });
+  const head = git(["rev-parse", "HEAD"]);
+  const rev = head.status === 0 ? head.stdout.trim() : "";
+  if (!/^[0-9a-f]{40}$/.test(rev)) return undefined;
+  const dirty = git(["status", "--porcelain", "--", "template", "copier.yml"]);
+  if (dirty.status !== 0 || dirty.stdout.trim()) return "template_rev not stamped: the template worktree has uncommitted changes";
+  const line = `template_rev: "${rev}"`;
+  let next: string;
+  if (/^template_rev:.*$/m.test(text)) next = text.replace(/^template_rev:.*$/m, line);
+  else if (/^provisioned_by:.*$/m.test(text)) next = text.replace(/^provisioned_by:.*$/m, (found) => [found, ...TEMPLATE_REV_COMMENT, line].join("\n"));
+  else next = `${text.replace(/\n*$/, "\n")}${[...TEMPLATE_REV_COMMENT, line].join("\n")}\n`;
+  if (next === text) return undefined;
+  writeIfDifferent(rolePath, next, dryRun, changedFiles);
+  return `template_rev -> ${rev.slice(0, 7)}`;
+}
 
 function writeIfDifferent(path: string, content: string, dryRun: boolean, changedFiles: string[], mode?: number): void {
   const normalized = content.endsWith("\n") ? content : `${content}\n`;
