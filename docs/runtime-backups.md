@@ -73,12 +73,19 @@ cache logs audio_cache image_cache lsp node_modules .venv __pycache__ *.pyc
   check. WAL commits are included, uncommitted transactions are not; sidecars are
   not copied. Invalid database files fail the run. Independent databases are not
   one cross-database transaction.
-- Ordinary regular files must be stable during their individual read. A change,
-  disappearance or non-socket special file fails staging; sockets are recorded
-  as ephemeral dependencies. There is no fleet-wide atomic snapshot guarantee.
+- Ordinary regular files must be stable during their individual read; directory
+  traversal uses pinned no-follow descriptors and fails if an owned directory is
+  replaced. Owner read/write/execute bits are retained where present; group/world
+  bits are removed. A change, disappearance or non-socket special file fails
+  staging; sockets are recorded as ephemeral dependencies. There is no fleet-wide
+  atomic snapshot guarantee.
 - Links among included roots become **relative links inside the snapshot**.
-  Missing lazy `state.db`/`kanban.db` links are allowed for unused employees.
-  Required owned links outside coverage fail rather than claim coverage.
+  A post's real profile-homed `state.db` is required for active employees; a
+  missing or dangling store fails by employee/path. Only the canonical profile
+  `kanban.db` link into a not-yet-created runtime store may dangle, matching
+  Flume's first-open lifecycle. Retired and portable rows still participate;
+  missing required sources do not become optional. Required owned links outside
+  coverage fail rather than claim coverage.
   Other external links are recorded in `manifest.json.dependencies`, not followed
   or restored automatically. Reconstruct shared skill/plugin/config dependencies
   using their original Flume/Skillex owners; never point a drill into live state.
@@ -139,9 +146,13 @@ stale temporary directories; never remove archives/checksums to silence errors.
 Only restore trusted, local archives. SHA-256 detects corruption, not malicious
 replacement by someone who can rewrite both archive and checksum. The adapter
 rejects traversal, absolute/escaping links, duplicate paths, hardlinks/devices,
-manifest/payload mismatch and an existing restore target. It writes normal files
-first, verifies payload hashes/SQLite, then reconstructs internal relative links.
-External dependencies remain a recorded reconstruction checklist.
+manifest/payload mismatch and an existing restore target. It checks archive and
+live source/Git overlap **before** creating even a parent of the requested drill;
+unsafe destinations cannot be used as temporary extraction locations. It validates
+the full symlink graph (including chains, `..` and cycles) before writing payload,
+writes normal files first, verifies hashes/SQLite, then reconstructs internal
+relative links with owner executable bits preserved. External dependencies remain
+a recorded reconstruction checklist.
 
 Use an owner-only parent **outside active sources/Git** and a nonexistent child:
 
@@ -203,11 +214,21 @@ After independent spec and quality review and landing:
 ```bash
 npm run typecheck && npm run build
 npm run test:runtime-backups
+# npm test also runs both backup suites, even if a pre-existing ordinary suite fails.
 ```
 
 The focused gate requires real forever-ago (never skips it), exercises WAL restore,
-seven-snapshot retention, failure preservation, corrupt/traversal archives,
-private modes, repeat setup for fresh/tracked-file/gitlink cases, scaffold and
-unrelated submodule preservation. Provisioning uses the real committed template
-and untracking CLI with a fixture-only topology adapter, not a real fleet write.
-Live installed/scheduled success remains a separate operational gate.
+symlink-chain rejection, directory/SQLite replacement, executable mode recovery,
+pre-write restore containment, missing session authority, seven-snapshot retention,
+failure preservation, corrupt/traversal archives, private modes, repeat setup for
+fresh/tracked-file/gitlink cases, scaffold and unrelated submodule preservation.
+Provisioning uses the real committed template and untracking CLI with a fixture-only
+topology adapter, not a real fleet write. CI/ordinary `npm test` executes both
+focused suites after the baseline runner and aggregates failures. A green focused
+suite is not a green full suite: pre-existing baseline failures/timeouts still
+require independent resolution. Fixture proofs are not evidence of a scheduled
+live invocation. AC1–3/6/7 have fixture coverage only; AC4 API readback, sole-clock
+and live doctor, and AC5 terminal scheduled archive/receipt remain unmet. The
+`delonet-company-reporter` missing profile is tracked under FLUME-67 for an owner
+repair-or-retire decision. Keep the Candybar definition disabled until the parent
+completes live inventory repairs, independent re-review and authorization.

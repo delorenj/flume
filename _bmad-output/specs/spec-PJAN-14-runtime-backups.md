@@ -52,9 +52,9 @@ baseline_commit: '9b639baf18d6d411f464d02f3fadfee0692fd0f5'
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `scripts/hermes-runtime-backup.py` — implement inventory/run/verify/restore CLI, strict registry/source validation, physical tree staging, SQLite API snapshots, safe link metadata, private atomic receipts and overlap lock. Default destination `~/backups/flume-runtime`; prefix `flume-runtime`; retain seven. Exclude Git, cache/logs, credential files and SQLite sidecars; explain config sensitivity. Registry discovery is the inclusion contract: no per-agent registration.
+- [x] `scripts/hermes-runtime-backup.py` — implement inventory/run/verify/restore CLI, strict registry/source validation, physical tree staging, SQLite API snapshots, safe link metadata, private atomic receipts and overlap lock. Default destination `~/backups/flume-runtime`; prefix `flume-runtime`; retain seven. Exclude Git, cache/logs, credential files and SQLite sidecars; explain config sensitivity. Registry discovery is the inclusion contract: no per-agent registration. Independent safety remediation: pinned no-follow traversal and checked SQLite source identity/parent, complete restore link graph, owner execute metadata, pre-write restore overlap and named missing active session authority.
 - [x] `.candybars/flume-runtime-backup.candybar.toml` — disabled exec runner at 03:17 America/New_York, bounded invocation, no second clock.
-- [x] `tests/runtime-backup-regressions.py` and `tests/runtime-backup-provisioning.mjs` — exercise every matrix row with disposable roots, real installed forever-ago, open WAL writer, isolated restore, retained good backup on failure, fresh and existing untracking setup repeated; preserve tracked scaffold/unrelated gitlink and prove checkpoint no commit/push. Connect tests through an owned npm script/CI seam rather than dirty test-runner path.
+- [x] `tests/runtime-backup-regressions.py` and `tests/runtime-backup-provisioning.mjs` — exercise every matrix row with disposable roots, real installed forever-ago, open WAL writer, isolated restore, retained good backup on failure, fresh and existing untracking setup repeated; preserve tracked scaffold/unrelated gitlink and prove checkpoint no commit/push. `package.json` runs both in ordinary `npm test` regardless of baseline suite failures; no concurrent-owner test-runner edit.
 - [x] `docs/runtime-backups.md` — sources/exclusions/private storage, credential/shared dependency reconstruction, commands for last-success/failure/restore, enrollment idempotency, live cutover and evidence checklist. Do not claim installation or scheduled proof.
 
 **Acceptance Criteria:**
@@ -65,6 +65,8 @@ baseline_commit: '9b639baf18d6d411f464d02f3fadfee0692fd0f5'
 - Given manifest/docs, when validated locally, then nightly zone/exec/paused state is correct; parent subsequently proves API parity, sole clock and scheduled terminal effect (AC4/5, live gates outstanding).
 
 ## Spec Change Log
+
+- Independent review remediation covers five quality defects plus missing active state.db and the ordinary npm test gate. Fixture success is not live acceptance: AC1–3/6/7 remain fixture-only; AC4 API/sole clock and AC5 scheduled terminal proof remain outstanding. FLUME-67 must resolve the missing `delonet-company-reporter` profile by owner decision before any live fleet backup. The Candybar manifest remains disabled; no registration, fleet writes or merge are authorized.
 
 ## Design Notes
 

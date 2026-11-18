@@ -32,7 +32,8 @@ EXCLUDES = (".git", ".env", ".env.*", "auth.json", "credentials*", "op_cache.jso
             "*-journal", "*.lock", "checkpoints", "backups", ".curator_backups")
 REQUIRED_LINKS = {"sessions", "memories", "workspace", "plans", "hooks", "pairing",
                   "cron", "SOUL.md", "state.db", "kanban.db", "learned-skills"}
-LAZY_FILES = {"state.db", "kanban.db"}
+# A post's profile-homed state.db is the Hermes session authority. kanban.db
+# is created on first use; only its canonical profile -> runtime link may dangle.
 
 
 class BackupError(Exception):
@@ -144,6 +145,16 @@ def inventory(args):
         for name in ("sessions", "memories"):
             if not (sources[0][1] / name).is_dir():
                 entry["errors"].append(f"unavailable owned profile state: {name}")
+        # Hermes's session authority is a real profile-homed store, not a
+        # lazily-created runtime link. Every active post must have one.
+        if employment == "post" and row.get("status") != "retired":
+            store = sources[0][1] / "state.db"
+            try:
+                mode = store.lstat().st_mode
+            except FileNotFoundError:
+                mode = 0
+            if not stat.S_ISREG(mode):
+                entry["errors"].append(f"unavailable owned profile state: {store}")
     # Different employees sharing physical state is a topology fault, not duplicate coverage.
     owners = {}
     for entry in entries:
@@ -177,37 +188,87 @@ def validate_dest(dest, info):
             raise BackupError("destination cannot be inside a Git checkout")
 
 
-def snapshot_database(source: Path, target: Path):
+DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+
+def same_inode(left, right):
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
+def checked_dir(path: Path):
+    """Pin every directory component; a replaced ancestor must fail, not be followed."""
+    parts = path.absolute().parts
+    fd = os.open(parts[0], DIR_FLAGS)
+    try:
+        for part in parts[1:]:
+            child = os.open(part, DIR_FLAGS, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        if not same_inode(os.fstat(fd), path.stat()):
+            raise BackupError(f"owned directory changed during staging: {path}")
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def check_entry(parent_fd, name, expected, display):
+    if not same_inode(os.stat(name, dir_fd=parent_fd, follow_symlinks=False), expected):
+        raise BackupError(f"owned state changed during staging: {display}")
+
+
+def snapshot_database(source: Path, target: Path, pinned_fd: int, parent_fd: int):
     deadline = time.monotonic() + 30
+    identity = os.fstat(pinned_fd)
+    def check_source():
+        check_entry(parent_fd, source.name, identity, source)
+        # SQLite canonicalizes /proc/self/fd paths for WAL and journal access.
+        # Refuse any path/parent replacement before and after the connection.
+        parent = checked_dir(source.parent)
+        try:
+            if not same_inode(os.fstat(parent), os.fstat(parent_fd)):
+                raise BackupError(f"SQLite parent changed during staging: {source}")
+        finally:
+            os.close(parent)
+        if not same_inode(source.stat(), identity):
+            raise BackupError(f"SQLite source changed during staging: {source}")
     def progress(status, remaining, total):
         if time.monotonic() > deadline:
             raise BackupError(f"SQLite snapshot timed out: {source.name}")
-    with contextlib.closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=5)) as src:
+        check_source()
+    check_source()
+    with contextlib.closing(sqlite3.connect(f"file:/proc/self/fd/{pinned_fd}?mode=ro", uri=True, timeout=5)) as src:
+        db_path = Path(src.execute("PRAGMA database_list").fetchone()[2])
+        if db_path != source or not same_inode(db_path.stat(), identity):
+            raise BackupError(f"SQLite source changed during connection: {source}")
+        check_source()
         with contextlib.closing(sqlite3.connect(target)) as dst:
             src.backup(dst, pages=256, progress=progress, sleep=0.05)
+            check_source()
             if dst.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
                 raise BackupError(f"SQLite integrity failed: {source.name}")
     target.chmod(0o600)
 
 
-def copy_file(source: Path, target: Path):
-    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+def copy_file(source: Path, target: Path, parent_fd: int, metadata):
+    fd = os.open(source.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent_fd)
     with os.fdopen(fd, "rb") as stream:
         before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode):
-            raise BackupError(f"unsupported state file: {source}")
+        if not stat.S_ISREG(before.st_mode) or not same_inode(metadata, before):
+            raise BackupError(f"unsupported or changed state file: {source}")
         header = stream.read(16)
         is_db = header == b"SQLite format 3\x00" or source.suffix.lower() in {".db", ".sqlite", ".sqlite3"}
         if is_db:
-            snapshot_database(source, target)
+            snapshot_database(source, target, stream.fileno(), parent_fd)
             return "sqlite"
         stream.seek(0)
         with target.open("xb") as out:
             shutil.copyfileobj(stream, out)
         after = os.fstat(stream.fileno())
+        check_entry(parent_fd, source.name, before, source)
         if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
             raise BackupError(f"state file changed while staging; retry: {source}")
-    target.chmod(0o600)
+    target.chmod(before.st_mode & 0o700)
     return "file"
 
 
@@ -224,50 +285,65 @@ def stage(info, directory):
                     return archived / relative
         return None
     def walk(source, target, source_root):
-        target.mkdir(mode=0o700, parents=True, exist_ok=True)
-        directories.append(str(target.relative_to(directory)))
-        for child in sorted(source.iterdir()):
-            relative = child.relative_to(source_root)
-            if excluded(relative):
-                continue
-            dest = target / child.name
-            metadata = child.lstat()
-            if stat.S_ISLNK(metadata.st_mode):
-                raw = os.readlink(child)
-                resolved = (child.parent / raw).resolve()
-                mapped = map_target(resolved)
-                required = child.name in REQUIRED_LINKS
-                # A link must not smuggle an excluded credential/cache subtree back in.
-                if any(inside(resolved, physical) and excluded(resolved.relative_to(physical))
-                       for physical, _ in roots):
-                    if required:
-                        raise BackupError(f"owned link points into an excluded subtree: {child}")
-                    dependencies.append({"path": str(dest.relative_to(directory)),
-                                         "action": "excluded target; reconstruct through its owner"})
+        parent_fd = checked_dir(source)
+        try:
+            target.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directories.append(str(target.relative_to(directory)))
+            for name in sorted(os.listdir(parent_fd)):
+                child = source / name
+                relative = child.relative_to(source_root)
+                if excluded(relative):
                     continue
-                if mapped is None:
-                    if required:
-                        raise BackupError(f"owned link target is outside inventoried roots: {child}")
-                    dependencies.append({"path": str(dest.relative_to(directory)), "target": raw,
-                                         "action": "reconstruct via Flume/Skillex; not restored automatically"})
+                dest = target / name
+                metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                if stat.S_ISLNK(metadata.st_mode):
+                    raw = os.readlink(name, dir_fd=parent_fd)
+                    check_entry(parent_fd, name, metadata, child)
+                    resolved = (child.parent / raw).resolve()
+                    mapped = map_target(resolved)
+                    required = name in REQUIRED_LINKS
+                    if any(inside(resolved, physical) and excluded(resolved.relative_to(physical))
+                           for physical, _ in roots):
+                        if required:
+                            raise BackupError(f"owned link points into an excluded subtree: {child}")
+                        dependencies.append({"path": str(dest.relative_to(directory)),
+                                             "action": "excluded target; reconstruct through its owner"})
+                        continue
+                    if mapped is None:
+                        if required:
+                            raise BackupError(f"owned link target is outside inventoried roots: {child}")
+                        dependencies.append({"path": str(dest.relative_to(directory)), "target": raw,
+                                             "action": "reconstruct via Flume/Skillex; not restored automatically"})
+                    else:
+                        # state.db is profile-homed and mandatory for a running post.
+                        # Only the documented profile -> runtime kanban link is lazy.
+                        lazy_kanban = (name == "kanban.db" and relative == Path("kanban.db")
+                                       and target.name == "profile" and mapped.name == "kanban.db"
+                                       and "runtime" in mapped.parts)
+                        if not child.exists() and not lazy_kanban:
+                            raise BackupError(f"unavailable owned link: {child}")
+                        links.append((dest, directory / mapped))
+                elif stat.S_ISDIR(metadata.st_mode):
+                    nested = next((a for p, a in roots if p == child and p != source_root), None)
+                    if nested is not None:
+                        check_entry(parent_fd, name, metadata, child)
+                        links.append((dest, directory / nested))
+                    else:
+                        walk(child, dest, source_root)
+                        check_entry(parent_fd, name, metadata, child)
+                elif stat.S_ISREG(metadata.st_mode):
+                    kind = copy_file(child, dest, parent_fd, metadata)
+                    files[str(dest.relative_to(directory))] = {"sha256": digest(dest), "kind": kind,
+                                                               "mode": dest.stat().st_mode & 0o700}
+                elif stat.S_ISSOCK(metadata.st_mode):
+                    dependencies.append({"path": str(dest.relative_to(directory)), "action": "ephemeral socket; recreate on launch"})
                 else:
-                    if not child.exists() and child.name not in LAZY_FILES:
-                        raise BackupError(f"unavailable owned link: {child}")
-                    links.append((dest, directory / mapped))
-            elif stat.S_ISDIR(metadata.st_mode):
-                # A nested root is staged once, at its own canonical archive path.
-                nested = next((a for p, a in roots if p == child and p != source_root), None)
-                if nested is not None:
-                    links.append((dest, directory / nested))
-                else:
-                    walk(child, dest, source_root)
-            elif stat.S_ISREG(metadata.st_mode):
-                kind = copy_file(child, dest)
-                files[str(dest.relative_to(directory))] = {"sha256": digest(dest), "kind": kind}
-            elif stat.S_ISSOCK(metadata.st_mode):
-                dependencies.append({"path": str(dest.relative_to(directory)), "action": "ephemeral socket; recreate on launch"})
-            else:
-                raise BackupError(f"unsupported owned state type: {child}")
+                    raise BackupError(f"unsupported owned state type: {child}")
+            # A swapped directory may remain readable through its fd; never publish it.
+            if not same_inode(os.fstat(parent_fd), source.stat()):
+                raise BackupError(f"owned directory changed during staging: {source}")
+        finally:
+            os.close(parent_fd)
     for physical, archived in roots:
         walk(physical, directory / archived, physical)
     link_map = {}
@@ -290,6 +366,33 @@ def safe_name(name):
     if path.is_absolute() or ".." in path.parts:
         raise BackupError("archive contains an unsafe path")
     return str(path)
+
+
+def validate_link_graph(links):
+    """Resolve link chains lexically against the complete manifest, never the host FS."""
+    for name, target in links.items():
+        if not isinstance(target, str) or not target or target.startswith("/"):
+            raise BackupError("archive contains an absolute or empty link")
+        parts = list(PurePosixPath(name).parent.parts)
+        pending = target.split("/")
+        visited = {name}
+        while pending:
+            part = pending.pop(0)
+            if part in ("", "."):
+                continue
+            if part == "..":
+                if not parts:
+                    raise BackupError("archive link escapes restore directory")
+                parts.pop()
+                continue
+            parts.append(part)
+            candidate = "/".join(parts)
+            if candidate in links:
+                if candidate in visited:
+                    raise BackupError("archive contains a link cycle")
+                visited.add(candidate)
+                parts.pop()
+                pending = links[candidate].split("/") + pending
 
 
 def extract_verified(archive: Path, destination: Path):
@@ -343,15 +446,11 @@ def extract_verified(archive: Path, destination: Path):
             for parent in PurePosixPath(name).parents:
                 if str(parent) in links or str(parent) in files:
                     raise BackupError("archive descends through a link or file")
+        validate_link_graph(links)
         for name in links:
             member = members[name]
             if not member.issym() or member.linkname != links[name]:
                 raise BackupError("archive link differs from recovery manifest")
-            if Path(member.linkname).is_absolute():
-                raise BackupError("archive contains an absolute link")
-            resolved = (destination / name).parent.joinpath(member.linkname).resolve()
-            if not inside(resolved, destination.resolve()):
-                raise BackupError("archive link escapes restore directory")
         # Do not extract links until every regular file has been written and checked.
         for name in sorted(dirs | {"employees"}, key=lambda n: len(Path(n).parts)):
             if not members[name].isdir():
@@ -367,7 +466,10 @@ def extract_verified(archive: Path, destination: Path):
                 raise BackupError("archive file is unreadable")
             with source, target.open("xb") as out:
                 shutil.copyfileobj(source, out)
-            target.chmod(0o600)
+            mode = record.get("mode", 0o600)  # schema v1 archives predate mode metadata
+            if type(mode) is not int or mode < 0 or mode & ~0o700:
+                raise BackupError(f"unsafe restored file mode: {name}")
+            target.chmod(mode)
             if digest(target) != record["sha256"]:
                 raise BackupError(f"restored file hash mismatch: {name}")
             if record["kind"] == "sqlite":
@@ -378,6 +480,22 @@ def extract_verified(archive: Path, destination: Path):
         for name, target in links.items():
             (destination / name).symlink_to(target)
     return manifest, expected
+
+
+def archived_inventory(archive):
+    """Read only the bounded manifest for restore placement; no extraction/writes."""
+    with tarfile.open(archive, "r:gz") as tar:
+        members = [m for m in tar if m.name == "snapshot/manifest.json"]
+        if len(members) != 1 or not members[0].isfile() or members[0].size > 64 * 1024 * 1024:
+            raise BackupError("archive recovery manifest missing or too large")
+        stream = tar.extractfile(members[0])
+        if stream is None:
+            raise BackupError("archive manifest is unreadable")
+        with stream:
+            manifest = json.load(stream)
+        if manifest.get("schema_version") != 1:
+            raise BackupError("unsupported recovery manifest")
+        return manifest["inventory"]
 
 
 def engine(args, source, retain):
@@ -478,14 +596,17 @@ def main():
                     raise BackupError("restore destination must not exist")
                 if inside(destination.resolve(), args.fleet_home.resolve()):
                     raise BackupError("restore destination must be outside the active fleet home")
+                # Refuse overlapping placement before even creating its parent or
+                # extracting into a temporary tree beneath an active runtime.
+                validate_dest(destination, archived_inventory(args.archive))
+                if args.registry.exists():
+                    validate_dest(destination, inventory(args))
                 private_dir(destination.parent)
                 with tempfile.TemporaryDirectory(prefix=".restore-", dir=destination.parent) as working:
                     recovered = Path(working) / "recovered"
                     recovered.mkdir(mode=0o700)
                     manifest, sha = extract_verified(args.archive, recovered)
                     validate_dest(destination, manifest["inventory"])
-                    if args.registry.exists():
-                        validate_dest(destination, inventory(args))
                     # Reserve the target without replacing even an empty existing directory.
                     destination.mkdir(mode=0o700)
                     try:

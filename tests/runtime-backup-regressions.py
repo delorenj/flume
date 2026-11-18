@@ -317,6 +317,120 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["metrics"], {"token_spend": 0, "cost_usd": 0})
         self.assertNotIn("fixture session", result_path.read_text())
+    def test_directory_swap_does_not_follow_outside_tree(self):
+        branch = self.runtime / "branch"
+        branch.mkdir()
+        (branch / "owned.txt").write_text("owned")
+        outside = self.home / "outside-tree"
+        outside.mkdir()
+        (outside / "outside.txt").write_text("OUTSIDE-FIXTURE")
+        original = os.listdir
+        swapped = False
+        def swap_listdir(fd):
+            nonlocal swapped
+            if not swapped and same_branch(fd):
+                swapped = True
+                branch.rename(self.home / "moved-branch")
+                branch.symlink_to(outside, target_is_directory=True)
+            return original(fd)
+        def same_branch(fd):
+            return os.fstat(fd).st_ino == branch.stat().st_ino
+        with patch.object(backup.os, "listdir", side_effect=swap_listdir):
+            with self.assertRaises((backup.BackupError, OSError)):
+                backup.run(self.args)
+        self.assertTrue(swapped)
+        self.assertFalse(self.archive.exists())
+        self.assertFalse((self.dest / "last-success.json").exists())
+
+    def test_sqlite_reopen_swap_fails_without_archiving_outside_database(self):
+        outside = self.home / "outside.db"
+        with sqlite3.connect(outside) as conn:
+            conn.execute("CREATE TABLE secret (value TEXT)")
+            conn.execute("INSERT INTO secret VALUES ('OUTSIDE-FIXTURE')")
+        original = sqlite3.connect
+        swapped = False
+        def swap_connect(database, *args, **kwargs):
+            nonlocal swapped
+            if str(database).startswith("file:/proc/self/fd/") and not swapped:
+                swapped = True
+                self.db.rollback()
+                self.db.close()
+                (self.profile / "state.db").rename(self.home / "saved-owned.db")
+                (self.profile / "state.db").symlink_to(outside)
+            return original(database, *args, **kwargs)
+        with patch.object(backup.sqlite3, "connect", side_effect=swap_connect):
+            with self.assertRaises((backup.BackupError, sqlite3.Error, OSError)):
+                backup.run(self.args)
+        self.assertTrue(swapped)
+        self.assertFalse(self.archive.exists())
+
+    def test_chained_links_and_cycles_are_rejected_before_publication(self):
+        self.cli("run")
+        for links in ({"employees/alice/runtime/bridge": "../../..",
+                       "employees/alice/runtime/probe": "bridge/../outside-marker"},
+                      {"employees/alice/runtime/a": "b", "employees/alice/runtime/b": "a"}):
+            crafted = self.home / "crafted.tar.gz"
+            with tarfile.open(self.archive) as old:
+                stream = old.extractfile("snapshot/manifest.json")
+                assert stream is not None
+                manifest = json.load(stream)
+                manifest["links"].update(links)
+                with tarfile.open(crafted, "w:gz") as new:
+                    for member in old.getmembers():
+                        if member.name == "snapshot/manifest.json":
+                            data = json.dumps(manifest).encode()
+                            member.size = len(data)
+                            new.addfile(member, io.BytesIO(data))
+                        else:
+                            new.addfile(member, old.extractfile(member) if member.isfile() else None)
+                    for name, target in links.items():
+                        member = tarfile.TarInfo("snapshot/" + name)
+                        member.type = tarfile.SYMTYPE
+                        member.linkname = target
+                        new.addfile(member)
+            Path(str(crafted) + ".sha256").write_text(backup.digest(crafted))
+            drill = self.home / "crafted-drill"
+            result = self.cli("restore", crafted, drill, success=False)
+            self.assertIn("link", result["error"])
+            self.assertFalse(drill.exists())
+            self.cli("verify", crafted, success=False)
+
+    def test_owner_execute_mode_restores_and_group_world_never_gain_access(self):
+        hook = self.runtime / "hooks/run.sh"
+        hook.parent.mkdir()
+        hook.write_text("#!/bin/sh\nexit 0\n")
+        hook.chmod(0o751)
+        self.cli("run")
+        drill = self.home / "exec-drill"
+        self.cli("restore", self.archive, drill)
+        restored = drill / "employees/alice/runtime/hooks/run.sh"
+        self.assertEqual(restored.stat().st_mode & 0o777, 0o700)
+        subprocess.run([str(restored)], check=True, timeout=5)
+        manifest = json.loads((drill / "manifest.json").read_text())
+        self.assertEqual(manifest["files"]["employees/alice/runtime/hooks/run.sh"]["mode"], 0o700)
+
+    def test_restore_overlap_fails_before_parent_or_extraction(self):
+        self.cli("run")
+        for unsafe in (self.runtime / "unintended-parent/drill", self.profile / "nested/drill",
+                       self.home / "project/agents/hermes/pm", self.home / "project"):
+            result = self.cli("restore", self.archive, unsafe, success=False)
+            self.assertTrue("overlaps an owned source" in result["error"] or
+                            "outside the active fleet home" in result["error"] or
+                            "restore destination must not exist" in result["error"], result)
+            if "must not exist" not in result["error"]:
+                self.assertFalse(unsafe.exists())
+        self.assertFalse((self.runtime / "unintended-parent").exists())
+        self.assertFalse((self.profile / "nested").exists())
+        self.assertFalse(any(self.runtime.glob(".restore-*")))
+
+    def test_active_missing_state_store_is_named_failure_not_lazy_success(self):
+        self.db.rollback()
+        self.db.close()
+        (self.profile / "state.db").unlink()
+        result = self.cli("run", success=False)
+        self.assertIn("alice:", result["error"])
+        self.assertIn("state.db", result["error"])
+        self.assertFalse(self.archive.exists())
 
 
 if __name__ == "__main__":

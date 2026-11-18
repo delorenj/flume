@@ -78,6 +78,10 @@ for(const name of ['sessions','memories','workspace','plans','hooks','pairing','
     assert.equal(git(repo, "check-ignore", "--", "agents/hermes/dev/runtime/memories/MEMORY.md"), "agents/hermes/dev/runtime/memories/MEMORY.md");
     if (mode !== "fresh") assert.equal(readFileSync(join(runtime, "memories/MEMORY.md"), "utf8"), "precious existing memory\n");
     const registry = join(home, ".hermes/agents-registry.yaml");
+    // A post becomes active only after Hermes creates its profile-homed session
+    // authority; a missing state.db must not be treated as backup-ready.
+    execute("/usr/bin/python3", ["-c", "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute('CREATE TABLE session_fixture(id INTEGER)'); c.close()",
+      join(home, ".hermes/profiles", mode, "state.db")], repo, env);
     writeFileSync(registry, JSON.stringify({ agents: { [mode]: { profile_name: mode, role_dir: role } } }));
     const backupArgs = [join(root, "scripts/hermes-runtime-backup.py"), "--fleet-home", join(home, ".hermes"), "--registry", registry,
       "--dest", join(home, "archives"), "inventory"];
