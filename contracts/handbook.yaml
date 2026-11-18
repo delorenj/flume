@@ -626,13 +626,6 @@ health_policy:
         the process table, so no running Hermes process can be attributed to a
         registry row or classified as sprawl.
       owner_story: "1.9"
-    - domain: bloodbank
-      capability: routing_liveness
-      reason: >-
-        The stored routing record is observed; whether the fleet-shared gateway
-        can dispatch to it is not. Routing readiness is a separate authority
-        from the record and must never be inferred from it.
-      owner_story: "1.10"
     - domain: release_provenance
       capability: fleet.registry_file
       reason: >-

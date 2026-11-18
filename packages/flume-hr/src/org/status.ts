@@ -54,6 +54,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
+import { observeBloodbankRoute, BLOODBANK_ROUTE_SOURCE, type BloodbankRouteResult } from "./bloodbank";
 import { loadFleetContract, resolveFleetContractPath, validateFleetContract } from "./contract";
 import {
   boundTransitions,
@@ -336,7 +337,7 @@ const DOMAIN_DESIRED: Readonly<Record<FleetStatusDomain, string>> = Object.freez
   runtime: "a real role-local runtime directory derived from role_dir, ignored by git",
   systemd: "the canonical per-agent unit set, observed on this machine",
   live_process: "every running Hermes process attributed to a registry row",
-  bloodbank: "a fleet-scoped routing record with a target id and an explicit boolean activation flag",
+  bloodbank: "a fleet-scoped target independently reconciled with the gateway's live served-profile authority; activation is separate",
   release_provenance: "the recorded pin and the live build agreeing",
 });
 
@@ -379,7 +380,6 @@ const DOMAIN_AUTHORITY_BLOCK: Readonly<Record<FleetStatusDomain, string>> = Obje
  * stop authorizing themselves.
  */
 const CAPABILITY_LIVE_PROCESS = "process_attribution";
-const CAPABILITY_BLOODBANK_LIVENESS = "routing_liveness";
 /**
  * The scaffold observer's own gap: a contract with no `scaffold_manifest` gives
  * it nothing to compare against, so every selected agent's `template_scaffold`
@@ -868,7 +868,7 @@ export function resolveStatusScope(
   const parts: string[] = [];
   parts.push(agentId ? `scoped to agent ${agentId}` : "whole registered fleet");
   parts.push(selectedDomain ? `domain ${selectedDomain} only` : "all nine domains");
-  parts.push(live ? "live host observation authorized" : "no live observation (--live not given)");
+  parts.push(live ? "live recipe audit authorized" : "no recipe audit (--live not given); selected direct observers still run");
 
   return {
     scope: {
@@ -1373,29 +1373,6 @@ export function observeFromInventory(
       observed: row.activation.value === null ? "present but not a boolean" : row.activation.value ? "true" : "false",
       desired: "absent (enabled) or a strict boolean, written only by the declared execution-authority owner",
       evidence: "declared",
-    }));
-    // Liveness is a SECOND observation, not a modifier on the record above: the
-    // record is observed and the liveness is not, and folding them would let a
-    // read of the registry pass for a read of the bus. Story 1.10 owns it.
-    //
-    // `unsupported`, not `unobserved`: nothing in this build can observe routing
-    // readiness at all, so it is a gap in the RELEASE rather than a gap in this
-    // run. Calling it `unobserved` would hold `health.complete` false forever
-    // and make the flag meaningless.
-    out.push(observation(ctx, {
-      domain: "bloodbank", agentId, state: "unsupported",
-      field: "gateways.bloodbank.command_subject",
-      summary: "no Bloodbank liveness observer exists in this release; routing readiness is story 1.10",
-      details: ["the routing RECORD above is observed; whether the shared gateway can dispatch to it is not"],
-      source: SOURCE_DECLARED_GAP,
-      // The capability the CONTRACT authorizes, by name. Remove the
-      // `health_policy.deferred_capabilities` entry and this observation is
-      // unchanged, unjustified, and counted against `proven` -- which is the
-      // difference between a gap somebody signed off and a gap that authorized
-      // itself.
-      capability: CAPABILITY_BLOODBANK_LIVENESS,
-      observed: "not observed",
-      desired: "the fleet-shared gateway proven able to dispatch to this target",
     }));
   }
 
@@ -2117,17 +2094,18 @@ export function agentLifecycle(
     ? "out_of_scope"
     : !profileProven ? "discovered" : anyFailure ? "installed" : "healthy";
 
+  const routing = own.find((item) => item.domain === "bloodbank" && item.source === BLOODBANK_ROUTE_SOURCE);
   const readiness: FleetStatusReadiness = !domains.has("bloodbank")
     ? "out_of_scope"
-    : !routingRecorded
-      ? "not_applicable"
-      : own.some((item) => item.domain === "bloodbank" && (item.state === "fail" || item.state === "error"))
-        ? "blocked"
-        : "unproven";
+    : routing?.state === "pass" && routing.evidence === "direct"
+      ? "ready"
+      : routing?.state === "fail" ? "blocked" : "unproven";
+  const observedState: FleetStatusLifecycleState = observed === "healthy" && readiness === "ready"
+    ? "routing_ready" : observed;
 
   return {
     desired_state: desired,
-    observed_state: observed,
+    observed_state: observedState,
     capability_readiness: readiness,
     // `null` now means a PRESENT non-boolean (absent resolves to true), which
     // the gateway treats as disabled -- so it reads as denied, not undeclared.
@@ -2874,6 +2852,32 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   const systemdRuleAgreement = { compared: 0, agree: 0, disagree: 0, not_compared: 0 };
   const systemdUnregisteredNotes: string[] = [];
 
+  // The gateway identify reply is a fresh in-memory served-authority snapshot, not a
+  // persisted registry declaration or a process-presence heuristic. One read per
+  // selected employee is bounded by the shared run context and capped concurrency.
+  const routes = new Map<string, BloodbankRouteResult>();
+  if (domainSet.has("bloodbank")) {
+    const root = resolveProfileLayout(contract, env, home).root;
+    const results = await mapBounded(agentIds, 4, async (agentId) => {
+      const row = rowsById.get(agentId)!;
+      const profile = profileNameByAgent.get(agentId) ?? null;
+      if (profile !== row.profile_name.value || (profile !== null && row.profile_path.state !== "resolved")) {
+        return { state: "fail", reason: "routing-profile-unresolved", observed: "routing-profile-unresolved", evidence: "direct", probe: "ok" } as BloodbankRouteResult;
+      }
+      if (profile !== null && duplicateProfileNames.has(profile)) {
+        return { state: "fail", reason: "routing-profile-conflict", observed: "routing-profile-conflict", evidence: "direct", probe: "ok" } as BloodbankRouteResult;
+      }
+      return observeBloodbankRoute(runContext, resolveFleetHome(env, home), root, agentId,
+        profile, row.bloodbank_scope.value, row.bloodbank_target.value);
+    });
+    agentIds.forEach((agentId, index) => {
+      const route = results[index]!;
+      routes.set(agentId, route);
+      ctx.probes.push({ id: `gateway-route:${agentId}`, kind: "gateway-route", target: agentId,
+        outcome: route.probe, reason: route.state === "pass" ? null : route.reason });
+    });
+  }
+
   // -- the recipe audit, as bounded children ---------------------------------
   const auditFedSelected = domains.filter((domain) => AUDIT_PER_AGENT_DOMAINS.has(domain));
   const wantsAudit = live && auditFedSelected.length > 0;
@@ -3373,6 +3377,20 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     const row = rowsById.get(agentId)!;
     const own: FleetStatusObservation[] = [];
     own.push(...observeFromInventory(ctx, row, domainSet));
+    if (domainSet.has("bloodbank")) {
+      const route = routes.get(agentId);
+      own.push(observation(ctx, {
+        domain: "bloodbank", agentId,
+        state: route?.state ?? "unobserved",
+        field: "agents.{agent_id}.bloodbank.target_agent_id",
+        source: BLOODBANK_ROUTE_SOURCE,
+        summary: route?.reason ?? "gateway-route-result-missing",
+        details: ["Hermes gateway control socket identify; live served_profiles home/profile_id must match the declared profile and target"],
+        observed: route?.observed ?? "gateway-route-result-missing",
+        desired: "the ready shared gateway currently serves the declared profile for this employee",
+        evidence: route?.evidence ?? "absent",
+      }));
+    }
     if (needsProvenance) own.push(...observeFromProvenance(ctx, provenanceFacts, agentId, domainSet));
 
     // Story 1.6: the scaffold observer's group observations and per-agent
