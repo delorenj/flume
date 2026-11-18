@@ -48,6 +48,9 @@ personas:
   morgan-finance:
     title: "Director of Finance — AutomaticAI"
     expertise: [ milkshake, client-finance, bookkeeping, mercury-reconciliation ]
+  penny:
+    title: "Personal Engineering Career Advocate — Jarad"
+    expertise: [ engineering-career-evidence, hiring, ai-adoption-consulting, team-training ]
   joe-pesci:
     title: "Personal Chief of Staff — Portfolio & Ventures"
     expertise: [ portfolio-strategy, business-analysis, prioritization, launch-planning ]
@@ -136,6 +139,13 @@ departments:
     name: "Founder's Office — Portfolio & Ventures"
     order: 0
     manager: joe-pesci
+    members: []
+
+  # Jarad's personal office: peer advisor, not Joe's subordinate or AAI staff.
+  - id: jarad-personal-office
+    name: "Jarad's Personal Office — Career"
+    order: 0
+    manager: penny
     members: []
 
   - id: platform
