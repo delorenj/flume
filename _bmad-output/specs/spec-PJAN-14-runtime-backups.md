@@ -37,6 +37,32 @@ baseline_commit: '9b639baf18d6d411f464d02f3fadfee0692fd0f5'
 
 </frozen-after-approval>
 
+## Safety hold — unsafe, not landable
+
+The implementation at `84996fb526d2c6cc620b3292cf318ae6cb7597ae` still fails
+QUALITY. Final remediation did not establish a bounded supported way to bind the
+stdlib SQLite connection's actual held inode to the pinned source while preserving
+live WAL/journal consistency. The authorized fallback is documentation only:
+no executable, tests, package wiring or Candybar manifest changed. Do not merge,
+register, enable or use this revision on live state.
+
+Real subprocess/strace-delay replays on `/usr/bin/python3` 3.13.7 (SQLite 3.46.1)
+and developer Python 3.14.9 (SQLite 3.53.1), with real forever-ago 0.3.0, confirmed:
+
+- SQLite ABA: backup and restore exit 0; restored database contains the synthetic
+  outside marker after the original pathname was restored before connect returned.
+- Restore parent swap: four payload creations reach a synthetic active runtime
+  before restore fails; absence of final publication is not safe rejection.
+- Required state.db removal after inventory: backup and restore exit 0 with the
+  session authority absent, and last-success is written.
+
+See `docs/runtime-backups.md` **Safety hold** for the supported-API/hardlink
+limitations and reopening gates. Evidence remains private under the active
+profile scratch root: `pjan14-quality-rereview-final-blocker-{system,developer}-probes.json`
+and their matching traces. The harness exits 0 on completed observation, not on
+safe behavior. The original independent report remains FAIL. Parent-owned final
+independent review has not been performed for this documentation-only handoff.
+
 ## Code Map
 
 - `packages/flume-hr/src/kernel/fleet-paths.ts:14` — fleet root and registry precedence; mirror HERMES_AGENTS_REGISTRY, HERMES_FLEET_REGISTRY_FILE, HERMES_FLEET_HOME.
@@ -52,9 +78,9 @@ baseline_commit: '9b639baf18d6d411f464d02f3fadfee0692fd0f5'
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `scripts/hermes-runtime-backup.py` — implement inventory/run/verify/restore CLI, strict registry/source validation, physical tree staging, SQLite API snapshots, safe link metadata, private atomic receipts and overlap lock. Default destination `~/backups/flume-runtime`; prefix `flume-runtime`; retain seven. Exclude Git, cache/logs, credential files and SQLite sidecars; explain config sensitivity. Registry discovery is the inclusion contract: no per-agent registration. Independent safety remediation: pinned no-follow traversal and checked SQLite source identity/parent, complete restore link graph, owner execute metadata, pre-write restore overlap and named missing active session authority.
+- [ ] `scripts/hermes-runtime-backup.py` — inventory/run/verify/restore CLI is present, but safety acceptance remains blocked. Default destination `~/backups/flume-runtime`; prefix `flume-runtime`; retain seven. Preserve existing pinned no-follow traversal, complete restore link graph, owner execute metadata, static overlap rejection and active state.db preflight. SQLite held-inode identity, descriptor-safe restore-parent handling and required-store coverage across inventory/staging/verification remain unresolved; pathname checks and early lstat are not sufficient.
 - [x] `.candybars/flume-runtime-backup.candybar.toml` — disabled exec runner at 03:17 America/New_York, bounded invocation, no second clock.
-- [x] `tests/runtime-backup-regressions.py` and `tests/runtime-backup-provisioning.mjs` — exercise every matrix row with disposable roots, real installed forever-ago, open WAL writer, isolated restore, retained good backup on failure, fresh and existing untracking setup repeated; preserve tracked scaffold/unrelated gitlink and prove checkpoint no commit/push. `package.json` runs both in ordinary `npm test` regardless of baseline suite failures; no concurrent-owner test-runner edit.
+- [ ] `tests/runtime-backup-regressions.py` and `tests/runtime-backup-provisioning.mjs` — existing disposable-root suites pass with real installed forever-ago, open WAL writer, isolated restore, retention/failure cases and repeated fresh/existing untracking. `package.json` still runs both in ordinary `npm test` regardless of baseline failure. Coverage remains incomplete: deterministic subprocess ABA, restore-parent replacement and required-store disappearance regressions must be committed with a safe fix before this task can be accepted.
 - [x] `docs/runtime-backups.md` — sources/exclusions/private storage, credential/shared dependency reconstruction, commands for last-success/failure/restore, enrollment idempotency, live cutover and evidence checklist. Do not claim installation or scheduled proof.
 
 **Acceptance Criteria:**
@@ -66,7 +92,9 @@ baseline_commit: '9b639baf18d6d411f464d02f3fadfee0692fd0f5'
 
 ## Spec Change Log
 
-- Independent review remediation covers five quality defects plus missing active state.db and the ordinary npm test gate. Fixture success is not live acceptance: AC1–3/6/7 remain fixture-only; AC4 API/sole clock and AC5 scheduled terminal proof remain outstanding. FLUME-67 must resolve the missing `delonet-company-reporter` profile by owner decision before any live fleet backup. The Candybar manifest remains disabled; no registration, fleet writes or merge are authorized.
+- First correction added traversal/link-graph/execute-mode/static-overlap/missing-state checks and ordinary npm test wiring. Subsequent real syscall-delay review disproved its SQLite identity, restore-parent and required-store completeness claims. The safety hold above supersedes completion claims; successful fixtures are not safety or live acceptance.
+- Final safety remediation took the authorized docs-only blocker path: no supported held-inode/WAL guarantee was established, so no partial executable fix was published. Preserve the existing fixes and frozen intent, leave code/test acceptance unchecked, and require safe deterministic race regressions plus independent re-review before landing.
+- FLUME-67 still requires an owner repair-or-retire decision for the missing `delonet-company-reporter` profile; it does not resolve the separate code hold. AC4 API/sole-clock and AC5 scheduled terminal proof remain outstanding. The Candybar manifest remains disabled; no registration, fleet writes or merge are authorized.
 
 ## Design Notes
 

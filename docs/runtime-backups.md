@@ -5,6 +5,76 @@ checksums and retention. There is no per-employee schedule, timer, daemon or Git
 checkpoint. The manifest ships **disabled**. This document is not evidence of
 registration, activation or a successful scheduled backup.
 
+## Safety hold — unsafe, not landable
+
+The implementation at `84996fb526d2c6cc620b3292cf318ae6cb7597ae` is **not safe to
+merge, register, enable, or use on live state**. Three P1 races remain reproducible
+with real subprocesses, syscall delays and forever-ago 0.3.0. The subsequent
+safety handoff changes documentation only; it does not fix or disable the runner.
+The contract and commands below describe the intended design, not an approved
+recovery procedure for this revision.
+
+| Unresolved boundary | Observed result on both interpreters | Required gate |
+|---|---|---|
+| SQLite ABA (`scripts/hermes-runtime-backup.py:220–249`) | After the initial safe open, SQLite opened a substituted synthetic outside inode. Restoring the original pathname before `connect()` returned defeated every pathname check. Backup and restore both exited 0 and recovered the outside marker. | Prove the actual SQLite-held database identity matches the pinned source inode, with correct WAL/journal locking and consistency; pathname checks are insufficient. |
+| Restore parent replacement (`:604–609`) | Replacing the validated 0700 parent with a symlink into a synthetic active runtime caused four payload `O_CREAT` writes there before restore exited 1. | Pin the parent and use no-follow descriptor-relative extraction/publication, or independently trusted staging and safe descriptor-relative publication. No payload write may follow the replaced parent. |
+| Required store disappears (`:150–157`, `:287–348`) | Moving active profile/state.db out after inventory but before profile listing produced exit-0 backup, last-success and exit-0 restore without the required database. | Carry required employee/path/inode coverage from inventory through staging and manifest verification; reject missing/replaced stores before archive publication or retention. |
+
+Replayed with `/usr/bin/python3` 3.13.7 / SQLite 3.46.1 and developer Python 3.14.9 /
+SQLite 3.53.1. All fixtures and traces stayed under the active profile's scratch
+directory; fixture payloads were removed. No live payload, registry, schedule or
+service was changed. The 22 committed recovery tests pass on each interpreter,
+the three provisioning cases pass, and typecheck/build pass. Those passing gates
+do **not** cover these three adversarial races; quality remains **FAIL**. No
+full-suite-green or independent final-review claim is made.
+
+### SQLite implementation blocker
+
+No bounded, supported held-inode validation was established in the current
+stdlib `sqlite3` dependency contract. Python's documented `Connection` interface
+exposes neither a database fd nor `sqlite3_file_control()`. The latter's
+`SQLITE_FCNTL_FILE_POINTER` returns a `sqlite3_file*`, not a supported Unix fd;
+reading CPython connection or SQLite `unixFile` private layouts is not an
+acceptable fix. `PRAGMA database_list` supplies a filename, not held-file
+identity. The actual traces confirm that `/proc/self/fd/N` is canonicalized and
+reopened by pathname; it must not be described as pinning SQLite's connection.
+
+A private hardlink alias was considered but not adopted: SQLite derives journals
+and WAL/shm paths from the database name. Linking one inode does not establish a
+consistent sidecar set during writer rotation/checkpoint/reopen, and adding
+separate aliases is not an atomic consistency protocol. SQLite explicitly warns
+about multiple names for an open database. No correct alias/locking protocol was
+proved here. Raw live copies, `immutable=1`, `nolock=1`, and more pre/post path
+checks are not substitutes. A different supported integration or an explicitly
+authorized snapshot/quiescence contract needs a scoped design decision; no
+custom backup engine, VFS framework or private-ABI workaround was added.
+
+References: [Python sqlite3 Connection API](https://docs.python.org/3.13/library/sqlite3.html#connection-objects),
+[SQLite file control](https://www.sqlite.org/c3ref/file_control.html),
+[SQLite multiple-name/locking warning](https://www.sqlite.org/howtocorrupt.html#_multiple_links_to_the_same_file),
+and [SQLite URI locking/immutable semantics](https://www.sqlite.org/uri.html).
+
+### Evidence and reopening
+
+Private evidence root: `/home/delorenj/.hermes/profiles/pjangler-pm/cache/scratch`.
+No runtime archive or payload is committed to this branch.
+
+- Original independent report: `pjan14-quality-rereview-report.json` (FAIL).
+- Real syscall-delay harness: `pjan14-quality-rereview-probes.py`.
+- Fresh replay results: `pjan14-quality-rereview-final-blocker-system-probes.json`
+  and `pjan14-quality-rereview-final-blocker-developer-probes.json`; each references
+  its matching metadata-only traces. The harness exits 0 when it completes its
+  observations, **not** when the implementation is safe; inspect each result.
+- Focused baseline logs: `pjan14-final-blocker-{system,developer}-recovery.log`.
+
+Reopening requires all three real race regressions to pass safely on both
+interpreters, committed deterministic coverage of those boundaries, preservation
+of the existing traversal/link-graph/execute-mode/retention/test-wiring fixes, and
+independent SPEC then QUALITY review. Do not resolve this hold merely by repairing
+FLUME-67: the missing `delonet-company-reporter` profile is a separate live
+coverage blocker. Do not create an empty profile, omit the employee or enable
+Candybar. No registration or merge is authorized by this handoff.
+
 ## Prerequisites and contract
 
 - Linux, Python 3.11+ with PyYAML (`python3 -c 'import yaml, sqlite3'`),
