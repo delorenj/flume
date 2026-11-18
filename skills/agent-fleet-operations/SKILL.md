@@ -133,7 +133,8 @@ and `heartbeat.sh`); it refuses duplicate keys instead of guessing, so never add
 an awk/grep role.yaml reader beside it. Plane boards follow Krebs lifecycle v2
 (`~/code/33GOD/krebs/spec/lifecycle.v2.yaml`): five stock lanes, with review and
 holds carried by labels. `tp transition <id> in_review` lands In Progress +
-`lifecycle:review`, `awaiting_decision` adds `lifecycle:needs-input` in place,
+`lifecycle:review`, `awaiting_decision` adds `lifecycle:needs-input` in place
+(`lifecycle:human` is the owner's own hold: agents never write it),
 and the retired nine-lane extended targets are refused; `tp resolve_state
 <state>` validates a target read-only.
 

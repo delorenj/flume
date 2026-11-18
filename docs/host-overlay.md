@@ -64,7 +64,7 @@ lanes:                          # per-host ticket lane names, over a tracked rol
 Krebs lifecycle v2 (`krebs/spec/lifecycle.v2.yaml`, 2026-11-14) gives every Plane board the five stock lanes, one per
 state group: `backlog`, `unstarted`, `started`, `completed`, `cancelled`. What the extra lanes of the retired
 nine-lane layout meant is now a label (`lifecycle:review`, `lifecycle:needs-input`, `lifecycle:blocked`,
-`agent:failed`), so review and holds are not bands and an overlay naming one is refused.
+`lifecycle:human`, `agent:failed`), so review and holds are not bands and an overlay naming one is refused.
 
 A lane name that does not exist on a board still lands a transition in the wrong place. A tracked `role.yaml` names its
 *owner's* lanes. For a board whose lanes are named differently, set a rule with `replace: true`: the tracked names are
