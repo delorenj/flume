@@ -1,15 +1,48 @@
-# FLUME-13 candidate evidence
+# FLUME-13 repaired candidate evidence
 
-The observer reads numeric `/proc` entries with bounded `comm`, `cmdline` and `environ` reads (16 KiB each); it selects Hermes executable/comm processes only. It emits only recognized profile flags and a recognized `HERMES_HOME` profile name, never arbitrary arguments or environment values. It checks the shared root and resolves employees from the complete registered profile map. One host gateway is expected; worker and interactive processes can coexist. No service/process control is invoked. `/proc` on non-Linux hosts is unavailable, reported as uncertainty.
+## Observation contract
 
-Actual commands in the isolated worktree:
-- `node tests/live-process-regressions.mjs`: exit 0; selection, unique/conflicting/unregistered/missing identities, empty/denied/exited, cancellation/deadline, secret and read-only fixture assertions passed.
-- `npm run typecheck`: exit 0.
-- `npm run build`: exit 0.
-- `node tests/fleet-status-regressions.mjs`: exit 1 before its assertions; fixture requires initialized template submodule at committed gitlink, missing in this worktree.
-- `node tests/fleet-health-regressions.mjs`: exit 1 at same fixture setup precondition. Existing expectations of an unsupported process capability also require updating after submodule initialization.
-- `git diff --check`: exit 0.
+`flume review --domain live_process [--json]` observes Linux `/proc` numeric PIDs. Candidate comm names are `hermes` and Python interpreter names (`python`, `python3`, versioned Python). Selected entrypoints are Hermes comm/executable, Python console-script `hermes`, and `python -m hermes`, `hermes_cli`, or the installed `hermes_cli.main`. Readable unrelated Python commands and noncandidate comms are excluded. An unreadable candidate command is **incomplete visibility**, not an excluded process. Duplicate PID entries are deduplicated.
 
-Read-only live invocation: `node packages/flume-hr/dist/index.js review --domain live_process --json --deadline-ms 5000`, exit 0; first sample selected PIDs 5339 (interactive, no registered profile), 697075 (host gateway), 1897468 (interactive, identity metadata unreadable); after the per-PID host finding refinement, the repeated invocation emitted one finding for each of those selected PIDs and seven additional `comm`-unreadable PIDs (3481816, 3482247, 3482248, 3482249, 3482279, 3482286, 3482292), each explicitly uncertain rather than selected as Hermes. Zero PIDs were attributed to employees. The report had host `error`, 48 employee visibility `error` observations, `complete:false`, `proven:false`. This is bounded live *uncertainty*, not proof of healthy runtime. PID 1897468's environ was denied; no process was signalled or changed. The process set can change between samples. Full command output was captured by terminal tooling outside the worktree; this file records only the reconciled sample, not unredacted process metadata.
+Each metadata read is capped at 16 KiB; enumeration is capped at 100,000 entries. Enumeration and parsing run in a child bounded by `org/runtime.ts`'s probe budget, whole-run deadline, cancellation and stdout cap. Only sanitized attribution facts cross stdout; raw argv/environment and exception messages do not. Timeout terminates only the spawned probe process group, never an observed process. There is no production fixture/environment bypass.
 
-Known limits: a failed `comm` read cannot identify whether its PID is Hermes; it is recorded as an observation error. A process with no recognized profile identity is not arbitrarily attributed. The inherited status envelope has no typed process summary; each selected PID is in an employee observation or a distinct host finding. The host summary carries totals and errors. No main integration or cleanup was performed.
+Attribution uses the complete registered profile map, even for `--agent`. Supported selectors include `--profile name`, `--profile=name`, `-p name`, and the compatibility `--profile-name` forms, including selectors after an action. Value-taking options, `--`, and `mcp add --args` prevent nested payloads/prompts becoming identity evidence. Multiple or invalid identities, foreign/invalid `HERMES_HOME`, and shared-root/profile contradictions remain host-scoped; no employee is guessed. Unknown values are redacted.
+
+Topology permits at most one shared gateway and any number of consistently attributed worker/interactive processes. A passing shared gateway must prove `HERMES_HOME` equals the declared shared root, without foreign or employee-profile claims. The installed launcher's explicit `--profile default` at that root is supported. Foreign, unregistered, missing-identity and duplicate gateways are non-pass host findings. A successfully observed empty set is complete observation, not evidence that a required service is running; service availability remains the systemd observer's job.
+
+## Persistent regressions
+
+`tests/live-process-regressions.mjs` exercises the parser and **built CLI** with a test-only OS preload inherited by the real bounded probe child. It covers each repaired defect: installed module/console entrypoints, denied Python identity, equals/short/repeated/after-action selectors, foreign/invalid homes, unregistered and foreign gateways, legitimate multiprocess layouts, nested argv and prompt boundaries, duplicate registry claims/PIDs, empty/denied/exited/oversized metadata, aggregate domain/health rollups and remaining Bloodbank/release-provenance observations. Human/JSON/stderr planted-secret checks, recursive content/mode/mtime fixture snapshots, and side-effect guards run on success and failure. Only the observer's own spawned probe may be terminated.
+
+A real synchronous ten-second fixture read returned in 52 ms under a 50 ms probe budget; cancellation returned `CANCELLED` in 101 ms and an 80 ms whole-run deadline returned `TIMEOUT` in 84 ms. These are measured results, not mocked clock assertions. Probe-spawn failure remains incomplete rather than empty-success. The suite is registered in `scripts/run-tests.mjs`.
+
+## Actual checks
+
+| Check | Exit | Result |
+| --- | ---: | --- |
+| `npm run typecheck` | 0 | Both workspaces |
+| `npm run build` | 0 | CLI and MCP bundles |
+| `node tests/live-process-regressions.mjs` | 0 | All adversarial parser/CLI/safety/budget cases |
+| `node tests/fleet-contract-regressions.mjs` | 0 | Contract/authority suite |
+| `node tests/fleet-status-regressions.mjs` in isolated initialized candidate | 0 | No failures; two operator-live-registry cases skipped |
+| `node tests/fleet-health-regressions.mjs` in isolated initialized candidate | 0 | No failures/skips; CLI/MCP equality and baseline comparisons included |
+| Same status suite against pre-feature `c360fae` with identical fixture adjustments | 0 | No failures; same two live cases skipped |
+| Same health suite against pre-feature `c360fae` with identical fixture adjustments | 0 | No failures/skips |
+| Bounded live review with `--deadline-ms 5000` | 0 | 488 ms; incomplete visibility honestly reported |
+| `git diff --check` | 0 | No whitespace errors |
+
+The full repository `npm test` was not run; no claim is made about unrelated suites. No board writes, integration, service changes or observed-process cleanup occurred.
+
+### Isolated baseline reconciliation
+
+Evidence directory: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume13-repair-evidence/`. Reviewer-owned artifacts were not overwritten. `base/` and `candidate/` are task-owned local shared-object clones; each template was cloned locally and checked out at **17b5217438cabd9cdfee12fa24d398c000a7455c**. No remote fetch/provider write was needed. The candidate source/tests were copied into the scratch candidate before building. Suites do not share their fixture trees. The same test-only empty process source and Bloodbank deferral assertions are used on both revisions, so concurrent host processes cannot alter byte-equality or adapter comparisons.
+
+The initial initialized run reproduced **8 status failures on base and candidate**: no-live audit-fed state; host-only fail isolation; project-warn isolation; hung-child state; missing-CLI state; observation-cap health; audit-child budget; clean-slice health. Initial health also reproduced **8 on each**: fully authorized healthy fleet; one authorization removed; declared deferral; removed deferral; exit-category projection; failing/incomplete member classification; deferred member classification; agent-exception classification. Full paired assertion stacks remain in `base-fleet-status.log`, `candidate-fleet-status.log`, and `base-fleet-health.log`; `base-clean-health.json` / `candidate-clean-health.json` captured the root cause during diagnosis: `profiles.{profile_name}.config.yaml: renderer-pyyaml-missing` for both employees. These were not waived or masked.
+
+Using a scratch-only `test-bin/python3 -> /usr/bin/python3` (3.13.7 with PyYAML 6.0.3) ahead of PATH resolved the renderer prerequisite without installing/changing any host runtime or production profile. Final results are in `base-fleet-status-final.log`, `candidate-fleet-status-final.log`, `base-fleet-health-final.log`, `candidate-fleet-health-final.log` and the corresponding `*-result.json`: **zero baseline failures, zero new failures**. The scratch scripts `flume13-repair-paired.py` and `flume13-repair-suite.py` beside the evidence directory record setup and commands. An earlier combined run exceeded the terminal's 600-second ceiling during the fourth suite; that partial log is superseded by separately completed suite runs. Background launch attempts were rejected by shell initialization/TMPDIR rewriting; final runs used explicit profile scratch TMPDIR and foreground execution.
+
+## Live reconciliation
+
+At `2026-11-18T15:33:55Z`, the bounded read-only review's selected PIDs were **5339, 697075, 1897468**, identical to sanitized independent samples immediately before and after. Every stable selected PID appeared once; `stable_selected_missing` was empty. PID 697075 proved the shared-root gateway; PID 5339 was an unattributed interactive process; PID 1897468's identity metadata was denied. Two transient comm reads (1174160, 1174161) failed and remained explicit host read errors. The host summary reported three selected processes, one shared gateway and three read errors (including the selected PID's environment error). No employee was guessed. `health.healthy`, `complete`, and `proven` were all false.
+
+`live-review.json`, `live-review.stderr` and `live-reconciliation.json` retain the bounded result and sanitized sample. This is live **uncertainty**, not a claim that the host runtime is healthy. No observed process was signalled, drained, restarted or modified.

@@ -2481,7 +2481,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   // The process table is host-wide even under --agent; attribution cannot use a
   // scoped registry because another employee might claim the same profile.
   const liveProcesses: LiveProcessReport | null = domainSet.has("live_process")
-    ? observeLiveProcesses(runContext, profileNameByAgent, resolveFleetHome(env, home))
+    ? await observeLiveProcesses(runContext, profileNameByAgent, resolveFleetHome(env, home))
     : null;
 
   const policy = readHealthPolicy(contract);
@@ -3337,9 +3337,9 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
 
   if (liveProcesses !== null) {
     const selected = liveProcesses.processes.filter((item) => item.employee === null);
-    const gateways = selected.filter((item) => item.kind === "gateway" && item.state === "unattributed");
-    const sprawl = selected.filter((item) => item.state !== "unattributed" || item.kind !== "gateway");
-    const state: FleetStatusState = !liveProcesses.complete ? "error" : sprawl.length > 0 || gateways.length !== 1 ? "warn" : "pass";
+    const gateways = selected.filter((item) => item.sharedGateway);
+    const sprawl = selected.filter((item) => !item.sharedGateway);
+    const state: FleetStatusState = !liveProcesses.complete ? "error" : sprawl.length > 0 || gateways.length > 1 ? "warn" : "pass";
     const field = DOMAIN_FIELD.live_process;
     const retrieval = retrievalFor(null, "live_process", live);
     const classification = classifyObservation({
@@ -3369,7 +3369,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     });
     for (const item of selected) {
       const pidRule = `live_process.pid.${item.pid}`;
-      const pidState: FleetStatusState = item.state === "error" ? "error" : item.kind === "gateway" && item.state === "unattributed" && gateways.length === 1 ? "pass" : "warn";
+      const pidState: FleetStatusState = item.state === "error" ? "error" : item.sharedGateway && gateways.length === 1 ? "pass" : "warn";
       const classification = classifyObservation({
         domain: "live_process", state: pidState, field: `processes.${item.pid}`, ruleId: pidRule, ruleScope: "host",
         source: SOURCE_LIVE_PROCESS, capability: null, evidence: null, fixable: false,

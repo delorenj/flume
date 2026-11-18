@@ -538,6 +538,9 @@ const isolation = {
   // so a case that bypasses the shim reads `manager-unavailable` rather than
   // this developer's own user manager -- where a fixture agent's units do not
   // exist and never will.
+  // Process state is synthetic too: byte-stability must not depend on host /proc.
+  NODE_OPTIONS: `--import=${join(ROOT, "tests", "helpers", "proc-fixture-preload.mjs")}`,
+  FLUME_TEST_PROC_FIXTURE: undefined,
   PATH: `${systemctlShim}:${process.env.PATH}`,
   ...noBusIsolation(temp),
   // The credential the audit child must never receive, present in the PARENT's

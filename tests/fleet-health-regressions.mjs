@@ -576,6 +576,9 @@ const isolation = {
   // address and runtime dir point at nothing -- so a case that bypasses the
   // shim reads `manager-unavailable` rather than this developer's own user
   // manager, where a fixture agent's units do not exist and never will.
+  // Process state is synthetic too: byte-stability must not depend on host /proc.
+  NODE_OPTIONS: `--import=${join(ROOT, "tests", "helpers", "proc-fixture-preload.mjs")}`,
+  FLUME_TEST_PROC_FIXTURE: undefined,
   PATH: `${systemctlShim}:${process.env.PATH}`,
   ...noBusIsolation(temp),
 };
@@ -961,15 +964,13 @@ try {
 
   // -- AC: deferred capabilities, declared and undeclared -------------------
 
-  // `live_process`, not `systemd`: story 1.8 ANSWERED the `unit_topology`
-  // deferral, so systemd is now an observed domain and can no longer stand for
-  // "a capability no observer in this release can answer". Process attribution
-  // (story 1.9) is the remaining one that still can.
+  // Bloodbank liveness remains deferred; live process attribution is observed.
+  const deferredDomain = "bloodbank";
   check("a contract-declared deferred capability is blocked, named, and does not reduce proof", () => {
     resetEntry(cleanShim);
     const data = status(cliAt(cleanRoot, ["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: cleanShim }));
-    const deferred = agentNamed(data, "alpha-pm").observations.find((item) => item.domain === "live_process");
-    assert.ok(deferred, "the live_process domain must still appear");
+    const deferred = agentNamed(data, "alpha-pm").observations.find((item) => item.domain === deferredDomain && item.source === "declared-gap");
+    assert.ok(deferred, "the Bloodbank domain must still appear");
     assert.equal(deferred.state, "unsupported", "the state is unchanged; only the AUTHORIZATION is new");
     assert.equal(deferred.applicability, "deferred");
     assert.equal(deferred.evidence, "absent");
@@ -977,22 +978,22 @@ try {
     assert.ok(deferred.justification, "a declared deferral must name the entry that authorizes it");
     assert.match(deferred.justification.policy, /^health_policy\.deferred_capabilities\[\d+\]$/u);
     assert.equal(deferred.justification.kind, "deferred_capability");
-    assert.equal(deferred.justification.owner, "1.9", "the entry names the story that owns the observer");
-    assert.match(deferred.next_action, /1\.9/u, "the next action must name the owning story");
+    assert.equal(deferred.justification.owner, "1.10", "the entry names the story that owns the observer");
+    assert.match(deferred.next_action, /1\.10/u, "the next action must name the owning story");
     assert.equal(deferred.next_action_class, "read-only");
     assert.equal(deferred.severity, "low", "a justified unsupported is low");
     assert.equal(data.health.proven, true, "a declared deferral does not reduce proof");
   });
 
   check("the same capability with the policy entry removed is unjustified and blocks proof", () => {
-    const stripped = writeContract("no-live-process-deferral", policyContract((document) => {
+    const stripped = writeContract("no-bloodbank-deferral", policyContract((document) => {
       document.health_policy.deferred_capabilities = document.health_policy.deferred_capabilities
-        .filter((item) => item.domain !== "live_process");
+        .filter((item) => item.domain !== deferredDomain);
     }));
-    const strippedRoot = makePackageRoot("pkg-no-live-process-deferral", readFileSync(stripped, "utf8"));
+    const strippedRoot = makePackageRoot("pkg-no-bloodbank-deferral", readFileSync(stripped, "utf8"));
     resetEntry(cleanShim);
     const data = status(cliAt(strippedRoot, ["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: cleanShim }));
-    const deferred = agentNamed(data, "alpha-pm").observations.find((item) => item.domain === "live_process");
+    const deferred = agentNamed(data, "alpha-pm").observations.find((item) => item.domain === deferredDomain && item.source === "declared-gap");
     assert.equal(deferred.state, "unsupported", "the same observation, in the same state");
     assert.equal(deferred.justification, null, "and now authorized by nothing");
     assert.notEqual(deferred.applicability, "deferred");

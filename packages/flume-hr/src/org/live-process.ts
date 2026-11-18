@@ -1,12 +1,11 @@
-import { closeSync, openSync, readSync, readdirSync } from "node:fs";
-import { basename, resolve, sep } from "node:path";
-import { remainingMs, throwIfCancelled, type FleetRunContext } from "./runtime";
+import { probeRaw, remainingMs, type FleetRunContext } from "./runtime";
 
 export interface LiveProcess {
   pid: number;
   employee: string | null;
   kind: "gateway" | "worker" | "interactive";
   state: "attributed" | "ambiguous" | "unattributed" | "error";
+  sharedGateway: boolean;
   reason: string;
   evidence: string[];
 }
@@ -20,105 +19,157 @@ export interface LiveProcessSource {
   read(pid: string, file: "comm" | "cmdline" | "environ"): Buffer;
 }
 
-// Only read bounded bytes; never serialize arbitrary argv or environment values.
-export const procSource: LiveProcessSource = {
-  list: () => readdirSync("/proc"),
-  read: (pid, file) => {
-    const fd = openSync(`/proc/${pid}/${file}`, "r");
-    try {
-      const buffer = Buffer.alloc(16 * 1024 + 1);
-      const count = readSync(fd, buffer, 0, buffer.length, null);
-      if (count > 16 * 1024) throw new Error("process metadata exceeds observation bound");
-      return buffer.subarray(0, count);
-    } finally { closeSync(fd); }
-  },
-};
-
-const split = (value: Buffer): string[] => value.toString("utf8").split("\0").filter(Boolean);
-const safeName = (name: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u.test(name);
-
-// Only exact registered profile names are displayed; unknown identity values may be secrets.
-const profileEvidence = (profile: string, names: ReadonlyMap<string, string[]>, source: string): string =>
-  names.has(profile) ? `${source} ${profile}` : `${source} unregistered identity`;
-
-export function observeLiveProcesses(
-  ctx: FleetRunContext,
-  registered: ReadonlyMap<string, string | null>,
+// Self-contained so the same typed parser runs inside the bounded read-only child.
+// Only sanitized attribution facts cross its stdout; raw metadata stays in the child.
+export function scanLiveProcesses(
+  registered: [string, string | null][],
   sharedHome: string,
-  source: LiveProcessSource = procSource,
+  source: LiveProcessSource,
+  paths: Pick<typeof import("node:path"), "resolve" | "basename" | "sep">,
 ): LiveProcessReport {
-  throwIfCancelled(ctx);
   const errors: string[] = [];
   const processes: LiveProcess[] = [];
   let entries: string[];
   try { entries = source.list(); }
   catch { return { processes, errors: ["process table unavailable or denied"], complete: false }; }
   if (entries.length > 100_000) return { processes, errors: ["process table exceeds observation bound"], complete: false };
-  const numeric = entries.filter((entry) => /^[1-9][0-9]*$/u.test(entry));
-  if (numeric.length === 0 && entries.length === 0) return { processes, errors, complete: true };
-  if (numeric.length === 0) return { processes, errors: ["process table contains no readable process IDs"], complete: false };
+  const numeric = [...new Set(entries.filter((entry) => /^[1-9][0-9]*$/u.test(entry)))];
+  if (numeric.length === 0 && entries.length !== 0) return { processes, errors: ["process table contains no readable process IDs"], complete: false };
   const names = new Map<string, string[]>();
   for (const [id, profile] of registered) {
     if (profile !== null) names.set(profile, [...(names.get(profile) ?? []), id]);
   }
-  const root = resolve(sharedHome);
+  const split = (value: Buffer): string[] => value.toString("utf8").split("\0").filter(Boolean);
+  const safeName = (name: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u.test(name);
+  const root = paths.resolve(sharedHome);
+  const profileRoot = `${root}${paths.sep}profiles${paths.sep}`;
   for (const pid of numeric.sort((a, b) => Number(a) - Number(b))) {
-    remainingMs(ctx);
     let comm: string;
     let args: string[];
-    try {
-      comm = source.read(pid, "comm").toString("utf8").trim();
-    } catch {
+    try { comm = source.read(pid, "comm").toString("utf8").trim(); }
+    catch {
       errors.push(`PID ${pid}: process identity unavailable, denied or exited during observation`);
       continue;
     }
-    if (comm !== "hermes" && !comm.startsWith("python")) continue;
+    if (comm !== "hermes" && !/^python(?:[0-9.]+)?$/u.test(comm)) continue;
     try { args = split(source.read(pid, "cmdline")); }
     catch {
-      if (comm === "hermes") errors.push(`PID ${pid}: metadata unavailable, denied or exited during observation`);
+      // An unreadable Python command might be a supported Hermes entrypoint.
+      errors.push(`PID ${pid}: candidate command unavailable, denied or exited during observation`);
       continue;
     }
-    const command = args[0] ?? "";
-    const isHermes = comm === "hermes" || basename(command) === "hermes" ||
-      (args[1] === "-m" && args[2] === "hermes");
-    if (!isHermes) continue;
-    const gateway = args.some((arg, i) => arg === "gateway" && args[i + 1] === "run");
-    const kind = gateway ? "gateway" : args.includes("worker") ? "worker" : "interactive";
+    let start = -1;
+    if (paths.basename(args[0] ?? "") === "hermes") start = 1;
+    else if (args[1] === "-m" && ["hermes", "hermes_cli", "hermes_cli.main"].includes(args[2] ?? "")) start = 3;
+    else if (paths.basename(args[1] ?? "") === "hermes") start = 2;
+    else if (comm === "hermes") start = 1;
+    if (start < 0) continue;
+
+    const evidence = ["Hermes entrypoint/comm"];
+    const claims = new Set<string>();
+    let invalid = false;
+    const claim = (value: string, label: string): void => {
+      if (!safeName(value)) { invalid = true; evidence.push(`invalid ${label}`); return; }
+      claims.add(value);
+      evidence.push(names.has(value) ? `${label} ${value}` : `${label} unregistered identity`);
+    };
+    // Hermes accepts selectors after an action too. Skip value-taking options
+    // so prompt text is not parsed as flags, and stop at nested-command argv.
+    const valueFlags = new Set(["-z", "--oneshot", "-m", "--model", "--provider", "--reasoning", "-t", "--toolsets", "-r", "--resume", "-s", "--skills", "--usage-file", "--in", "-q", "--query", "--prompt", "--token"]);
+    let action = -1;
+    let mcp = false;
+    let mcpAdd = false;
+    for (let i = start; i < args.length; i++) {
+      const arg = args[i]!;
+      if (arg === "--" || (arg === "--args" && mcpAdd)) break;
+      if (["--profile", "--profile-name", "-p"].includes(arg)) claim((args[++i] ?? "").trim().toLowerCase(), "profile flag");
+      else if (arg.startsWith("--profile=") || arg.startsWith("--profile-name=")) claim(arg.slice(arg.indexOf("=") + 1).trim().toLowerCase(), "profile flag");
+      else if (valueFlags.has(arg)) i++;
+      else if (["-c", "--continue"].includes(arg)) { if (args[i + 1] && !args[i + 1]!.startsWith("-")) i++; }
+      else if (!arg.startsWith("-")) {
+        if (action < 0) { action = i; mcp = arg === "mcp"; }
+        else if (mcp && arg === "add") mcpAdd = true;
+      }
+    }
+    const kind: LiveProcess["kind"] = args[action] === "gateway" && args[action + 1] === "run" ? "gateway" : args[action] === "worker" ? "worker" : "interactive";
     let env: string[];
     try { env = split(source.read(pid, "environ")); }
     catch {
-      processes.push({ pid: Number(pid), employee: null, kind, state: "error", reason: "identity metadata denied or process exited", evidence: ["Hermes executable/comm"] });
+      processes.push({ pid: Number(pid), employee: null, kind, state: "error", sharedGateway: false, reason: "identity metadata denied or process exited", evidence });
       errors.push(`PID ${pid}: identity metadata unavailable`);
       continue;
     }
-    const evidence: string[] = ["Hermes executable/comm"];
-    const claims = new Set<string>();
-    for (let i = 0; i < args.length - 1; i++) {
-      if (args[i] !== "--profile" && args[i] !== "--profile-name") continue;
-      const value = args[i + 1]!;
-      if (safeName(value)) { claims.add(value); evidence.push(profileEvidence(value, names, "--profile")); }
-      else evidence.push("invalid profile flag");
-    }
+    let sharedRoot = false;
+    let foreignHome = false;
     for (const entry of env) {
       if (!entry.startsWith("HERMES_HOME=")) continue;
       const home = entry.slice("HERMES_HOME=".length);
-      const normalized = resolve(home);
-      if (normalized.startsWith(`${root}${sep}`) && normalized.slice(root.length + 1).startsWith(`profiles${sep}`)) {
-        const profile = normalized.slice(root.length + 1 + `profiles${sep}`.length);
-        if (safeName(profile)) { claims.add(profile); evidence.push(profileEvidence(profile, names, "HERMES_HOME profile")); }
-      } else if (normalized !== root) evidence.push("HERMES_HOME outside declared profile root");
+      // Empty/relative homes cannot prove a shared runtime identity.
+      const normalized = paths.resolve(home);
+      if (home.startsWith(paths.sep) && normalized === root) {
+        sharedRoot = true; evidence.push("HERMES_HOME declared shared root");
+      } else if (home.startsWith(paths.sep) && normalized.startsWith(profileRoot) && safeName(normalized.slice(profileRoot.length))) {
+        claim(normalized.slice(profileRoot.length), "HERMES_HOME profile");
+      } else {
+        foreignHome = true; evidence.push("HERMES_HOME outside declared profile root or invalid");
+      }
     }
-    const owners = new Set([...claims].flatMap((claim) => names.get(claim) ?? []));
+    // --profile default is how the installed launcher selects the shared home.
+    const gatewayDefault = kind === "gateway" && claims.size === 1 && claims.has("default") && sharedRoot && !names.has("default");
+    const owners = new Set([...claims].flatMap((value) => names.get(value) ?? []));
     let state: LiveProcess["state"] = "unattributed";
-    let reason = gateway ? "shared gateway (host-scoped)" : "no registered profile identity";
+    let reason = "no registered profile identity";
     let employee: string | null = null;
-    if (claims.size > 1 || owners.size > 1) { state = "ambiguous"; reason = "conflicting profile identities"; }
-    else if (claims.size === 1 && owners.size === 1 && !gateway) {
+    const sharedGateway = kind === "gateway" && sharedRoot && !foreignHome && !invalid && (claims.size === 0 || gatewayDefault);
+    if (foreignHome || invalid || claims.size > 1 || owners.size > 1 || (sharedRoot && claims.size > 0 && !gatewayDefault)) {
+      state = "ambiguous"; reason = "conflicting or invalid runtime identity evidence";
+    } else if (sharedGateway) reason = "shared gateway at declared root (host-scoped)";
+    else if (kind === "gateway") reason = claims.size > 0 ? "gateway profile identity is not the declared shared runtime" : "gateway lacks declared shared-root identity";
+    else if (claims.size === 1 && owners.size === 1) {
       state = "attributed"; employee = [...owners][0]!; reason = "unique registered profile match";
-    } else if (claims.size === 1 && owners.size === 0) reason = "profile identity is not registered";
-    else if (gateway && claims.size > 0) { state = "ambiguous"; reason = "shared gateway carries an employee profile identity"; }
-    processes.push({ pid: Number(pid), employee, kind, state, reason, evidence });
+    } else if (claims.size === 1) reason = "profile identity is not registered";
+    processes.push({ pid: Number(pid), employee, kind, state, sharedGateway, reason, evidence });
   }
-  remainingMs(ctx);
   return { processes, errors, complete: errors.length === 0 };
+}
+
+export async function observeLiveProcesses(
+  ctx: FleetRunContext,
+  registered: ReadonlyMap<string, string | null>,
+  sharedHome: string,
+): Promise<LiveProcessReport> {
+  remainingMs(ctx);
+  // A synchronous /proc read can block. Isolate enumeration so the runtime can
+  // enforce wall-clock limits/cancellation by terminating only this probe child,
+  // never any observed process. Each read is capped independently at 16 KiB.
+  const script = `
+const fs = require('node:fs');
+const scan = ${scanLiveProcesses.toString()};
+let input = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', chunk => { input += chunk; });
+process.stdin.on('end', () => {
+  const { registered, sharedHome } = JSON.parse(input);
+  const source = {
+    list: () => fs.readdirSync('/proc'),
+    read: (pid, file) => {
+      const fd = fs.openSync('/proc/' + pid + '/' + file, 'r');
+      try {
+        const buffer = Buffer.alloc(16 * 1024 + 1);
+        const count = fs.readSync(fd, buffer, 0, buffer.length, null);
+        if (count > 16 * 1024) throw Error('metadata bound');
+        return buffer.subarray(0, count);
+      } finally { fs.closeSync(fd); }
+    }
+  };
+  process.stdout.write(JSON.stringify(scan(registered, sharedHome, source, require('node:path'))));
+});`;
+  const result = await probeRaw(ctx, [process.execPath, "--eval", script], undefined, JSON.stringify({ registered: [...registered], sharedHome }));
+  // Deadline/cancellation must not be downgraded to a partial observation.
+  remainingMs(ctx);
+  if (result.outcome !== "ok" || result.value === null) return {
+    processes: [], errors: [`process observation probe ${result.outcome}`], complete: false,
+  };
+  try { return JSON.parse(result.value.toString("utf8")) as LiveProcessReport; }
+  catch { return { processes: [], errors: ["process observation probe returned invalid metadata"], complete: false }; }
 }
