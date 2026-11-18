@@ -18,14 +18,16 @@ try {
   for(const name of ['build','review']) {mkdirSync(join(skillex,'all-skills',name),{recursive:true});writeFileSync(join(skillex,'all-skills',name,'SKILL.md'),`---\nname: ${name}\ndescription: fixture\n---\n`);}
   mkdirSync(join(skillex,'packs','dev'),{recursive:true});writeFileSync(join(skillex,'packs','dev','pack.toml'),'[pack]\nname="dev"\nversion="1.0.0"\n[freeform]\nskills=["build","review"]\n');
   mkdirSync(desk,{recursive:true});
-  const base=YAML.parse(readFileSync('/home/delorenj/.hermes/config.yaml','utf8'));
-  const chain=['automaticai/personal/kimi-2.8','automaticai/personal/glm-5.3'];
-  writeFileSync(join(fleet,'config.yaml'),YAML.stringify({model:base.model,fallback_providers:base.fallback_providers,providers:base.providers}));
+  const chain=['automaticai/fixture/primary','automaticai/fixture/fallback'];
+  const base={model:{provider:'automaticai',default:'automaticai/fixture/base'},fallback_providers:[{provider:'automaticai',model:'automaticai/fixture/base-fallback'}],providers:{}};
+  const catalogPath=join(work,'routes.json');
+  writeFileSync(catalogPath,JSON.stringify({routes:[...chain,base.model.default,base.fallback_providers[0].model].map(id=>({id}))}));
+  writeFileSync(join(fleet,'config.yaml'),YAML.stringify(base));
   writeFileSync(registry,'agents:\n  boss: {role: director, department: engineering}\n  unrelated: {role: reporter, department: editorial}\n');
   const original='# precious top comment\ncompany: {name: Fixture}\ndepartments:\n  - id: engineering # department comment\n    manager: boss\n    members: []\n  - id: editorial\n    members: [unrelated] # precious other employee\n';
   writeFileSync(org,original);
   const role={role:'dev',skills:{pack:'dev'},chain,department:'engineering',reports_to:'boss'};
-  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome:join(home,'.local','state'),catalogModels:chain,catalogPath:'/home/delorenj/docker/stacks/ai/newapi/ops/routes.json',renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
+  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome:join(home,'.local','state'),catalogModels:chain,catalogPath,renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
   await api.projectRoleDeclaration(role,'demo-dev','demo-dev',options);
   // The loadout is a Skillex selection projected into the strict desk's own skills/ -- never a
   // second skill directory or a discovery root.
