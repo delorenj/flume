@@ -5,6 +5,7 @@ import { join, dirname, relative } from "node:path";
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as p from "@clack/prompts";
+import { describeStepFailure, formatElapsed, runStep } from "../utils/run-step";
 import YAML from "yaml";
 import { Command, type InvokeResult } from "../engine/Command";
 import { HERMES_AGENT_TEMPLATE, deriveAgentId, deriveProfileName, type HermesAgentContext } from "./types";
@@ -302,8 +303,8 @@ export class RunCopierTemplate extends Command {
       }
     }
 
-    const spinner = ctx.quiet ? undefined : p.spinner();
-    spinner?.start(`Running copier copy  (target: agents/hermes/${safeRole})`);
+    const copierLabel = `copier copy (agents/hermes/${safeRole})`;
+    if (!ctx.quiet) p.log.step(`Running ${copierLabel}`);
     const copierExecutable = ctx.trustedCopier?.executable ?? "copier";
     let restoreRegistryComments: (() => Promise<void>) | undefined;
     try {
@@ -312,15 +313,26 @@ export class RunCopierTemplate extends Command {
         restoreRegistryComments = await preserveCopierRegistryComments(env.REGISTRY_FILE);
       }
     } catch (error) {
-      spinner?.stop("✗ registry preflight failed");
+      if (!ctx.quiet) p.log.error("✗ registry preflight failed");
       return { success: false, outcome: "failed", message: `Registry preflight: ${error instanceof Error ? error.message : String(error)}` };
     }
     // Invalid fleet data must be refused before creating any render directory.
     mkdirSync(join(ctx.targetDir, "agents", "hermes"), { recursive: true });
-    const result = spawnSync(copierExecutable, args, ctx.quiet
-      ? { encoding: "utf8", env, cwd: ctx.targetDir }
-      : { stdio: "inherit", env, cwd: ctx.targetDir });
-    spinner?.stop(result.status === 0 ? "✓ copier run complete" : "✗ copier failed");
+    // Without --defaults Copier asks its questions on this terminal, so the
+    // human sets the pace. Otherwise its tasks (profile, board, systemd) run
+    // unattended: they get a heartbeat and a bound instead of a frozen spinner.
+    const result = await runStep(copierExecutable, args, {
+      label: copierLabel,
+      env,
+      cwd: ctx.targetDir,
+      capture: ctx.quiet,
+      interactive: !(ctx.yes || ctx.quiet),
+      heartbeat: ctx.quiet ? null : undefined,
+    });
+    if (!ctx.quiet) {
+      if (result.status === 0) p.log.success(`✓ copier run complete (${formatElapsed(result.elapsedMs)})`);
+      else p.log.error(`✗ copier ${describeStepFailure(result)}`);
+    }
 
     try {
       await restoreRegistryComments?.();
@@ -332,7 +344,7 @@ export class RunCopierTemplate extends Command {
       return {
         success: false,
         outcome: "failed",
-        message: `copier exited with status ${result.status}.${ctx.quiet && String(result.stderr ?? "").trim() ? ` ${String(result.stderr).trim()}` : " Check the output above; re-run with the same flags after fixing."}`,
+        message: `copier ${describeStepFailure(result)}.${ctx.quiet && String(result.stderr ?? "").trim() ? ` ${String(result.stderr).trim()}` : " Check the output above; re-run with the same flags after fixing."}`,
       };
     }
 

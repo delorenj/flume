@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { existsSync, unlinkSync } from "node:fs";
 import * as p from "@clack/prompts";
+import { describeStepFailure, runStep } from "../utils/run-step";
 import { Command, type InvokeResult } from "../engine/Command";
 import type { HermesAgentContext } from "./types";
 import { modernBash } from "../kernel/host-platform";
@@ -57,7 +58,7 @@ export class WireTelegram extends Command {
     let source: "env" | "op" | "prompt" | null = token ? "env" : null;
 
     if (!token) {
-      const tryOp = spawnSync("op", ["read", vaultRef], { encoding: "utf8" });
+      const tryOp = spawnSync("op", ["read", vaultRef], { encoding: "utf8", timeout: 15_000 });
       if (tryOp.status === 0) {
         token = tryOp.stdout.trim();
         source = "op";
@@ -110,7 +111,7 @@ export class WireTelegram extends Command {
             `token=${token}`,
             `bot_handle=${botHandle}`,
           ],
-          { stdio: "inherit" }
+          { stdio: "inherit", timeout: 30_000 }
         );
         if (create.status !== 0) {
           p.log.warn("Could not store in 1Password — token is still set for this run.");
@@ -160,10 +161,9 @@ export class WireTelegram extends Command {
     let bash: string;
     try { bash = modernBash(); } catch (error) { return { success: false, message: `✗ ${(error as Error).message}` }; }
 
-    const spinner = p.spinner();
-    spinner.start("Verifying token + wiring profile");
-    const result = spawnSync(bash, [script], {
-      stdio: "inherit",
+    p.log.step("Verifying token + wiring profile");
+    const result = await runStep(bash, [script], {
+      label: "Telegram wiring",
       env: {
         ...process.env,
         // Interactive wiring is an explicit host-state operation: it writes the
@@ -176,10 +176,9 @@ export class WireTelegram extends Command {
       },
       cwd: roleDir,
     });
-    spinner.stop(result.status === 0 ? "✓ Telegram wired" : "✗ Telegram step failed");
-
     if (result.status !== 0) {
-      return { success: false, message: "Telegram wire-up failed.  See output above." };
+      p.log.error(`✗ Telegram step ${describeStepFailure(result)}`);
+      return { success: false, message: `Telegram wire-up ${describeStepFailure(result)}.  See output above.` };
     }
 
     const sourceLabel = source === "env" ? " (token: env)" : source === "op" ? " (token: op)" : "";

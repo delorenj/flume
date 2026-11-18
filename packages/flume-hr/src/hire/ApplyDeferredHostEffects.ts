@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { describeStepFailure, runStep } from "../utils/run-step";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { Command, type InvokeResult } from "../engine/Command";
@@ -57,11 +57,11 @@ export class ApplyDeferredHostEffects extends Command {
       if (!existsSync(path)) {
         return { success: false, outcome: "failed", message: `Deferred Hermes host script is missing: ${path}` };
       }
-      const result = spawnSync(path, [], { cwd: ctx.roleDir, env, encoding: "utf8" });
-      if (String(result.stdout ?? "").trim()) logs.push(String(result.stdout).trim());
-      if (String(result.stderr ?? "").trim()) logs.push(String(result.stderr).trim());
-      if (result.error || result.status !== 0) {
-        const detail = result.error?.message ?? logs.at(-1) ?? `status ${result.status ?? "unknown"}`;
+      const result = await runStep(path, [], { label: script, cwd: ctx.roleDir, env, capture: true, heartbeat: ctx.quiet ? null : undefined });
+      if (result.stdout.trim()) logs.push(result.stdout.trim());
+      if (result.stderr.trim()) logs.push(result.stderr.trim());
+      if (result.error || result.timedOut || result.status !== 0) {
+        const detail = result.timedOut ? describeStepFailure(result) : result.error?.message ?? logs.at(-1) ?? `status ${result.status ?? "unknown"}`;
         return { success: false, outcome: "failed", message: `${script} failed: ${detail}` };
       }
     }
