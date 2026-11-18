@@ -52,6 +52,30 @@ export function readRoleDeclaration(root:string, role:string, post="", profile=p
   if(doc.errors.length) throw new Error(doc.errors[0]!.message);
   return validateRoleDeclaration({...doc.toJS(),role},post,profile);
 }
+/** A role file that carries `retired:` in its frontmatter: no new hire, no composed SOUL. */
+export interface RetiredRole { role: string; since: string; superseded_by: string; message: string }
+/**
+ * Is `roles/<role>.md` retired? A retired role keeps its file (history, deployed desks) but its body
+ * is a notice and its frontmatter says `retired: {since, superseded_by}`. `flume hire|onboard`
+ * refuse it, and the composer refuses to render it, with the same pointer. Returns undefined for a
+ * live role, a role with no file of its own, or a file that cannot be read (never throws).
+ */
+export function retiredRole(root:string, role:string): RetiredRole|undefined {
+  if (!/^[a-z0-9][a-z0-9_-]*$/u.test(role)) return undefined;
+  const path=join(root,"roles",`${role}.md`);
+  if (!existsSync(path)) return undefined;
+  try {
+    const front=/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(readFileSync(path,"utf8"))?.[1];
+    if (front===undefined) return undefined;
+    const retired=(YAML.parse(front) ?? {}).retired;
+    if (retired===null || typeof retired!=="object" || Array.isArray(retired)) return undefined;
+    const since=String(retired.since ?? ""), superseded=String(retired.superseded_by ?? "pm");
+    return {role,since,superseded_by:superseded,message:
+      `Role "${role}" is retired${since?` (${since})`:""}: launch mode on a single PM replaced it. ${
+        role==="em"?"Convert an existing em desk to pm (docs/launch-mode.md, \"em to pm conversion\"), do not hire a new one.":
+        `Hire a pm instead (${superseded}); declare the launch in the repo's .launch.yaml and run \`flume launch enable <repo>\`.`}`};
+  } catch { return undefined; }
+}
 export function gatewayCatalog(options:RoleProjectionOptions={}): Set<string> {
   if(options.catalogModels) return new Set(options.catalogModels);
   const {home}=paths(options);

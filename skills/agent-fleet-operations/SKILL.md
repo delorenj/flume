@@ -331,8 +331,9 @@ or `em` is a finding that names `flume retire` (directors) or the em-to-pm
 conversion below.
 
 **Retired titles.** `launch-director`, `paired-launch-director` and `em` are
-retired handbook titles: `flume hire <title>` refuses with a pointer here (the
-mechanism scrum-master used). The plain `director` title is not retired as a
+retired role titles: `flume hire|onboard <title>` refuses with a pointer here (a
+`retired:` block in the role file; the composer refuses to render it too, so a deployed
+desk's SOUL is never overwritten). The plain `director` title is not retired as a
 role, but the TOLT portfolio desk `tolt-director` is; other repos' directors
 (delonet-director, context-director, ...) are untouched.
 
@@ -347,16 +348,24 @@ hindsight bank or its Telegram vault item. Retired 2026-11-18: `tolt-launch-dire
 `green-in-between-launch-groom`, `green-in-between-launch-weekly`).
 
 **Convert an EM desk to a PM** (`tolt-pm`, `gruvato-pm`; the EM pass
-`tolt-em-pass`/`gruvato-em-pass` is replaced by the launch pass):
+`tolt-em-pass`/`gruvato-em-pass` is replaced by the launch pass). Full recipe:
+`flume/docs/launch-mode.md`, "em to pm conversion". Run from the repo.
 
-1. Pause the EM Candybar job; keep the Hermes job id if the launch job will adopt it.
-2. In `<repo>/agents/hermes/pm/role.yaml` set `role: pm`; keep `agent_id`, `profile`
-   and the registry key unchanged (routing, gitlink and desk never move).
-3. `flume remediate hermes.pm-scaffold <repo> --dry-run`, read the diff, apply: the
-   SOUL is recomposed from `roles/pm.md`. Never hand-edit a deployed `SOUL.md`.
-4. Project the registry row (`role: pm`) with the role dir's `80-registry.sh`
-   step; read it back with `flume roster` (no `registry-parity` finding).
-5. Write `.launch.yaml`, then `flume launch enable <repo>`.
+1. Pause the EM Candybar job (`candybar pause <repo>-em-pass`); keep any Hermes job id the
+   launch job should adopt.
+2. Set `role: "pm"` in `agents/hermes/pm/role.yaml` **and** `agents.<id>.role: "pm"` in the
+   repo's `.project.json` (both: `hermes.pm-scaffold` blocks with "identity does not match
+   role.yaml" while they differ). Keep `agent_id`, `profile` and the registry key unchanged
+   (routing, gitlink and desk never move). Until this step the scaffold rule leaves the desk's
+   SOUL alone ("role em is retired; SOUL left as is").
+3. `flume remediate hermes.pm-scaffold <repo> --dry-run`, read the diff, apply: the SOUL is
+   recomposed from `roles/pm.md`. Never hand-edit a deployed `SOUL.md`.
+4. Project the registry row (`role: pm`, other keys such as `plane.scope_label` merge and
+   survive): `flume onboard pm --target-repo <repo> --yes` (runs the template's `80-registry.sh`
+   upsert; convergent). Read it back with `flume audit <repo> --rules
+   hermes.launch-mode,hermes.pm-scaffold,hermes.registry-parity`.
+5. Write `.launch.yaml`, then `flume launch enable <repo>`; delete the repo's `em-pass.py` and
+   `em-pass.prompt.md` (not template managed). Commit and push everything.
 
 **Cost.** One launch pass is about 0.4-0.6M tokens a day across a working day
 (hourly cadence, 08:00-22:00); an unchanged board costs 0 tokens because the

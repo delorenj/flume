@@ -19,6 +19,7 @@ roles/
   dev.md
   review.md
   reporter.md
+  em.md, launch-director.md, paired-launch-director.md   RETIRED: notices only (see below)
 ```
 
 ## Branching a role is `cp`
@@ -67,6 +68,24 @@ hint; never status). No file means steady and the section is inert. Turning
 launch on or off is a commit to that repo, never a new role, a re-hire or a
 re-compose. The template ships `.scripts/launch-pass.py` to every PM desk, and
 Candybar fires it (`<repo>-pm-launch-pass`) only for a repo that launches.
+
+Launch mode is wired by `flume launch status|enable|disable [repo]` and audited by
+`flume audit --rules hermes.launch-mode` (full procedure: `docs/launch-mode.md`).
+
+## Retired roles
+
+A retired role keeps its file, with `retired: {since, superseded_by}` in the frontmatter and a short
+notice for a body. Three titles are retired (2026-11-18), replaced by launch mode on a single PM:
+`launch-director`, `paired-launch-director` and `em`. The `director` role is **not** retired.
+
+- `flume hire <title>` and `flume onboard <title>` refuse a retired title, pointing at PM launch mode
+  (`ValidateHermesOptions`, via `retiredRole()` in `workforce/role.ts`).
+- `composeSoul()` throws `RetiredRoleError` for it, so a deployed desk's SOUL is never overwritten
+  with the notice. `flume remediate hermes.pm-scaffold` reports such a desk as preserved and moves on.
+- `hermes.launch-mode` names every non-retired registry row still carrying one of the three roles:
+  retire a director with `flume retire <id> --apply`, convert an `em` desk to `pm`
+  (`docs/launch-mode.md`, "em to pm conversion"). Retiring a role is a one-line `retired:` block in its
+  file; nothing else lists retired roles.
 
 ## The one composer
 

@@ -2,7 +2,7 @@ import { lstatSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Command, type InvokeResult } from "../engine/Command";
 import { normalizeAgentRole, resolveContainedPath, resolveFlumeRoot } from "../kernel/paths";
-import { declarationProblems, readRoleDeclaration, skillsProblems } from "../workforce/role";
+import { declarationProblems, readRoleDeclaration, retiredRole, skillsProblems } from "../workforce/role";
 import type { HermesAgentContext } from "./types";
 
 export const EMAIL_UNSUPPORTED_MESSAGE =
@@ -73,6 +73,9 @@ export class ValidateHermesOptions extends Command {
     }
 
     const role = normalizeAgentRole(ctx.role ?? "pm");
+    // A retired title (launch-director, paired-launch-director, em) never seats a new employee.
+    const retired = retiredRole(process.env.FLUME_ROLES_ROOT ?? resolveFlumeRoot(), role);
+    if (retired) return { success: false, outcome: "failed", message: retired.message };
     const roleDir = resolveContainedPath(
       ctx.targetDir,
       join(ctx.targetDir, "agents", "hermes", role),
