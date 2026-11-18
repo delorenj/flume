@@ -73,6 +73,7 @@ const SUITES = [
   "tests/role-projection-regressions.mjs",
   "tests/role-selection-regressions.mjs",
   "tests/role-hire-regressions.mjs",
+  "tests/flume-45-hire-manifest.mjs",
   "tests/telegram-hire-regressions.mjs",
   "tests/registry-comments-regressions.mjs",
   "tests/tree-diff-regressions.mjs",
