@@ -6,7 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
-import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration, withRegistryLock } from "../workforce/role";
+import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration, retiredRole, withRegistryLock } from "../workforce/role";
 import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { resolveFlumeRoot } from "../kernel/paths";
@@ -14,6 +14,7 @@ import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { gatewayPolicyOf, loadHostOverlay, type GatewayPolicy } from "../kernel/host-overlay";
 import { hostPlatform, isLaunchdHost, launchdGatewayTarget, launchdNotObservable, LAUNCHD_GATEWAY_INSTALL, LAUNCHD_GATEWAY_LABEL, observeLaunchdGateway, type LaunchdGatewayObservation } from "../kernel/host-platform";
 import { retiredRoutingCheck, roleDeclarationCheck } from "../workforce/audit";
+import { launchModeCheck } from "../workforce/launch";
 import { skillDiagnostics, skillCoreOptions } from "./skills";
 import { OWNED_PROFILE_ENTRIES, OWNED_PROFILE_FILES, PROFILE_HOMED_FILES, SQLITE_SIDECARS, homedStoreLink, isDanglingLink, lacksRequiredTarget, linkState, ownedDirMode, targetMustExist } from "./singleton-links";
 import { showProfile, syncProfile } from "@delorenj/skillex";
@@ -881,6 +882,12 @@ function namedAgentSoulInputs(identity: SoulIdentity): Record<string, string> {
 }
 
 
+/** composeSoul refused because the role file is retired (see `retired:` in roles/<role>.md). */
+export class RetiredRoleError extends Error {
+  constructor(readonly role: string, message: string) { super(message); this.name = "RetiredRoleError"; }
+}
+
+
 /**
  * Compose one agent's SOUL from `<flumeRoot>/roles/`.
  *
@@ -897,6 +904,12 @@ export function composeSoul(flumeRoot: string, identity: SoulIdentity, deployed:
   const base = join(dir, "_base.md");
   if (!existsSync(base)) throw new Error("roles/_base.md is missing");
   const definition = readRoleDefinition(dir, identity.role);
+  // A retired role has a notice for a body, never a charter: composing it would overwrite a desk's
+  // live SOUL with the notice. Callers treat this as "leave the desk as it is".
+  if (definition.front.retired !== undefined && definition.front.retired !== null) {
+    throw new RetiredRoleError(identity.role, retiredRole(flumeRoot, identity.role)?.message
+      ?? `Role "${identity.role}" is retired: launch mode on a single PM replaced it.`);
+  }
   const tone = resolveSoulTone(readToneBook(dir), identity, deployed);
 
   const purposeTemplate = soulScalar(definition.front.purpose_template) || "{role} agent for {repo}";
@@ -1058,6 +1071,8 @@ function soulParityDetails(ctx: Context, role: RoleMeta): string[] {
   try {
     composed = composeSoul(ctx.pjanglerRoot, soulIdentityOf(role), safeReadText(runtime) ?? safeReadText(tracked));
   } catch (error) {
+    // A retired role is reported once, by hermes.launch-mode, with its conversion/retirement command.
+    if (error instanceof RetiredRoleError) return [];
     return [`soul composer failed: ${error instanceof Error ? error.message : String(error)}`];
   }
   const details: string[] = [];
@@ -3108,6 +3123,7 @@ export function createHermesChecks(): RecipeOwnedCheck[] {
 return [
   roleDeclarationCheck,
   retiredRoutingCheck,
+  launchModeCheck,
   {
     id: "hermes.pm-scaffold",
     title: "Hermes orchestrator scaffold parity",
@@ -3229,7 +3245,9 @@ return [
                 details.push(`${prefix}: composed SOUL from roles/${basename(composed.source)} (tone ${composed.tone.key}, ${composed.tone.origin})`);
               }
             } catch (error) {
-              return { id: finding.id, title: finding.title, status: "blocked", summary: `Cannot compose ${prefix}'s SOUL`, changedFiles, details: [...details, error instanceof Error ? error.message : String(error)] };
+              if (error instanceof RetiredRoleError) {
+                preserved.push(`${prefix}: role ${error.role} is retired; SOUL left as is (convert an em desk to pm, or retire the row)`);
+              } else return { id: finding.id, title: finding.title, status: "blocked", summary: `Cannot compose ${prefix}'s SOUL`, changedFiles, details: [...details, error instanceof Error ? error.message : String(error)] };
             }
           }
           writeIfDifferent(join(role.roleDir, "hermes"), renderHermesWrapper(role, templateRoleDir), ctx.dryRun, changedFiles, 0o755);

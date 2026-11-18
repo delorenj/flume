@@ -1,7 +1,7 @@
 ---
 name: agent-fleet-operations
 description: |
-  Operate and maintain the Hermes workforce with `flume`: hire/onboard an employee into a repo, the org chart in `~/.hermes/agents-registry.yaml`, the handbook (`contracts/handbook.yaml`), real named profiles with generated base-plus-delta config, ignored local runtime, the single host gateway (`hermes-gateway.service` serves every profile and the Bloodbank lane; an employee owns no unit, and a leftover per-agent `hermes-<agent>-gateway.service` is drift to retire), compliance audits and remediations, credential migration, transactional config recovery, and TTS defaults. Use for `flume hire|onboard|roster|org|record|review|audit|remediate|handbook`, `~/.hermes/*`, `hermes-agent-template`, PM deployment verification, generated profiles, gateway state, MCP drift, template propagation, or voice changes. Do NOT use for project bootstrap/identity requests (→ 33god-projects), Plane ticket operations (→ project-lifecycle), Bloodbank event schemas (→ bloodbank-integration), or generic config fan-out (→ agent-config-fanout).
+  Operate and maintain the Hermes workforce with `flume`: hire/onboard an employee into a repo, the org chart in `~/.hermes/agents-registry.yaml`, the handbook (`contracts/handbook.yaml`), real named profiles with generated base-plus-delta config, ignored local runtime, the single host gateway (`hermes-gateway.service` serves every profile and the Bloodbank lane; an employee owns no unit, and a leftover per-agent `hermes-<agent>-gateway.service` is drift to retire), compliance audits and remediations, credential migration, transactional config recovery, and TTS defaults. Use for `flume hire|onboard|roster|org|record|review|audit|remediate|handbook|launch`, PM launch mode (`.launch.yaml`, the launch pass, retiring launch directors, em-to-pm conversion), `~/.hermes/*`, `hermes-agent-template`, PM deployment verification, generated profiles, gateway state, MCP drift, template propagation, or voice changes. Do NOT use for project bootstrap/identity requests (→ 33god-projects), Plane ticket operations (→ project-lifecycle), Bloodbank event schemas (→ bloodbank-integration), or generic config fan-out (→ agent-config-fanout).
 ---
 
 # Hermes Workforce Operations
@@ -48,6 +48,9 @@ flume channel list [--employee e]  every employee x platform: status, delta enab
 flume channel offline <employee> [--platform p] [--reason ".."] [--apply]   park a channel on purpose (preview unless --apply)
 flume channel online <employee> [--platform p] [--credential-ref op://..] [--apply]   bring it back / rotate to a new bot (getMe-verified)
 flume retire <employee> [--reason ".."] [--apply]   take an employee out of service, keep the row: bloodbank.enabled false AND the plane board claim removed (disabling bloodbank alone still wins the board and drops the ticket), live channels parked via channel offline; prints who gets each ticket per board; the gateway restart stays yours
+flume launch status [repo] [--json]   launch mode on a repo: declaration, pm desk, Hermes job, Candybar state, last run
+flume launch enable [repo] [--dry-run] [--schedule "<cron>"]   wire the launch pass (see "Launch mode"); idempotent
+flume launch disable [repo] [--dry-run]   pause the launch pass (mode went steady); keeps manifest and job
 ```
 
 `roster`, `record`, `review` and `handbook validate` are strictly read-only, take
@@ -130,7 +133,8 @@ and `heartbeat.sh`); it refuses duplicate keys instead of guessing, so never add
 an awk/grep role.yaml reader beside it. Plane boards follow Krebs lifecycle v2
 (`~/code/33GOD/krebs/spec/lifecycle.v2.yaml`): five stock lanes, with review and
 holds carried by labels. `tp transition <id> in_review` lands In Progress +
-`lifecycle:review`, `awaiting_decision` adds `lifecycle:needs-input` in place,
+`lifecycle:review`, `awaiting_decision` adds `lifecycle:needs-input` in place
+(`lifecycle:human` is the owner's own hold: agents never write it),
 and the retired nine-lane extended targets are refused; `tp resolve_state
 <state>` validates a target read-only.
 
@@ -217,6 +221,8 @@ exception register is `~/code/33GOD/candybar/deploy/scheduling-policy.json`. Rul
 and audit: flume's `docs/scheduling-policy.md` and
 `flume refresh-scheduling-policy --json`.
 
+Wiring a Hermes job to run an LLM pass on that clock? Build it as an interval driver (`interval-driver` skill): monitor-script gate, roadmap brief, lean toolsets. Unchanged board = 0 tokens. For a launch, the PM launch pass already is one ("Launch mode" below).
+
 Bloodbank command ingress is the **fleet lane of the host gateway**:
 `hermes-gateway.service` runs the Bloodbank adapter
 (`bloodbank/services/hermes-gateway`, durable consumer `bloodbank-hermes-gateway`),
@@ -233,7 +239,8 @@ gateway terminally rejects them. Enforcement: `flume audit` / `flume remediate
 hermes.registry-parity` detects and converges violations. Canon:
 `hermes-agent-template/docs/architecture.md` § "One host gateway, no per-agent
 unit" and § "Bloodbank wiring". The retired scrum-master title's duties folded
-into the PM.
+into the PM. So did the launch-director, paired-launch-director and em titles
+(2026-11-18): see "Launch mode".
 
 ### Full command journey
 
@@ -285,6 +292,86 @@ lets you claim the whole workforce is clean. The nine observation domains are
 to one. `--live` is an authorization, not a mode: it permits bounded read-only
 host and network observation (the recipe-owned audit rules), never mutation,
 process control, service changes, board changes, or Bloodbank activation.
+
+## Launch mode (the one way to drive a launch, 2026-11-18)
+
+A launch is driven by the repo's single PM in **launch mode**. Launch directors,
+paired launch directors and the EM that paired with them are retired fleet-wide
+(owner decision 2026-11-18); do not hire, recreate or re-pair one. Launch mode is
+repo data, not a role. Role contract: `flume/roles/pm.md`, "## Launch mode".
+
+| Part | Where | Rule |
+|---|---|---|
+| Declaration | committed `<repo>/.launch.yaml` | `mode: launch\|steady`, `declared`, `source`, `finish_line`, `target_date`, `contract: [paths]`, `epic: <BOARD-n>`, optional `cut_line {launch_critical, after_launch}`. Absent file = steady. **Owner-edited only**; the PM proposes `mode: steady` in one ticket when the finish line is met on evidence. |
+| Driver | `<role dir>/.scripts/launch-pass.py` (+ `launch-pass.prompt.md`), shipped by hermes-agent-template | `--monitor` (the gate snapshot), `--brief` (contract + declaration + snapshot + roadmap + plan schema), `--apply plan.json` (the only board writer: board-driver lease, `[pm]` tag, ops `comment\|create\|move\|close\|cancel\|rank\|link`, write cap, receipt under `runtime/launch-receipts/`, roadmap `runtime/launch-roadmap.md`) |
+| Wrappers | `~/.hermes/profiles/<repo>-pm/scripts/launch-{monitor,brief}.sh` | real files (Hermes refuses symlinks) that exec the repo driver |
+| Job | one Hermes job pinned `--scheduler external`, leaned with `interval-driver` `lean-job.py` | `monitor_script launch-monitor.sh`, `script launch-brief.sh` |
+| Clock | Candybar manifest `<repo>/.candybars/<repo>-pm-launch-pass.candybar.toml` | name is always `<repo>-pm-launch-pass`; Candybar is the only clock |
+
+Operate it with `flume launch`:
+
+```bash
+flume launch status [repo] [--json]   # declaration, desk, job, candybar state, last run
+flume launch enable [repo] --dry-run  # then without --dry-run; --schedule "<cron>" overrides the default
+flume launch disable [repo] [--dry-run]  # mode went steady: pauses the Candybar job, keeps manifest and job
+```
+
+`enable` needs `.launch.yaml` with `mode: launch` and a pm desk for the repo. It
+writes the two wrappers, creates (or adopts) the external-pinned lean Hermes job,
+writes the Candybar manifest, registers it (dry run first) and enables it. It
+commits nothing: commit and push the manifest yourself. It is idempotent; prove
+the first fire with `candybar history <repo>-pm-launch-pass` and the second
+(unchanged) one at `tokens 0`. Worked example: earshot (`earshot-pm`, job
+`b0a35860840f`, `.candybars/earshot-pm-launch-pass.candybar.toml`).
+
+**Audit.** `flume audit --rules hermes.launch-mode` (project scope): `mode: launch`
+requires the enabled Candybar `<repo>-pm-launch-pass` and an external Hermes job on
+the repo's pm desk; `mode: steady` or no file requires no enabled launch pass; any
+non-retired registry row whose role is `launch-director`, `paired-launch-director`
+or `em` is a finding that names `flume retire` (directors) or the em-to-pm
+conversion below.
+
+**Retired titles.** `launch-director`, `paired-launch-director` and `em` are
+retired role titles: `flume hire|onboard <title>` refuses with a pointer here (a
+`retired:` block in the role file; the composer refuses to render it too, so a deployed
+desk's SOUL is never overwritten). The plain `director` title is not retired as a
+role, but the TOLT portfolio desk `tolt-director` is; other repos' directors
+(delonet-director, context-director, ...) are untouched.
+
+**Retire a director desk.** `flume retire <agent> --reason "launch directors retired:
+PM launch mode" --apply` (keeps the row, removes the board claim, parks channels),
+pause its Candybar jobs (`candybar pause <name>`; once the repo no longer defines
+the manifest, `candybar register --prune` archives it), and let the gateway restart
+ride on the one batched `hermes-gateway-restart`. Never delete the desk, its
+hindsight bank or its Telegram vault item. Retired 2026-11-18: `tolt-launch-director`,
+`tolt-director`, `gruvato-launch-director`, `green-in-between-launch-director`
+(jobs `tolt-launch-director-pass`, `tolt-director-pass`, `gruvato-launch-director-pass`,
+`green-in-between-launch-groom`, `green-in-between-launch-weekly`).
+
+**Convert an EM desk to a PM** (`tolt-pm`, `gruvato-pm`; the EM pass
+`tolt-em-pass`/`gruvato-em-pass` is replaced by the launch pass). Full recipe:
+`flume/docs/launch-mode.md`, "em to pm conversion". Run from the repo.
+
+1. Pause the EM Candybar job (`candybar pause <repo>-em-pass`); keep any Hermes job id the
+   launch job should adopt.
+2. Set `role: "pm"` in `agents/hermes/pm/role.yaml` **and** `agents.<id>.role: "pm"` in the
+   repo's `.project.json` (both: `hermes.pm-scaffold` blocks with "identity does not match
+   role.yaml" while they differ). Keep `agent_id`, `profile` and the registry key unchanged
+   (routing, gitlink and desk never move). Until this step the scaffold rule leaves the desk's
+   SOUL alone ("role em is retired; SOUL left as is").
+3. `flume remediate hermes.pm-scaffold <repo> --dry-run`, read the diff, apply: the SOUL is
+   recomposed from `roles/pm.md`. Never hand-edit a deployed `SOUL.md`.
+4. Project the registry row (`role: pm`, other keys such as `plane.scope_label` merge and
+   survive): `flume onboard pm --target-repo <repo> --yes` (runs the template's `80-registry.sh`
+   upsert; convergent). Read it back with `flume audit <repo> --rules
+   hermes.launch-mode,hermes.pm-scaffold,hermes.registry-parity`.
+5. Write `.launch.yaml`, then `flume launch enable <repo>`; delete the repo's `em-pass.py` and
+   `em-pass.prompt.md` (not template managed). Commit and push everything.
+
+**Cost.** One launch pass is about 0.4-0.6M tokens a day across a working day
+(hourly cadence, 08:00-22:00); an unchanged board costs 0 tokens because the
+monitor hash matches and the agent never starts. Recipe and measurements:
+`interval-driver`. Ticket triage under launch mode: `project-lifecycle`.
 
 ## Operating Principles
 
@@ -364,6 +451,7 @@ process control, service changes, board changes, or Bloodbank activation.
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | each role launcher (`agents/hermes/<title>/hermes`) sets `HERMES_HOME` to the named desk; no dead `HERMES_OAUTH_FILE`. The rule also reads a per-agent unit's `Environment=HERMES_HOME=` when a leftover file exists; that unit is drift whatever its env says. The one host unit runs with `HERMES_HOME=~/.hermes`, which is correct |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer`/`gateway_unit` under `systemd` |
+  | `hermes.launch-mode` | project | `.launch.yaml` `mode: launch` => enabled Candybar `<repo>-pm-launch-pass` plus an external-pinned Hermes job on the repo's pm desk; `steady`/absent => no enabled launch pass; a non-retired registry row with role `launch-director`, `paired-launch-director` or `em` is a finding (names `flume retire` or the em-to-pm conversion). See "Launch mode" |
   | `hermes.retired-routing` | host | no row with a `retired` channel still has a `plane` board claim or enabled bloodbank, and no Plane board has two `plane.scope_default: true` rows. Not auto-fixable; each finding names `flume retire <id> --apply` |
 
   `hermes.fleet-config` is deliberately **not** auto-fixable: those are fleet-wide
@@ -568,8 +656,8 @@ as a turn on the `bloodbank` platform. The toolsets that turn gets come from
   `clarify`, `memory`, `send_message`, `cronjob` and `kanban`, so `terminal` and
   `file` are on the PM's list **for its workers**. A worker can never exceed the
   PM turn's own power.
-- **Routable non-PM employees stay restricted.** A reporter, legal assistant or
-  director that is routable over Bloodbank has always had no native tools. Pin
+- **Routable non-PM employees stay restricted.** A reporter or legal assistant
+  that is routable over Bloodbank has always had no native tools. Pin
   that in its `config.delta.yaml` with
   `x-pjangler-merge: list_patches: platform_toolsets.bloodbank: remove: [...]`.
   Do **not** write `platform_toolsets.bloodbank: []` in a delta: it works, but it
@@ -802,3 +890,4 @@ workflow, manual fallback, and common pitfalls.
 - **Plane ticket lifecycle** → `project-lifecycle`.
 - **Bloodbank event schemas or naming contract** → `bloodbank-integration`.
 - **Generic SSOT config fan-out engine mechanics** → `agent-config-fanout`.
+- **Launch-mode ticket triage (Todo = launch-critical only, cut line, readout)** → `project-lifecycle`; the pass cost recipe → `interval-driver`.

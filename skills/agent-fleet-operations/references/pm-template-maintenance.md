@@ -154,6 +154,18 @@ Detailed checklist and acceptance criteria:
 - For self-checks: which fixes belong to the repo board vs the Hermes Agent PM
   board vs service-specific boards
 
+## Launch mode lives in the template and the role
+
+The launch pass driver (`template/.scripts/launch-pass.py`, `launch-pass.prompt.md`)
+ships in `hermes-agent-template`; the PM's launch behavior is `roles/pm.md`
+"## Launch mode" and `behavior.launch_mode` in flume. "Update the template to
+capture X" for a launch rule edits one of those, then recomposes with `flume
+remediate hermes.pm-scaffold <repo>`. Keep flume's submodule
+(`templates/hermes-agent`) and the standalone checkout
+`~/code/33GOD/hermes-agent-template` at the same pushed commit. The retired
+launch-director, paired-launch-director and em role templates are not an
+alternative path; see SKILL.md "Launch mode".
+
 ## Safety rules
 
 - Never invent event naming contracts; follow repo specs.

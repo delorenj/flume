@@ -289,3 +289,14 @@ The deployment is complete only when all of these assertions hold:
 If a required deployment skill is absent, repair its Skillex manifest/projection
 and validate `~/.agents/skills/<name>/SKILL.md`. Do not fabricate a placeholder
 or let the deployer mark the step complete after only warning.
+
+## Launch mode is not part of the hire
+
+`flume hire pm` deploys the one PM and never turns on a launch pass. Launch mode
+is repo data: the committed `<repo>/.launch.yaml` (`mode: launch`), then `flume
+launch enable <repo>` wires the external-pinned Hermes job and the Candybar
+`<repo>-pm-launch-pass`. A deployment with no `.launch.yaml`, or `mode: steady`,
+must have no enabled launch pass (`flume audit --rules hermes.launch-mode`). Do
+not hire a launch-director, paired-launch-director or em desk to run a launch;
+those titles are retired (2026-11-18). Procedure, retirement and the em-to-pm
+conversion: SKILL.md, "Launch mode".

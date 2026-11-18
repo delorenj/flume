@@ -23,7 +23,8 @@ try {
   buildSync({ entryPoints: [entry], bundle: true, platform: "node", format: "esm", packages: "external", outfile: bundle, logLevel: "silent",
     nodePaths: [join(root, "node_modules"), join(root, "packages/flume-hr/node_modules")] });
   const { composeSoul, specialistSchedulingRequest } = await import(pathToFileURL(bundle).href);
-  const declared = readdirSync(join(root, "roles")).filter(name => name.endsWith(".md") && !name.startsWith("_") && name !== "README.md").map(name => name.slice(0, -3));
+  const isRetired = name => /^retired:/mu.test(readFileSync(join(root, "roles", name), "utf8").split(/^---$/mu)[1] ?? "");
+  const declared = readdirSync(join(root, "roles")).filter(name => name.endsWith(".md") && !name.startsWith("_") && name !== "README.md" && !isRetired(name)).map(name => name.slice(0, -3));
   const roles = [...declared, "director", "infra-specialist", "unconfigured-future-role"];
   for (const role of roles) {
     check(`composer propagates byte-identical policy to ${role} (named and unnamed)`, () => {

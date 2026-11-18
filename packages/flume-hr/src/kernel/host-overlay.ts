@@ -79,11 +79,13 @@ export const LIFECYCLE_LABELS = Object.freeze({
   review: "lifecycle:review",
   needsInput: "lifecycle:needs-input",
   blocked: "lifecycle:blocked",
+  /** The owner took the ticket by hand: a hold only the owner adds or removes. */
+  human: "lifecycle:human",
   failed: "agent:failed",
 } as const);
 
 /** Labels that take a ticket out of the flow: never dispatched, never holding a slot. */
-export const HOLD_LABELS = Object.freeze([LIFECYCLE_LABELS.needsInput, LIFECYCLE_LABELS.blocked, LIFECYCLE_LABELS.failed] as const);
+export const HOLD_LABELS = Object.freeze([LIFECYCLE_LABELS.needsInput, LIFECYCLE_LABELS.blocked, LIFECYCLE_LABELS.human, LIFECYCLE_LABELS.failed] as const);
 
 /** Why a band outside LANE_BANDS is refused: the lane it names was retired into a label. */
 export const LANE_BANDS_NOTE = `lifecycle v2 boards have five stock lanes; review and holds are labels (${LIFECYCLE_LABELS.review}, ${HOLD_LABELS.join(", ")}), not lanes`;

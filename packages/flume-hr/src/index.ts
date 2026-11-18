@@ -45,6 +45,7 @@ import { githubApiBase, githubEvidence } from "./workforce/github";
 import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
 import { formatPlaneCommentResult, verifyPlaneComments } from "./workforce/plane";
 import { runEmployeeCommand } from "./workforce/launcher";
+import { disableLaunch, enableLaunch, formatLaunchPlan, formatLaunchStatus, launchStatus } from "./workforce/launch";
 import { homedir } from "node:os";
 import YAML from "yaml";
 import { join } from "node:path";
@@ -164,11 +165,53 @@ async function specialistResult(action: () => Promise<unknown>, json: boolean): 
   }
 }
 
-program.command("launch")
+// `flume launch` has two faces. `flume launch status|enable|disable [repo]` wires a repo's PM launch
+// pass (launch mode, `.launch.yaml`); `flume launch <employee> [-- hermes args]` is the older
+// portable-specialist launcher and stays the default subcommand, so every existing invocation works.
+const launchCommand = program.command("launch")
+  .description("Launch mode for a repo's PM (status | enable | disable), or launch a portable employee");
+
+async function launchResult(action: () => unknown, format: (value: any) => string, json: boolean): Promise<void> {
+  guardBrokenPipe();
+  try {
+    const result = action() as { ok: boolean };
+    await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : `${format(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
+  } catch (error) {
+    await writeStdout(json ? `${JSON.stringify({ ok: false, error: (error as Error).message })}\n` : `\u2717 ${(error as Error).message}\n`);
+    await exitAfterFlush(1);
+  }
+}
+
+launchCommand.command("status")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("Declaration, PM desk, wrappers, Hermes job, Candybar state and last run for a repo's launch pass")
+  .option("--json", "Output machine-parseable JSON")
+  .action((repo: string | undefined, options) => launchResult(() => launchStatus(repo), formatLaunchStatus, Boolean(options.json)));
+
+launchCommand.command("enable")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("Wire the launch pass: wrappers, external Hermes job, Candybar manifest, registered and enabled. Needs .launch.yaml `mode: launch` and a pm desk. Idempotent; adopts what exists")
+  .option("--dry-run", "Print the plan and change nothing")
+  .option("--schedule <cron>", "5-field cron for a new or re-scheduled pass (default: hourly 08-22 at a per-repo minute; an adopted job keeps its own)")
+  .option("--timezone <iana>", "IANA timezone for the schedule (default: the job's, else America/New_York)")
+  .option("--json", "Output machine-parseable JSON")
+  .action((repo: string | undefined, options) => launchResult(
+    () => enableLaunch(repo, { dryRun: Boolean(options.dryRun), ...(options.schedule ? { schedule: options.schedule } : {}), ...(options.timezone ? { timezone: options.timezone } : {}) }),
+    formatLaunchPlan, Boolean(options.json)));
+
+launchCommand.command("disable")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("Pause the repo's Candybar launch pass (manifest and Hermes job stay). Use when .launch.yaml goes steady")
+  .option("--dry-run", "Print the plan and change nothing")
+  .option("--json", "Output machine-parseable JSON")
+  .action((repo: string | undefined, options) => launchResult(() => disableLaunch(repo, { dryRun: Boolean(options.dryRun) }), formatLaunchPlan, Boolean(options.json)));
+
+launchCommand.command("employee", { isDefault: true, hidden: true })
   .argument("<employee>", "Portable specialist identity")
   .argument("[hermesArgs...]", "Hermes CLI arguments following --")
   .option("--cwd <directory>", "Working directory (default: caller's current directory)")
-  .description("Launch Hermes with a portable employee's charter, loadout and personal memory")
+  .description("Launch Hermes with a portable employee's charter, loadout and personal memory (the default: `flume launch <employee>`)")
   .action(async (employee: string, args: string[], options) => {
     try { process.exitCode = await launchSpecialist(employee, args, options.cwd); }
     catch (error) { console.error((error as Error).message); process.exitCode = 1; }
