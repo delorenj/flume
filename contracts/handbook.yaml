@@ -594,16 +594,9 @@ service_model:
 # pass -- an authorized gap is still reported with its own state.
 health_policy:
   # Domains an aggregate must have observed before it may claim proof. All nine
-  # are required; the deferred_capabilities below are what carve out the halves
-  # no adapter exists for in this release. Generated-profile health is no longer
-  # one of them: the profile observer (story 1.7) proves it through the
-  # canonical renderer's own check, so `profile.render_generation` is answered
-  # rather than deferred. Neither is systemd topology: the systemd observer
-  # (story 1.8) samples the user manager itself, so `unit_topology` is answered
-  # too. THREE deferrals remain, not two: live-process attribution (owner 1.9)
-  # and Bloodbank routing liveness (owner 1.10), both whole-domain, plus the
-  # capability-level `release_provenance`/`fleet.registry_file` (owner 1.1) --
-  # that last one is easy to forget because its domain still reports verdicts.
+  # are required; the deferred_capabilities below carve out capabilities not
+  # implemented yet. Process attribution is observed from /proc by story 1.9;
+  # Bloodbank routing liveness and release provenance remain deferred.
   required_domains:
     - registry
     - project_binding
@@ -619,13 +612,6 @@ health_policy:
   # it. Each entry authorizes ONE unsupported answer; it never authorizes
   # inferring the answer from something else.
   deferred_capabilities:
-    - domain: live_process
-      capability: process_attribution
-      reason: >-
-        No process observer exists in this release: nothing in the build reads
-        the process table, so no running Hermes process can be attributed to a
-        registry row or classified as sprawl.
-      owner_story: "1.9"
     - domain: bloodbank
       capability: routing_liveness
       reason: >-

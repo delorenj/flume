@@ -32,22 +32,13 @@
 //     isolated and concurrency-capped -- at the cost of depending on
 //     `pjangler audit --json` being parse-safe, which is why this story fixes
 //     the flush.
-//   * `--live` MEANS "MAY REACH THE HOST AND THE NETWORK, READ-ONLY", AND
-//     NOTHING ELSE. The bmad rule's `npm view` is a real network call, so the
-//     audit is gated. `--live` does not conjure a process or Bloodbank-liveness
-//     observer -- those stay `unsupported`/`unobserved`, by name, with the story
-//     that owns them. The systemd observer is NOT gated on it: sampling the user
-//     manager is a bounded, read-only local read that every scope performs, and
-//     what `--live` adds there is only the two recipe rules its readings are
-//     then checked for agreement against.
-//   * `data` IS DETERMINISTIC. No timestamp, duration, pid, hostname, or
-//     ordering by completion: the child's `auditedAt` is dropped at the boundary
-//     and every path goes through `redactHome`. Two runs over unchanged state
-//     produce byte-identical `data`, which is what turns the CLI/MCP parity
-//     assertion into an equality rather than a resemblance.
+//   * Local /proc observation is read-only and runs even without `--live`;
+//     that flag permits the recipe audit's network and host reads.
+//   * `data` IS BOUNDED. Process PIDs are live snapshots and may change between
+//     runs; other stable store facts remain comparable across adapters.
 //
-// What this module deliberately does NOT do: observe live processes or
-// Bloodbank liveness (stories 1.9/1.10); mutate anything, anywhere; or run
+// What this module deliberately does NOT do: control observed processes,
+// observe Bloodbank routing liveness, mutate services or agent records, or run
 // the credentialed `momo-lifecycle-plane` profile.
 
 import { createHash } from "node:crypto";
@@ -87,6 +78,7 @@ import {
 } from "./inventory";
 import { bounded, redactHome } from "./output";
 import { collectProfileHealth, resolveConfigHome, type FleetProfileAgentResult, type FleetProfileHealth } from "./profile";
+import { observeLiveProcesses, type LiveProcessReport } from "./live-process";
 import { collectFleetProvenance } from "./provenance";
 import { captureSelf, mapBounded, remainingMs, throwIfCancelled, type FleetRunContext } from "./runtime";
 import { collectScaffoldParity, type FleetScaffoldAgentResult, type FleetScaffoldParity } from "./scaffold";
@@ -378,7 +370,6 @@ const DOMAIN_AUTHORITY_BLOCK: Readonly<Record<FleetStatusDomain, string>> = Obje
  * reported, still `unsupported`, and now unjustified: DW-63's three domains
  * stop authorizing themselves.
  */
-const CAPABILITY_LIVE_PROCESS = "process_attribution";
 const CAPABILITY_BLOODBANK_LIVENESS = "routing_liveness";
 /**
  * The scaffold observer's own gap: a contract with no `scaffold_manifest` gives
@@ -443,6 +434,7 @@ const SOURCE_REGISTRY = "fleet-inventory";
 const SOURCE_PROVENANCE = "fleet-provenance";
 const SOURCE_AUDIT = "recipe-audit";
 const SOURCE_DECLARED_GAP = "declared-gap";
+const SOURCE_LIVE_PROCESS = "procfs";
 /** The scaffold observer (story 1.6): role directories against the template at the committed gitlink. */
 const SOURCE_SCAFFOLD = "fleet-scaffold";
 
@@ -868,7 +860,7 @@ export function resolveStatusScope(
   const parts: string[] = [];
   parts.push(agentId ? `scoped to agent ${agentId}` : "whole registered fleet");
   parts.push(selectedDomain ? `domain ${selectedDomain} only` : "all nine domains");
-  parts.push(live ? "live host observation authorized" : "no live observation (--live not given)");
+  parts.push(live ? "live host and network audit authorized" : "local read-only observation; network audit not authorized (--live not given)");
 
   return {
     scope: {
@@ -1396,19 +1388,6 @@ export function observeFromInventory(
       capability: CAPABILITY_BLOODBANK_LIVENESS,
       observed: "not observed",
       desired: "the fleet-shared gateway proven able to dispatch to this target",
-    }));
-  }
-
-  if (domains.has("live_process")) {
-    out.push(observation(ctx, {
-      domain: "live_process", agentId, state: "unsupported",
-      field: "processes.{agent_id}",
-      summary: "no live-process observer exists in this release",
-      details: ["there is no ps, pgrep, or /proc read anywhere in this build; process attribution is story 1.9"],
-      source: SOURCE_DECLARED_GAP,
-      capability: CAPABILITY_LIVE_PROCESS,
-      observed: "not observed",
-      desired: "every running Hermes process attributed to a registry row",
     }));
   }
 
@@ -2499,6 +2478,12 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   for (const name of profileNameByAgent.values()) if (name !== null) profileNameClaims.set(name, (profileNameClaims.get(name) ?? 0) + 1);
   const duplicateProfileNames = new Set([...profileNameClaims.entries()].filter(([, count]) => count > 1).map(([name]) => name));
 
+  // The process table is host-wide even under --agent; attribution cannot use a
+  // scoped registry because another employee might claim the same profile.
+  const liveProcesses: LiveProcessReport | null = domainSet.has("live_process")
+    ? observeLiveProcesses(runContext, profileNameByAgent, resolveFleetHome(env, home))
+    : null;
+
   const policy = readHealthPolicy(contract);
   // The manifest is read only when the domain it feeds is selected: a
   // `--domain registry` run must not resolve render inputs it will never use.
@@ -3350,6 +3335,41 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     }
   }
 
+  if (liveProcesses !== null) {
+    const selected = liveProcesses.processes.filter((item) => item.employee === null);
+    const gateways = selected.filter((item) => item.kind === "gateway" && item.state === "unattributed");
+    const sprawl = selected.filter((item) => item.state !== "unattributed" || item.kind !== "gateway");
+    const state: FleetStatusState = !liveProcesses.complete ? "error" : sprawl.length > 0 || gateways.length !== 1 ? "warn" : "pass";
+    const field = DOMAIN_FIELD.live_process;
+    const retrieval = retrievalFor(null, "live_process", live);
+    const classification = classifyObservation({
+      domain: "live_process", state, field, ruleId: "live_process.host", ruleScope: "host",
+      source: SOURCE_LIVE_PROCESS, capability: null, evidence: null, fixable: false,
+      exceptionId: null, exceptionReason: null, freshness: "not_applicable", repo: null,
+      retrieval, activationField: ctx.activationField, activationOwner: ctx.activationOwner,
+    }, ctx.policy);
+    hostByRule.set("live_process.host", {
+      finding: {
+        rule_id: "live_process.host", owner: ctx.domainOwner("live_process"), domain: "live_process",
+        state, summary: !liveProcesses.complete ? "process observation incomplete" :
+          sprawl.length > 0 || gateways.length > 1 ? "unexplained or conflicting Hermes runtime on host" :
+            "selected Hermes processes match the host topology",
+        details: boundedDetails([
+          "source /proc: numeric PIDs, Hermes executable or comm; profile flags and HERMES_HOME identify employees; no arbitrary argv or environment values reported",
+          ...liveProcesses.errors,
+          ...selected.map((item) => `PID ${item.pid} ${item.kind}: ${item.reason} (${item.evidence.join(", ")})`),
+        ]),
+        finding_id: statusFindingId("host", null, "live_process", "live_process.host", field, SOURCE_LIVE_PROCESS),
+        retrieval, applicability: classification.applicability, evidence: classification.evidence,
+        freshness: classification.freshness, severity: classification.severity, repair: classification.repair,
+        observed: `${liveProcesses.processes.length} selected process(es), ${gateways.length} shared gateway(s), ${liveProcesses.errors.length} read error(s)`,
+        desired: "at most one shared gateway and every other selected process uniquely attributable to an employee",
+        next_action: classification.next_action, next_action_class: classification.next_action_class,
+        justification: classification.justification,
+      }, states: new Map([[state, 1]]),
+    });
+  }
+
   const agentRecords: FleetStatusAgent[] = [];
   let totalObservations = 0;
   let emittedObservations = 0;
@@ -3373,6 +3393,26 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     const row = rowsById.get(agentId)!;
     const own: FleetStatusObservation[] = [];
     own.push(...observeFromInventory(ctx, row, domainSet));
+    if (liveProcesses !== null) {
+      const attributed = liveProcesses.processes.filter((item) => item.employee === agentId);
+      for (const item of attributed) own.push(observation(ctx, {
+        domain: "live_process", agentId, state: "pass", field: `processes.${item.pid}`,
+        summary: `PID ${item.pid} ${item.kind} uniquely attributed to ${agentId}`,
+        details: item.evidence, source: SOURCE_LIVE_PROCESS,
+        observed: `PID ${item.pid} ${item.kind}`, desired: "one registered employee identified by consistent profile evidence",
+        evidence: "direct",
+      }));
+      own.push(observation(ctx, {
+        domain: "live_process", agentId,
+        state: liveProcesses.complete ? "pass" : "error",
+        field: DOMAIN_FIELD.live_process,
+        summary: liveProcesses.complete ? `${attributed.length} process(es) attributed to this employee; host findings report all remaining selected PIDs` :
+          "process visibility incomplete; attribution cannot be claimed complete",
+        details: liveProcesses.errors, source: SOURCE_LIVE_PROCESS,
+        observed: liveProcesses.complete ? `${attributed.length} attributed` : "incomplete process table",
+        desired: "all selected Hermes processes accounted for",
+      }));
+    }
     if (needsProvenance) own.push(...observeFromProvenance(ctx, provenanceFacts, agentId, domainSet));
 
     // Story 1.6: the scaffold observer's group observations and per-agent
