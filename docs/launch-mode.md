@@ -8,7 +8,7 @@ repos that use it.
 | piece | where | owner |
 | --- | --- | --- |
 | charter | `roles/pm.md`, `## Launch mode` (inert without the declaration) | flume |
-| declaration | `<repo>/.launch.yaml` (`mode: launch \| steady`, `finish_line`, `contract`, `epic`, optional `cut_line`) | **Jarad only**; the PM proposes `mode: steady` in a ticket |
+| declaration | `<repo>/.launch.yaml` (`mode: launch \| steady`, `finish_line`, `contract`, `epic`, optional `cut_line`, optional `scopes: [child dirs]` for a monorepo parent) | **Jarad only**; the PM proposes `mode: steady` in a ticket |
 | driver | `<desk>/.scripts/launch-pass.py` (`--monitor`, `--brief`, `--apply plan.json`) | hermes-agent template |
 | wrappers | `~/.hermes/profiles/<profile>/scripts/launch-{monitor,brief}.sh` (real files exec'ing the driver) | `flume launch enable` |
 | Hermes job | profile cron job, `scheduler: external`, lean (terminal,file,no_mcp; no skills; 10 iterations) | `flume launch enable` |
