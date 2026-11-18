@@ -3356,8 +3356,7 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
             "selected Hermes processes match the host topology",
         details: boundedDetails([
           "source /proc: numeric PIDs, Hermes executable or comm; profile flags and HERMES_HOME identify employees; no arbitrary argv or environment values reported",
-          ...liveProcesses.errors,
-          ...selected.map((item) => `PID ${item.pid} ${item.kind}: ${item.reason} (${item.evidence.join(", ")})`),
+          "individual PID findings below account for each unattributed process and read failure",
         ]),
         finding_id: statusFindingId("host", null, "live_process", "live_process.host", field, SOURCE_LIVE_PROCESS),
         retrieval, applicability: classification.applicability, evidence: classification.evidence,
@@ -3368,6 +3367,47 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
         justification: classification.justification,
       }, states: new Map([[state, 1]]),
     });
+    for (const item of selected) {
+      const pidRule = `live_process.pid.${item.pid}`;
+      const pidState: FleetStatusState = item.state === "error" ? "error" : item.kind === "gateway" && item.state === "unattributed" && gateways.length === 1 ? "pass" : "warn";
+      const classification = classifyObservation({
+        domain: "live_process", state: pidState, field: `processes.${item.pid}`, ruleId: pidRule, ruleScope: "host",
+        source: SOURCE_LIVE_PROCESS, capability: null, evidence: null, fixable: false,
+        exceptionId: null, exceptionReason: null, freshness: "not_applicable", repo: null,
+        retrieval, activationField: ctx.activationField, activationOwner: ctx.activationOwner,
+      }, ctx.policy);
+      hostByRule.set(pidRule, { finding: {
+        rule_id: pidRule, owner: ctx.domainOwner("live_process"), domain: "live_process", state: pidState,
+        summary: `PID ${item.pid} ${item.kind}: ${item.reason}`,
+        details: boundedDetails(item.evidence),
+        finding_id: statusFindingId("host", null, "live_process", pidRule, `processes.${item.pid}`, SOURCE_LIVE_PROCESS),
+        retrieval, applicability: classification.applicability, evidence: classification.evidence,
+        freshness: classification.freshness, severity: classification.severity, repair: classification.repair,
+        observed: `PID ${item.pid} ${item.kind}`, desired: "unique registered employee or the one shared host gateway",
+        next_action: classification.next_action, next_action_class: classification.next_action_class,
+        justification: classification.justification,
+      }, states: new Map([[pidState, 1]]) });
+    }
+    for (const [index, reason] of liveProcesses.errors.entries()) {
+      if (/^PID [0-9]+: identity metadata unavailable$/u.test(reason)) continue;
+      const pidRule = `live_process.read.${index}`;
+      const classification = classifyObservation({
+        domain: "live_process", state: "error", field: DOMAIN_FIELD.live_process, ruleId: pidRule, ruleScope: "host",
+        source: SOURCE_LIVE_PROCESS, capability: null, evidence: null, fixable: false,
+        exceptionId: null, exceptionReason: null, freshness: "not_applicable", repo: null,
+        retrieval, activationField: ctx.activationField, activationOwner: ctx.activationOwner,
+      }, ctx.policy);
+      hostByRule.set(pidRule, { finding: {
+        rule_id: pidRule, owner: ctx.domainOwner("live_process"), domain: "live_process", state: "error",
+        summary: reason, details: ["process read was denied, unavailable or exited"],
+        finding_id: statusFindingId("host", null, "live_process", pidRule, DOMAIN_FIELD.live_process, SOURCE_LIVE_PROCESS),
+        retrieval, applicability: classification.applicability, evidence: classification.evidence,
+        freshness: classification.freshness, severity: classification.severity, repair: classification.repair,
+        observed: "unreadable", desired: "bounded readable process metadata",
+        next_action: classification.next_action, next_action_class: classification.next_action_class,
+        justification: classification.justification,
+      }, states: new Map([["error", 1]]) });
+    }
   }
 
   const agentRecords: FleetStatusAgent[] = [];

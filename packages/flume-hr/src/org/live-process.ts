@@ -54,12 +54,15 @@ export function observeLiveProcesses(
   try { entries = source.list(); }
   catch { return { processes, errors: ["process table unavailable or denied"], complete: false }; }
   if (entries.length > 100_000) return { processes, errors: ["process table exceeds observation bound"], complete: false };
+  const numeric = entries.filter((entry) => /^[1-9][0-9]*$/u.test(entry));
+  if (numeric.length === 0 && entries.length === 0) return { processes, errors, complete: true };
+  if (numeric.length === 0) return { processes, errors: ["process table contains no readable process IDs"], complete: false };
   const names = new Map<string, string[]>();
   for (const [id, profile] of registered) {
     if (profile !== null) names.set(profile, [...(names.get(profile) ?? []), id]);
   }
   const root = resolve(sharedHome);
-  for (const pid of entries.filter((entry) => /^[1-9][0-9]*$/u.test(entry)).sort((a, b) => Number(a) - Number(b))) {
+  for (const pid of numeric.sort((a, b) => Number(a) - Number(b))) {
     remainingMs(ctx);
     let comm: string;
     let args: string[];
