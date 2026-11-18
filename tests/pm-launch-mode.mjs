@@ -41,7 +41,7 @@ try {
     assert.match(body, /With no file, or `mode: steady`,\s+this section is inert/);
     // The rules absorbed from the Launch Director charter.
     assert.match(body, /\*\*One finish line:\*\* the declaration's `finish_line`, `contract` and `epic`/);
-    assert.match(body, /If the repo has a Launch Director desk, apply its cut line instead/);
+    assert.match(body, /If the repo has a Launch Director desk, apply its cut line and\s+leave\s+verdicts to it/);
     assert.match(body, /\*\*Todo holds only launch-critical work\*\*, owner-filed bugs on top/);
     assert.match(body, /Only\s+owner-filed High or Urgent bugs block the finish line/);
     assert.match(body, /\*\*His play is the gate; silence is approval\.\*\* Never ask Jarad to verify or\s+sign off/);
