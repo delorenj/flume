@@ -1,0 +1,1289 @@
+{
+  "recorded_at": "2026-11-18T23:40:52.877057+00:00",
+  "outcome": "PASS: both public specialist launches completed native retain and separate fresh-session native recall; both scoped audits in good standing.",
+  "initial_flume_commit": "fe21461e7acbc59a190eb0d0bf5aee7c006d4ca9",
+  "template_commit": "96e7e288026782358584b9b85c764659d240ee0d",
+  "invocation": {
+    "path": "/home/delorenj/.hermes/hermes-agent/hermes_cli/gateway_chat.py",
+    "sha256": "f689d2471c2020e2b884375f45dc850332af934f958d2a633ec1275cf6ebdb02",
+    "validation_lines": "# These options change execution or require frontend facilities not yet exposed by\n# the authority. Reject them, rather than mutate process-wide gateway settings.\n_UNSUPPORTED = (\n    \"image\", \"worktree\", \"w\",\n    \"no_restore_cwd\",\n    \"run_budget\", \"verbose\", \"compact\",\n)\n_POLICY = (\"model\", \"provider\", \"reasoning\", \"toolsets\", \"max_turns\", \"base_url\", \"ignore_rules\", \"api_key\",\n           \"yolo\", \"safe_mode\", \"ignore_user_config\", \"skills\", \"checkpoints\", \"accept_hooks\", \"pass_session_id\")\n# Where each refused option lives now; the refusal names it so the user is not left guessing.\n_RELOCATED = {\n    \"image\": \"`hermes --tui` or the Desktop app to attach the image\",\n    \"worktree\": \"`hermes --tui -w`\",\n    \"w\": \"`hermes --tui -w`\",\n    \"no_restore_cwd\": \"`--in <dir>` (the gateway keeps the session's frozen cwd)\",\n    \"run_budget\": \"`agent.run_budget_seconds` in config.yaml\",\n    \"verbose\": \"`hermes logs --follow`, or `hermes chat --tui -v`\",\n    \"compact\": \"`display.compact: true` in config.yaml\",\n    \"create-if-missing without -c <name>\": \"`-c <name> --create-if-missing`\",\n}\n_SAFE_MODE_EXAMPLE = 'hermes chat --safe-mode --provider openrouter --model anthropic/claude-sonnet-4 -q \"hello\"'",
+    "supported_oneshot_lines": "async def run_gateway_chat(args, emitter=None):\n    from hermes_cli.gateway_chat_view import GatewayChatView\n    query = getattr(args, \"query\", None) or getattr(args, \"q\", None)\n    oneshot_prompt = getattr(args, \"oneshot\", None)\n    if isinstance(oneshot_prompt, str):\n        query = oneshot_prompt\n    quiet = bool(getattr(args, \"quiet\", False) or oneshot_prompt or emitter is not None)\n    # Finite: answer one prompt and exit (-z, --oneshot, -Q, stream-json, or -q off a TTY).\n    oneshot = bool(oneshot_prompt or getattr(args, \"oneshot_exit\", False) or quiet or\n                   (query and not (sys.stdin.isatty() and sys.stdout.isatty())))",
+    "supported_max_turns_lines": "def _launch_flags(args):\n    \"\"\"The creation flags the user passed. Identity, not equality: ``--max-turns 0`` (unlimited)\n    is a value, while ``0 == False`` would drop it to the profile default.\"\"\"\n    return {key: value for key in _POLICY if (value := getattr(args, key, None)) is not None and value is not False}",
+    "supported_stream_json_lines": "    from websockets.exceptions import WebSocketException\n    emitter = None\n    if getattr(args, \"output_format\", \"text\") == \"stream-json\":\n        # Built before validation/connection so any failed start still closes the protocol\n        # (init + result) instead of exiting with an empty stdout.\n        from hermes_cli.stream_json import StreamJsonEmitter\n        emitter = StreamJsonEmitter(model=getattr(args, \"model\", None) or \"\")",
+    "external_wall_timeout_seconds": 300,
+    "max_turns": 8,
+    "run_budget_flag_omitted": true,
+    "runtime_config_changed": false
+  },
+  "policy": {
+    "infra-specialist": {
+      "run_budget_seconds": null,
+      "personal_bank": "agent-infra-specialist"
+    },
+    "n8n-specialist": {
+      "run_budget_seconds": null,
+      "personal_bank": "agent-n8n-specialist"
+    }
+  },
+  "employees": {
+    "infra-specialist": {
+      "personal_bank": "agent-infra-specialist",
+      "scoped_audit_before": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "infra-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.57,
+        "timed_out": false,
+        "stdout": "{\n  \"ok\": true,\n  \"id\": \"infra-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"write_bank\": \"agent-infra-specialist\",\n  \"recall_banks\": [\n    \"agent-infra-specialist\",\n    \"infra\",\n    \"docker\"\n  ],\n  \"skills\": [\n    \"delonet-conventions\",\n    \"delonet-dotenv\",\n    \"stacks-deploy\",\n    \"systemd-agent-service-diagnostics\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      "scoped_audit_after": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "infra-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.61,
+        "timed_out": false,
+        "stdout": "{\n  \"ok\": true,\n  \"id\": \"infra-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"write_bank\": \"agent-infra-specialist\",\n  \"recall_banks\": [\n    \"agent-infra-specialist\",\n    \"infra\",\n    \"docker\"\n  ],\n  \"skills\": [\n    \"delonet-conventions\",\n    \"delonet-dotenv\",\n    \"stacks-deploy\",\n    \"systemd-agent-service-diagnostics\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      "sessions": {
+        "retain": {
+          "command": [
+            "flume",
+            "launch",
+            "infra-specialist",
+            "--cwd",
+            "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "--",
+            "chat",
+            "--oneshot",
+            "--format",
+            "stream-json",
+            "--max-turns",
+            "8",
+            "-q",
+            "FLUME-29 inspection-only live acceptance. You are infra-specialist. In this session: (1) identify your loaded employee charter, enumerate the curated role skill names and inherited shared guidance exposed to you, and load one relevant curated role skill plus shared delonet-conventions guidance using native skill tools; (2) obtain actual CWD using a bounded read-only pwd terminal call; (3) use the NATIVE Hindsight retain tool, discovering its schema if necessary, to persist ONLY in your OWN personal bank this harmless employee-attributed preference: \"infra-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes. Historical acceptance marker FLUME29-LIVE2-20261118-infra-specialist.\" This is an attributed employee operational preference, not a user preference or an active infrastructure problem. Wait for a native successful result and report its bank and operation/document identifiers. Do not claim persistence from prose alone. Expected CWD: /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof. Only native own-bank memory retain may persist state. No infrastructure changes, deployments, workflow edits/execution, file writes, credential reads/writes, service control, scheduling, CLI/HTTP memory substitute, or additional-bank writes. Keep tool use focused and final concise."
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 81.03,
+          "timed_out": false,
+          "stderr": "  1Password: applied 16 secrets\nSession: local-146fce7875f89c6e2b51dc6846cd6093478095e414e60480735be191dd3e71a7\n\nsession_id: local-146fce7875f89c6e2b51dc6846cd6093478095e414e60480735be191dd3e71a7\n",
+          "result": {
+            "type": "result",
+            "session_id": "local-146fce7875f89c6e2b51dc6846cd6093478095e414e60480735be191dd3e71a7",
+            "exit_code": 0,
+            "text": "Charter: Big Chungus, infra-specialist \u2014 inspect and operate DeLoNET infrastructure across working directories. Confirmed in /home/delorenj/.hermes/profiles/infra-specialist/SOUL.md.\n\nCharter-designated role skills:\n  delonet-conventions\n  delonet-dotenv\n  stacks-deploy\n  systemd-agent-service-diagnostics\n\nInherited shared guidance: inspect before changing; distinguish source, installed runtime and live proof; preserve unrelated work; protect credentials; use Candybar as the sole recurring clock; verify actual execution; keep personal writes in agent-infra-specialist.\n\nLoaded through native skill_view:\n  systemd-agent-service-diagnostics\n  delonet-conventions\n\nActual terminal pwd matched:\n  /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof\n\nNative Hindsight retain submitted the exact employee-attributed preference and historical marker. Result: \u201cMemory stored successfully.\u201d\n  Configured personal bank: agent-infra-specialist\n  Operation/document identifiers: not exposed by the native response. Native recall also returned no identifiers, so identifier-level acceptance remains unproven.\n\nNo infrastructure, workflow, file, credential, service or scheduling changes were made.",
+            "tokens": {
+              "input": 97813,
+              "output": 1218,
+              "total": 99031,
+              "cache_read": 74368,
+              "cache_write": 0
+            },
+            "duration_ms": 77589,
+            "timestamp": 1795045053068
+          },
+          "tool_events": [
+            {
+              "type": "tool_use",
+              "name": "skill_view",
+              "tool_call_id": "call_88e63dfeb1754350acdf852da115a46e",
+              "input": {
+                "file_path": "",
+                "name": "systemd-agent-service-diagnostics"
+              },
+              "timestamp": 1795044982947
+            },
+            {
+              "type": "tool_use",
+              "name": "skill_view",
+              "tool_call_id": "call_ed1814112eaa4ccfb674f6afc2a74280",
+              "input": {
+                "file_path": "",
+                "name": "delonet-conventions"
+              },
+              "timestamp": 1795044984523
+            },
+            {
+              "type": "tool_result",
+              "name": "skill_view",
+              "tool_call_id": "call_88e63dfeb1754350acdf852da115a46e",
+              "duration_ms": 1976,
+              "is_error": false,
+              "timestamp": 1795044984924,
+              "output_sha256": "4d40ee135b1b289b8480abbb92d2c451a21a9bdfe1360fe7acdd2f4403668868",
+              "output_excerpt": "{\"success\": true, \"name\": \"systemd-agent-service-diagnostics\", \"description\": \"Diagnose long-running agent or automation services managed by systemd when the unit file looks correct but the live process still behaves as if an old provider, model, binary, or environment override is active.\", \"tags\": ",
+              "excerpt_note": "First 300 characters of capped native skill response; full stream retained privately."
+            },
+            {
+              "type": "tool_result",
+              "name": "skill_view",
+              "tool_call_id": "call_ed1814112eaa4ccfb674f6afc2a74280",
+              "duration_ms": 409,
+              "is_error": false,
+              "timestamp": 1795044984932,
+              "output_sha256": "b2ff7ca6b4b35b2c2bdb5b203eeacb2e3f34e7ef5b6f46f1135218f2346ea5e5",
+              "output_excerpt": "{\"success\": true, \"name\": \"delonet-conventions\", \"description\": \"System conventions for the machines that run 33GOD: where code lives, how shells, secrets, containers, CI, git ignores and tooling are handled. Host-agnostic rules are here; per-network facts (addresses, tailnet, domains, container run",
+              "excerpt_note": "First 300 characters of capped native skill response; full stream retained privately."
+            },
+            {
+              "type": "tool_use",
+              "name": "terminal",
+              "tool_call_id": "call_279337605bb74891982c61ae3f2a8033",
+              "input": {
+                "background": false,
+                "command": "pwd",
+                "heartbeat": 0,
+                "notify": false,
+                "persist_on_release": false,
+                "pty": false,
+                "timeout": 10,
+                "workdir": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof"
+              },
+              "timestamp": 1795044985391
+            },
+            {
+              "type": "tool_result",
+              "name": "terminal",
+              "tool_call_id": "call_279337605bb74891982c61ae3f2a8033",
+              "output": "{\"output\": \"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof\", \"exit_code\": 0, \"error\": null}",
+              "duration_ms": 1632,
+              "is_error": false,
+              "timestamp": 1795044987023
+            },
+            {
+              "type": "tool_use",
+              "name": "search_files",
+              "tool_call_id": "call_5fb339c630db4f61a50f80f5f0cc8808",
+              "input": {
+                "context": 0,
+                "file_glob": "",
+                "limit": 30,
+                "offset": 0,
+                "order": "discovery",
+                "output_mode": "content",
+                "path": "/home/delorenj/.hermes/profiles/infra-specialist",
+                "pattern": "*AGENTS*",
+                "target": "files"
+              },
+              "timestamp": 1795044995954
+            },
+            {
+              "type": "tool_result",
+              "name": "search_files",
+              "tool_call_id": "call_5fb339c630db4f61a50f80f5f0cc8808",
+              "output": "{\"total_count\": 0}",
+              "duration_ms": 292,
+              "is_error": false,
+              "timestamp": 1795044996247
+            },
+            {
+              "type": "tool_use",
+              "name": "search_files",
+              "tool_call_id": "call_46378a088dc64f3aa3b26ef8da799388",
+              "input": {
+                "context": 0,
+                "file_glob": "",
+                "limit": 20,
+                "offset": 0,
+                "order": "discovery",
+                "output_mode": "content",
+                "path": "/home/delorenj/.hermes/profiles/infra-specialist",
+                "pattern": "*SOUL*",
+                "target": "files"
+              },
+              "timestamp": 1795045004901
+            },
+            {
+              "type": "tool_use",
+              "name": "search_files",
+              "tool_call_id": "call_067b8822b1274a30a3879344a33eccdf",
+              "input": {
+                "context": 2,
+                "file_glob": "*.md",
+                "limit": 30,
+                "offset": 0,
+                "order": "discovery",
+                "output_mode": "content",
+                "path": "/home/delorenj/.hermes/profiles/infra-specialist",
+                "pattern": "curated|employee charter|role skills",
+                "target": "content"
+              },
+              "timestamp": 1795045005182
+            },
+            {
+              "type": "tool_result",
+              "name": "search_files",
+              "tool_call_id": "call_46378a088dc64f3aa3b26ef8da799388",
+              "output": "{\"total_count\": 1, \"files\": [\"/home/delorenj/.hermes/profiles/infra-specialist/SOUL.md\"]}",
+              "duration_ms": 427,
+              "is_error": false,
+              "timestamp": 1795045005328
+            },
+            {
+              "type": "tool_result",
+              "name": "search_files",
+              "tool_call_id": "call_067b8822b1274a30a3879344a33eccdf",
+              "output": "{\"total_count\": 5, \"matches_format\": \"path-grouped: each file path on its own line, followed by indented '<line>: <content>' rows for matches in that file\", \"matches_text\": \"/home/delorenj/.hermes/profiles/infra-specialist/plugins/hindsight/README.md\\n  161: ```\\n  162: \\n  163: The setup wizard installs nothing (dependencies come with the plugin), walks you through configuration, and offers to seed the bank with a **starter memory template** (a curated set of dispositions/instructions for common agent roles) \u2014 you can skip it, and it warns before overwriting an already-configured bank.\\n  164: \\n  165: Or manually (cloud mode with defaults):\"}",
+              "duration_ms": 153,
+              "is_error": false,
+              "timestamp": 1795045005335
+            },
+            {
+              "type": "tool_use",
+              "name": "hindsight_retain",
+              "tool_call_id": "call_51efb545c6ba484eb8bb129db6392b7a",
+              "input": {
+                "content": "infra-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes. Historical acceptance marker FLUME29-LIVE2-20261118-infra-specialist.",
+                "context": "Attributed employee operational preference of infra-specialist; not a user preference or an active infrastructure problem.",
+                "occurred_at": "",
+                "tags": [
+                  "employee:infra-specialist",
+                  "operational-preference",
+                  "FLUME29-LIVE2-20261118-infra-specialist"
+                ]
+              },
+              "timestamp": 1795045005597
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_retain",
+              "tool_call_id": "call_51efb545c6ba484eb8bb129db6392b7a",
+              "output": "{\"result\": \"Memory stored successfully.\"}",
+              "duration_ms": 2365,
+              "is_error": false,
+              "timestamp": 1795045007963
+            },
+            {
+              "type": "tool_use",
+              "name": "read_file",
+              "tool_call_id": "call_64be0b39a9a942d495c6323dcf33c3dc",
+              "input": {
+                "limit": 250,
+                "offset": 1,
+                "path": "/home/delorenj/.hermes/profiles/infra-specialist/SOUL.md"
+              },
+              "timestamp": 1795045023403
+            },
+            {
+              "type": "tool_result",
+              "name": "read_file",
+              "tool_call_id": "call_64be0b39a9a942d495c6323dcf33c3dc",
+              "output": "{\"content\": \"1|# Big Chungus\\n2|\\n3|Inspect and operate DeLoNET infrastructure across working directories using the operator's established conventions.\\n4|\\n5|<!-- flume:scheduling-policy:start -->\\n6|## Recurring schedules: Candybar is the single clock\\n7|\\n8|**Candybar owns when; Hermes and services own execution.** Every new or changed\\n9|recurring task MUST use a registered Candybar manifest as its one scheduling\\n10|owner. Hermes may execute an agent invocation dispatched by Candybar; it MUST\\n11|NOT own an independent recurring schedule. systemd services and other workers\\n12|may be execution/service runners, not alternative clocks.\\n13|\\n14|Do NOT create or enable ad hoc systemd timers, cron entries, Hermes recurring\\n15|jobs, n8n Schedule Triggers, or embedded sleep/poll loops that schedule recurring\\n16|work outside Candybar. A new systemd timer is **not a Candybar**. Renaming a\\n17|scheduler to a service or wrapping it in an agent does not change ownership.\\n18|Bounded retries within one invocation and event-driven service consumers are\\n19|execution, not permission to start another recurring clock.\\n20|\\n21|The Hermes `cronjob` tool creates a Hermes-owned recurring job, so never use it\\n22|for recurring work (a one-shot is fine). Load the `candybar` skill to register,\\n23|change or retire a schedule.\\n24|\\n25|Before declaring a recurring task installed or migrated: commit its Candybar\\n26|manifest, read back the registered schedule through Candybar's API, prove an\\n27|actual terminal invocation and its intended effect, and verify every competing\\n28|native clock is disabled. Preserve evidence of the single-clock cutover; tests,\\n29|registration alone, or a successful dispatch receipt are not execution proof.\\n30|Externally pinned Hermes execution is allowed; an arbitrary agent daemon is not\\n31|required. From `~/code/33GOD/candybar/`, run the actual policy lint command:\\n32|`uv run candybar doctor --repo . --live --json`. Keep findings visible; this\\n33|instruction update does not claim runtime cutover or a clean machine.\\n34|\\n35|**Narrow exceptions, never a blanket infrastructure exemption:**\\n36|- The existing `candybar-watchdog.timer` and its page-only service remain OUTSIDE\\n37|  Candybar under AD-22 (`candybar/deploy/watchdog/README.md`), so failure of the\\n38|  scheduler itself remains observable. This exception is only that self-watchdog,\\n39|  not crank-watchdog or any other agent's recurring work; never register it as a\\n40|  Candybar or disable it merely to remove a bypass finding.\\n41|- Any OS/vendor infrastructure exemption or further owner-approved exception\\n42|  must name the exact schedule, responsible owner, scope, and explicit rationale\\n43|  in the owning component's exception record. Absence of that record is a policy\\n44|  violation, not implicit approval. Do not disable an unfamiliar infrastructure\\n45|  timer automatically: report it to its owner for classification.\\n46|<!-- flume:scheduling-policy:end -->\\n47|\\n48|- Discover current source, process state and logs before changing infrastructure; distinguish source verification from installed process and live service proof.\\n49|- Docker stacks live under ~/docker; public services use Cloudflare Tunnel and Traefik at ~/docker/core/traefik through the external proxy network.\\n50|- Use service hostnames in configuration; the current LAN is 192.168.1.0/24 and the tailnet is burro-salmon.ts.net. Never hardcode a stale LAN address.\\n51|- Inspect Compose configuration and running containers before recreating only the affected service; verify its health and hostname route afterward.\\n52|- Diagnose systemd user services through their units, installed launchers, live process environment and logs; reload and restart the actual affected runtime before claiming a fix.\\n53|- Keep non-secret literals in .env and credential references in .env.op as op://DeLoSecrets/<item>/<field>; resolve them into process environment with op run. Never place raw credentials in files, definitions, projections or evidence.\\n54|- Preserve unrelated work, handwritten configuration and other employees. Use canonical delonet-conventions, delonet-dotenv, stacks-deploy and systemd-agent-service-diagnostics rather than inventing policy.\\n55|\\n56|Tone: Direct, practical and concise.\\n57|\\n58|Personal memory: write only to agent-infra-specialist.\\n59|Recall scope (only these banks): agent-infra-specialist, infra, docker.\\n60|Your working directory is supplied by the caller; it does not change your identity or bank.\", \"total_lines\": 60, \"file_size\": 4298, \"truncated\": false, \"is_binary\": false, \"is_image\": false, \"not_found\": false}",
+              "duration_ms": 181,
+              "is_error": false,
+              "timestamp": 1795045023585
+            },
+            {
+              "type": "tool_use",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_68b7fe00b7514e828526b864e4494c74",
+              "input": {
+                "query": "Exact employee preference with historical acceptance marker FLUME29-LIVE2-20261118-infra-specialist. Return available document, memory, or operation identifiers and bank for this retained preference."
+              },
+              "timestamp": 1795045023768
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_68b7fe00b7514e828526b864e4494c74",
+              "duration_ms": 260,
+              "is_error": false,
+              "timestamp": 1795045024029,
+              "output_sha256": "464819fd78d31728b5d78944bad72dc73bb86a6c7cf8f483ba432a70db84d508",
+              "output_excerpt": "1. The infra-specialist employee has a portable-desk acceptance marker with name FLUME29-infra-specialist-95dea7ce8fcc for October 5, 2026. | When: 2026-10-05\n2. The infra-specialist employee's portable-desk acceptance marker is FLUME29-infra-specialist-f2a981e15ee6. | When: October 5, 2026 | Involving: infra-specialist | Serves as the acceptance marker for the portable-desk setup.",
+              "excerpt_note": "First two actual native result entries; remaining unrelated history omitted. Full scrubbed raw stream retained privately in scratch."
+            }
+          ],
+          "raw_stream_sha256": "773d97c7530c6c8b68aa7793d70afea13150880f2dcf7d9b38481935f2ef270e",
+          "runtime_session": {
+            "id": "local-146fce7875f89c6e2b51dc6846cd6093478095e414e60480735be191dd3e71a7",
+            "source": "oneshot",
+            "created_source": "oneshot",
+            "profile_name": "infra-specialist",
+            "transport_profile": "default",
+            "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "parent_session_id": null,
+            "model": "automaticai/auto",
+            "system_prompt_hash": "dfc788c8a99f1a772289ce3edbd8c98f53e2ef3f6b0db95321c884e39c1e6510",
+            "gateway_runtime": {
+              "provider": "automaticai",
+              "base_url": "https://api-direct.automaticai.io/v1",
+              "api_mode": "chat_completions",
+              "fallback_active": false
+            },
+            "system_prompt_checked_without_publication": {
+              "charter_title_present": true,
+              "own_bank_present": true,
+              "curated_role_skill_mentions": {
+                "delonet-conventions": true,
+                "delonet-dotenv": true,
+                "stacks-deploy": true,
+                "systemd-agent-service-diagnostics": true
+              },
+              "shared_guidance_mentions": {
+                "Candybar": true,
+                "delonet-conventions": true,
+                "credentials": true,
+                "skills": true
+              },
+              "charter_excerpt": "# Big Chungus",
+              "bank_excerpt": "Personal memory: write only to agent-infra-specialist."
+            }
+          },
+          "native_tool_call_id": "call_51efb545c6ba484eb8bb129db6392b7a",
+          "native_success": true
+        },
+        "recall": {
+          "command": [
+            "flume",
+            "launch",
+            "infra-specialist",
+            "--cwd",
+            "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "--",
+            "chat",
+            "--oneshot",
+            "--format",
+            "stream-json",
+            "--max-turns",
+            "8",
+            "-q",
+            "FLUME-29 inspection-only NEW-session recall acceptance. You are infra-specialist. Use the NATIVE Hindsight recall tool, discovering its schema if needed, against your OWN personal bank to retrieve the employee operational preference from historical marker FLUME29-LIVE2-20261118-infra-specialist. The marker is only a search key, not an active problem. Do not infer or invent the preference. Return the actual recalled preference, bank, native source identifiers and whether retrieval succeeded. Native result is required; prose assertion is not proof. No retain or memory edits in this session. No infrastructure changes, deployment, workflow edits/execution, file writes, credential reads/writes, service control, scheduling, CLI/HTTP memory substitutes or other-bank calls. Keep tool use focused and final concise."
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 30.67,
+          "timed_out": false,
+          "stderr": "  1Password: applied 16 secrets\nSession: local-a10f79cc839e2ce0ca64556388b90a3f35f52896d4ad5e9860824f435f6ca7b3\n\nsession_id: local-a10f79cc839e2ce0ca64556388b90a3f35f52896d4ad5e9860824f435f6ca7b3\n",
+          "result": {
+            "type": "result",
+            "session_id": "local-a10f79cc839e2ce0ca64556388b90a3f35f52896d4ad5e9860824f435f6ca7b3",
+            "exit_code": 0,
+            "text": "Retrieval succeeded via native hindsight_recall.\n\nPreference: \u201cThe infra-specialist prefers an inspection checklist ordered scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes.\u201d\n\nBank: agent-infra-specialist\nSearch marker: FLUME29-LIVE2-20261118-infra-specialist\nNative evidence: returned entries 1 and 2 explicitly match the marker.\nNative source identifiers: not exposed in the tool response; entry numbers are result positions, not source IDs.\n\nNo memory edits or infrastructure actions performed.",
+            "tokens": {
+              "input": 34387,
+              "output": 143,
+              "total": 34530,
+              "cache_read": 15872,
+              "cache_write": 0
+            },
+            "duration_ms": 27290,
+            "timestamp": 1795045099116
+          },
+          "tool_events": [
+            {
+              "type": "tool_use",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_749016d58f6b45b1948253d43f998b5e",
+              "input": {
+                "query": "FLUME29-LIVE2-20261118-infra-specialist"
+              },
+              "timestamp": 1795045080060
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_749016d58f6b45b1948253d43f998b5e",
+              "duration_ms": 289,
+              "is_error": false,
+              "timestamp": 1795045080350,
+              "output_sha256": "863841dbb7401737174cfa5b19d86e4f8dd41fc23aba680bf90a33a5faf1f3dc",
+              "output_excerpt": "1. The infra-specialist prefers an inspection checklist ordered scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes (historical acceptance marker FLUME29-LIVE2-20261118-infra-specialist).\n2. Employee-attributed preference stored in the agent-infra-specialist Hindsight bank: infra-specialist prefers an inspection checklist ordered scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes; historical acceptance marker FLUME29-LIVE2-20261118-infra-specialist. | When: November 18, 2026 | Involving: infra-specialist | Recorded as part of FLUME-29 inspection-only live acceptance",
+              "excerpt_note": "First two actual native result entries; remaining unrelated history omitted. Full scrubbed raw stream retained privately in scratch."
+            }
+          ],
+          "raw_stream_sha256": "4face0934e43b19bad3cbf8d72c7ff736f6a3c7d5ef03fbf1e31b4bb2f52198c",
+          "runtime_session": {
+            "id": "local-a10f79cc839e2ce0ca64556388b90a3f35f52896d4ad5e9860824f435f6ca7b3",
+            "source": "oneshot",
+            "created_source": "oneshot",
+            "profile_name": "infra-specialist",
+            "transport_profile": "default",
+            "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "parent_session_id": null,
+            "model": "automaticai/auto",
+            "system_prompt_hash": "20feb9bccf404cab5eb5e663f728a67461209253543d1131b4f09bce3bf783d3",
+            "gateway_runtime": {
+              "provider": "automaticai",
+              "base_url": "https://api-direct.automaticai.io/v1",
+              "api_mode": "chat_completions",
+              "fallback_active": false
+            },
+            "system_prompt_checked_without_publication": {
+              "charter_title_present": true,
+              "own_bank_present": true,
+              "curated_role_skill_mentions": {
+                "delonet-conventions": true,
+                "delonet-dotenv": true,
+                "stacks-deploy": true,
+                "systemd-agent-service-diagnostics": true
+              },
+              "shared_guidance_mentions": {
+                "Candybar": true,
+                "delonet-conventions": true,
+                "credentials": true,
+                "skills": true
+              },
+              "charter_excerpt": "# Big Chungus",
+              "bank_excerpt": "Personal memory: write only to agent-infra-specialist."
+            }
+          },
+          "native_tool_call_id": "call_749016d58f6b45b1948253d43f998b5e",
+          "native_success": true
+        }
+      },
+      "fresh_separate_session_verified": true,
+      "recall_prompt_contained_preference": false,
+      "native_operation_document_ids": "Not exposed by installed native provider; no identifiers invented."
+    },
+    "n8n-specialist": {
+      "personal_bank": "agent-n8n-specialist",
+      "scoped_audit_before": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "n8n-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.58,
+        "timed_out": false,
+        "stdout": "{\n  \"ok\": true,\n  \"id\": \"n8n-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"write_bank\": \"agent-n8n-specialist\",\n  \"recall_banks\": [\n    \"agent-n8n-specialist\",\n    \"n8n\"\n  ],\n  \"skills\": [\n    \"n8n-agents\",\n    \"n8n-binary-and-data\",\n    \"n8n-code-javascript\",\n    \"n8n-code-python\",\n    \"n8n-code-tool\",\n    \"n8n-error-handling\",\n    \"n8n-expression-syntax\",\n    \"n8n-mcp-tools-expert\",\n    \"n8n-multi-instance\",\n    \"n8n-node-configuration\",\n    \"n8n-self-hosting\",\n    \"n8n-subworkflows\",\n    \"n8n-validation-expert\",\n    \"n8n-workflow-patterns\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      "scoped_audit_after": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "n8n-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.63,
+        "timed_out": false,
+        "stdout": "{\n  \"ok\": true,\n  \"id\": \"n8n-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"write_bank\": \"agent-n8n-specialist\",\n  \"recall_banks\": [\n    \"agent-n8n-specialist\",\n    \"n8n\"\n  ],\n  \"skills\": [\n    \"n8n-agents\",\n    \"n8n-binary-and-data\",\n    \"n8n-code-javascript\",\n    \"n8n-code-python\",\n    \"n8n-code-tool\",\n    \"n8n-error-handling\",\n    \"n8n-expression-syntax\",\n    \"n8n-mcp-tools-expert\",\n    \"n8n-multi-instance\",\n    \"n8n-node-configuration\",\n    \"n8n-self-hosting\",\n    \"n8n-subworkflows\",\n    \"n8n-validation-expert\",\n    \"n8n-workflow-patterns\"\n  ]\n}\n",
+        "stderr": ""
+      },
+      "sessions": {
+        "retain": {
+          "command": [
+            "flume",
+            "launch",
+            "n8n-specialist",
+            "--cwd",
+            "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "--",
+            "chat",
+            "--oneshot",
+            "--format",
+            "stream-json",
+            "--max-turns",
+            "8",
+            "-q",
+            "FLUME-29 inspection-only live acceptance. You are n8n-specialist. In this session: (1) identify your loaded employee charter, enumerate the curated role skill names and inherited shared guidance exposed to you, and load one relevant curated role skill plus shared delonet-conventions guidance using native skill tools; (2) obtain actual CWD using a bounded read-only pwd terminal call; (3) use the NATIVE Hindsight retain tool, discovering its schema if necessary, to persist ONLY in your OWN personal bank this harmless employee-attributed preference: \"n8n-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes. Historical acceptance marker FLUME29-LIVE2-20261118-n8n-specialist.\" This is an attributed employee operational preference, not a user preference or an active infrastructure problem. Wait for a native successful result and report its bank and operation/document identifiers. Do not claim persistence from prose alone. Expected CWD: /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof. Only native own-bank memory retain may persist state. No infrastructure changes, deployments, workflow edits/execution, file writes, credential reads/writes, service control, scheduling, CLI/HTTP memory substitute, or additional-bank writes. Keep tool use focused and final concise."
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 50.73,
+          "timed_out": false,
+          "stderr": "  1Password: applied 16 secrets\nSession: local-58f4aefbea92a7fc41075fecf4c433ee93a8e77abda7c42fdb245419e9e79e17\n\nsession_id: local-58f4aefbea92a7fc41075fecf4c433ee93a8e77abda7c42fdb245419e9e79e17\n",
+          "result": {
+            "type": "result",
+            "session_id": "local-58f4aefbea92a7fc41075fecf4c433ee93a8e77abda7c42fdb245419e9e79e17",
+            "exit_code": 0,
+            "text": "Loaded employee charter: \u201cn8n Workflow Specialist,\u201d identity n8n-specialist. Its remit is canonical n8n workflow design, organization, maintenance, validation, and real execution verification, with personal memory writes restricted to agent-n8n-specialist.\n\nCurated role skills exposed (14):\nn8n-agents, n8n-binary-and-data, n8n-code-javascript, n8n-code-python, n8n-code-tool, n8n-error-handling, n8n-expression-syntax, n8n-mcp-tools-expert, n8n-multi-instance, n8n-node-configuration, n8n-self-hosting, n8n-subworkflows, n8n-validation-expert, n8n-workflow-patterns.\n\nInherited shared guidance exposed:\nDeLoNET conventions; Candybar single-clock policy; careful repository inspection and surgical edits; secret protection; real-tool verification; native skill discovery; scoped memory; parallel independent reads; concise plain-text reporting.\n\nNative skill loads succeeded:\n  n8n-mcp-tools-expert\n  delonet-conventions\n\nBounded pwd succeeded, exit 0:\n  /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof\n\nNative Hindsight retain submitted the exact requested employee-attributed preference and historical marker. Result: \u201cMemory stored successfully.\u201d\n  Personal bank configured for this session: agent-n8n-specialist\n  Operation/document identifiers: not exposed by the native response; unavailable to report.\n  Subsequent native recall returned the checklist preference, but no identifiers.\n\nNo infrastructure, workflow, file, credential, service, or scheduling changes were made. The native memory retain was the only requested state mutation.",
+            "tokens": {
+              "input": 93567,
+              "output": 901,
+              "total": 94468,
+              "cache_read": 64384,
+              "cache_write": 0
+            },
+            "duration_ms": 47419,
+            "timestamp": 1795045022912
+          },
+          "tool_events": [
+            {
+              "type": "tool_use",
+              "name": "skill_view",
+              "tool_call_id": "call_1f2d5f9b209a451a81dd6e8ab6915666",
+              "input": {
+                "file_path": "",
+                "name": "n8n-mcp-tools-expert"
+              },
+              "timestamp": 1795044982905
+            },
+            {
+              "type": "tool_use",
+              "name": "skill_view",
+              "tool_call_id": "call_0521ad0ed47b46d589d8b1995cd3fad0",
+              "input": {
+                "file_path": "",
+                "name": "delonet-conventions"
+              },
+              "timestamp": 1795044984316
+            },
+            {
+              "type": "tool_result",
+              "name": "skill_view",
+              "tool_call_id": "call_1f2d5f9b209a451a81dd6e8ab6915666",
+              "duration_ms": 1612,
+              "is_error": false,
+              "timestamp": 1795044984517,
+              "output_sha256": "7a998e4baf3c2bc1778083ae30edd923b6f33f34ed8ad00632b0249818bfaf87",
+              "output_excerpt": "{\"success\": true, \"name\": \"n8n-mcp-tools-expert\", \"description\": \"Expert guide for using n8n-mcp MCP tools effectively. Use when searching for nodes, validating configurations, accessing templates, managing workflows, managing credentials, auditing instance security, or using any n8n-mcp tool. Provi",
+              "excerpt_note": "First 300 characters of capped native skill response; full stream retained privately."
+            },
+            {
+              "type": "tool_result",
+              "name": "skill_view",
+              "tool_call_id": "call_0521ad0ed47b46d589d8b1995cd3fad0",
+              "duration_ms": 211,
+              "is_error": false,
+              "timestamp": 1795044984527,
+              "output_sha256": "b2ff7ca6b4b35b2c2bdb5b203eeacb2e3f34e7ef5b6f46f1135218f2346ea5e5",
+              "output_excerpt": "{\"success\": true, \"name\": \"delonet-conventions\", \"description\": \"System conventions for the machines that run 33GOD: where code lives, how shells, secrets, containers, CI, git ignores and tooling are handled. Host-agnostic rules are here; per-network facts (addresses, tailnet, domains, container run",
+              "excerpt_note": "First 300 characters of capped native skill response; full stream retained privately."
+            },
+            {
+              "type": "tool_use",
+              "name": "terminal",
+              "tool_call_id": "call_a5566e64dbdf4bc7bd7676e3c415e153",
+              "input": {
+                "background": false,
+                "command": "pwd",
+                "heartbeat": 0,
+                "notify": false,
+                "persist_on_release": false,
+                "pty": false,
+                "timeout": 10,
+                "workdir": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof"
+              },
+              "timestamp": 1795044984859
+            },
+            {
+              "type": "tool_result",
+              "name": "terminal",
+              "tool_call_id": "call_a5566e64dbdf4bc7bd7676e3c415e153",
+              "output": "{\"output\": \"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof\", \"exit_code\": 0, \"error\": null}",
+              "duration_ms": 268,
+              "is_error": false,
+              "timestamp": 1795044985128
+            },
+            {
+              "type": "tool_use",
+              "name": "hindsight_retain",
+              "tool_call_id": "call_8403824a89da4a4ca06241e92fb9cec9",
+              "input": {
+                "content": "n8n-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes. Historical acceptance marker FLUME29-LIVE2-20261118-n8n-specialist.",
+                "context": "Employee-attributed operational preference of n8n-specialist; not a user preference or an active infrastructure problem.",
+                "occurred_at": "",
+                "tags": [
+                  "employee:n8n-specialist",
+                  "operational-preference",
+                  "FLUME29-LIVE2-20261118-n8n-specialist"
+                ]
+              },
+              "timestamp": 1795044989617
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_retain",
+              "tool_call_id": "call_8403824a89da4a4ca06241e92fb9cec9",
+              "output": "{\"result\": \"Memory stored successfully.\"}",
+              "duration_ms": 2523,
+              "is_error": false,
+              "timestamp": 1795044992141
+            },
+            {
+              "type": "tool_use",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_de92f5a528474014af3c2322df1dd1d2",
+              "input": {
+                "query": "Exact historical acceptance marker FLUME29-LIVE2-20261118-n8n-specialist; n8n-specialist employee operational preference inspection checklist scope dependencies rollback verification."
+              },
+              "timestamp": 1795045002690
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_de92f5a528474014af3c2322df1dd1d2",
+              "duration_ms": 300,
+              "is_error": false,
+              "timestamp": 1795045002990,
+              "output_sha256": "1170e391300f8aa15cf3f06425e50c4ddcede4ca675a832dbb8e0e64c2d227f1",
+              "output_excerpt": "1. Workforce deployment verification identifier for n8n-specialist is FLUME29-n8n-specialist-7e0e94fe22e8.\n2. Workforce deployment verification identifier for n8n-specialist is FLUME29-n8n-specialist-7e0e94fe22e8.",
+              "excerpt_note": "First two actual native result entries; remaining unrelated history omitted. Full scrubbed raw stream retained privately in scratch."
+            }
+          ],
+          "raw_stream_sha256": "37e8fbc72921449ccced5bf1b1bba5594b49220b18798d60d4a16d5bb0900136",
+          "runtime_session": {
+            "id": "local-58f4aefbea92a7fc41075fecf4c433ee93a8e77abda7c42fdb245419e9e79e17",
+            "source": "oneshot",
+            "created_source": "oneshot",
+            "profile_name": "n8n-specialist",
+            "transport_profile": "default",
+            "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "parent_session_id": null,
+            "model": "automaticai/auto",
+            "system_prompt_hash": "55960dd8d104aa02ef1ca763c842099646057ea8e789a4cf7be1bdb42d1f93cc",
+            "gateway_runtime": {
+              "provider": "automaticai",
+              "base_url": "https://api-direct.automaticai.io/v1",
+              "api_mode": "chat_completions",
+              "fallback_active": false
+            },
+            "system_prompt_checked_without_publication": {
+              "charter_title_present": true,
+              "own_bank_present": true,
+              "curated_role_skill_mentions": {
+                "n8n-agents": true,
+                "n8n-binary-and-data": true,
+                "n8n-code-javascript": true,
+                "n8n-code-python": true,
+                "n8n-code-tool": true,
+                "n8n-error-handling": true,
+                "n8n-expression-syntax": true,
+                "n8n-mcp-tools-expert": true,
+                "n8n-multi-instance": true,
+                "n8n-node-configuration": true,
+                "n8n-self-hosting": true,
+                "n8n-subworkflows": true,
+                "n8n-validation-expert": true,
+                "n8n-workflow-patterns": true
+              },
+              "shared_guidance_mentions": {
+                "Candybar": true,
+                "delonet-conventions": true,
+                "credentials": false,
+                "skills": true
+              },
+              "charter_excerpt": "# n8n Workflow Specialist",
+              "bank_excerpt": "Personal memory: write only to agent-n8n-specialist."
+            }
+          },
+          "native_tool_call_id": "call_8403824a89da4a4ca06241e92fb9cec9",
+          "native_success": true
+        },
+        "recall": {
+          "command": [
+            "flume",
+            "launch",
+            "n8n-specialist",
+            "--cwd",
+            "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "--",
+            "chat",
+            "--oneshot",
+            "--format",
+            "stream-json",
+            "--max-turns",
+            "8",
+            "-q",
+            "FLUME-29 inspection-only NEW-session recall acceptance. You are n8n-specialist. Use the NATIVE Hindsight recall tool, discovering its schema if needed, against your OWN personal bank to retrieve the employee operational preference from historical marker FLUME29-LIVE2-20261118-n8n-specialist. The marker is only a search key, not an active problem. Do not infer or invent the preference. Return the actual recalled preference, bank, native source identifiers and whether retrieval succeeded. Native result is required; prose assertion is not proof. No retain or memory edits in this session. No infrastructure changes, deployment, workflow edits/execution, file writes, credential reads/writes, service control, scheduling, CLI/HTTP memory substitutes or other-bank calls. Keep tool use focused and final concise."
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 26.13,
+          "timed_out": false,
+          "stderr": "  1Password: applied 16 secrets\nSession: local-3202e9d2ec6d49885366c84fa8b041fce9a3d31bc71591add24414f670ec530e\n\nsession_id: local-3202e9d2ec6d49885366c84fa8b041fce9a3d31bc71591add24414f670ec530e\n",
+          "result": {
+            "type": "result",
+            "session_id": "local-3202e9d2ec6d49885366c84fa8b041fce9a3d31bc71591add24414f670ec530e",
+            "exit_code": 0,
+            "text": "Retrieval succeeded via native hindsight_recall.\n\nPreference: \u201cn8n-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes.\u201d\n\nBank: agent-n8n-specialist (configured personal bank).\nHistorical marker: FLUME29-LIVE2-20261118-n8n-specialist.\nNative evidence: returned result entries 1 and 2 explicitly match the marker and preference.\nNative source identifiers: not exposed by the tool response; entry numbers are not source IDs.\n\nNo memory edits or other changes performed.",
+            "tokens": {
+              "input": 37299,
+              "output": 208,
+              "total": 37507,
+              "cache_read": 16384,
+              "cache_write": 0
+            },
+            "duration_ms": 22876,
+            "timestamp": 1795045094630
+          },
+          "tool_events": [
+            {
+              "type": "tool_use",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_2213b967e3564dd4aca1e5d8de93406a",
+              "input": {
+                "query": "FLUME29-LIVE2-20261118-n8n-specialist employee operational preference"
+              },
+              "timestamp": 1795045076198
+            },
+            {
+              "type": "tool_result",
+              "name": "hindsight_recall",
+              "tool_call_id": "call_2213b967e3564dd4aca1e5d8de93406a",
+              "duration_ms": 879,
+              "is_error": false,
+              "timestamp": 1795045077078,
+              "output_sha256": "e6debdd93eda1efc6a1ac35f203026649df1cf0cf82fcbc390c1428f3a0c8542",
+              "output_excerpt": "1. n8n-specialist prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes; historical acceptance marker FLUME29-LIVE2-20261118-n8n-specialist. | When: November 18, 2026 | Involving: n8n-specialist agent | Employee-attributed operational preference persisted via native Hindsight retain during FLUME-29 live acceptance.\n2. The n8n-specialist agent prefers an inspection checklist ordered as scope, dependencies, rollback, then verification before proposing infrastructure or workflow changes; persisted via native Hindsight retain during FLUME-29 live acceptance with historical acceptance marker FLUME29-LIVE2-20261118-n8n-specialist (November 18, 2026).",
+              "excerpt_note": "First two actual native result entries; remaining unrelated history omitted. Full scrubbed raw stream retained privately in scratch."
+            }
+          ],
+          "raw_stream_sha256": "b34683fc8f9875ccbbdc1fef8f4022ae624f148529a4f4ef8d9bbbc36063ab00",
+          "runtime_session": {
+            "id": "local-3202e9d2ec6d49885366c84fa8b041fce9a3d31bc71591add24414f670ec530e",
+            "source": "oneshot",
+            "created_source": "oneshot",
+            "profile_name": "n8n-specialist",
+            "transport_profile": "default",
+            "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+            "parent_session_id": null,
+            "model": "automaticai/auto",
+            "system_prompt_hash": "c150f942c7e904d00c5538c9a7e8fed16cc2b60bd7ecde84415cd67af7f935db",
+            "gateway_runtime": {
+              "provider": "automaticai",
+              "base_url": "https://api-direct.automaticai.io/v1",
+              "api_mode": "chat_completions",
+              "fallback_active": false
+            },
+            "system_prompt_checked_without_publication": {
+              "charter_title_present": true,
+              "own_bank_present": true,
+              "curated_role_skill_mentions": {
+                "n8n-agents": true,
+                "n8n-binary-and-data": true,
+                "n8n-code-javascript": true,
+                "n8n-code-python": true,
+                "n8n-code-tool": true,
+                "n8n-error-handling": true,
+                "n8n-expression-syntax": true,
+                "n8n-mcp-tools-expert": true,
+                "n8n-multi-instance": true,
+                "n8n-node-configuration": true,
+                "n8n-self-hosting": true,
+                "n8n-subworkflows": true,
+                "n8n-validation-expert": true,
+                "n8n-workflow-patterns": true
+              },
+              "shared_guidance_mentions": {
+                "Candybar": true,
+                "delonet-conventions": true,
+                "credentials": false,
+                "skills": true
+              },
+              "charter_excerpt": "# n8n Workflow Specialist",
+              "bank_excerpt": "Personal memory: write only to agent-n8n-specialist."
+            }
+          },
+          "native_tool_call_id": "call_2213b967e3564dd4aca1e5d8de93406a",
+          "native_success": true
+        }
+      },
+      "fresh_separate_session_verified": true,
+      "recall_prompt_contained_preference": false,
+      "native_operation_document_ids": "Not exposed by installed native provider; no identifiers invented."
+    }
+  },
+  "native_provider_routing_source": {
+    "infra-specialist": {
+      "path": "/home/delorenj/.hermes/profiles/infra-specialist/plugins/hindsight/__init__.py",
+      "sha256": "3d9b7e5ca55e8066988a78828f868063778af32d68d7b9dc5d3a1b7d3b0107c1",
+      "retain_native_bank_and_response_lines": "    def _tool_retain(self, args: dict) -> str:\n        content, context = args[\"content\"], args.get(\"context\")\n        item = self._build_retain_kwargs(\n            content, context=context, tags=args.get(\"tags\"), occurred_at=args.get(\"occurred_at\")\n        )\n        logger.debug(\"Tool hindsight_retain: bank=%s, content_len=%d, context=%s\", self._bank_id, len(content), context)\n        self._retain_batch(item, bank_id=self._bank_id)\n        logger.debug(\"Tool hindsight_retain: success\")\n        return \"Memory stored successfully.\"",
+      "recall_native_bank_lines": "    def _recall(self, query: str) -> list:\n        kwargs: dict = {\n            \"bank_id\": self._bank_id,\n            \"query\": query,\n            \"budget\": self._budget,\n            \"max_tokens\": self._recall_max_tokens,\n        }\n        if self._recall_tags:\n            kwargs.update(tags=self._recall_tags, tags_match=self._recall_tags_match)\n        if self._recall_types:\n            kwargs[\"types\"] = self._recall_types\n        resp = self._run_hindsight_operation(lambda client: client.arecall(**kwargs))\n        return resp.results or []",
+      "recall_formatting_lines": "    def _tool_recall(self, args: dict) -> str:\n        query = args[\"query\"]\n        logger.debug(\"Tool hindsight_recall: bank=%s, query_len=%d, budget=%s\", self._bank_id, len(query), self._budget)\n        results = self._recall(query)\n        logger.debug(\"Tool hindsight_recall: %d results\", len(results))\n        return \"\\n\".join(f\"{i}. {r.text}\" for i, r in enumerate(results, 1)) or \"No relevant memories found.\""
+    },
+    "n8n-specialist": {
+      "path": "/home/delorenj/.hermes/profiles/n8n-specialist/plugins/hindsight/__init__.py",
+      "sha256": "3d9b7e5ca55e8066988a78828f868063778af32d68d7b9dc5d3a1b7d3b0107c1",
+      "retain_native_bank_and_response_lines": "    def _tool_retain(self, args: dict) -> str:\n        content, context = args[\"content\"], args.get(\"context\")\n        item = self._build_retain_kwargs(\n            content, context=context, tags=args.get(\"tags\"), occurred_at=args.get(\"occurred_at\")\n        )\n        logger.debug(\"Tool hindsight_retain: bank=%s, content_len=%d, context=%s\", self._bank_id, len(content), context)\n        self._retain_batch(item, bank_id=self._bank_id)\n        logger.debug(\"Tool hindsight_retain: success\")\n        return \"Memory stored successfully.\"",
+      "recall_native_bank_lines": "    def _recall(self, query: str) -> list:\n        kwargs: dict = {\n            \"bank_id\": self._bank_id,\n            \"query\": query,\n            \"budget\": self._budget,\n            \"max_tokens\": self._recall_max_tokens,\n        }\n        if self._recall_tags:\n            kwargs.update(tags=self._recall_tags, tags_match=self._recall_tags_match)\n        if self._recall_types:\n            kwargs[\"types\"] = self._recall_types\n        resp = self._run_hindsight_operation(lambda client: client.arecall(**kwargs))\n        return resp.results or []",
+      "recall_formatting_lines": "    def _tool_recall(self, args: dict) -> str:\n        query = args[\"query\"]\n        logger.debug(\"Tool hindsight_recall: bank=%s, query_len=%d, budget=%s\", self._bank_id, len(query), self._budget)\n        results = self._recall(query)\n        logger.debug(\"Tool hindsight_recall: %d results\", len(results))\n        return \"\\n\".join(f\"{i}. {r.text}\" for i, r in enumerate(results, 1)) or \"No relevant memories found.\""
+    }
+  },
+  "preservation": {
+    "guard_state_equal": true,
+    "changed_top_level_keys": [],
+    "scope": "shared base, all profile config/delta pairs, target definitions/identity/banks/member refs/registry; moving runtime session/log files excluded"
+  },
+  "preservation_before_hash_manifest": {
+    "base_sha256": "51acf9723d1ce270fa1a3aad7fc6c7ac3f645d1359712c2f53c9e3a785ae382c",
+    "profiles": {
+      "gruvato-launch-director": {
+        "config.yaml": "1215c43d588a8ea7b47c8da852926c36e2e16d8898f0bb5cd8451a2290d17f9c",
+        "config.delta.yaml": "2a0dcabbe2bcfb13facc6701d9e48b588cf2a4c4cf933cd355661bfa52e9bd4f"
+      },
+      "heyma-pm": {
+        "config.yaml": "8047997289c82a01493491a715c2c4c7786b8a1010f673e798949ba7d6774e3a",
+        "config.delta.yaml": "a14d7ee6e29dd404744a86c247c4898721858af3284bec0a6d15e7a49a376b82"
+      },
+      "deckard-pm": {
+        "config.yaml": "bc72303ad29502dbdd81bfd3e288608efb344e6f28870c3358d4331426fa26a7",
+        "config.delta.yaml": "814a40f423dbb469e9c696a1fffda2efed689696479c82cc2809c785380d791e"
+      },
+      "slowburns-pm": {
+        "config.yaml": "cc8c66d359293065f15271f624611fc5234c3dbb4adb20e78b712bc242a1fb32",
+        "config.delta.yaml": "44b7869db528a5ff6b684aac51e8390b313250f0f7b5a12439d29c33106db658"
+      },
+      "flume-pm": {
+        "config.yaml": "fb2aa88f3bf1a0714ba7459508cd73676f6170d58633bfcc85dd7f119d833230",
+        "config.delta.yaml": "a71ac9a6d652d2f29f038decdcf1d3959217c5b18d95f86d58c1976aedb59067"
+      },
+      "peter-griffin": {
+        "config.yaml": "79e0e75c06ce1afc7509461e85be1ad8dcd63eb93fc1e8b644b237f2873acb54",
+        "config.delta.yaml": "479cbb841a3017d58f5065ec5c94842ad991faec946ec72fe4be6107b426a182"
+      },
+      "fleet-bloodbank-gateway": {
+        "config.yaml": "49308dc4056dfd879f58ea5d8b2d0ef0ade7728bbc2588803aa56eef4aaac2ff",
+        "config.delta.yaml": "78a8887631c587879187336bec3141d3bdf4d6c802b6abfb02d5fcabda4ad6d6"
+      },
+      "tonnybox-pm": {
+        "config.yaml": "79c12c11517cde2ffd621cfe32e6e1a09516830e4ca805ce8a5698881aec0563",
+        "config.delta.yaml": "cf194c248bd8179e5c4bab58e2a8037f255d22b1438f963e3b67515107e22662"
+      },
+      "tolt-launch-director": {
+        "config.yaml": "28b3c09c09aa477f5fe0832736b7f5351f276492c9e6ae0b5d747ce219a281d6",
+        "config.delta.yaml": "c7e65ac6a2ab195aae8936403a0b39f6c5ba2709f0e6107c7c23841a2c1687a7"
+      },
+      "context-director": {
+        "config.yaml": "3425be2178ebb0f225c8bdc2684389dccf341e0e60d76ccc7530f853587582ad",
+        "config.delta.yaml": "03a4a588ec8549d441bb63a12bc08b7a089068a4826b21e333c1994e760af8ef"
+      },
+      "marge-simpson": {
+        "config.yaml": "65720c4eb7d4b85da04b47a4c433769d168de9e2f91ee59af2088e57c8d62e82",
+        "config.delta.yaml": "648d6c2c1ee9b725a63c0f63fa992df57a0b474173399389dc9e7eb56f80c50a"
+      },
+      "33god-pm": {
+        "config.yaml": "d55a02fbce8b17e85c9376e542fca8cf1afd178c7acb0d3a246f30e6ae4f9bc6",
+        "config.delta.yaml": "996035ba074593ad508e1d3c7c0ce8fc97f32a12c7d3979263b17edfa3c58959"
+      },
+      "holocene-pm": {
+        "config.yaml": "43e534c636a12b2106876af0212a67f13acaf876c0b5c6f8e459e44de31cdc0b",
+        "config.delta.yaml": "97afc0c20b4e09f95431ef861cdbf84cd7086c04a2158ea3ada5679847a7bc4a"
+      },
+      "tolt-director": {
+        "config.yaml": "395118156e93af8a12daaa0d40a840c3617f30df0883708d6fa1f3b796e409f1",
+        "config.delta.yaml": "29fd03c91730e4ac132c965580f7c5274a47189bda092f607fcdfdde5b777389"
+      },
+      "dumply": {
+        "config.yaml": "03a05bd0e1d72feb9f604732622bde3b719ddb93dbb4aa0c70bc26f22fdecbdf",
+        "config.delta.yaml": "e5e527998a93def5102bb0f38f1a4997b716422789bbd1bc957a3d938e86704e"
+      },
+      "idealscenario-pm": {
+        "config.yaml": "615c73feb46214a125ee72d365d0cdefec057d7a23f71ceabc1be7cc8f6ba64b",
+        "config.delta.yaml": "5e54a25474f5fc6f820503a1f9ec4bbfba73bd897c6f5f128225fea4f60db76b"
+      },
+      "keepy-money-pm": {
+        "config.yaml": "e12806302c0219ee9cebd767f08ad7f32778b2999550a53c6846193ab6b796a8",
+        "config.delta.yaml": "2b93268780058c2677188777352d381181839b1125f8b738d0a8116474664680"
+      },
+      "navi-pm": {
+        "config.yaml": "132744adb0822def7d18bcfdd94900ce35e3a5e2d1a98ae1dcd4a5a2dba846c0",
+        "config.delta.yaml": "7bf55f0a1f2d1f1ca576b9b15d48fef904b5916339ff7f367f1c762b643f2e38"
+      },
+      "milkshake-pm": {
+        "config.yaml": "9f1097751d53ba0579e7da3233e9a3df8b4a47b65d1ccc9ab4f4995e6b7cd7c9",
+        "config.delta.yaml": "f2354389b52f8a57fdb17ea4801cc41c1173e80e0e3a0ecc10ecbfb8b0ce9476"
+      },
+      "green-in-between-launch-director": {
+        "config.yaml": "cdc4ac83ab6523a08326ad8e4bdf6ade45b7807eb83ad57e4ed8b429e22396be",
+        "config.delta.yaml": "d9ecd43265e52358c4bd65be97b68d0497a7754997f7e1d8e7988d4d29493fb6"
+      },
+      "client-portal-pm": {
+        "config.yaml": "6812cf8de158824dae50d8c52ffda4b2cb808e35cd79450f361226d76c5f579f",
+        "config.delta.yaml": "9a7a9a42a79997018e501a244875c884ea05f58acd61162dffaa8c0b4aca0a6c"
+      },
+      "pilot-pm": {
+        "config.yaml": "364a56fad5e00abd8d4b6f084e18baed5e51fc64694c65bcdd01f1ea0a1ed81b",
+        "config.delta.yaml": "d6c2494f5bd733ef3fa9771abe7d0a953f36ec32b7927f6917bd82501c85852e"
+      },
+      "james-brennan-pm": {
+        "config.yaml": "d3df88738f5fa5ec761a0b1a83c362bafff574d41129746f8d65bd997132da01",
+        "config.delta.yaml": "2e0845d0f419ae7d90f1a1eed8b71e086352cb8b72de807a9ffaddc7943793da"
+      },
+      "skillex-pm": {
+        "config.yaml": "e3ddef5e54018f4e0bd07536b63c90f1beea0ccfca396494e1928216351b1b71",
+        "config.delta.yaml": "f3a2e477bd449c2d64b1577f6a8e23a3a3acfe5c9c1cbed58c527e620476c795"
+      },
+      "zshyzsh-pm": {
+        "config.yaml": "f11457c430816a70c1f29ece75c2a4190136ea2fd8c2ec4771ea267551710e96",
+        "config.delta.yaml": "0bb32600d8e8b25b821f882a80b25e55851338b8843e51b4a16e88731075b49f"
+      },
+      "bennett": {
+        "config.yaml": "1c2cdc02e16fc1d14c59e5bc895b65b0edacd4939a225c8f1d7892b916bf9c58",
+        "config.delta.yaml": "072a0ab4da69772acf456636af705898f33b20b166fdf3f0fb7fc9fae8e7ee6c"
+      },
+      "earshot-pm": {
+        "config.yaml": "7bb0687b425565a2ce2ec405ff4a62aef0d3bffcad01f7f1d52f7db45d98f2b6",
+        "config.delta.yaml": "dd625c13f9cb89fb68f1ded48f5894a0f990f84a3dbf70cdcd552a17fbd9b77e"
+      },
+      "morgan-finance": {
+        "config.yaml": "e992d7196fb94fea9ef44f44b6c996a31fb8124572aad84da82d5e92cb9ea356",
+        "config.delta.yaml": "92abca151e998bf539dffbc6e6e936b6445c9bb2f315dcbf5f3c6ffa3f633869"
+      },
+      "raw-stdio-pm": {
+        "config.yaml": "3c75c74062c1926745617828b9adc5a6e38b852c6cdf8980401cddacab17a972",
+        "config.delta.yaml": "4f4ef15f94330c100fd4215d6cb6cb0f3b4aa74f24c4a6d2466ebef98e964622"
+      },
+      "ssbnk-pm": {
+        "config.yaml": "9e8692f4db63b09beb8da1f1405f634fff1c2bb47ac8d31305907fac0360d9ed",
+        "config.delta.yaml": "f01240496c236cf16d03cb860dabd76c6e1a2720a36bfee860d099dc62c1263f"
+      },
+      "lost-things-forge-pm": {
+        "config.yaml": "ee13c79547ce87f2c4454e03b29eea250df45775d59de362e31e2e4e58fb1455",
+        "config.delta.yaml": "b60f563949aceea8c7c92e659e3ea708885fed4c5c3d40e197f0e9db31eae6d6"
+      },
+      "gruvato-pm": {
+        "config.yaml": "b91b460d21b9bf2c8a19143bb2bd15d69972e7736c300208b48c21bf04ecb7ec",
+        "config.delta.yaml": "27c923329b6ebf3b3030b2ee84c336a02380b80a51d7c6326c2d9b8f88036c47"
+      },
+      "infra-specialist": {
+        "config.yaml": "736d90851623f5e0c3b5d3e44f6b4f9a47d098b7ae880e5014a3d8dc7ed729e9",
+        "config.delta.yaml": "c86fde9a1d212555c3bae64e5cfb2a134b45d5ff877a555f117b7cdf22402746"
+      },
+      "tolt-pm": {
+        "config.yaml": "f654b0d8d442026a4afc3a69ec8417af7d8a242ab1a13efc8ce8834665e89a79",
+        "config.delta.yaml": "b8bb0443f3b71ec28a3826a3e55d45d46c410b3a506749756464bfdbd0e1b09e"
+      },
+      "penny": {
+        "config.yaml": "b6cc801022218ca663bf97c145163ba1661b0c8e12f440516d75581ee6822488",
+        "config.delta.yaml": "3a62ed7ea4ddf82d97b9eca943408c4a13e9f98f9728963b236451313881b492"
+      },
+      ".deleted": {
+        "config.yaml": null,
+        "config.delta.yaml": null
+      },
+      "jacksnaps-pm": {
+        "config.yaml": "b33fa497864567c8d4aeb0fb71c99d9d74bda2ea2e611a540d97b05053b07a93",
+        "config.delta.yaml": "53ea572f3a37571afce9754d7d7bd5fa418e71f114a11537f1147cf7c06521b5"
+      },
+      "pile-of-dumb-things-pm": {
+        "config.yaml": "6d949428330f0691984f5fbc28313bc8076181dd1d6c25b36d2a526b9d17840d",
+        "config.delta.yaml": "268679e8d1564a585644d96a5afc8237c63e3b007cee116eb49fb558995d101f"
+      },
+      "bloodbank-pm": {
+        "config.yaml": "1834236add2f69dedb8dad84c4f53f25b3909529dd3d6a86e92078a92ff6c223",
+        "config.delta.yaml": "4c4aadf57552c65f479d0f89b1a45d0a5baa8d1d95e4db83060a658152d8a6fa"
+      },
+      "nautilus-trader-pm": {
+        "config.yaml": "bc963e5ed05843074958d1f4614b1f52842c99b2557491c97f9f5c2b25a810c7",
+        "config.delta.yaml": "faab1222f081add8eb519b848aab9c005e9baf754bd887d0f29ef5f49ef3fa18"
+      },
+      "pjangler-pm": {
+        "config.yaml": "1daddaf1eae5ae1c7df932f187804108d0c34c275ffb2d3ffb8fc29678cfab3e",
+        "config.delta.yaml": "287c0915587db41ee0c95698d673da3a57eec7bbbecd89e764c3017da44af567"
+      },
+      "green-in-between-pm": {
+        "config.yaml": "e307e11edea0e51b98ddf2c6298d8e83704f2604fec8aef1809821b0baaf2715",
+        "config.delta.yaml": "0c8dc0221ff1d8b6e1b0ec4238ac049b7e6b66bfab637e4a3ae89023db503fc5"
+      },
+      "monitoring-pm": {
+        "config.yaml": "db9d06d1a20ab460714842268792fad2c5e18464d4e0ef5f52fa3b2abfba12ff",
+        "config.delta.yaml": "83c85f2f8ea31aa6985e07bab71c65d2196edb0b67f40f1f1b146009528d3377"
+      },
+      "infra-pm": {
+        "config.yaml": "c35a9ae990d4f0c3afa217219c683711748aacc05a40846f7f82e6e1e7df0733",
+        "config.delta.yaml": "4bd2ce6d9b6a691eab42903edaf54e358f193a7ed97fe832f75566b864f95745"
+      },
+      "voxxy-pm": {
+        "config.yaml": "43200b8c3a5be93b0d14903cd99e8766df4eea1d8754e36241ede6a3e734d7b9",
+        "config.delta.yaml": "5682a640876b52ab4bbd47539f761d09e79d55629ed107b683139eb23453ef52"
+      },
+      "n8n-specialist": {
+        "config.yaml": "9419eba2f1ae948be085e42e5c9b3235a18356e5bd2330dafd407b21b48ee77a",
+        "config.delta.yaml": "0ad32fc7c69f4de38b4b8074a8490350802bdd90c3e08ece14c911c3d783da0e"
+      },
+      "rererere": {
+        "config.yaml": "1c6a2d7420f7339fc2b42b632d34a06d80505116e5f8c63f6f1d1bd8373a59d2",
+        "config.delta.yaml": "7b95b5502c035b90fd98fee541e1a7f856720361400958dfc6ae8f3cd7cc2a33"
+      },
+      "sidepiece-pm": {
+        "config.yaml": "f5a321afb126325fff962e204e3a8e70e4b33ab1d3440593ad980b2bd64a1389",
+        "config.delta.yaml": "eec8dc0f76f53971f8dbb96f6f8b6405e3c7afdf3f655a0be320876ef32e8fe5"
+      },
+      "candystore-pm": {
+        "config.yaml": "f75a04929245baf3a4b9f96b8576f3f8d8c28e111a42956acb9a4c02c52d0394",
+        "config.delta.yaml": "5877607c0a94806a441b1cbf2141f896af83b14d4f623b5476c9e41b3d6e0af2"
+      },
+      "joe-pesci": {
+        "config.yaml": "a52d48e203ca420b9efc84e00159adbde84220010b82059e09a6b8dcda28a681",
+        "config.delta.yaml": "2f0438615630d9128555d6a546c069c31d24bda33e0f5bc417d1d4b40e529016"
+      },
+      "delonet-director": {
+        "config.yaml": "3d06c40d22aec0910cdfe1e54aa3e7eb324e92d34848a574c3c862962d117bb7",
+        "config.delta.yaml": "e808fd0cb88409c9a973e3920c034a24a2b70367ffba3a336b16a33348b5228a"
+      }
+    },
+    "employees": {
+      "infra-specialist": {
+        "definition_sha256": "fb38b0915d771a600ad977490cec17e7d05d8b1691aa340cde9202e96311ca89",
+        "company_identity_sha256": "f63c95775f55a71462606da32775e4673e4f41f8c34e6688759f74aa7a44986c",
+        "bank": "agent-infra-specialist",
+        "memory_config_sha256": "dac1ab3b02e1e04109e409364dfe4abf16b49656120d0109bf04caa2729301fe",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-infra-specialist",
+        "registry_row_sha256": "c48b828bdde3ad933b8911117b3ef577698f2203f8fcfb33fa0227a7dd15d620"
+      },
+      "n8n-specialist": {
+        "definition_sha256": "b227b3eeb54ffc943b30eed6874be18ce0584d0432160c45d18571994900ff58",
+        "company_identity_sha256": "bd2624ad6c753dce284b3f773968ea9bd14a1659469edcc76f244f76d532a556",
+        "bank": "agent-n8n-specialist",
+        "memory_config_sha256": "97db05d1875ddc427a34221a0dcecd50379f61fc62323ebe62f87f3786861ab8",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-n8n-specialist",
+        "registry_row_sha256": "8e9850a9e1a38fada707277b8b3955a4086eab28eaec3a030fecefd223c537ce"
+      }
+    },
+    "registry_sha256": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910"
+  },
+  "preservation_after_hash_manifest": {
+    "base_sha256": "51acf9723d1ce270fa1a3aad7fc6c7ac3f645d1359712c2f53c9e3a785ae382c",
+    "profiles": {
+      "gruvato-launch-director": {
+        "config.yaml": "1215c43d588a8ea7b47c8da852926c36e2e16d8898f0bb5cd8451a2290d17f9c",
+        "config.delta.yaml": "2a0dcabbe2bcfb13facc6701d9e48b588cf2a4c4cf933cd355661bfa52e9bd4f"
+      },
+      "heyma-pm": {
+        "config.yaml": "8047997289c82a01493491a715c2c4c7786b8a1010f673e798949ba7d6774e3a",
+        "config.delta.yaml": "a14d7ee6e29dd404744a86c247c4898721858af3284bec0a6d15e7a49a376b82"
+      },
+      "deckard-pm": {
+        "config.yaml": "bc72303ad29502dbdd81bfd3e288608efb344e6f28870c3358d4331426fa26a7",
+        "config.delta.yaml": "814a40f423dbb469e9c696a1fffda2efed689696479c82cc2809c785380d791e"
+      },
+      "slowburns-pm": {
+        "config.yaml": "cc8c66d359293065f15271f624611fc5234c3dbb4adb20e78b712bc242a1fb32",
+        "config.delta.yaml": "44b7869db528a5ff6b684aac51e8390b313250f0f7b5a12439d29c33106db658"
+      },
+      "flume-pm": {
+        "config.yaml": "fb2aa88f3bf1a0714ba7459508cd73676f6170d58633bfcc85dd7f119d833230",
+        "config.delta.yaml": "a71ac9a6d652d2f29f038decdcf1d3959217c5b18d95f86d58c1976aedb59067"
+      },
+      "peter-griffin": {
+        "config.yaml": "79e0e75c06ce1afc7509461e85be1ad8dcd63eb93fc1e8b644b237f2873acb54",
+        "config.delta.yaml": "479cbb841a3017d58f5065ec5c94842ad991faec946ec72fe4be6107b426a182"
+      },
+      "fleet-bloodbank-gateway": {
+        "config.yaml": "49308dc4056dfd879f58ea5d8b2d0ef0ade7728bbc2588803aa56eef4aaac2ff",
+        "config.delta.yaml": "78a8887631c587879187336bec3141d3bdf4d6c802b6abfb02d5fcabda4ad6d6"
+      },
+      "tonnybox-pm": {
+        "config.yaml": "79c12c11517cde2ffd621cfe32e6e1a09516830e4ca805ce8a5698881aec0563",
+        "config.delta.yaml": "cf194c248bd8179e5c4bab58e2a8037f255d22b1438f963e3b67515107e22662"
+      },
+      "tolt-launch-director": {
+        "config.yaml": "28b3c09c09aa477f5fe0832736b7f5351f276492c9e6ae0b5d747ce219a281d6",
+        "config.delta.yaml": "c7e65ac6a2ab195aae8936403a0b39f6c5ba2709f0e6107c7c23841a2c1687a7"
+      },
+      "context-director": {
+        "config.yaml": "3425be2178ebb0f225c8bdc2684389dccf341e0e60d76ccc7530f853587582ad",
+        "config.delta.yaml": "03a4a588ec8549d441bb63a12bc08b7a089068a4826b21e333c1994e760af8ef"
+      },
+      "marge-simpson": {
+        "config.yaml": "65720c4eb7d4b85da04b47a4c433769d168de9e2f91ee59af2088e57c8d62e82",
+        "config.delta.yaml": "648d6c2c1ee9b725a63c0f63fa992df57a0b474173399389dc9e7eb56f80c50a"
+      },
+      "33god-pm": {
+        "config.yaml": "d55a02fbce8b17e85c9376e542fca8cf1afd178c7acb0d3a246f30e6ae4f9bc6",
+        "config.delta.yaml": "996035ba074593ad508e1d3c7c0ce8fc97f32a12c7d3979263b17edfa3c58959"
+      },
+      "holocene-pm": {
+        "config.yaml": "43e534c636a12b2106876af0212a67f13acaf876c0b5c6f8e459e44de31cdc0b",
+        "config.delta.yaml": "97afc0c20b4e09f95431ef861cdbf84cd7086c04a2158ea3ada5679847a7bc4a"
+      },
+      "tolt-director": {
+        "config.yaml": "395118156e93af8a12daaa0d40a840c3617f30df0883708d6fa1f3b796e409f1",
+        "config.delta.yaml": "29fd03c91730e4ac132c965580f7c5274a47189bda092f607fcdfdde5b777389"
+      },
+      "dumply": {
+        "config.yaml": "03a05bd0e1d72feb9f604732622bde3b719ddb93dbb4aa0c70bc26f22fdecbdf",
+        "config.delta.yaml": "e5e527998a93def5102bb0f38f1a4997b716422789bbd1bc957a3d938e86704e"
+      },
+      "idealscenario-pm": {
+        "config.yaml": "615c73feb46214a125ee72d365d0cdefec057d7a23f71ceabc1be7cc8f6ba64b",
+        "config.delta.yaml": "5e54a25474f5fc6f820503a1f9ec4bbfba73bd897c6f5f128225fea4f60db76b"
+      },
+      "keepy-money-pm": {
+        "config.yaml": "e12806302c0219ee9cebd767f08ad7f32778b2999550a53c6846193ab6b796a8",
+        "config.delta.yaml": "2b93268780058c2677188777352d381181839b1125f8b738d0a8116474664680"
+      },
+      "navi-pm": {
+        "config.yaml": "132744adb0822def7d18bcfdd94900ce35e3a5e2d1a98ae1dcd4a5a2dba846c0",
+        "config.delta.yaml": "7bf55f0a1f2d1f1ca576b9b15d48fef904b5916339ff7f367f1c762b643f2e38"
+      },
+      "milkshake-pm": {
+        "config.yaml": "9f1097751d53ba0579e7da3233e9a3df8b4a47b65d1ccc9ab4f4995e6b7cd7c9",
+        "config.delta.yaml": "f2354389b52f8a57fdb17ea4801cc41c1173e80e0e3a0ecc10ecbfb8b0ce9476"
+      },
+      "green-in-between-launch-director": {
+        "config.yaml": "cdc4ac83ab6523a08326ad8e4bdf6ade45b7807eb83ad57e4ed8b429e22396be",
+        "config.delta.yaml": "d9ecd43265e52358c4bd65be97b68d0497a7754997f7e1d8e7988d4d29493fb6"
+      },
+      "client-portal-pm": {
+        "config.yaml": "6812cf8de158824dae50d8c52ffda4b2cb808e35cd79450f361226d76c5f579f",
+        "config.delta.yaml": "9a7a9a42a79997018e501a244875c884ea05f58acd61162dffaa8c0b4aca0a6c"
+      },
+      "pilot-pm": {
+        "config.yaml": "364a56fad5e00abd8d4b6f084e18baed5e51fc64694c65bcdd01f1ea0a1ed81b",
+        "config.delta.yaml": "d6c2494f5bd733ef3fa9771abe7d0a953f36ec32b7927f6917bd82501c85852e"
+      },
+      "james-brennan-pm": {
+        "config.yaml": "d3df88738f5fa5ec761a0b1a83c362bafff574d41129746f8d65bd997132da01",
+        "config.delta.yaml": "2e0845d0f419ae7d90f1a1eed8b71e086352cb8b72de807a9ffaddc7943793da"
+      },
+      "skillex-pm": {
+        "config.yaml": "e3ddef5e54018f4e0bd07536b63c90f1beea0ccfca396494e1928216351b1b71",
+        "config.delta.yaml": "f3a2e477bd449c2d64b1577f6a8e23a3a3acfe5c9c1cbed58c527e620476c795"
+      },
+      "zshyzsh-pm": {
+        "config.yaml": "f11457c430816a70c1f29ece75c2a4190136ea2fd8c2ec4771ea267551710e96",
+        "config.delta.yaml": "0bb32600d8e8b25b821f882a80b25e55851338b8843e51b4a16e88731075b49f"
+      },
+      "bennett": {
+        "config.yaml": "1c2cdc02e16fc1d14c59e5bc895b65b0edacd4939a225c8f1d7892b916bf9c58",
+        "config.delta.yaml": "072a0ab4da69772acf456636af705898f33b20b166fdf3f0fb7fc9fae8e7ee6c"
+      },
+      "earshot-pm": {
+        "config.yaml": "7bb0687b425565a2ce2ec405ff4a62aef0d3bffcad01f7f1d52f7db45d98f2b6",
+        "config.delta.yaml": "dd625c13f9cb89fb68f1ded48f5894a0f990f84a3dbf70cdcd552a17fbd9b77e"
+      },
+      "morgan-finance": {
+        "config.yaml": "e992d7196fb94fea9ef44f44b6c996a31fb8124572aad84da82d5e92cb9ea356",
+        "config.delta.yaml": "92abca151e998bf539dffbc6e6e936b6445c9bb2f315dcbf5f3c6ffa3f633869"
+      },
+      "raw-stdio-pm": {
+        "config.yaml": "3c75c74062c1926745617828b9adc5a6e38b852c6cdf8980401cddacab17a972",
+        "config.delta.yaml": "4f4ef15f94330c100fd4215d6cb6cb0f3b4aa74f24c4a6d2466ebef98e964622"
+      },
+      "ssbnk-pm": {
+        "config.yaml": "9e8692f4db63b09beb8da1f1405f634fff1c2bb47ac8d31305907fac0360d9ed",
+        "config.delta.yaml": "f01240496c236cf16d03cb860dabd76c6e1a2720a36bfee860d099dc62c1263f"
+      },
+      "lost-things-forge-pm": {
+        "config.yaml": "ee13c79547ce87f2c4454e03b29eea250df45775d59de362e31e2e4e58fb1455",
+        "config.delta.yaml": "b60f563949aceea8c7c92e659e3ea708885fed4c5c3d40e197f0e9db31eae6d6"
+      },
+      "gruvato-pm": {
+        "config.yaml": "b91b460d21b9bf2c8a19143bb2bd15d69972e7736c300208b48c21bf04ecb7ec",
+        "config.delta.yaml": "27c923329b6ebf3b3030b2ee84c336a02380b80a51d7c6326c2d9b8f88036c47"
+      },
+      "infra-specialist": {
+        "config.yaml": "736d90851623f5e0c3b5d3e44f6b4f9a47d098b7ae880e5014a3d8dc7ed729e9",
+        "config.delta.yaml": "c86fde9a1d212555c3bae64e5cfb2a134b45d5ff877a555f117b7cdf22402746"
+      },
+      "tolt-pm": {
+        "config.yaml": "f654b0d8d442026a4afc3a69ec8417af7d8a242ab1a13efc8ce8834665e89a79",
+        "config.delta.yaml": "b8bb0443f3b71ec28a3826a3e55d45d46c410b3a506749756464bfdbd0e1b09e"
+      },
+      "penny": {
+        "config.yaml": "b6cc801022218ca663bf97c145163ba1661b0c8e12f440516d75581ee6822488",
+        "config.delta.yaml": "3a62ed7ea4ddf82d97b9eca943408c4a13e9f98f9728963b236451313881b492"
+      },
+      ".deleted": {
+        "config.yaml": null,
+        "config.delta.yaml": null
+      },
+      "jacksnaps-pm": {
+        "config.yaml": "b33fa497864567c8d4aeb0fb71c99d9d74bda2ea2e611a540d97b05053b07a93",
+        "config.delta.yaml": "53ea572f3a37571afce9754d7d7bd5fa418e71f114a11537f1147cf7c06521b5"
+      },
+      "pile-of-dumb-things-pm": {
+        "config.yaml": "6d949428330f0691984f5fbc28313bc8076181dd1d6c25b36d2a526b9d17840d",
+        "config.delta.yaml": "268679e8d1564a585644d96a5afc8237c63e3b007cee116eb49fb558995d101f"
+      },
+      "bloodbank-pm": {
+        "config.yaml": "1834236add2f69dedb8dad84c4f53f25b3909529dd3d6a86e92078a92ff6c223",
+        "config.delta.yaml": "4c4aadf57552c65f479d0f89b1a45d0a5baa8d1d95e4db83060a658152d8a6fa"
+      },
+      "nautilus-trader-pm": {
+        "config.yaml": "bc963e5ed05843074958d1f4614b1f52842c99b2557491c97f9f5c2b25a810c7",
+        "config.delta.yaml": "faab1222f081add8eb519b848aab9c005e9baf754bd887d0f29ef5f49ef3fa18"
+      },
+      "pjangler-pm": {
+        "config.yaml": "1daddaf1eae5ae1c7df932f187804108d0c34c275ffb2d3ffb8fc29678cfab3e",
+        "config.delta.yaml": "287c0915587db41ee0c95698d673da3a57eec7bbbecd89e764c3017da44af567"
+      },
+      "green-in-between-pm": {
+        "config.yaml": "e307e11edea0e51b98ddf2c6298d8e83704f2604fec8aef1809821b0baaf2715",
+        "config.delta.yaml": "0c8dc0221ff1d8b6e1b0ec4238ac049b7e6b66bfab637e4a3ae89023db503fc5"
+      },
+      "monitoring-pm": {
+        "config.yaml": "db9d06d1a20ab460714842268792fad2c5e18464d4e0ef5f52fa3b2abfba12ff",
+        "config.delta.yaml": "83c85f2f8ea31aa6985e07bab71c65d2196edb0b67f40f1f1b146009528d3377"
+      },
+      "infra-pm": {
+        "config.yaml": "c35a9ae990d4f0c3afa217219c683711748aacc05a40846f7f82e6e1e7df0733",
+        "config.delta.yaml": "4bd2ce6d9b6a691eab42903edaf54e358f193a7ed97fe832f75566b864f95745"
+      },
+      "voxxy-pm": {
+        "config.yaml": "43200b8c3a5be93b0d14903cd99e8766df4eea1d8754e36241ede6a3e734d7b9",
+        "config.delta.yaml": "5682a640876b52ab4bbd47539f761d09e79d55629ed107b683139eb23453ef52"
+      },
+      "n8n-specialist": {
+        "config.yaml": "9419eba2f1ae948be085e42e5c9b3235a18356e5bd2330dafd407b21b48ee77a",
+        "config.delta.yaml": "0ad32fc7c69f4de38b4b8074a8490350802bdd90c3e08ece14c911c3d783da0e"
+      },
+      "rererere": {
+        "config.yaml": "1c6a2d7420f7339fc2b42b632d34a06d80505116e5f8c63f6f1d1bd8373a59d2",
+        "config.delta.yaml": "7b95b5502c035b90fd98fee541e1a7f856720361400958dfc6ae8f3cd7cc2a33"
+      },
+      "sidepiece-pm": {
+        "config.yaml": "f5a321afb126325fff962e204e3a8e70e4b33ab1d3440593ad980b2bd64a1389",
+        "config.delta.yaml": "eec8dc0f76f53971f8dbb96f6f8b6405e3c7afdf3f655a0be320876ef32e8fe5"
+      },
+      "candystore-pm": {
+        "config.yaml": "f75a04929245baf3a4b9f96b8576f3f8d8c28e111a42956acb9a4c02c52d0394",
+        "config.delta.yaml": "5877607c0a94806a441b1cbf2141f896af83b14d4f623b5476c9e41b3d6e0af2"
+      },
+      "joe-pesci": {
+        "config.yaml": "a52d48e203ca420b9efc84e00159adbde84220010b82059e09a6b8dcda28a681",
+        "config.delta.yaml": "2f0438615630d9128555d6a546c069c31d24bda33e0f5bc417d1d4b40e529016"
+      },
+      "delonet-director": {
+        "config.yaml": "3d06c40d22aec0910cdfe1e54aa3e7eb324e92d34848a574c3c862962d117bb7",
+        "config.delta.yaml": "e808fd0cb88409c9a973e3920c034a24a2b70367ffba3a336b16a33348b5228a"
+      }
+    },
+    "employees": {
+      "infra-specialist": {
+        "definition_sha256": "fb38b0915d771a600ad977490cec17e7d05d8b1691aa340cde9202e96311ca89",
+        "company_identity_sha256": "f63c95775f55a71462606da32775e4673e4f41f8c34e6688759f74aa7a44986c",
+        "bank": "agent-infra-specialist",
+        "memory_config_sha256": "dac1ab3b02e1e04109e409364dfe4abf16b49656120d0109bf04caa2729301fe",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-infra-specialist",
+        "registry_row_sha256": "c48b828bdde3ad933b8911117b3ef577698f2203f8fcfb33fa0227a7dd15d620"
+      },
+      "n8n-specialist": {
+        "definition_sha256": "b227b3eeb54ffc943b30eed6874be18ce0584d0432160c45d18571994900ff58",
+        "company_identity_sha256": "bd2624ad6c753dce284b3f773968ea9bd14a1659469edcc76f244f76d532a556",
+        "bank": "agent-n8n-specialist",
+        "memory_config_sha256": "97db05d1875ddc427a34221a0dcecd50379f61fc62323ebe62f87f3786861ab8",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-n8n-specialist",
+        "registry_row_sha256": "8e9850a9e1a38fada707277b8b3955a4086eab28eaec3a030fecefd223c537ce"
+      }
+    },
+    "registry_sha256": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910"
+  },
+  "prior_convergence_evidence": "source-live-continuation-state-proof-20261118.json",
+  "limits": [
+    "Native retain reports success but exposes no operation/document ID; fresh native recall proves actual retrieval instead.",
+    "Native recall formats text only and stream output is capped at 5000 characters. Published excerpt preserves the first two matching entries; no source IDs are invented.",
+    "The runtime creates session/history/log and configured memory-provider automatic retention state normally; no policy change was made to suppress those normal behaviors.",
+    "No new source tests rerun: this is live acceptance on already-tested landed source. No claim of full workforce/global regression coverage, clean global git state, or unrelated R2 collision repair."
+  ],
+  "board_writes": false,
+  "application_code_changed": false,
+  "runtime_policy_changed": false,
+  "service_restarts": false,
+  "accounts_or_credentials_created": false
+}
