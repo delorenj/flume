@@ -124,7 +124,7 @@ export class WireTelegram extends Command {
       if (allowedUsers) p.log.warn("TELEGRAM_ALLOWED_USERS must be comma-separated numeric ids; enter a valid value instead.");
       allowedUsers = "";
       const operatorRef = "op://DeLoSecrets/Telegram/id";
-      const idRead = spawnSync("op", ["read", operatorRef], { encoding: "utf8" });
+      const idRead = spawnSync("op", ["read", operatorRef], { encoding: "utf8", timeout: 15_000 });
       if (!idRead.error && idRead.status === 0 && /^[0-9]+$/.test(idRead.stdout.trim())) {
         allowedUsers = idRead.stdout.trim();
       } else {

@@ -64,6 +64,7 @@ export const spinner = globalThis.__flume40.spinner;
     const idReads = calls.filter(({ command }) => command === "op");
     const scriptCalls = calls.filter(({ command }) => command === "bash");
     assert.ok(idReads.every(({ args }) => JSON.stringify(args) === JSON.stringify(["read", "op://DeLoSecrets/Telegram/id"])), label);
+    assert.ok(idReads.every(({ options }) => options.encoding === "utf8" && options.timeout === 15_000), `${label}: vault read must be bounded`);
     count++;
     return { result, idReads, scriptCalls };
   }
@@ -86,6 +87,7 @@ export const spinner = globalThis.__flume40.spinner;
 
     for (const [label, read] of [
       ["missing op", { status: null, error: new Error("ENOENT"), stdout: "" }],
+      ["stalled op", { status: null, error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }), stdout: "" }],
       ["failed read", { status: 1, stdout: "" }],
       ["empty read", { status: 0, stdout: " \n" }],
       ["non-numeric read", { status: 0, stdout: "bot-name\n" }],
@@ -113,6 +115,12 @@ export const spinner = globalThis.__flume40.spinner;
     assert.equal(run.result.success, false);
     assert.match(run.result.message, /Aborted; Telegram step deferred/);
     assert.equal(run.scriptCalls.length, 0);
+
+    run = await exercise("cancel after timeout", { read: { status: null, error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }), stdout: "" }, answer: Symbol.for("cancel") });
+    assert.equal(run.result.success, false);
+    assert.match(run.result.message, /Aborted; Telegram step deferred/);
+    assert.equal(run.scriptCalls.length, 0);
+    assert.match(warnings.join(" "), /Could not resolve a numeric Telegram user id/);
 
     run = await exercise("invalid manual answer", { read: { status: 1, stdout: "" }, answer: "bad" });
     assert.equal(run.result.success, false);
