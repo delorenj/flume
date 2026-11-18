@@ -1,0 +1,186 @@
+{
+  "verdict": "PASS",
+  "ticket": "FLUME-32",
+  "recorded_at": "2026-11-18T23:26:49Z",
+  "ingress": "isolated installed Hermes AIAgent.run_conversation; exact Flume role-projected desk config; not multiplexed Bloodbank",
+  "effective_chain": [
+    "automaticai/personal/kimi-k3",
+    "automaticai/personal/sol-6.1"
+  ],
+  "scratch_path": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume32-ac6-ttqf5qkq",
+  "failure_injection": "HTTP503 at client-local httpx send for declared primary only; no primary sent to gateway",
+  "bounds": {
+    "real_inference_requests": 1,
+    "max_tokens": 512,
+    "hermes_wall_seconds": 110
+  },
+  "receipts": [
+    {
+      "log_id": 1006749,
+      "request_id": "202611182326544908510298268d9d6othtUQIR",
+      "created_at": 1795044416,
+      "token_name": "aai:hermes-flume-pm:1790777406434714921",
+      "session_id": "",
+      "route": "automaticai/personal/sol-6.1",
+      "account": "openai-personal",
+      "native_model": "gpt-6.1-sol",
+      "channel": 8,
+      "requested_effort": "medium",
+      "effective_effort": "medium",
+      "prompt_tokens": 761,
+      "completion_tokens": 5,
+      "quota": 0,
+      "group_ratio": 1,
+      "model_ratio": 0,
+      "effort_defaulted": false,
+      "ledger_reasoning_effort": "medium"
+    }
+  ],
+  "consumer": "hermes-flume-pm",
+  "credential_reference": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-flume-pm",
+  "runner_sha256": "10de81882f8fac46020fb7cf3906bc4f66d2b70d910ed0a564950e5542110630",
+  "projector_sha256": "409bb4cce7aae88ed08c08bcf43b74700ecccdd5d427aeb38f5dab643eb8e566",
+  "hermes_commit": "d6100d8bda1af8c7f1ca121a7f99a29112c62045",
+  "template_commit": "96e7e288026782358584b9b85c764659d240ee0d",
+  "protected_before_sha256": {
+    "/home/delorenj/.hermes/config.yaml": "51acf9723d1ce270fa1a3aad7fc6c7ac3f645d1359712c2f53c9e3a785ae382c",
+    "/home/delorenj/.hermes/profiles/flume-pm/config.yaml": "fb2aa88f3bf1a0714ba7459508cd73676f6170d58633bfcc85dd7f119d833230",
+    "/home/delorenj/.hermes/profiles/flume-pm/config.delta.yaml": "a71ac9a6d652d2f29f038decdcf1d3959217c5b18d95f86d58c1976aedb59067",
+    "/home/delorenj/.hermes/agents-registry.yaml": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910",
+    "/home/delorenj/.hermes/org.yaml": "92bb841c35de00053c43a8762e24495919a0c9aae6a38263185309f7095949cc",
+    "/home/delorenj/docker/stacks/ai/newapi/ops/routes.json": "60b70a1ae0de0b88839041be2d7efb9baf2286fef4ff09f77e755a55ce229dcb"
+  },
+  "catalog": {
+    "sha256": "60b70a1ae0de0b88839041be2d7efb9baf2286fef4ff09f77e755a55ce229dcb",
+    "authenticated_models_verified": true,
+    "selected_routes": [
+      {
+        "id": "automaticai/personal/kimi-k3",
+        "account": "kimi-personal",
+        "upstream": "k3",
+        "default_effort": "high",
+        "billing": "subscription"
+      },
+      {
+        "id": "automaticai/personal/sol-6.1",
+        "account": "openai-personal",
+        "upstream": "gpt-6.1-sol",
+        "default_effort": "xhigh",
+        "billing": "subscription"
+      }
+    ]
+  },
+  "projection": {
+    "role": {
+      "role": "ac6",
+      "department": "proof",
+      "reports_to": "proof-manager",
+      "chain": [
+        "automaticai/personal/kimi-k3",
+        "automaticai/personal/sol-6.1"
+      ]
+    },
+    "result": {
+      "department": "proof",
+      "reports_to": "proof-manager",
+      "skills": [],
+      "selection": null,
+      "overrides": [],
+      "chain": [
+        "automaticai/personal/kimi-k3",
+        "automaticai/personal/sol-6.1"
+      ],
+      "fallback_surface": "desk-gateway"
+    },
+    "effective_chain": [
+      "automaticai/personal/kimi-k3",
+      "automaticai/personal/sol-6.1"
+    ],
+    "authenticated_catalog_check": "projectRoleDeclaration invoked scripts/role-catalog-check.py (no catalogModels bypass)",
+    "role_sha256": "debfcb46d9d4e705887215259f3ed0148519528788262446345fc7b776a12f64",
+    "config_sha256": "a6433234986104f0b334d99ce57873ebd7aabdbf5545b69ffe775f434c8ea9e8",
+    "role_source": "---\nrole: ac6\ndepartment: proof\nreports_to: proof-manager\nchain:\n- automaticai/personal/kimi-k3\n- automaticai/personal/sol-6.1\n---\nBounded AC6 test desk.\n",
+    "generated_config": "# ---------------------------------------------------------------------------\n# GENERATED FILE -- DO NOT EDIT.\n#\n#   source of truth : config.delta.yaml (in this directory)\n#   base            : ~/.hermes/config.yaml\n#   rendered by     : hermes-profile-config.py render\n#\n# Edit config.delta.yaml and re-run `hermes-profile-config.py render`.\n# An edit made here directly (or by Hermes itself, e.g. /model) can be folded\n# back into the delta with `hermes-profile-config.py absorb --profile <name>`.\n# ---------------------------------------------------------------------------\nmodel:\n  provider: automaticai\n  default: automaticai/personal/kimi-k3\n  api_mode: chat_completions\nfallback_providers:\n- provider: automaticai\n  model: automaticai/personal/sol-6.1\nproviders:\n  automaticai:\n    name: AutomaticAI\n    api: https://api.automaticai.io/v1\n    key_env: AUTOMATICAI_GATEWAY_KEY\n    api_mode: chat_completions\n    extra_body:\n      reasoning_effort: xhigh\n    request_timeout_seconds: 40\nsecrets:\n  onepassword:\n    env:\n      AUTOMATICAI_GATEWAY_KEY: op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-flume-pm\nagent:\n  api_max_retries: 3\n  auto_recover_max_attempts: 0\ncompression:\n  enabled: false\nmemory:\n  memory_enabled: false\n  user_profile_enabled: false\nskills:\n  external_dirs: []\nplugins:\n  enabled: false\nx-flume-fallback-override: desk-gateway\n",
+    "delta": "model:\n  provider: automaticai\n  default: automaticai/personal/kimi-k3\nfallback_providers:\n- provider: automaticai\n  model: automaticai/personal/sol-6.1\nx-flume-fallback-override: desk-gateway\n",
+    "managed_state": {
+      "fallback_providers": [
+        {
+          "model": "automaticai/personal/sol-6.1",
+          "provider": "automaticai"
+        }
+      ],
+      "model": {
+        "default": "automaticai/personal/kimi-k3",
+        "provider": "automaticai"
+      }
+    },
+    "base_chain": [
+      "automaticai/personal/sol-6.1"
+    ],
+    "source_commit": "d6601ebb43f6758dadf8c8e1b063ecf330053c37"
+  },
+  "marker": "AAI_ROUTE_PROOF_169213cb3886f924478b5c50b9f04db2",
+  "since": 1795044410,
+  "runtime": {
+    "config_sha256": "a6433234986104f0b334d99ce57873ebd7aabdbf5545b69ffe775f434c8ea9e8",
+    "effective_chain": [
+      "automaticai/personal/kimi-k3",
+      "automaticai/personal/sol-6.1"
+    ],
+    "primary_http503_count": 3,
+    "real_inference_requests": 1,
+    "request_ids": [
+      "202611182326544908510298268d9d6othtUQIR"
+    ],
+    "requests": [
+      {
+        "model": "automaticai/personal/kimi-k3",
+        "url": "https://api.automaticai.io/v1/chat/completions",
+        "reasoning_effort": "medium",
+        "max_tokens": 512,
+        "max_completion_tokens": null,
+        "stream": true
+      },
+      {
+        "model": "automaticai/personal/kimi-k3",
+        "url": "https://api.automaticai.io/v1/chat/completions",
+        "reasoning_effort": "medium",
+        "max_tokens": 512,
+        "max_completion_tokens": null,
+        "stream": false
+      },
+      {
+        "model": "automaticai/personal/kimi-k3",
+        "url": "https://api.automaticai.io/v1/chat/completions",
+        "reasoning_effort": "medium",
+        "max_tokens": 512,
+        "max_completion_tokens": null,
+        "stream": true
+      },
+      {
+        "model": "automaticai/personal/sol-6.1",
+        "url": "https://api.automaticai.io/v1/chat/completions",
+        "reasoning_effort": "medium",
+        "max_tokens": 512,
+        "max_completion_tokens": null,
+        "stream": true
+      }
+    ],
+    "fallback_notice_count": 0,
+    "completed": true,
+    "gateway_http_status": 200,
+    "activated_model": "automaticai/personal/sol-6.1",
+    "fallback_index": 1,
+    "final_response_nonempty": true,
+    "final_response_sha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
+    "result_error_present": false
+  },
+  "protected_after_sha256": {
+    "/home/delorenj/.hermes/config.yaml": "51acf9723d1ce270fa1a3aad7fc6c7ac3f645d1359712c2f53c9e3a785ae382c",
+    "/home/delorenj/.hermes/profiles/flume-pm/config.yaml": "fb2aa88f3bf1a0714ba7459508cd73676f6170d58633bfcc85dd7f119d833230",
+    "/home/delorenj/.hermes/profiles/flume-pm/config.delta.yaml": "a71ac9a6d652d2f29f038decdcf1d3959217c5b18d95f86d58c1976aedb59067",
+    "/home/delorenj/.hermes/agents-registry.yaml": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910",
+    "/home/delorenj/.hermes/org.yaml": "92bb841c35de00053c43a8762e24495919a0c9aae6a38263185309f7095949cc",
+    "/home/delorenj/docker/stacks/ai/newapi/ops/routes.json": "60b70a1ae0de0b88839041be2d7efb9baf2286fef4ff09f77e755a55ce229dcb"
+  }
+}
