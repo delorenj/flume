@@ -44,6 +44,7 @@ import {
 import { homedir, tmpdir, userInfo } from "node:os";
 import { join, relative, resolve } from "node:path";
 import YAML from "yaml";
+import { renderFixtureTemplate } from "./helpers/scaffold-render.mjs";
 import {
   deferredAgentUnits,
   fakeSystemctlChildEnvs,
@@ -219,7 +220,7 @@ function renderPinnedRole(roleDir, inputs) {
     const target = rendered ? file.path.slice(0, -".jinja".length) : file.path;
     let bytes = file.bytes;
     if (rendered && !presenceOnly.has(target)) {
-      const text = bytes.toString("utf8").replace(/\{\{\s*([a-z_]+)\s*\}\}/gu, (whole, name) => (name in inputs ? inputs[name] : whole));
+      const text = renderFixtureTemplate(bytes.toString("utf8"), inputs);
       bytes = Buffer.from(text, "utf8");
     }
     const full = join(roleDir, ...target.split("/"));

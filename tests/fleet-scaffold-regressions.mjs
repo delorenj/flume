@@ -229,13 +229,14 @@ function seedTemplate() {
   gitOk(templateSource, ["add", "-f", "-A"]);
   gitOk(templateSource, ["commit", "--quiet", "-m", "contaminated"]);
   COMMIT.contaminated = gitOk(templateSource, ["rev-parse", "HEAD"]);
-  // An UNSUPPORTED version: control flow in one content-compared template and
+  // An UNSUPPORTED version: control flow beyond a string-equality if (a
+  // for loop) in one content-compared template and
   // an undeclared placeholder in another. Neither may be rendered "as best it
   // can": each asset is `incomplete` with the reason, the source stays intact,
   // and every other asset is still compared.
   gitOk(templateSource, ["checkout", "--quiet", COMMIT.v3]);
   gitOk(templateSource, ["checkout", "--quiet", "-b", "unsupported"]);
-  writeFileSync(join(templateSource, "template", ".gitignore.jinja"), "# {{ role }}\n{% if role == \"pm\" %}runtime/{% else %}other/{% endif %}\n", "utf8");
+  writeFileSync(join(templateSource, "template", ".gitignore.jinja"), "# {{ role }}\n{% for dir in [\"runtime\"] %}{{ dir }}/{% endfor %}\n", "utf8");
   writeFileSync(join(templateSource, "template", "hermes.jinja"), "#!/usr/bin/env bash\n# launcher for {{ agent_id }} ({{ launcher_flavor }})\n", "utf8");
   gitOk(templateSource, ["add", "-A"]);
   gitOk(templateSource, ["commit", "--quiet", "-m", "unsupported"]);

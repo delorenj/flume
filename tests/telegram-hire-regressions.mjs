@@ -1,6 +1,7 @@
 // Exercise the interactive ingredient with a controlled prompt and an op executable
 // that cannot reach a real vault. The rendered-script boundary is asserted separately.
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -25,7 +26,7 @@ export const log = globalThis.__flume40.log;
 export const spinner = globalThis.__flume40.spinner;
 `);
   const childStub = join(work, "child.mjs");
-  writeFileSync(childStub, `export const spawnSync = globalThis.__flume40.spawnSync;\n`);
+  writeFileSync(childStub, `export const spawnSync = globalThis.__flume40.spawnSync;\nexport const spawn = globalThis.__flume40.spawn;\n`);
   bundle = join(root, "node_modules/.cache", `flume40-wire-${process.pid}.mjs`);
   mkdirSync(join(root, "node_modules/.cache"), { recursive: true });
   buildSync({ entryPoints: [join(root, "packages/flume-hr/src/hire/WireTelegram.ts")],
@@ -43,6 +44,15 @@ export const spinner = globalThis.__flume40.spinner;
       if (command === "op") return opResult;
       assert.equal(command, "bash");
       return { status: 0 };
+    },
+    // The wiring script runs through runStep (async spawn, bounded, heartbeat).
+    spawn: (command, args, options) => {
+      assert.equal(command, "bash");
+      calls.push({ command, args, options });
+      const child = new EventEmitter();
+      child.kill = () => true;
+      queueMicrotask(() => { child.emit("exit", 0, null); child.emit("close", 0, null); });
+      return child;
     },
   };
   const { WireTelegram } = await import(pathToFileURL(bundle).href);
