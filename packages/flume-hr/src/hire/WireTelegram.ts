@@ -118,15 +118,31 @@ export class WireTelegram extends Command {
       }
     }
 
-    const allowedAnswer = await p.text({
-      message: "Your Telegram user id (allow-list for this bot)",
-      placeholder: process.env.TELEGRAM_ALLOWED_USERS ?? "",
-      initialValue: process.env.TELEGRAM_ALLOWED_USERS ?? "",
-      validate: (v) =>
-        /^[0-9](?:[0-9,]*[0-9])?$/.test(String(v).trim()) ? undefined : "comma-separated numeric ids",
-    });
-    if (p.isCancel(allowedAnswer)) {
-      return { success: false, message: "✗ Aborted; Telegram step deferred." };
+    const validIds = (value: string) => /^[0-9]+(?:,[0-9]+)*$/.test(value);
+    let allowedUsers = (process.env.TELEGRAM_ALLOWED_USERS ?? "").trim();
+    if (!validIds(allowedUsers)) {
+      if (allowedUsers) p.log.warn("TELEGRAM_ALLOWED_USERS must be comma-separated numeric ids; enter a valid value instead.");
+      allowedUsers = "";
+      const operatorRef = "op://DeLoSecrets/Telegram/id";
+      const idRead = spawnSync("op", ["read", operatorRef], { encoding: "utf8" });
+      if (!idRead.error && idRead.status === 0 && /^[0-9]+$/.test(idRead.stdout.trim())) {
+        allowedUsers = idRead.stdout.trim();
+      } else {
+        p.log.warn(`Could not resolve a numeric Telegram user id from ${operatorRef}; enter it manually or cancel.`);
+      }
+    }
+    if (!allowedUsers) {
+      const allowedAnswer = await p.text({
+        message: "Your Telegram user id (allow-list for this bot)",
+        validate: (v) => validIds(String(v ?? "").trim()) ? undefined : "comma-separated numeric ids",
+      });
+      if (p.isCancel(allowedAnswer)) {
+        return { success: false, message: "✗ Aborted; Telegram step deferred." };
+      }
+      allowedUsers = String(allowedAnswer).trim();
+      if (!validIds(allowedUsers)) {
+        return { success: false, message: "✗ Telegram allow-list must be comma-separated numeric ids." };
+      }
     }
 
     const script = join(roleDir, ".scripts", "30-telegram.sh");
@@ -156,7 +172,7 @@ export class WireTelegram extends Command {
         SKIP_HOST_STATE: "0",
         SKIP_TELEGRAM: "0",
         TELEGRAM_BOT_TOKEN: token,
-        TELEGRAM_ALLOWED_USERS: String(allowedAnswer).trim(),
+        TELEGRAM_ALLOWED_USERS: allowedUsers,
       },
       cwd: roleDir,
     });
