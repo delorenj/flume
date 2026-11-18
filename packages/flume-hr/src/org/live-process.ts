@@ -66,34 +66,69 @@ export function scanLiveProcesses(
     if (paths.basename(args[0] ?? "") === "hermes") start = 1;
     else if (comm === "hermes") start = 1;
     else {
-      // Walk Python's interpreter argv, not a fixed offset: -u/-I and
-      // value-taking switches can precede either -m or a console script.
+      // Python processes short options left to right. -m/-c end option parsing;
+      // -W/-X consume the rest of their group or the following argv element.
       let uncertain = false;
+      const modules = ["hermes", "hermes_cli", "hermes_cli.main"];
+      const possibleEntrypoint = (index: number): boolean => {
+        const value = args[index] ?? "";
+        return paths.basename(value) === "hermes" ||
+          (value === "-m" && modules.includes(args[index + 1] ?? "")) ||
+          (/^-[bBdEhiIOPqsStuUvVxRt]*m$/u.test(value) && modules.includes(args[index + 1] ?? "")) ||
+          /^-[bBdEhiIOPqsStuUvVxRt]*m(?:hermes|hermes_cli(?:\.main)?)$/u.test(value);
+      };
       for (let i = 1; i < args.length; i++) {
         const arg = args[i]!;
-        if (arg === "-m") {
-          if (["hermes", "hermes_cli", "hermes_cli.main"].includes(args[i + 1] ?? "")) {
-            if (uncertain) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
-            else start = i + 2;
-          }
+        if (arg === "-" || ["--help", "--help-all", "--help-env", "--help-xoptions", "--version"].includes(arg)) break;
+        if (arg === "--") {
+          if (paths.basename(args[i + 1] ?? "") === "hermes") start = i + 2;
           break;
         }
-        // -c executes source text, never a module or script. Its payload
-        // (even one spelling "hermes") cannot establish an entrypoint.
-        if (arg === "-c" || arg.startsWith("-c") || arg === "-") break;
-        if (arg === "-W" || arg === "-X" || arg === "--check-hash-based-pycs") { i++; continue; }
-        if (/^-(?:W|X).+/u.test(arg) || arg.startsWith("--check-hash-based-pycs=")) continue;
-        if (/^-[bBdEhiIOPqsStuUvVx]+$/u.test(arg)) continue;
-        if (arg.startsWith("-")) { uncertain = true; continue; }
+        if (arg === "--check-hash-based-pycs") {
+          if (++i >= args.length) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
+          continue;
+        }
+        if (arg.startsWith("--check-hash-based-pycs=")) continue;
+        if (arg.startsWith("-")) {
+          if (!arg.startsWith("--")) {
+            let terminal = false;
+            let consumed = false;
+            for (let j = 1; j < arg.length; j++) {
+              const option = arg[j]!;
+              if (option === "c") { terminal = true; break; }
+              if (option === "m") {
+                const module = arg.slice(j + 1) || args[++i] || "";
+                if (!module) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
+                else if (modules.includes(module)) {
+                  if (uncertain) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
+                  else start = i + 1;
+                }
+                terminal = true;
+                break;
+              }
+              if (option === "W" || option === "X") {
+                if (j + 1 === arg.length && ++i >= args.length) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
+                consumed = true;
+                break;
+              }
+              if (!"bBdEhiIOPqsStuUvVxRt".includes(option)) { uncertain = true; break; }
+            }
+            if (terminal) break;
+            if (consumed) continue;
+          } else {
+            uncertain = true;
+          }
+          continue;
+        }
         if (paths.basename(arg) === "hermes") {
           if (uncertain) errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
           else start = i + 1;
         } else if (uncertain) {
-          // An unrecognized option may have consumed this positional argument.
-          // A later explicit Hermes entrypoint is uncertain, not empty-success.
+          // An unknown switch may consume this argument; a later explicit
+          // entrypoint is uncertain rather than proof of an empty process table.
           for (let j = i + 1; j < args.length; j++) {
             if (args[j] === "-c" || args[j]?.startsWith("-c")) break;
-            if ((args[j] === "-m" && ["hermes", "hermes_cli", "hermes_cli.main"].includes(args[j + 1] ?? "")) || paths.basename(args[j] ?? "") === "hermes") {
+            if (possibleEntrypoint(j)) {
               errors.push(`PID ${pid}: Python entrypoint options could not be resolved`);
               break;
             }
