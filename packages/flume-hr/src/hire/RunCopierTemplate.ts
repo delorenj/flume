@@ -45,14 +45,13 @@ export function scrubInteractiveChannelCredentials(env: NodeJS.ProcessEnv): void
   delete env.WIRE_SLACK;
 }
 
-function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: string): void {
+function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: string, renderedAgentId: unknown): void {
   const manifestPath = join(ctx.targetDir, ".project.json");
-  // Return early if manifest doesn't exist (no project to register to)
-  // or if targetRepo is null/undefined (should not happen, but guard against it)
-  // Note: We allow empty string for targetRepo to handle edge cases like
-  // running from a directory ending with separator, as the hire can still
-  // succeed even if the agentId will be less ideal (e.g., "-pm").
-  if (!existsSync(manifestPath) || ctx.targetRepo == null) return;
+  if (!existsSync(manifestPath)) return;
+  const expectedAgentId = ctx.agentId ?? deriveAgentId(ctx.targetRepo!, role);
+  if (typeof renderedAgentId !== "string" || !renderedAgentId || renderedAgentId !== expectedAgentId) {
+    throw new Error(`${roleDir}/role.yaml agent_id must match ${expectedAgentId} before project registration`);
+  }
 
   const current = readFileSync(manifestPath, "utf8");
   const parsed = JSON.parse(current) as unknown;
@@ -66,8 +65,7 @@ function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: s
     throw new Error(`${manifestPath} agents must contain a JSON object`);
   }
   const agents = (rawAgents ?? {}) as Record<string, unknown>;
-  const agentId = ctx.agentId ?? deriveAgentId(ctx.targetRepo, role);
-  Object.defineProperty(agents, agentId, {
+  Object.defineProperty(agents, expectedAgentId, {
     value: {
       role,
       role_dir: relative(ctx.targetDir, roleDir),
@@ -347,12 +345,12 @@ export class RunCopierTemplate extends Command {
       document.setIn(["deployment", "systemd"], ctx.deferredExternalEffects ? "deferred" : ctx.skipSystemd ? "deferred" : "required");
       const next = String(document);
       if (next !== current) writeFileSync(roleManifest, next, "utf8");
-      registerRenderedAgent(ctx, roleDir, safeRole);
+      registerRenderedAgent(ctx, roleDir, safeRole, document.get("agent_id"));
     } catch (error) {
       return {
         success: false,
         outcome: "failed",
-        message: `Failed to record Hermes deployment mode in ${roleManifest}: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Failed to record Hermes deployment mode or project registration (${roleManifest}, ${join(ctx.targetDir, ".project.json")}): ${error instanceof Error ? error.message : String(error)}`,
       };
     }
 
