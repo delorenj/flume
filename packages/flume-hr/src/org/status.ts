@@ -54,7 +54,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { observeBloodbankRoute, BLOODBANK_ROUTE_SOURCE, type BloodbankRouteResult } from "./bloodbank";
+import { observeBloodbankRoute, bloodbankRouteCause, BLOODBANK_ROUTE_SOURCE, BLOODBANK_ROUTE_LIMITATION, type BloodbankRouteResult } from "./bloodbank";
 import { loadFleetContract, resolveFleetContractPath, validateFleetContract } from "./contract";
 import {
   boundTransitions,
@@ -337,7 +337,7 @@ const DOMAIN_DESIRED: Readonly<Record<FleetStatusDomain, string>> = Object.freez
   runtime: "a real role-local runtime directory derived from role_dir, ignored by git",
   systemd: "the canonical per-agent unit set, observed on this machine",
   live_process: "every running Hermes process attributed to a registry row",
-  bloodbank: "a fleet-scoped target independently reconciled with the gateway's live served-profile authority; activation is separate",
+  bloodbank: "fleet-scoped routing prerequisites; session addressability is auxiliary and Bloodbank target resolution remains unsupported; activation is separate",
   release_provenance: "the recorded pin and the live build agreeing",
 });
 
@@ -1374,6 +1374,17 @@ export function observeFromInventory(
       desired: "absent (enabled) or a strict boolean, written only by the declared execution-authority owner",
       evidence: "declared",
     }));
+    out.push(observation(ctx, {
+      domain: "bloodbank", agentId, state: "unsupported",
+      field: "gateways.bloodbank.command_subject",
+      owner: "unmapped: Bloodbank target-resolver inspection",
+      summary: "bloodbank-target-resolution-unsupported",
+      details: [BLOODBANK_ROUTE_LIMITATION],
+      source: SOURCE_DECLARED_GAP,
+      capability: "routing_liveness",
+      observed: "Bloodbank target-to-profile resolution not observed",
+      desired: "current Bloodbank ProfileResolver association including target_profiles precedence and selected registry",
+    }));
   }
 
   if (domains.has("live_process")) {
@@ -2097,15 +2108,13 @@ export function agentLifecycle(
   const routing = own.find((item) => item.domain === "bloodbank" && item.source === BLOODBANK_ROUTE_SOURCE);
   const readiness: FleetStatusReadiness = !domains.has("bloodbank")
     ? "out_of_scope"
-    : routing?.state === "pass" && routing.evidence === "direct"
-      ? "ready"
-      : routing?.state === "fail" ? "blocked" : "unproven";
-  const observedState: FleetStatusLifecycleState = observed === "healthy" && readiness === "ready"
-    ? "routing_ready" : observed;
+    // identify cannot observe Bloodbank's target resolver. Even positive
+    // session addressability cannot prove this capability or advance lifecycle.
+    : routing?.state === "fail" ? "blocked" : "unproven";
 
   return {
     desired_state: desired,
-    observed_state: observedState,
+    observed_state: observed,
     capability_readiness: readiness,
     // `null` now means a PRESENT non-boolean (absent resolves to true), which
     // the gateway treats as disabled -- so it reads as denied, not undeclared.
@@ -2852,9 +2861,9 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
   const systemdRuleAgreement = { compared: 0, agree: 0, disagree: 0, not_compared: 0 };
   const systemdUnregisteredNotes: string[] = [];
 
-  // The gateway identify reply is a fresh in-memory served-authority snapshot, not a
-  // persisted registry declaration or a process-presence heuristic. One read per
-  // selected employee is bounded by the shared run context and capped concurrency.
+  // The gateway identify reply is a fresh in-memory session-authority snapshot,
+  // not Bloodbank target-resolution evidence. One auxiliary read per selected
+  // employee is bounded by the shared run context and capped concurrency.
   const routes = new Map<string, BloodbankRouteResult>();
   if (domainSet.has("bloodbank")) {
     const root = resolveProfileLayout(contract, env, home).root;
@@ -3379,17 +3388,19 @@ export async function collectFleetStatus(options: FleetStatusOptions): Promise<F
     own.push(...observeFromInventory(ctx, row, domainSet));
     if (domainSet.has("bloodbank")) {
       const route = routes.get(agentId);
-      own.push(observation(ctx, {
+      const cause = bloodbankRouteCause(route?.reason ?? "gateway-route-result-missing");
+      const auxiliary = observation(ctx, {
         domain: "bloodbank", agentId,
         state: route?.state ?? "unobserved",
-        field: "agents.{agent_id}.bloodbank.target_agent_id",
+        field: cause.field,
         source: BLOODBANK_ROUTE_SOURCE,
         summary: route?.reason ?? "gateway-route-result-missing",
-        details: ["Hermes gateway control socket identify; live served_profiles home/profile_id must match the declared profile and target"],
+        details: [BLOODBANK_ROUTE_LIMITATION, "Freshness: a new bounded identify exchange in this run; persisted snapshots are never accepted as current addressability."],
         observed: route?.observed ?? "gateway-route-result-missing",
-        desired: "the ready shared gateway currently serves the declared profile for this employee",
+        desired: "the ready session gateway currently serves the declared profile (auxiliary addressability only)",
         evidence: route?.evidence ?? "absent",
-      }));
+      });
+      own.push({ ...auxiliary, next_action: bounded(cause.nextAction), next_action_class: "read-only" });
     }
     if (needsProvenance) own.push(...observeFromProvenance(ctx, provenanceFacts, agentId, domainSet));
 

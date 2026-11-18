@@ -4,8 +4,9 @@ import { isAbsolute, join, resolve } from "node:path";
 import { FleetError } from "./types";
 import { remainingMs, type FleetRunContext } from "./runtime";
 
-/** Hermes gateway/control_socket.py: identify is a live, argument-free read of its served authorities. */
+/** Hermes identify observes session authorities, NOT Bloodbank's ProfileResolver. */
 export const BLOODBANK_ROUTE_SOURCE = "gateway-control-identify";
+export const BLOODBANK_ROUTE_LIMITATION = "Session-profile addressability only; Bloodbank target resolution (target_profiles overrides and independently selected registry) is unsupported; no broker subscription, delivery or execution proof.";
 const MAX_RESPONSE_BYTES = 512 * 1024;
 
 export interface BloodbankRouteResult {
@@ -19,6 +20,29 @@ export interface BloodbankRouteResult {
 
 function result(state: BloodbankRouteResult["state"], reason: string, probe: BloodbankRouteResult["probe"] = "ok"): BloodbankRouteResult {
   return { state, reason, observed: reason, evidence: state === "pass" || state === "fail" ? "direct" : "absent", probe };
+}
+
+export function bloodbankRouteCause(reason: string): { field: string; nextAction: string } {
+  if (reason.startsWith("routing-scope-")) return {
+    field: "agents.{agent_id}.bloodbank.gateway_scope",
+    nextAction: "Inspect the employee's registry gateway_scope; the handbook requires fleet. Ask agent-registry to correct the declaration if wrong; review does not write it.",
+  };
+  if (reason.startsWith("routing-target-")) return {
+    field: "agents.{agent_id}.bloodbank.target_agent_id",
+    nextAction: "Compare the registry target_agent_id with the employee ID; ask agent-registry to correct a mismatch. Do not change bloodbank.enabled.",
+  };
+  if (reason === "routing-profile-missing-or-invalid" || reason === "routing-profile-conflict") return {
+    field: "agents.{agent_id}.profile_name",
+    nextAction: "Inspect registry profile_name declarations for a blank, invalid or duplicate identity; ask agent-registry to reconcile the employee-to-profile mapping.",
+  };
+  if (reason === "routing-profile-unresolved" || reason === "profile-layout-unresolved") return {
+    field: "profiles.{profile_name}.config.yaml",
+    nextAction: "Inspect the handbook profile layout and the declared profile directory; ask runtime-template to investigate the missing or unresolved generated profile. Do not create it during review.",
+  };
+  return {
+    field: "units.hermes-gateway.service",
+    nextAction: "Inspect the shared gateway's read-only identify response and control-socket access with runtime-template; reconcile served profile identities. Do not restart, attach profiles or dispatch commands during review.",
+  };
 }
 
 function record(value: unknown): value is Record<string, unknown> {

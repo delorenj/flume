@@ -46,6 +46,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import YAML from "yaml";
+import { startGatewayIdentify } from "./helpers/gateway-identify.mjs";
 import {
   deferredAgentUnits,
   installFakeSystemctl,
@@ -860,12 +861,17 @@ const CLEAN_RULES = [RULE.scaffoldPass, RULE.bindingPass, RULE.profilePass, RULE
 
 console.log("fleet health: four axes, one policy, one verdict a machine can act on");
 
+let gatewayIdentify;
 try {
   if (!existsSync(CLI)) {
     skip("the whole suite", "dist/index.js is not built; run `npm run build` first");
     throw new SkipCase("unbuilt");
   }
   seedScratch();
+  // Session addressability must be freshly observed for health, while the
+  // separate Bloodbank resolver gap remains explicitly contract-deferred.
+  gatewayIdentify = await startGatewayIdentify(join(scratchHome, ".hermes"),
+    SLUGS.map((slug) => join(scratchHome, ".hermes", "profiles", `${slug}-pm`)), shimRoot);
 
   const cleanContract = writeContract("clean", policyContract());
   const cleanRoot = makePackageRoot("pkg-clean", readFileSync(cleanContract, "utf8"));
@@ -879,7 +885,7 @@ try {
     assert.equal(result.status, 0, `a proven fleet must exit 0: ${result.stderr}`);
     const data = status(result);
     assert.equal(data.health.unobserved, 0, `nothing may be left unobserved: ${JSON.stringify(data.health)}`);
-    assert.equal(data.health.healthy, true, "no observation may fail");
+    assert.equal(data.health.healthy, true, `no observation may fail: ${JSON.stringify(observationsOf(data).filter((o) => o.state === "fail" || o.state === "error").map((o) => ({ field: o.field, summary: o.summary, details: o.details })))}`);
     assert.equal(data.health.complete, true);
     assert.equal(data.health.fleet_complete, true);
     assert.equal(data.health.unjustified, 0, "every non-pass must be authorized by the contract");
@@ -892,6 +898,44 @@ try {
       assert.notEqual(observation.evidence, undefined);
       assert.notEqual(observation.freshness, undefined);
     }
+  });
+
+  check("FLUME-14 full health never promotes auxiliary addressability to routing_ready or activated", () => {
+    for (const args of [["review", "--live", "--json"], ["review", "--json"]]) {
+      const data = status(cliAt(cleanRoot, args, { PJ_FLEET_CLI_ENTRY: cleanShim }));
+      for (const agent of data.agents) {
+        assert.equal(agent.lifecycle.capability_readiness, "unproven");
+        assert.ok(!["routing_ready", "activated"].includes(agent.lifecycle.observed_state));
+        assert.equal(agent.observations.find((o) => o.source === "gateway-control-identify").state, "pass");
+        const gap = agent.observations.find((o) => o.summary === "bloodbank-target-resolution-unsupported");
+        assert.equal(gap.state, "unsupported");
+        assert.equal(gap.justification.kind, "deferred_capability");
+      }
+      if (!args.includes("--live")) {
+        assert.equal(data.health.proven, false);
+        assert.equal(data.health.complete, false);
+      }
+    }
+    const missing = status(cliAt(cleanRoot, ["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: join(shimRoot, "missing.mjs") }));
+    assert.ok(missing.health.collection_errors > 0);
+    assert.equal(missing.health.proven, false);
+    assert.equal(missing.health.complete, false);
+    assert.equal(missing.health.verdict, "unproven");
+    for (const agent of missing.agents) assert.ok(!["routing_ready", "activated"].includes(agent.lifecycle.observed_state));
+  });
+
+  await checkAsync("FLUME-14 unread addressability cannot be a fully proven healthy aggregate", async () => {
+    await gatewayIdentify.state("draining");
+    try {
+      const data = status(cliAt(cleanRoot, ["review", "--live", "--json"], { PJ_FLEET_CLI_ENTRY: cleanShim }));
+      assert.equal(data.health.proven, false);
+      assert.equal(data.health.complete, false);
+      assert.equal(data.health.verdict, "unproven");
+      for (const agent of data.agents) {
+        assert.equal(agent.lifecycle.capability_readiness, "unproven");
+        assert.ok(!["routing_ready", "activated"].includes(agent.lifecycle.observed_state));
+      }
+    } finally { await gatewayIdentify.state("ready"); }
   });
 
   check("removing ONE policy entry makes the fleet unproven and leaves health.healthy untouched", () => {
@@ -1025,6 +1069,10 @@ try {
     assert.equal(stale[0].domain, "project_binding");
     assert.equal(data.health.stale, 1);
     assert.equal(data.health.proven, false, "stale evidence cannot be proof");
+    for (const agent of data.agents) {
+      assert.equal(agent.lifecycle.capability_readiness, "unproven");
+      assert.ok(!["routing_ready", "activated"].includes(agent.lifecycle.observed_state));
+    }
     const alpha = agentNamed(data, "alpha-pm").observations
       .find((item) => item.domain === "project_binding" && item.source === "fleet-inventory");
     assert.equal(alpha.freshness, "current", "the agent inside the window must read current");
@@ -1819,6 +1867,10 @@ try {
       assert.equal(data.health.freshness_unknown, 1, `${label}: exactly one reading must be unknown`);
       assert.equal(data.health.stale, 0, `${label}: unknown is not stale, and the two must not collapse`);
       assert.equal(data.health.proven, false, `${label}: evidence this run could not read is not proof`);
+      for (const agent of data.agents) {
+        assert.equal(agent.lifecycle.capability_readiness, "unproven");
+        assert.ok(!["routing_ready", "activated"].includes(agent.lifecycle.observed_state));
+      }
       const alpha = agentNamed(data, "alpha-pm").observations
         .find((item) => item.domain === "project_binding" && item.source === "fleet-inventory");
       assert.equal(alpha.freshness, "current", `${label}: the untouched agent must stay current`);
@@ -1998,7 +2050,7 @@ try {
     assert.match(section, /still exits 0/u, "and must keep stating that the default exits 0");
   });
 
-  check("an agent_exceptions entry flips a drifted agent to exception and leaves health.healthy alone", () => {
+  await checkAsync("an agent_exceptions entry flips a drifted agent to exception and leaves health.healthy alone", async () => {
     // Story 1.6 (PJAN-108). A DELTA on one contract entry: the same fleet, with
     // one role directory missing its `role.yaml`, once without a ruling and once
     // with `health_policy.agent_exceptions` naming it. The drift is still
@@ -2018,6 +2070,7 @@ try {
     // profile must carry no failure of its own or the agent could never be an
     // exception rather than unhealthy.
     const profile = seedRendererCleanProfile(scratchHome, "drifted-pm");
+    await gatewayIdentify.profiles([...SLUGS.map((slug) => join(scratchHome, ".hermes", "profiles", `${slug}-pm`)), profile]);
     // And service-clean (story 1.8), for exactly the same reason: a row with no
     // units on the scripted manager reads `gateway-missing`, which is a
     // SEPARATE proven failure the scaffold ruling does not cover -- the agent
@@ -2078,6 +2131,7 @@ try {
       assert.equal(after.health.members.exception, before.health.members.exception + 1);
       assert.equal(after.health.members.unhealthy, before.health.members.unhealthy - 1);
     } finally {
+      await gatewayIdentify.profiles(SLUGS.map((slug) => join(scratchHome, ".hermes", "profiles", `${slug}-pm`)));
       rmSync(profile, { recursive: true, force: true });
       rmSync(join(scratchHome, ".hermes", "profiles", ".drifted-pm.config.lock"), { force: true });
       setFakeSystemctlState(systemctlShim, canonicalSystemdState());
@@ -2132,6 +2186,11 @@ try {
 } catch (error) {
   if (!(error instanceof SkipCase)) throw error;
 } finally {
+  if (gatewayIdentify) {
+    const requests = await gatewayIdentify.stop();
+    assert.ok(requests.length > 0);
+    for (const request of requests) assert.deepEqual(request, { verb: "identify", id: 1, protocol: 1 });
+  }
   rmSync(temp, { recursive: true, force: true });
   rmSync(shimRoot, { recursive: true, force: true });
 }

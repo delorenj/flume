@@ -1618,6 +1618,13 @@ export function formatFleetStatusReport(status: FleetStatus): string {
   const agentWidth = status.agents.reduce((max, agent) => Math.max(max, agent.agent_id.length), 0);
   for (const agent of status.agents.slice(0, REPORT_MAX_AGENTS)) {
     for (const line of agentLine(agent, agentWidth, status.domains)) lines.push(line);
+    // This positive observation must survive the actionable-only filter below:
+    // session addressability is useful, but is not Bloodbank routing proof.
+    for (const item of agent.observations.filter((item) => item.source === "gateway-control-identify")) {
+      lines.push(`       ${dim(glyph.arrow)} ${dim(`${item.source}: ${item.state} ${item.summary}`)}`);
+      for (const detail of item.details) lines.push(`       ${dim(glyph.arrow)} ${dim(detail)}`);
+      lines.push(`       ${dim(glyph.arrow)} ${dim(`owner ${item.owner ?? "undeclared"}; ${item.next_action}`)}`);
+    }
   }
   if (status.agents.length > REPORT_MAX_AGENTS) {
     lines.push(`    ${dim(`... ${status.agents.length - REPORT_MAX_AGENTS} more agent(s); use --json for all of them`)}`);

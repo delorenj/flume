@@ -600,10 +600,11 @@ health_policy:
   # canonical renderer's own check, so `profile.render_generation` is answered
   # rather than deferred. Neither is systemd topology: the systemd observer
   # (story 1.8) samples the user manager itself, so `unit_topology` is answered
-  # too. THREE deferrals remain, not two: live-process attribution (owner 1.9)
-  # and Bloodbank routing liveness (owner 1.10), both whole-domain, plus the
-  # capability-level `release_provenance`/`fleet.registry_file` (owner 1.1) --
-  # that last one is easy to forget because its domain still reports verdicts.
+  # too. THREE deferrals remain: live-process attribution (owner 1.9),
+  # Bloodbank target resolution (owner 1.10; session-profile addressability is
+  # observed, but not the adapter's resolver), and capability-level
+  # `release_provenance`/`fleet.registry_file` (owner 1.1) -- that last one is
+  # easy to forget because its domain still reports verdicts.
   required_domains:
     - registry
     - project_binding
@@ -626,6 +627,15 @@ health_policy:
         the process table, so no running Hermes process can be attributed to a
         registry row or classified as sprawl.
       owner_story: "1.9"
+    - domain: bloodbank
+      capability: routing_liveness
+      reason: >-
+        Gateway identify observes live session-profile addressability only.
+        Bloodbank target resolution remains unsupported: its ProfileResolver
+        prioritizes target_profiles overrides and selects its own registry. No
+        existing safe inspection surface exposes that current association;
+        addressability must not imply routing readiness or execution.
+      owner_story: "1.10"
     - domain: release_provenance
       capability: fleet.registry_file
       reason: >-
