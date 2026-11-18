@@ -154,6 +154,14 @@ desk:
     assert.throws(() => validateNamedAgentSchema({ ...contract, voice }), NamedAgentValidationError);
   }
   console.log("  ok: optional voice slug survives validation/resolution; invalid slugs and nonstrings refuse");
+  assert.throws(() => validateNamedAgentSchema({ ...contract, memory: { write_bank: 'agent-other' } }), /write_bank/);
+  for (const bank of ['custom', 'hermes', 'Bad-Bank', '../escape']) {
+    assert.throws(() => validateNamedAgentSchema({ ...contract, memory: { ...contract.memory, recall_banks: [bank] } }), NamedAgentValidationError);
+  }
+  const fifteen = Array.from({ length: 15 }, (_, i) => `domain-${i}`);
+  assert.doesNotThrow(() => validateNamedAgentSchema({ ...contract, memory: { ...contract.memory, recall_banks: fifteen } }));
+  assert.throws(() => validateNamedAgentSchema({ ...contract, memory: { ...contract.memory, recall_banks: [...fifteen, 'one-too-many'] } }), NamedAgentValidationError);
+  console.log("  ok: shared identity semantics enforce exact own-bank, reserved/invalid recall refusal and 16 total banks");
 
   // ==========================================================================
   // Test 2: Omission of desk resolves default path
