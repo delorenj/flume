@@ -63,6 +63,7 @@ const SUITES = [
   "tests/fleet-scaffold-regressions.mjs",
   "tests/soul-project-bank-regressions.mjs",
   "tests/paired-launch-director-copy-gate.mjs",
+  "tests/pm-launch-mode.mjs",
   "tests/scheduling-policy-regressions.mjs",
   "tests/policy-refresh-regressions.mjs",
   "tests/named-agent-regressions.mjs",

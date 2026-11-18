@@ -56,6 +56,18 @@ Substitution is `{{ name }}` and nothing else. No conditionals, no filters, no
 loops: a role that needs a branch is a second role file, which is the whole
 point. An undeclared placeholder is a hard error, never a half-rendered SOUL.
 
+## A mode read from repo data is not a role branch
+
+A second role file is for a different charter. A PM in launch mode is the same
+PM reading different data, so it is a section, not a file: `pm.md` puts one
+`## Launch mode` section in every PM soul, and the repo's committed
+`.launch.yaml` decides whether it applies (`mode: launch | steady`, declared
+date, source, finish line, target date, contract paths, epic, optional cut-line
+hint; never status). No file means steady and the section is inert. Turning
+launch on or off is a commit to that repo, never a new role, a re-hire or a
+re-compose. The template ships `.scripts/launch-pass.py` to every PM desk, and
+Candybar fires it (`<repo>-pm-launch-pass`) only for a repo that launches.
+
 ## The one composer
 
 `composeSoul()` in `packages/flume-hr/src/parity/rules.ts` is the only thing that
