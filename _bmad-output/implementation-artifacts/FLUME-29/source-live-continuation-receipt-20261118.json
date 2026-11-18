@@ -1,0 +1,846 @@
+{
+  "recorded_at": "2026-11-18T23:29:39.386423+00:00",
+  "ticket": "https://plane.delo.sh/33god/browse/FLUME-29/",
+  "overall": "projection-reconciled-convergent-live-sessions-blocked",
+  "authority": "Parent PM explicitly authorized reversible maintained per-profile base+existing-delta render only for infra-specialist and n8n-specialist, scoped onboarding and native own-bank memory acceptance. No authorization inferred for runtime/policy edits.",
+  "previous_evidence": {
+    "markdown": "source-live-acceptance-20261118.md",
+    "receipt": "source-live-receipt-20261118.json",
+    "history_preserved": true
+  },
+  "source": {
+    "flume_main_at_start": "d13a29b49ec520700b717b1801d4e0f822065117",
+    "observed_flume_remote_main": "d13a29b49ec520700b717b1801d4e0f822065117\trefs/heads/main",
+    "template_main": "96e7e288026782358584b9b85c764659d240ee0d",
+    "observed_template_remote_main": "96e7e288026782358584b9b85c764659d240ee0d\trefs/heads/main",
+    "public_flume": "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+    "runtime_revision": "d6100d8bda1af8c7f1ca121a7f99a29112c62045"
+  },
+  "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+  "preflight_differences": {
+    "infra-specialist": {
+      "profile": "infra-specialist",
+      "differences": [
+        {
+          "path": "gateway.platforms.bloodbank.extra.queued_capacity",
+          "current": "<absent>",
+          "expected": 64
+        }
+      ],
+      "delta_sha256": "c86fde9a1d212555c3bae64e5cfb2a134b45d5ff877a555f117b7cdf22402746",
+      "config_sha256": "e96c9bd264522c464aabc1f7c0ae8b934fc91a9dff1c988f21267ea060ad25ec"
+    },
+    "n8n-specialist": {
+      "profile": "n8n-specialist",
+      "differences": [
+        {
+          "path": "gateway.platforms.bloodbank.extra.queued_capacity",
+          "current": "<absent>",
+          "expected": 64
+        },
+        {
+          "path": "plugins.enabled",
+          "current": [
+            "bloodbank-platform",
+            "camofox",
+            "fal",
+            "gemini-provider",
+            "hindsight",
+            "kimi-coding-provider",
+            "ntfy-platform",
+            "openai-codex",
+            "openrouter",
+            "orca-status",
+            "self-hosted",
+            "slack-platform",
+            "telegram-platform",
+            "tts/vox",
+            "voice-persona",
+            "vox",
+            "web-brave-free",
+            "web-tavily"
+          ],
+          "expected": [
+            "bloodbank-platform",
+            "camofox",
+            "fal",
+            "gemini-provider",
+            "hindsight",
+            "kimi-coding-provider",
+            "ntfy-platform",
+            "openai-codex",
+            "openrouter",
+            "orca-status",
+            "self-hosted",
+            "slack-platform",
+            "telegram-platform",
+            "tts/vox",
+            "vox",
+            "web-brave-free",
+            "web-tavily",
+            "voice-persona"
+          ]
+        }
+      ],
+      "delta_sha256": "0ad32fc7c69f4de38b4b8074a8490350802bdd90c3e08ece14c911c3d783da0e",
+      "config_sha256": "a2e46a6744cb6e390d3d1ccc0527103a4453a833146c3762973469d349f83f48"
+    }
+  },
+  "profiles": {
+    "infra-specialist": {
+      "generated_config": {
+        "before_sha256": "e96c9bd264522c464aabc1f7c0ae8b934fc91a9dff1c988f21267ea060ad25ec",
+        "after_sha256": "736d90851623f5e0c3b5d3e44f6b4f9a47d098b7ae880e5014a3d8dc7ed729e9",
+        "private_renderer_backup": "/home/delorenj/.hermes/.profile-config-backups/20261118T182658-render/infra-specialist/config.yaml",
+        "backup_hash_matches_before": true
+      },
+      "delta": {
+        "before_sha256": "c86fde9a1d212555c3bae64e5cfb2a134b45d5ff877a555f117b7cdf22402746",
+        "after_sha256": "c86fde9a1d212555c3bae64e5cfb2a134b45d5ff877a555f117b7cdf22402746",
+        "byte_preserved": true
+      },
+      "identity_bank_refs": {
+        "definition_sha256": "fb38b0915d771a600ad977490cec17e7d05d8b1691aa340cde9202e96311ca89",
+        "company_identity_sha256": "f63c95775f55a71462606da32775e4673e4f41f8c34e6688759f74aa7a44986c",
+        "bank": "agent-infra-specialist",
+        "memory_config_sha256": "dac1ab3b02e1e04109e409364dfe4abf16b49656120d0109bf04caa2729301fe",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-infra-specialist",
+        "registry_row_sha256": "c48b828bdde3ad933b8911117b3ef577698f2203f8fcfb33fa0227a7dd15d620"
+      },
+      "projection_refresh": {
+        "dry_run": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "infra-specialist",
+            "--dry-run",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.64,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"dryRun\": true,\n  \"id\": \"infra-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n    \"changed\": [\n      \".no-bundled-skills\",\n      \"specialist-projection.json\"\n    ],\n    \"write_bank\": \"agent-infra-specialist\",\n    \"recall_banks\": [\n      \"agent-infra-specialist\",\n      \"infra\",\n      \"docker\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/infra-specialist/.skillex-selection\",\n    \"manifest\": {\n      \"inherit_global\": false,\n      \"set\": \"infra-specialist\"\n    },\n    \"manifestChange\": \"none\",\n    \"changes\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "apply": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "infra-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 1.04,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"infra-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"write_bank\": \"agent-infra-specialist\",\n  \"recall_banks\": [\n    \"agent-infra-specialist\",\n    \"infra\",\n    \"docker\"\n  ],\n  \"skills\": [\n    \"delonet-conventions\",\n    \"delonet-dotenv\",\n    \"stacks-deploy\",\n    \"systemd-agent-service-diagnostics\"\n  ],\n  \"changed\": true,\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n    \"changed\": [\n      \".no-bundled-skills\",\n      \"specialist-projection.json\"\n    ],\n    \"write_bank\": \"agent-infra-specialist\",\n    \"recall_banks\": [\n      \"agent-infra-specialist\",\n      \"infra\",\n      \"docker\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/infra-specialist/.skillex-selection\",\n    \"manifestChanged\": false,\n    \"applied\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "second": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "infra-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.97,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"infra-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"write_bank\": \"agent-infra-specialist\",\n  \"recall_banks\": [\n    \"agent-infra-specialist\",\n    \"infra\",\n    \"docker\"\n  ],\n  \"skills\": [\n    \"delonet-conventions\",\n    \"delonet-dotenv\",\n    \"stacks-deploy\",\n    \"systemd-agent-service-diagnostics\"\n  ],\n  \"changed\": false,\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n    \"changed\": [],\n    \"write_bank\": \"agent-infra-specialist\",\n    \"recall_banks\": [\n      \"agent-infra-specialist\",\n      \"infra\",\n      \"docker\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/infra-specialist/.skillex-selection\",\n    \"manifestChanged\": false,\n    \"applied\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "audit": {
+          "command": [
+            "flume",
+            "audit",
+            "--employee",
+            "infra-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.59,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"infra-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/infra-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/infra-specialist\",\n  \"write_bank\": \"agent-infra-specialist\",\n  \"recall_banks\": [\n    \"agent-infra-specialist\",\n    \"infra\",\n    \"docker\"\n  ],\n  \"skills\": [\n    \"delonet-conventions\",\n    \"delonet-dotenv\",\n    \"stacks-deploy\",\n    \"systemd-agent-service-diagnostics\"\n  ]\n}\n",
+          "stderr": ""
+        },
+        "convergence": {
+          "exit_code": 0,
+          "changed": false,
+          "owned_state_byte_inode_mtime_equal": true,
+          "changed_paths": []
+        },
+        "owned_state_entries_compared": 228
+      },
+      "declared_not_runtime_proof": {
+        "skills_policy": {
+          "inherit_global": true,
+          "project_discovery": false,
+          "external_dirs": []
+        },
+        "strict_markers": {
+          ".skillex-only": true,
+          ".no-bundled-skills": true
+        },
+        "selected_role_skills": [
+          "delonet-conventions",
+          "delonet-dotenv",
+          "stacks-deploy",
+          "systemd-agent-service-diagnostics"
+        ],
+        "profile_skill_entry_names": [
+          "33god-features",
+          "33god-hub",
+          "activity-report",
+          "agent-config-fanout",
+          "agent-fleet-operations",
+          "agent-workspace-linux",
+          "antislop",
+          "antislop-code",
+          "antislop-copywriting",
+          "antislop-human",
+          "antislop-ui",
+          "artifacts",
+          "automaticai-provider-gateway",
+          "automaticai-provider-gateway-lazy-migration-strategy",
+          "autonomous-ai-agents",
+          "belsky-doctrine",
+          "bloodbank-integration",
+          "bmad-advanced-elicitation",
+          "bmad-agent-analyst",
+          "bmad-agent-architect",
+          "bmad-agent-builder",
+          "bmad-agent-dev",
+          "bmad-agent-pm",
+          "bmad-agent-ux-designer",
+          "bmad-architecture",
+          "bmad-bmb-setup",
+          "bmad-brainstorming",
+          "bmad-build",
+          "bmad-build-auto",
+          "bmad-cis-agent-brainstorming-coach",
+          "bmad-cis-agent-creative-problem-solver",
+          "bmad-cis-agent-design-thinking-coach",
+          "bmad-cis-agent-innovation-strategist",
+          "bmad-cis-agent-presentation-master",
+          "bmad-cis-agent-storyteller",
+          "bmad-cis-design-thinking",
+          "bmad-cis-innovation-strategy",
+          "bmad-cis-problem-solving",
+          "bmad-cis-storytelling",
+          "bmad-code-review",
+          "bmad-correct-course",
+          "bmad-create-epics-and-stories",
+          "bmad-customize",
+          "bmad-deep-recon",
+          "bmad-eval-runner",
+          "bmad-forge-idea",
+          "bmad-help",
+          "bmad-loop-resolve",
+          "bmad-loop-setup",
+          "bmad-loop-sweep",
+          "bmad-module-builder",
+          "bmad-party-mode",
+          "bmad-prd",
+          "bmad-prfaq",
+          "bmad-product-brief",
+          "bmad-project-context",
+          "bmad-qa-generate-e2e-tests",
+          "bmad-retrospective",
+          "bmad-review",
+          "bmad-spec",
+          "bmad-sprint-planning",
+          "bmad-ux",
+          "bmad-walkthrough",
+          "bmad-workflow-builder",
+          "board-taxonomy",
+          "candybar",
+          "candystore-context",
+          "canvas-design",
+          "code-reviewer",
+          "codegraph-voyage",
+          "computer-use",
+          "delohome",
+          "delonet-conventions",
+          "delonet-daily-report",
+          "delonet-dotenv",
+          "delonet-parental-controls",
+          "delorenzo-family",
+          "design-md",
+          "detached-worker-completion",
+          "domain-triage",
+          "ebook-to-audiobook",
+          "ego-browser",
+          "event-driven-architecture",
+          "find-skills",
+          "gitignore-maintenance",
+          "hermes-pm-template-maintenance",
+          "hermes-project-avatar",
+          "heyma",
+          "hindsight",
+          "humanizer",
+          "impeccable",
+          "interval-driver",
+          "kapture",
+          "krebs",
+          "liam-dev",
+          "mental-model-jotting",
+          "merge-forward",
+          "mise-configuration",
+          "mise-tasks",
+          "mise-versioning",
+          "monitoring-stack",
+          "pillars",
+          "pilot",
+          "power-automate",
+          "pr-creator",
+          "project-jangler",
+          "project-lifecycle",
+          "project-notebook",
+          "projects",
+          "recap",
+          "shadcn-components",
+          "skill-maintenance",
+          "skillex-skill-registry",
+          "spa-host",
+          "stacks-deploy",
+          "stitch",
+          "subagent-driven-development",
+          "systemd-agent-service-diagnostics",
+          "vox-tts",
+          "vox-voice-persona",
+          "waybill",
+          "web-search",
+          "worktrunk",
+          "zellij-workspace-ops"
+        ],
+        "provider_routes": {
+          "api": "https://api-direct.automaticai.io/v1",
+          "base_url": "https://api-direct.automaticai.io/v1"
+        }
+      },
+      "launch": {
+        "command": [
+          "flume",
+          "launch",
+          "infra-specialist",
+          "--cwd",
+          "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "--",
+          "chat",
+          "--oneshot",
+          "--format",
+          "stream-json",
+          "--max-turns",
+          "8",
+          "--run-budget",
+          "120",
+          "-q",
+          "FLUME-29 inspection-only acceptance continuation. You are infra-specialist. First identify your employee charter and enumerate the curated role skills and inherited shared guidance actually exposed in this session. Load relevant available skills as required. Confirm the actual terminal CWD with a bounded read-only pwd call; expected /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof. Use the NATIVE Hindsight retain tool for your OWN identity bank only to retain this harmless attributed operational preference: \"infra-specialist prefers an inspection checklist before proposing infrastructure or workflow changes; acceptance marker FLUME29-CONT-20261118-infra-specialist.\" Ensure the native tool result confirms success; if it does not, report the exact blocker. Report your own bank and tool operation/document identifiers. No infrastructure changes, no deployments, no workflow edits or execution, no file writes, no credential reads or writes, no service-control, no scheduling. Only native own-bank memory retain is authorized to persist state. Do not use CLI or HTTP to bypass a missing native memory tool. Keep the answer brief."
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 2,
+        "seconds": 3.87,
+        "timed_out": false,
+        "stdout": "{\"type\": \"system\", \"subtype\": \"init\", \"model\": \"\", \"session_id\": \"\", \"timestamp\": 1795044447949}\n{\"type\": \"result\", \"session_id\": \"\", \"exit_code\": 2, \"text\": \"\", \"tokens\": {\"input\": 0, \"output\": 0, \"total\": 0, \"cache_read\": 0, \"cache_write\": 0}, \"duration_ms\": 0, \"error\": \"Unsupported gateway CLI options: --run-budget. No local fallback or policy changes were made.\\n  --run-budget: use `agent.run_budget_seconds` in config.yaml\", \"timestamp\": 1795044447949}\n",
+        "stderr": "  1Password: applied 16 secrets\nError: Unsupported gateway CLI options: --run-budget. No local fallback or policy changes were made.\n  --run-budget: use `agent.run_budget_seconds` in config.yaml\n\nsession_id: \n"
+      },
+      "actual_sessions": 0,
+      "session_ids": [],
+      "native_retain": false,
+      "fresh_session_native_recall": false,
+      "second_session_attempted": false,
+      "renderer_dry_run": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "render",
+          "--profile",
+          "infra-specialist",
+          "--dry-run"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.11,
+        "timed_out": false,
+        "stdout": "render infra-specialist                     (46 delta lines)\n",
+        "stderr": ""
+      },
+      "renderer_apply": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "render",
+          "--profile",
+          "infra-specialist"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.12,
+        "timed_out": false,
+        "stdout": "backup -> /home/delorenj/.hermes/.profile-config-backups/20261118T182658-render\n\nrender infra-specialist                     (46 delta lines)\n",
+        "stderr": ""
+      },
+      "renderer_check": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "check",
+          "--profile",
+          "infra-specialist"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.15,
+        "timed_out": false,
+        "stdout": "OK: every profile config.yaml == expected_config(base, delta) (deep_merge + renderer pins)\n",
+        "stderr": ""
+      }
+    },
+    "n8n-specialist": {
+      "generated_config": {
+        "before_sha256": "a2e46a6744cb6e390d3d1ccc0527103a4453a833146c3762973469d349f83f48",
+        "after_sha256": "9419eba2f1ae948be085e42e5c9b3235a18356e5bd2330dafd407b21b48ee77a",
+        "private_renderer_backup": "/home/delorenj/.hermes/.profile-config-backups/20261118T182658-render/n8n-specialist/config.yaml",
+        "backup_hash_matches_before": true
+      },
+      "delta": {
+        "before_sha256": "0ad32fc7c69f4de38b4b8074a8490350802bdd90c3e08ece14c911c3d783da0e",
+        "after_sha256": "0ad32fc7c69f4de38b4b8074a8490350802bdd90c3e08ece14c911c3d783da0e",
+        "byte_preserved": true
+      },
+      "identity_bank_refs": {
+        "definition_sha256": "b227b3eeb54ffc943b30eed6874be18ce0584d0432160c45d18571994900ff58",
+        "company_identity_sha256": "bd2624ad6c753dce284b3f773968ea9bd14a1659469edcc76f244f76d532a556",
+        "bank": "agent-n8n-specialist",
+        "memory_config_sha256": "97db05d1875ddc427a34221a0dcecd50379f61fc62323ebe62f87f3786861ab8",
+        "gateway_ref": "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-n8n-specialist",
+        "registry_row_sha256": "8e9850a9e1a38fada707277b8b3955a4086eab28eaec3a030fecefd223c537ce"
+      },
+      "projection_refresh": {
+        "dry_run": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "n8n-specialist",
+            "--dry-run",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.64,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"dryRun\": true,\n  \"id\": \"n8n-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n    \"changed\": [\n      \".no-bundled-skills\",\n      \"specialist-projection.json\"\n    ],\n    \"write_bank\": \"agent-n8n-specialist\",\n    \"recall_banks\": [\n      \"agent-n8n-specialist\",\n      \"n8n\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/n8n-specialist/.skillex-selection\",\n    \"manifest\": {\n      \"inherit_global\": false,\n      \"set\": \"n8n\"\n    },\n    \"manifestChange\": \"none\",\n    \"changes\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "apply": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "n8n-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 1.04,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"n8n-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"write_bank\": \"agent-n8n-specialist\",\n  \"recall_banks\": [\n    \"agent-n8n-specialist\",\n    \"n8n\"\n  ],\n  \"skills\": [\n    \"n8n-agents\",\n    \"n8n-binary-and-data\",\n    \"n8n-code-javascript\",\n    \"n8n-code-python\",\n    \"n8n-code-tool\",\n    \"n8n-error-handling\",\n    \"n8n-expression-syntax\",\n    \"n8n-mcp-tools-expert\",\n    \"n8n-multi-instance\",\n    \"n8n-node-configuration\",\n    \"n8n-self-hosting\",\n    \"n8n-subworkflows\",\n    \"n8n-validation-expert\",\n    \"n8n-workflow-patterns\"\n  ],\n  \"changed\": true,\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n    \"changed\": [\n      \".no-bundled-skills\",\n      \"specialist-projection.json\"\n    ],\n    \"write_bank\": \"agent-n8n-specialist\",\n    \"recall_banks\": [\n      \"agent-n8n-specialist\",\n      \"n8n\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/n8n-specialist/.skillex-selection\",\n    \"manifestChanged\": false,\n    \"applied\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "second": {
+          "command": [
+            "flume",
+            "onboard",
+            "--employee",
+            "n8n-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.92,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"n8n-specialist\",\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"write_bank\": \"agent-n8n-specialist\",\n  \"recall_banks\": [\n    \"agent-n8n-specialist\",\n    \"n8n\"\n  ],\n  \"skills\": [\n    \"n8n-agents\",\n    \"n8n-binary-and-data\",\n    \"n8n-code-javascript\",\n    \"n8n-code-python\",\n    \"n8n-code-tool\",\n    \"n8n-error-handling\",\n    \"n8n-expression-syntax\",\n    \"n8n-mcp-tools-expert\",\n    \"n8n-multi-instance\",\n    \"n8n-node-configuration\",\n    \"n8n-self-hosting\",\n    \"n8n-subworkflows\",\n    \"n8n-validation-expert\",\n    \"n8n-workflow-patterns\"\n  ],\n  \"changed\": false,\n  \"projection\": {\n    \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n    \"changed\": [],\n    \"write_bank\": \"agent-n8n-specialist\",\n    \"recall_banks\": [\n      \"agent-n8n-specialist\",\n      \"n8n\"\n    ]\n  },\n  \"selection\": {\n    \"project\": \"/home/delorenj/.hermes/profiles/n8n-specialist/.skillex-selection\",\n    \"manifestChanged\": false,\n    \"applied\": []\n  }\n}\n",
+          "stderr": ""
+        },
+        "audit": {
+          "command": [
+            "flume",
+            "audit",
+            "--employee",
+            "n8n-specialist",
+            "--json"
+          ],
+          "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "exit_code": 0,
+          "seconds": 0.57,
+          "timed_out": false,
+          "stdout": "{\n  \"ok\": true,\n  \"id\": \"n8n-specialist\",\n  \"standing\": \"in good standing\",\n  \"problems\": [],\n  \"desk\": \"/home/delorenj/.agents/workforce/n8n-specialist\",\n  \"profile\": \"/home/delorenj/.hermes/profiles/n8n-specialist\",\n  \"write_bank\": \"agent-n8n-specialist\",\n  \"recall_banks\": [\n    \"agent-n8n-specialist\",\n    \"n8n\"\n  ],\n  \"skills\": [\n    \"n8n-agents\",\n    \"n8n-binary-and-data\",\n    \"n8n-code-javascript\",\n    \"n8n-code-python\",\n    \"n8n-code-tool\",\n    \"n8n-error-handling\",\n    \"n8n-expression-syntax\",\n    \"n8n-mcp-tools-expert\",\n    \"n8n-multi-instance\",\n    \"n8n-node-configuration\",\n    \"n8n-self-hosting\",\n    \"n8n-subworkflows\",\n    \"n8n-validation-expert\",\n    \"n8n-workflow-patterns\"\n  ]\n}\n",
+          "stderr": ""
+        },
+        "convergence": {
+          "exit_code": 0,
+          "changed": false,
+          "owned_state_byte_inode_mtime_equal": true,
+          "changed_paths": []
+        },
+        "owned_state_entries_compared": 451
+      },
+      "declared_not_runtime_proof": {
+        "skills_policy": {
+          "inherit_global": true,
+          "project_discovery": false,
+          "external_dirs": []
+        },
+        "strict_markers": {
+          ".skillex-only": true,
+          ".no-bundled-skills": true
+        },
+        "selected_role_skills": [
+          "n8n-agents",
+          "n8n-binary-and-data",
+          "n8n-code-javascript",
+          "n8n-code-python",
+          "n8n-code-tool",
+          "n8n-error-handling",
+          "n8n-expression-syntax",
+          "n8n-mcp-tools-expert",
+          "n8n-multi-instance",
+          "n8n-node-configuration",
+          "n8n-self-hosting",
+          "n8n-subworkflows",
+          "n8n-validation-expert",
+          "n8n-workflow-patterns"
+        ],
+        "profile_skill_entry_names": [
+          "33god-features",
+          "33god-hub",
+          "activity-report",
+          "agent-config-fanout",
+          "agent-fleet-operations",
+          "agent-workspace-linux",
+          "antislop",
+          "antislop-code",
+          "antislop-copywriting",
+          "antislop-human",
+          "antislop-ui",
+          "artifacts",
+          "automaticai-provider-gateway",
+          "automaticai-provider-gateway-lazy-migration-strategy",
+          "autonomous-ai-agents",
+          "belsky-doctrine",
+          "bloodbank-integration",
+          "bmad-advanced-elicitation",
+          "bmad-agent-analyst",
+          "bmad-agent-architect",
+          "bmad-agent-builder",
+          "bmad-agent-dev",
+          "bmad-agent-pm",
+          "bmad-agent-ux-designer",
+          "bmad-architecture",
+          "bmad-bmb-setup",
+          "bmad-brainstorming",
+          "bmad-build",
+          "bmad-build-auto",
+          "bmad-cis-agent-brainstorming-coach",
+          "bmad-cis-agent-creative-problem-solver",
+          "bmad-cis-agent-design-thinking-coach",
+          "bmad-cis-agent-innovation-strategist",
+          "bmad-cis-agent-presentation-master",
+          "bmad-cis-agent-storyteller",
+          "bmad-cis-design-thinking",
+          "bmad-cis-innovation-strategy",
+          "bmad-cis-problem-solving",
+          "bmad-cis-storytelling",
+          "bmad-code-review",
+          "bmad-correct-course",
+          "bmad-create-epics-and-stories",
+          "bmad-customize",
+          "bmad-deep-recon",
+          "bmad-eval-runner",
+          "bmad-forge-idea",
+          "bmad-help",
+          "bmad-loop-resolve",
+          "bmad-loop-setup",
+          "bmad-loop-sweep",
+          "bmad-module-builder",
+          "bmad-party-mode",
+          "bmad-prd",
+          "bmad-prfaq",
+          "bmad-product-brief",
+          "bmad-project-context",
+          "bmad-qa-generate-e2e-tests",
+          "bmad-retrospective",
+          "bmad-review",
+          "bmad-spec",
+          "bmad-sprint-planning",
+          "bmad-ux",
+          "bmad-walkthrough",
+          "bmad-workflow-builder",
+          "board-taxonomy",
+          "candybar",
+          "candystore-context",
+          "canvas-design",
+          "code-reviewer",
+          "codegraph-voyage",
+          "computer-use",
+          "delohome",
+          "delonet-conventions",
+          "delonet-daily-report",
+          "delonet-dotenv",
+          "delonet-parental-controls",
+          "delorenzo-family",
+          "design-md",
+          "detached-worker-completion",
+          "domain-triage",
+          "ebook-to-audiobook",
+          "ego-browser",
+          "event-driven-architecture",
+          "find-skills",
+          "gitignore-maintenance",
+          "hermes-pm-template-maintenance",
+          "hermes-project-avatar",
+          "heyma",
+          "hindsight",
+          "humanizer",
+          "impeccable",
+          "interval-driver",
+          "kapture",
+          "krebs",
+          "liam-dev",
+          "mental-model-jotting",
+          "merge-forward",
+          "mise-configuration",
+          "mise-tasks",
+          "mise-versioning",
+          "monitoring-stack",
+          "n8n-agents",
+          "n8n-binary-and-data",
+          "n8n-code-javascript",
+          "n8n-code-python",
+          "n8n-code-tool",
+          "n8n-error-handling",
+          "n8n-expression-syntax",
+          "n8n-mcp-tools-expert",
+          "n8n-multi-instance",
+          "n8n-node-configuration",
+          "n8n-self-hosting",
+          "n8n-subworkflows",
+          "n8n-validation-expert",
+          "n8n-workflow-patterns",
+          "pillars",
+          "pilot",
+          "power-automate",
+          "pr-creator",
+          "project-jangler",
+          "project-lifecycle",
+          "project-notebook",
+          "projects",
+          "recap",
+          "shadcn-components",
+          "skill-maintenance",
+          "skillex-skill-registry",
+          "spa-host",
+          "stitch",
+          "subagent-driven-development",
+          "vox-tts",
+          "vox-voice-persona",
+          "waybill",
+          "web-search",
+          "worktrunk",
+          "zellij-workspace-ops"
+        ],
+        "provider_routes": {
+          "api": "https://api-direct.automaticai.io/v1",
+          "base_url": "https://api-direct.automaticai.io/v1"
+        }
+      },
+      "launch": {
+        "command": [
+          "flume",
+          "launch",
+          "n8n-specialist",
+          "--cwd",
+          "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "--",
+          "chat",
+          "--oneshot",
+          "--format",
+          "stream-json",
+          "--max-turns",
+          "8",
+          "--run-budget",
+          "120",
+          "-q",
+          "FLUME-29 inspection-only acceptance continuation. You are n8n-specialist. First identify your employee charter and enumerate the curated role skills and inherited shared guidance actually exposed in this session. Load relevant available skills as required. Confirm the actual terminal CWD with a bounded read-only pwd call; expected /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof. Use the NATIVE Hindsight retain tool for your OWN identity bank only to retain this harmless attributed operational preference: \"n8n-specialist prefers an inspection checklist before proposing infrastructure or workflow changes; acceptance marker FLUME29-CONT-20261118-n8n-specialist.\" Ensure the native tool result confirms success; if it does not, report the exact blocker. Report your own bank and tool operation/document identifiers. No infrastructure changes, no deployments, no workflow edits or execution, no file writes, no credential reads or writes, no service-control, no scheduling. Only native own-bank memory retain is authorized to persist state. Do not use CLI or HTTP to bypass a missing native memory tool. Keep the answer brief."
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 2,
+        "seconds": 3.97,
+        "timed_out": false,
+        "stdout": "{\"type\": \"system\", \"subtype\": \"init\", \"model\": \"\", \"session_id\": \"\", \"timestamp\": 1795044452288}\n{\"type\": \"result\", \"session_id\": \"\", \"exit_code\": 2, \"text\": \"\", \"tokens\": {\"input\": 0, \"output\": 0, \"total\": 0, \"cache_read\": 0, \"cache_write\": 0}, \"duration_ms\": 0, \"error\": \"Unsupported gateway CLI options: --run-budget. No local fallback or policy changes were made.\\n  --run-budget: use `agent.run_budget_seconds` in config.yaml\", \"timestamp\": 1795044452288}\n",
+        "stderr": "  1Password: applied 16 secrets\nError: Unsupported gateway CLI options: --run-budget. No local fallback or policy changes were made.\n  --run-budget: use `agent.run_budget_seconds` in config.yaml\n\nsession_id: \n"
+      },
+      "actual_sessions": 0,
+      "session_ids": [],
+      "native_retain": false,
+      "fresh_session_native_recall": false,
+      "second_session_attempted": false,
+      "renderer_dry_run": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "render",
+          "--profile",
+          "n8n-specialist",
+          "--dry-run"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.12,
+        "timed_out": false,
+        "stdout": "render n8n-specialist                       (49 delta lines)\n",
+        "stderr": ""
+      },
+      "renderer_apply": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "render",
+          "--profile",
+          "n8n-specialist"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.14,
+        "timed_out": false,
+        "stdout": "backup -> /home/delorenj/.hermes/.profile-config-backups/20261118T182658-render\n\nrender n8n-specialist                       (49 delta lines)\n",
+        "stderr": ""
+      },
+      "renderer_check": {
+        "command": [
+          "python3",
+          "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+          "check",
+          "--profile",
+          "n8n-specialist"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 0,
+        "seconds": 0.14,
+        "timed_out": false,
+        "stdout": "OK: every profile config.yaml == expected_config(base, delta) (deep_merge + renderer pins)\n",
+        "stderr": ""
+      }
+    }
+  },
+  "preservation": {
+    "shared_base_sha256": "51acf9723d1ce270fa1a3aad7fc6c7ac3f645d1359712c2f53c9e3a785ae382c",
+    "shared_base_unchanged": true,
+    "registry_sha256": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910",
+    "registry_unchanged": true,
+    "employee_definitions_company_identity_banks_and_refs_unchanged": true,
+    "all_existing_deltas_unchanged": true,
+    "changed_generated_profiles": [
+      "infra-specialist",
+      "n8n-specialist"
+    ],
+    "other_profiles_unchanged": true,
+    "absorb": false,
+    "force_ownership": false,
+    "manual_config_edit": false,
+    "credentials_minted": false,
+    "credentials_printed": false,
+    "existing_member_references_resolved_in_memory": true,
+    "services_restarted": false,
+    "schedules_changed": false,
+    "board_writes": false,
+    "accounts_provisioned": false,
+    "repo_code_edits": false,
+    "unrelated_dirty_paths_preserved": [
+      "_bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+      "_bmad-output/specs/spec-one-command-employee-provisioning/"
+    ]
+  },
+  "checks": {
+    "renderer_help": {
+      "command": [
+        "python3",
+        "/home/delorenj/code/33GOD/flume/templates/hermes-agent/scripts/hermes-profile-config.py",
+        "render",
+        "--help"
+      ],
+      "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+      "exit_code": 0,
+      "seconds": 0.05,
+      "timed_out": false,
+      "stdout": "usage: hermes-profile-config.py render [-h] [--profile PROFILE] [--all]\n                                       [--dry-run] [--no-prune-stale]\n                                       [--only-broken] [--bank-id BANK_ID]\n                                       [--bank-template BANK_TEMPLATE]\n                                       [--delta-file DELTA_FILE]\n\noptions:\n  -h, --help            show this help message and exit\n  --profile PROFILE     operate on one profile (default: all)\n  --all                 all profiles (default)\n  --dry-run             show, do not write\n  --no-prune-stale      keep every difference from base, even values that were\n                        themselves an older fleet default (init only)\n  --only-broken         memory-pin: pin only the profiles whose identity would\n                        silently resolve to 'custom' and collide\n  --bank-id BANK_ID     memory-pin: pin one profile to this explicit named-\n                        agent bank; requires --profile\n  --bank-template BANK_TEMPLATE\n                        memory-template: manifest path (default: config.toml\n                        [hindsight] agent_bank_template); '' removes it\n  --delta-file DELTA_FILE\n                        expected: evaluate this delta instead of the profile's\n                        own ('-' reads stdin)\n",
+      "stderr": ""
+    },
+    "hermes_chat_help": {
+      "command": [
+        "hermes",
+        "chat",
+        "--help"
+      ],
+      "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+      "exit_code": 0,
+      "seconds": 0.71,
+      "timed_out": false,
+      "stdout": "usage: hermes chat [-h] [-q QUERY | --query-file PATH] [--oneshot]\n                   [--image IMAGE] [-m MODEL] [-t TOOLSETS]\n                   [--reasoning LEVEL] [-s SKILLS] [--provider PROVIDER]\n                   [--base-url URL] [--api-key KEY] [-v] [-Q]\n                   [--format {text,stream-json}] [--resume SESSION_ID]\n                   [--no-restore-cwd] [--in DIR] [--continue [SESSION_NAME]]\n                   [--create-if-missing] [--worktree] [--accept-hooks]\n                   [--checkpoints] [--max-turns N] [--run-budget SECONDS]\n                   [--yolo] [--pass-session-id] [--ignore-user-config]\n                   [--ignore-rules] [--safe-mode] [--source SOURCE] [--tui]\n                   [--native] [--cli] [--dev]\n\nStart an interactive chat session with Hermes Agent\n\noptions:\n  -h, --help            show this help message and exit\n  -q, --query QUERY     Query to run. On a real TTY the prompt seeds an\n                        interactive session (submitted literally as the first\n                        turn); combined with --oneshot or -Q, or on a non-TTY,\n                        it answers and exits.\n  --query-file PATH     Read the single query from a file instead of the\n                        command line ('-' reads stdin). Safe for arbitrary\n                        text: nothing is shell-interpreted, so quotes, $(...),\n                        and backticks are preserved verbatim. Mutually\n                        exclusive with -q.\n  --oneshot             With -q/--query-file: answer the query and exit\n                        (legacy single-query behavior) instead of seeding an\n                        interactive session. Implied on non-TTY stdio and by\n                        -Q/--quiet.\n  --image IMAGE         Optional local image path to attach to a single query\n  -m, --model MODEL     Model to use (e.g., anthropic/claude-sonnet-4)\n  -t, --toolsets TOOLSETS\n                        Comma-separated toolsets to enable\n  --reasoning LEVEL     Reasoning effort for this session: none, minimal, low,\n                        medium, high, xhigh, max, or ultra. Overrides\n                        agent.reasoning_effort for this run only (same levels\n                        as the /reasoning slash command).\n  -s, --skills SKILLS   Preload one or more skills for the session (repeat\n                        flag or comma-separate)\n  --provider PROVIDER   Inference provider (default: auto). Built-in or a\n                        user-defined name from `providers:` in config.yaml.\n  --base-url URL        OpenAI-compatible endpoint for --provider custom (e.g.\n                        http://127.0.0.1:8000/v1).\n  --api-key KEY         API key for this launch only; not persisted.\n  -v, --verbose         Verbose output\n  -Q, --quiet           Quiet mode for programmatic use: suppress banner,\n                        spinner, and tool previews. Only output the final\n                        response and session info.\n  --format {text,stream-json}\n                        Output format for single-query mode (-q). 'text'\n                        prints the final response as plain text (default).\n                        'stream-json' emits newline-delimited JSON events\n                        (JSONL), implies --quiet, and cannot be combined with\n                        --tui.\n  --resume, -r SESSION_ID\n                        Resume a previous session by ID (shown on exit), or\n                        'latest' for the most recent session\n  --no-restore-cwd      Don't cd into a resumed session's recorded working\n                        directory.\n  --in DIR              Change into DIR before starting or resuming (scopes '\n                        --resume latest' / -c lookups to DIR's workspace).\n  --continue, -c [SESSION_NAME]\n                        Resume a session by name, or the most recent if no\n                        name given\n  --create-if-missing   With -c/--continue <name>: if no session matches the\n                        name, create a new session with that title and proceed\n                        (instead of failing with a not-found error).\n                        Programmatic callers that want 'send to this named\n                        thread, making it if needed'.\n  --worktree, -w        Run in an isolated git worktree (for parallel agents\n                        on the same repo)\n  --accept-hooks        Auto-approve any unseen shell hooks declared in\n                        config.yaml without a TTY prompt (see also\n                        HERMES_ACCEPT_HOOKS env var and hooks_auto_accept: in\n                        config.yaml).\n  --checkpoints         Enable filesystem checkpoints before destructive file\n                        operations (use /rollback to restore)\n  --max-turns N         Maximum tool-calling iterations per conversation turn\n                        (default: 500, or agent.max_turns in config)\n  --run-budget SECONDS  Optional wall-clock budget in seconds for each\n                        conversation run. At 80% elapsed the agent gets a one-\n                        time wrap-up notice, and implicit provider stale\n                        timeouts are capped to the remaining budget so one\n                        hung call can't consume the run. Unset = off. Also\n                        configurable as agent.run_budget_seconds in\n                        config.yaml. Intended for one-shot/eval invocations\n                        with a hard ceiling.\n  --yolo                Bypass all dangerous command approval prompts (use at\n                        your own risk)\n  --pass-session-id     Include the session ID in the agent's system prompt\n  --ignore-user-config  Ignore ~/.hermes/profiles/flume-pm/config.yaml and\n                        fall back to built-in defaults (credentials in .env\n                        are still loaded). Useful for isolated CI runs,\n                        reproduction, and third-party integrations.\n  --ignore-rules        Skip auto-injection of AGENTS.md, SOUL.md,\n                        .cursorrules, memory, and preloaded skills. Combine\n                        with --ignore-user-config for a fully isolated run.\n  --safe-mode           Troubleshooting mode: disable ALL customizations \u2014\n                        user config, AGENTS.md/memory injection, plugins, and\n                        MCP servers (implies --ignore-user-config and\n                        --ignore-rules). Use to isolate whether a problem\n                        comes from your setup or from Hermes itself.\n  --source SOURCE       Session source tag for filtering (default: cli). Use\n                        'tool' for third-party integrations that should not\n                        appear in user session lists.\n  --tui                 Launch the modern TUI instead of the classic REPL\n  --native, --tui-native\n                        Use native terminal scrollback and disable mouse\n                        tracking\n  --cli                 Force the classic prompt_toolkit REPL (overrides\n                        display.interface=tui)\n  --dev                 With --tui: run TypeScript sources via tsx (skip dist\n                        build)\n",
+      "stderr": "  1Password: applied 17 secrets\n"
+    },
+    "git_initial": {
+      "command": [
+        "git",
+        "status",
+        "--short"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "seconds": 0.0,
+      "timed_out": false,
+      "stdout": " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl\n?? _bmad-output/specs/spec-one-command-employee-provisioning/\n",
+      "stderr": ""
+    },
+    "git_initial_parity": {
+      "command": [
+        "git",
+        "rev-list",
+        "--left-right",
+        "--count",
+        "HEAD...origin/main"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "seconds": 0.0,
+      "timed_out": false,
+      "stdout": "0\t0\n",
+      "stderr": ""
+    }
+  },
+  "blocker": {
+    "owner": "Hermes canonical gateway CLI run-budget policy support / acceptance launch contract",
+    "exact_error": "Unsupported gateway CLI options: --run-budget. No local fallback or policy changes were made.\n  --run-budget: use `agent.run_budget_seconds` in config.yaml",
+    "both_launch_exit_codes": 2,
+    "session_ids_empty": true,
+    "inference_tokens": 0,
+    "diagnosis": "Installed hermes_cli/gateway_chat.py _UNSUPPORTED includes run_budget; validate_options raises before session creation. Help still advertises --run-budget SECONDS. Not a missing member credential or demonstrated company-access refusal.",
+    "runtime_source": "hermes_cli/gateway_chat.py:17-30,91-101",
+    "next": "Parent must resolve the acceptance invocation with the runtime owner: provide supported bounded per-run gateway behavior or explicitly authorize an alternate bounded public invocation. No removal of budget, config policy mutation, local runtime fallback, safe-mode or credential/account provisioning attempted.",
+    "unproven": [
+      "runtime charter discovery",
+      "runtime role plus shared skill discovery",
+      "actual terminal CWD tool output",
+      "native own-bank retain",
+      "distinct fresh-session native recall"
+    ],
+    "second_session_not_run_reason": "First session was not created; no retained fact exists to prove recall."
+  }
+}

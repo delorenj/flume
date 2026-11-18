@@ -1,0 +1,65 @@
+{
+  "artifact_receipt": {
+    "project": "flume",
+    "project_source": "--project",
+    "date": "2026-11-18",
+    "name": "flume29-supported-gateway-live-proof",
+    "files": 7,
+    "entry_url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-supported-gateway-20261118.md",
+    "verified": 7,
+    "ok": true,
+    "date_index_url": "https://s3.delo.sh/projects/flume/2026-11-18/index.html",
+    "project_index_url": "https://s3.delo.sh/projects/flume/index.html",
+    "entry_content_type": "text/markdown"
+  },
+  "independent_anonymous_verification": [
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-supported-gateway-20261118.md",
+      "http_status": 200,
+      "sha256": "2005539b73003adbbbcb1592e9362614d47ffe6cee2ad4cbe3eafe069fb5540f",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-supported-gateway-receipt-20261118.json",
+      "http_status": 200,
+      "sha256": "493ed7b00a1cea44869f9216320fce52a0e2df6c335b6310ade93fa376e0c4c3",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-acceptance-20261118.md",
+      "http_status": 200,
+      "sha256": "88e6dcdc4ca654d3927caf97a8e143a1fdbc7f79e138eaa41fd55641175de78c",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-receipt-20261118.json",
+      "http_status": 200,
+      "sha256": "9eefd2244c0a99b4f2acaeaa071221718efa1ef3753d72af9c7e32a58e126f56",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-continuation-20261118.md",
+      "http_status": 200,
+      "sha256": "58645890a30d8a893103af5b89f334bfb21e844283bbdea3d1a043b60ea009cd",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-continuation-receipt-20261118.json",
+      "http_status": 200,
+      "sha256": "9ed201722400b96f1b02c2564b4aa92426d81379b1adcac63a089fd729ab63fb",
+      "anonymous_fetch_hash_matches": true
+    },
+    {
+      "url": "https://s3.delo.sh/projects/flume/2026-11-18/flume29-supported-gateway-live-proof/source-live-continuation-state-proof-20261118.json",
+      "http_status": 200,
+      "sha256": "61a8ca50f405dfee68a34fa69b6b6b2c8cea0899a548567b40503be71ef79396",
+      "anonymous_fetch_hash_matches": true
+    }
+  ],
+  "public_raw_secret_config_snapshots": false,
+  "new_repository_evidence_paths": [
+    "_bmad-output/implementation-artifacts/FLUME-29/source-live-supported-gateway-20261118.md",
+    "_bmad-output/implementation-artifacts/FLUME-29/source-live-supported-gateway-receipt-20261118.json",
+    "_bmad-output/implementation-artifacts/FLUME-29/source-live-supported-gateway-publication-20261118.json"
+  ]
+}

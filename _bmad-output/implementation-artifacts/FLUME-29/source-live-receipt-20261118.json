@@ -1,0 +1,376 @@
+{
+  "recorded_at": "2026-11-18T23:20:48.565258+00:00",
+  "ticket": "https://plane.delo.sh/33god/browse/FLUME-29/",
+  "overall": "source-landed-live-blocked",
+  "authority": "Operator standing integration authority and scoped specialist acceptance; no PM or PR approval asserted.",
+  "source": {
+    "flume": {
+      "repo": "https://github.com/delorenj/flume",
+      "reviewed_commit": "0a7e0a173f8037dbd8e82bbdf9f623daaf08b7e4",
+      "integration_commit": "a117a618e92cfe3fabaad655fe34196292b36536",
+      "observed_remote_main": "a117a618e92cfe3fabaad655fe34196292b36536"
+    },
+    "template": {
+      "repo": "https://github.com/delorenj/hermes-agent-template",
+      "reviewed_commit": "96e7e288026782358584b9b85c764659d240ee0d",
+      "observed_remote_main": "96e7e288026782358584b9b85c764659d240ee0d"
+    },
+    "integration_template_gitlink": "96e7e288026782358584b9b85c764659d240ee0d",
+    "reviewed_commits_are_remote_main_ancestors": true
+  },
+  "verification": [
+    {
+      "command": "npm run build",
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "result": "esbuild workspaces succeeded; installed flume resolves to packages/flume-hr/dist/index.js"
+    },
+    {
+      "command": "npm run typecheck",
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "result": "Both core and HR tsc --noEmit succeeded"
+    },
+    {
+      "command": "node tests/named-agent-contract-regressions.ts",
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "result": "All assertions passed; hermetic provider environment, scratch TMPDIR"
+    },
+    {
+      "command": "node tests/specialist-hire-regressions.mjs",
+      "cwd": "/home/delorenj/code/33GOD/flume",
+      "exit_code": 0,
+      "result": "42 specialist check groups passed; hermetic provider environment, scratch TMPDIR; includes route drift, arbitrary-CWD fixture launch, strict loadout and no-op receipt checks"
+    },
+    {
+      "command": "SKILLEX_TEST_NODE_BIN=/home/delorenj/.local/share/mise/installs/node/24.6.0/bin/node PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q --tb=short -p no:cacheprovider tests/test_desk_root_profile.py tests/test_specialist_profile.py tests/test_specialist_provider_migration.py tests/test_named_agent_identity.py tests/test_profile_env_detach_contract.py tests/test_ticket_provider_skip_contract.py",
+      "cwd": "/home/delorenj/code/33GOD/flume/templates/hermes-agent",
+      "exit_code": 0,
+      "result": "198 passed in 86.83s; published Skillex 0.1.3 fixture for desk tests"
+    },
+    {
+      "command": "SKILLEX_TEST_NODE_BIN=/home/delorenj/.local/share/mise/installs/node/24.6.0/bin/node SKILLEX_TEST_TARBALL=/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/delorenj-skillex-0.4.8.tgz PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -c 'import sys,pytest; sys.path.insert(0,\"tests\"); import test_skillex_profile as suite; suite.VERSION=\"0.4.8\"; raise SystemExit(pytest.main([\"-q\",\"--tb=short\",\"-p\",\"no:cacheprovider\",\"tests/test_desk_root_profile.py\",\"tests/test_skillex_profile.py::test_new_profile_receives_declared_global_and_project_skills\",\"tests/test_skillex_profile.py::test_rerun_on_strict_profile_is_byte_and_inode_noop\",\"tests/test_skillex_profile.py::test_strict_role_selection_rerun_does_not_rebind_receipt_to_repo\"]))'",
+      "cwd": "/home/delorenj/code/33GOD/flume/templates/hermes-agent",
+      "exit_code": 0,
+      "result": "54 passed in 51.94s: 51 desk tests plus fresh project create, strict no-op and persisted role selection; tarball packed unchanged from installed node_modules, no tracked tests modified"
+    },
+    {
+      "command": "bash -n template/.scripts/10-hermes-profile.sh template/.scripts/_lib.sh; git diff --check",
+      "cwd": "/home/delorenj/code/33GOD/flume/templates/hermes-agent",
+      "exit_code": 0,
+      "result": "Passed"
+    }
+  ],
+  "live": {
+    "infra-specialist": {
+      "dry_run": {
+        "command": [
+          "flume",
+          "onboard",
+          "--employee",
+          "infra-specialist",
+          "--dry-run",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.54,
+        "stdout": "{\n  \"ok\": false,\n  \"standing\": \"unable to assess\",\n  \"error\": \"specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\"\n}\n",
+        "stderr": ""
+      },
+      "audit": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "infra-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.49,
+        "stdout": "{\n  \"ok\": false,\n  \"standing\": \"unable to assess\",\n  \"error\": \"specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\"\n}\n",
+        "stderr": ""
+      },
+      "first_session_launch_attempt": {
+        "command": [
+          "flume",
+          "launch",
+          "infra-specialist",
+          "--cwd",
+          "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "--",
+          "chat",
+          "--oneshot",
+          "--format",
+          "stream-json",
+          "--max-turns",
+          "8",
+          "--run-budget",
+          "120",
+          "-q",
+          "FLUME-29 inspection-only inaugural proof. Identify your employee charter, enumerate your curated role skills and inherited shared guidance, and report your own Hindsight bank. Use the native Hindsight retain tool to remember this harmless operational preference attributed to you: for FLUME29-LIVE-20261118, prefer an inspection checklist before proposing infrastructure or workflow changes. Do not change infrastructure, deploy workflows, write local files or credentials, or call any service-control or scheduling tool."
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.51,
+        "stdout": "",
+        "stderr": "specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\n"
+      },
+      "refresh_applied": false,
+      "second_refresh_changed_false": null,
+      "actual_chat_sessions": 0,
+      "native_retain": false,
+      "fresh_session_native_recall": false
+    },
+    "n8n-specialist": {
+      "dry_run": {
+        "command": [
+          "flume",
+          "onboard",
+          "--employee",
+          "n8n-specialist",
+          "--dry-run",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.66,
+        "stdout": "{\n  \"ok\": false,\n  \"standing\": \"unable to assess\",\n  \"error\": \"specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\"\n}\n",
+        "stderr": ""
+      },
+      "audit": {
+        "command": [
+          "flume",
+          "audit",
+          "--employee",
+          "n8n-specialist",
+          "--json"
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.52,
+        "stdout": "{\n  \"ok\": false,\n  \"standing\": \"unable to assess\",\n  \"error\": \"specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\"\n}\n",
+        "stderr": ""
+      },
+      "first_session_launch_attempt": {
+        "command": [
+          "flume",
+          "launch",
+          "n8n-specialist",
+          "--cwd",
+          "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+          "--",
+          "chat",
+          "--oneshot",
+          "--format",
+          "stream-json",
+          "--max-turns",
+          "8",
+          "--run-budget",
+          "120",
+          "-q",
+          "FLUME-29 inspection-only inaugural proof. Identify your employee charter, enumerate your curated role skills and inherited shared guidance, and report your own Hindsight bank. Use the native Hindsight retain tool to remember this harmless operational preference attributed to you: for FLUME29-LIVE-20261118, prefer an inspection checklist before proposing infrastructure or workflow changes. Do not change infrastructure, deploy workflows, write local files or credentials, or call any service-control or scheduling tool."
+        ],
+        "cwd": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof",
+        "exit_code": 1,
+        "seconds": 0.49,
+        "stdout": "",
+        "stderr": "specialist projection refused: ownership conflict: handwritten config.yaml; retain changes in config.delta.yaml\n"
+      },
+      "refresh_applied": false,
+      "second_refresh_changed_false": null,
+      "actual_chat_sessions": 0,
+      "native_retain": false,
+      "fresh_session_native_recall": false
+    }
+  },
+  "read_only_drift_diagnosis": {
+    "infra-specialist": {
+      "profile": "/home/delorenj/.hermes/profiles/infra-specialist",
+      "read_only": true,
+      "differs_from_current_base_delta_render_paths": [
+        "gateway.platforms.bloodbank.extra.queued_capacity"
+      ],
+      "safe_values": {
+        "gateway.platforms.bloodbank.extra.queued_capacity": {
+          "current": "<absent>",
+          "expected": 64
+        }
+      },
+      "is_render_of_current_base_delta": false,
+      "receipt_routes": {
+        "providers.automaticai.api": "https://api.automaticai.io/v1",
+        "providers.automaticai.base_url": "https://api.automaticai.io/v1"
+      },
+      "bank_id": "agent-infra-specialist",
+      "strict_markers": {
+        ".skillex-only": true,
+        ".no-bundled-skills": true
+      },
+      "skill_policy": {
+        "inherit_global": true,
+        "project_discovery": false,
+        "external_dirs": []
+      },
+      "definition_and_record_untouched": true
+    },
+    "n8n-specialist": {
+      "profile": "/home/delorenj/.hermes/profiles/n8n-specialist",
+      "read_only": true,
+      "differs_from_current_base_delta_render_paths": [
+        "gateway.platforms.bloodbank.extra.queued_capacity",
+        "plugins.enabled"
+      ],
+      "safe_values": {
+        "gateway.platforms.bloodbank.extra.queued_capacity": {
+          "current": "<absent>",
+          "expected": 64
+        },
+        "plugins.enabled": {
+          "current": [
+            "bloodbank-platform",
+            "camofox",
+            "fal",
+            "gemini-provider",
+            "hindsight",
+            "kimi-coding-provider",
+            "ntfy-platform",
+            "openai-codex",
+            "openrouter",
+            "orca-status",
+            "self-hosted",
+            "slack-platform",
+            "telegram-platform",
+            "tts/vox",
+            "voice-persona",
+            "vox",
+            "web-brave-free",
+            "web-tavily"
+          ],
+          "expected": [
+            "bloodbank-platform",
+            "camofox",
+            "fal",
+            "gemini-provider",
+            "hindsight",
+            "kimi-coding-provider",
+            "ntfy-platform",
+            "openai-codex",
+            "openrouter",
+            "orca-status",
+            "self-hosted",
+            "slack-platform",
+            "telegram-platform",
+            "tts/vox",
+            "vox",
+            "web-brave-free",
+            "web-tavily",
+            "voice-persona"
+          ]
+        }
+      },
+      "is_render_of_current_base_delta": false,
+      "receipt_routes": {
+        "providers.automaticai.api": "https://api.automaticai.io/v1",
+        "providers.automaticai.base_url": "https://api.automaticai.io/v1"
+      },
+      "bank_id": "agent-n8n-specialist",
+      "strict_markers": {
+        ".skillex-only": true,
+        ".no-bundled-skills": true
+      },
+      "skill_policy": {
+        "inherit_global": true,
+        "project_discovery": false,
+        "external_dirs": []
+      },
+      "definition_and_record_untouched": true
+    }
+  },
+  "cleanup": [
+    {
+      "repo": "/home/delorenj/code/33GOD/flume",
+      "branch": "fix/FLUME-29-projection-repair",
+      "worktree": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-29-projection-repair",
+      "merged_in_origin_main": true,
+      "ignored_artifacts_preserved": [
+        {
+          "source": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-29-projection-repair/node_modules",
+          "preserved_at": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-projection-repair/node_modules"
+        },
+        {
+          "source": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-29-projection-repair/packages/flume-hr/dist",
+          "preserved_at": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-projection-repair/packages/flume-hr/dist"
+        }
+      ],
+      "archive_directory": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-projection-repair",
+      "removed": true,
+      "branch_deletion": "Deleted branch fix/FLUME-29-projection-repair (was 0a7e0a1)."
+    },
+    {
+      "repo": "/home/delorenj/code/33GOD/flume/templates/hermes-agent",
+      "branch": "fix/FLUME-29-desk-provider-repair",
+      "worktree": "/home/delorenj/code/33GOD/flume/templates/hermes-agent/.worktrees/fix-FLUME-29-desk-provider-repair",
+      "merged_in_origin_main": true,
+      "ignored_artifacts_preserved": [
+        {
+          "source": "/home/delorenj/code/33GOD/flume/templates/hermes-agent/.worktrees/fix-FLUME-29-desk-provider-repair/.pytest_cache",
+          "preserved_at": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-desk-provider-repair/.pytest_cache"
+        },
+        {
+          "source": "/home/delorenj/code/33GOD/flume/templates/hermes-agent/.worktrees/fix-FLUME-29-desk-provider-repair/scripts/__pycache__",
+          "preserved_at": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-desk-provider-repair/scripts/__pycache__"
+        },
+        {
+          "source": "/home/delorenj/code/33GOD/flume/templates/hermes-agent/.worktrees/fix-FLUME-29-desk-provider-repair/template/.scripts/lib/__pycache__",
+          "preserved_at": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-desk-provider-repair/template/.scripts/lib/__pycache__"
+        }
+      ],
+      "archive_directory": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-live-proof/preserved-worktree-artifacts/fix-FLUME-29-desk-provider-repair",
+      "removed": true,
+      "branch_deletion": "Deleted branch fix/FLUME-29-desk-provider-repair (was 96e7e28)."
+    }
+  ],
+  "preservation": {
+    "profile_changes": [],
+    "definition_changes": [],
+    "registry_changes": false,
+    "credentials_resolved_by_live_attempts": false,
+    "board_writes": false,
+    "services_restarted": false,
+    "identity_or_account_provisioning": false,
+    "schedules_changed": false,
+    "shared_branch_switch_stash_reset_rebase": false,
+    "unrelated_flume_work_preserved": [
+      "_bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+      "_bmad-output/specs/spec-one-command-employee-provisioning/"
+    ],
+    "agents_repo": "Read-only; existing unrelated tool and marge-simpson skill WIP preserved"
+  },
+  "limits": [
+    "No actual Hermes chat session started: launcher failed at profile audit before member-token or Access lookup.",
+    "No native Hindsight retain or fresh-session recall ran; no session IDs or memory success asserted.",
+    "No real refresh applied after failed dry-runs; second refresh changed=false and live scoped audit pass remain unproven.",
+    "Read-only bank and strict-policy fields are declarations, not successful runtime charter/skill discovery.",
+    "Current missing-token, Cloudflare authorization or inference availability is not established as a blocker.",
+    "Existing Skillex/runtime advertised-name collision R2 remains outside this repair; do not interpret managed links as an exhaustive runtime-discovery allowlist."
+  ],
+  "next_owner": "Flume/template managed-config ownership reconciliation and fleet-base config owner must resolve the guarded mismatch through an authorized maintained path, then rerun the scoped refresh and actual two-session memory acceptance. Preserve operator intent; no forced render/absorb or hand-edit workaround authorized here.",
+  "git_unpushed": {
+    "executed": true,
+    "exit_code": 1,
+    "global_result": "328 repositories reported local-only work on the final global invocation; unrelated, left untouched",
+    "touched_main_ahead_behind_before_evidence_commit": {
+      "flume": [
+        0,
+        0
+      ],
+      "template": [
+        0,
+        0
+      ]
+    }
+  }
+}

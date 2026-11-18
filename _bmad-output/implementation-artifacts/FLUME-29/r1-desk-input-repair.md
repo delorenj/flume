@@ -1,0 +1,35 @@
+# FLUME-29 R1 repair evidence
+
+## Scope and disposition
+
+R1 is repaired on the existing review branches, not merged. Template repair commit: `96e7e288026782358584b9b85c764659d240ee0d`, pushed to `fix/FLUME-29-desk-provider-repair`. The low-level template step 10 now requires a real owning desk with regular `role.yaml` and `SOUL.md`, checks the **effective** selection's regular file and real ancestors before profile effects, and validates the existing role identity before profile creation or strict-profile policy writes. The existing `.skillex-selection` directory and recorded selection binding retain precedence over the initial desk selection. Canonical catalog skill symlinks are unchanged.
+
+Template paths: `template/.scripts/_lib.sh`, `template/.scripts/10-hermes-profile.sh`, `tests/test_desk_root_profile.py`. Flume changes: `docs/named-specialists.md`, this evidence, the bounded repair spec and the template gitlink. No Skillex source, live employee state or board state is changed. Shared-main event trail and provisioning-spec work remain untouched.
+
+## Executed verification
+
+- Published Skillex 0.1.3 fixture: `SKILLEX_TEST_NODE_BIN=/home/delorenj/.local/share/mise/installs/node/24.6.0/bin/node PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m pytest -q -x --tb=short -p no:cacheprovider tests/test_desk_root_profile.py` — **48 passed in 45.52s** (before three additional FIFO charter cases). Log: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-r1-desk-tests.log`.
+- Installed Flume Skillex 0.4.8 packed unchanged from `node_modules/@delorenj/skillex` into scratch; the suite's runtime `VERSION` constant was set to 0.4.8 in the isolated Python invocation, without changing committed test pins. Final desk tests plus real project fresh-create, strict no-op and persisted-selection entrypoints — **54 passed in 55.38s**, comprising 51 desk cases and 3 project cases. Log: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-r1-current-skillex-tests.log`.
+- Existing identity/credential-clone/host-state entrypoint guards: `/usr/bin/python3 -m pytest -q --tb=short -p no:cacheprovider tests/test_named_agent_identity.py tests/test_profile_env_detach_contract.py tests/test_ticket_provider_skip_contract.py -k 'host_state_guard or identity or profile_creation'` — **13 passed, 41 deselected in 2.75s**. Log: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-r1-entrypoint-tests.log`.
+- Negative control using unchanged template `6795b92d7bade77425fbdc7ec0d97c142d561645` archived into scratch and current installed Skillex: all **5 targeted regressions failed as expected**. Missing charter, symlinked charter, symlinked selection and symlinked selection ancestor incorrectly succeeded; invalid post identity changed HOME before refusal. Log: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-r1-baseline-negative-controls.log`.
+- `bash -n template/.scripts/10-hermes-profile.sh template/.scripts/_lib.sh` and `git diff --check` pass.
+
+New actual-step tests snapshot HOME (inode, mode, bytes and link targets), preserve runtime DB/PID sentinels for existing desks, and assert the Hermes create stub was not called. They cover missing/directory/dangling/symlink charters and selections, symlinked selection ancestors, FIFO charters, new/partial/strict profiles, invalid identity, unsafe persisted/receipt selections and valid persisted/receipt precedence despite an unsafe unused initial selection. Success paths assert canonical skill symlinks and unchanged refresh.
+
+The active Hermes Python has no pytest. The Node 24.15 and 26.5 npm wrappers attempt a mise reshim that fails trust checks under fixture HOME. The installed Node 24.6 executable has ordinary npm and exercised the real path without changing trust configuration. One initial new-test failure was an over-specific diagnostic assertion for a strict-profile missing selection; it was corrected to require the offending `skills.json` path while keeping the no-effects assertion.
+
+## Separate existing risk: R2, owner Skillex/runtime
+
+Independent review's `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume29-review-skills.py` demonstrated a regular unselected `skills/foreign/SKILL.md` advertising `name: alpha` passing Flume audit while selected canonical `alpha` made actual Hermes `skill_view('alpha')` ambiguous. Directory-name ownership checks do not establish uniqueness of runtime-advertised skill names. This predates the repair branch and is **not fixed here**. Preserve legitimate noncolliding local skills; the parent must route advertised-name collision protection to the owning dependency. Documentation now distinguishes managed selection from runtime-discovered local skills instead of claiming all extras are refused. No exhaustive-runtime-loadout claim is made for profiles containing local skills.
+
+## Current live-acceptance boundary
+
+The parent verified on 2026-11-18 that both inaugural profiles currently reference `op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-<employee>` and both secret-safe OP reads succeeded. This worker neither fetched nor persisted tokens. Historical missing-token/FLUME-39 results are not current blocker evidence. Live conversation and cross-session memory acceptance remain untested here; company identity/Access readiness may still be relevant but is not asserted as a proven blocker.
+
+## Independent regression recheck pending
+
+Parent owns the independent post-push recheck before landing. No new independent review was run by this implementation worker. Recheck the full review branches as well as the R1 delta; previously reviewed provider/marker behavior must survive.
+
+Review prompt (fully specified for a separate reviewer):
+
+Conduct a review of the changed R1 desk-input repair in `/home/delorenj/code/33GOD/flume/templates/hermes-agent/.worktrees/fix-FLUME-29-desk-provider-repair` relative to `6795b92d7bade77425fbdc7ec0d97c142d561645`, and documentation/evidence in `/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-29-projection-repair` relative to `bc145562de428befa5b9ea49777e0718b7f19231`. Inspect these worktrees directly. Look for missing guarantees, not only incorrect code. Compute the finding floor N = min(floor(sqrt(kB) + 1), 10), where kB is changed content size; state the arithmetic in one line, then provide a Markdown list of findings only. Verify actual step 10 refuses missing/symlinked charter, symlinked selection and symlinked ancestors before HOME/profile mutation; test new/partial/strict profiles, invalid identity timing, persisted/receipt selection precedence, canonical skill symlink survival and project-path guards. Do not change application code or Skillex. The existing advertised-name collision risk belongs to Skillex/runtime and is disclosed, not solved in this patch. Do not use historical missing-token claims as current evidence. Do not invoke skills or spawn subagents; return findings as text. Distinguish a new regression from a disclosed dependency and do not infer live acceptance from isolated fixtures.
