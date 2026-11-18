@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, lstatSync, readFileSync, readdirSync, readlinkS
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import * as paths from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 const { join, resolve } = paths;
 const scratch = mkdtempSync(join(tmpdir(), "flume13-"));
@@ -42,6 +42,19 @@ const fixtures = {
   prompt: { 10: gateway, 11: hermes("--profile\0alpha\0chat\0--query\0--profile beta\0", profile("alpha")) },
   afterAction: { 10: gateway, 11: hermes("chat\0--profile=beta\0", profile("alpha")) },
   normalized: { 10: gateway, 11: hermes("--model\0planted-secret\0--profile=ALPHA\0chat\0", profile("alpha")) },
+  emptyModelSole: { 10: gateway, 11: hermes("--model\0\0--profile=beta\0chat\0") },
+  emptyQuerySole: { 10: gateway, 11: hermes("chat\0--query\0\0--profile=beta\0") },
+  emptyModelConflict: { 10: gateway, 11: hermes("--model\0\0--profile=beta\0chat\0", profile("alpha")) },
+  emptyQueryConflict: { 10: gateway, 11: hermes("chat\0--query\0\0--profile=beta\0", profile("alpha")) },
+  emptyRepeated: { 10: gateway, 11: hermes("--model\0\0--profile=alpha\0--profile=beta\0chat\0") },
+  switchedModule: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-u\0-I\0-m\0hermes_cli.main\0--profile=alpha\0", environ: "" } },
+  switchedConsole: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-Bu\0/opt/bin/hermes\0--profile=alpha\0", environ: "" } },
+  valueSwitchModule: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-W\0ignore\0-X\0dev\0--check-hash-based-pycs\0always\0-m\0hermes_cli.main\0--profile=alpha\0", environ: "" } },
+  combinedValueSwitch: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-Wignore\0-Xdev\0--check-hash-based-pycs=always\0/opt/bin/hermes\0--profile=alpha\0", environ: "" } },
+  pythonCommandPayload: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-u\0-c\0hermes\0-m\0hermes_cli.main\0--profile=alpha\0", environ: "" } },
+  pythonScriptPayload: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0-u\0/other.py\0hermes\0--profile=alpha\0", environ: "" } },
+  unknownSwitchModule: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0--unknown\0-m\0hermes_cli.main\0--profile=alpha\0", environ: "" } },
+  unknownValueSwitch: { 10: gateway, 11: { comm: "python3", cmdline: "python3\0--unknown\0value\0-m\0hermes_cli.main\0--profile=alpha\0", environ: "" } },
   oversized: { 10: gateway, 11: { ...hermes(), cmdline: "x".repeat(16 * 1024 + 1) } },
   deniedPython: { 10: gateway, 11: { comm: "python3", cmdline: null } },
   exited: { 10: gateway, 11: hermes("--profile\0alpha\0", null) },
@@ -82,19 +95,26 @@ try {
   assert.deepEqual(scan(fixtures.normal).processes.map(p => p.pid), [10, 11, 12]);
   assert.equal(scan(fixtures.module).processes[1].employee, "alpha");
   assert.equal(scan(fixtures.console).processes[1].employee, "alpha");
-  for (const key of ["equals", "short", "repeated", "foreignClaim", "invalidHome", "afterAction"]) assert.equal(scan(fixtures[key]).processes[1].state, "ambiguous", key);
-  for (const key of ["passthrough", "prompt", "normalized"]) assert.equal(scan(fixtures[key]).processes[1].employee, "alpha", key);
+  for (const key of ["equals", "short", "repeated", "foreignClaim", "invalidHome", "afterAction", "emptyModelConflict", "emptyQueryConflict", "emptyRepeated"]) assert.equal(scan(fixtures[key]).processes[1].state, "ambiguous", key);
+  for (const key of ["passthrough", "prompt", "normalized", "switchedModule", "switchedConsole", "valueSwitchModule", "combinedValueSwitch"]) assert.equal(scan(fixtures[key]).processes[1].employee, "alpha", key);
+  for (const key of ["emptyModelSole", "emptyQuerySole"]) assert.equal(scan(fixtures[key]).processes[1].employee, "beta", key);
+  for (const key of ["pythonCommandPayload", "pythonScriptPayload"]) assert.deepEqual(scan(fixtures[key]).processes.map(p => p.pid), [10], key);
+  assert.equal(scan(fixtures.unknownSwitchModule).complete, false);
+  assert.equal(scan(fixtures.unknownValueSwitch).complete, false);
   assert.equal(scanLiveProcesses([["alpha", "alpha"], ["other", "alpha"]], fleet, source(fixtures.module), paths).processes[1].state, "ambiguous");
   assert.equal(scan({ ...fixtures.module, 11: { comm: "python3", cmdline: null } }).complete, false);
   assert.equal(scanLiveProcesses(registered, fleet, { list: () => ["10", "10"], read: source({ 10: gateway }).read }, paths).processes.length, 1);
   for (const [key, rows] of Object.entries(fixtures)) {
     const data = invoke(rows, ["--domain", "live_process"]);
     const host = data.host.find(f => f.rule_id === "live_process.host");
-    const expected = ["deniedPython", "exited", "deniedComm", "deniedList", "oversized"].includes(key) ? "error" : ["normal", "module", "console", "defaultGateway", "passthrough", "prompt", "normalized", "empty"].includes(key) ? "pass" : "warn";
+    const expected = ["deniedPython", "exited", "deniedComm", "deniedList", "oversized", "unknownSwitchModule", "unknownValueSwitch"].includes(key) ? "error" : ["normal", "module", "console", "defaultGateway", "passthrough", "prompt", "normalized", "empty", "emptyModelSole", "emptyQuerySole", "switchedModule", "switchedConsole", "valueSwitchModule", "combinedValueSwitch", "pythonCommandPayload", "pythonScriptPayload"].includes(key) ? "pass" : "warn";
     assert.equal(host.state, expected, key);
     const pidFindings = [...data.host, ...data.agents.flatMap(a => a.observations)].filter(f => /^processes\.\d+$/.test(f.field ?? "") || /^live_process\.pid\.\d+$/.test(f.rule_id ?? ""));
-    if (!key.startsWith("denied") && key !== "oversized") assert.equal(pidFindings.length, Object.values(rows).filter(row => row.comm === "hermes" || row.cmdline?.includes("hermes")).length, `${key}: each selected PID exactly once`);
-    if (["module", "console"].includes(key)) assert.ok(data.agents.find(a => a.agent_id === "alpha").observations.some(o => o.field === "processes.11"));
+    const selected = ["pythonCommandPayload", "pythonScriptPayload", "unknownSwitchModule", "unknownValueSwitch"].includes(key) ? 1 : Object.values(rows).filter(row => row.comm === "hermes" || row.cmdline?.includes("hermes")).length;
+    if (!key.startsWith("denied") && key !== "oversized") assert.equal(pidFindings.length, selected, `${key}: each selected PID exactly once`);
+    if (["module", "console", "switchedModule", "switchedConsole", "valueSwitchModule", "combinedValueSwitch"].includes(key)) assert.ok(data.agents.find(a => a.agent_id === "alpha").observations.some(o => o.field === "processes.11"));
+    if (["emptyModelSole", "emptyQuerySole"].includes(key)) assert.ok(data.agents.find(a => a.agent_id === "beta").observations.some(o => o.field === "processes.11"));
+    if (["emptyModelConflict", "emptyQueryConflict", "emptyRepeated"].includes(key)) assert.ok(data.host.some(f => f.rule_id === "live_process.pid.11" && f.state !== "pass"), `${key}: conflict belongs to host`);
     if (expected !== "pass") {
       assert.equal(data.health.proven, false, key);
       if (expected === "error") assert.equal(data.health.complete, false, key);
@@ -139,5 +159,34 @@ try {
   const effects = readdirSync(scratch).filter(f => /^effects\.\d+\.json$/.test(f));
   assert.ok(effects.length >= 20, "side-effect guards must have actually run in CLI/probe children");
   for (const file of effects) assert.deepEqual(JSON.parse(readFileSync(join(scratch, file))), [], file);
-  console.log("live-process adversarial regressions: PASS (selection, identity, topology, CLI rollups, secrets, zero observed effects, bounded reads, timeout/deadline/cancel/failure)");
+  // Real /proc startup shape: sitecustomize stalls our own Python child before
+  // importing Hermes. Only /proc listing is scoped; metadata comes from Linux.
+  const startup = join(scratch, "startup"); mkdirSync(startup);
+  writeFileSync(join(startup, "sitecustomize.py"), "import os,time\nos.write(1,b'owned-startup-ready\\n')\ntime.sleep(20)\nraise SystemExit(0)\n");
+  const child = spawn("/usr/bin/python3", ["-u", "-m", "hermes_cli.main", "--profile=alpha"], {
+    env: { HOME: home, PATH: "/usr/bin:/bin", PYTHONPATH: startup, PYTHONNOUSERSITE: "1", PYTHONDONTWRITEBYTECODE: "1" }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  try {
+    await new Promise((ok, fail) => {
+      const timeout = setTimeout(() => fail(Error("owned Python startup timed out")), 2500);
+      child.once("error", error => { clearTimeout(timeout); fail(error); });
+      child.stdout.once("data", data => { clearTimeout(timeout); assert.match(String(data), /owned-startup-ready/); ok(); });
+    });
+    assert.equal(readFileSync(`/proc/${child.pid}/comm`, "utf8").trim(), "python3");
+    const actualArgv = readFileSync(`/proc/${child.pid}/cmdline`, "utf8").split("\0"); actualArgv.pop();
+    assert.deepEqual(actualArgv.slice(1), ["-u", "-m", "hermes_cli.main", "--profile=alpha"]);
+    const ownedOnly = join(scratch, "owned-proc.mjs");
+    writeFileSync(ownedOnly, `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module'; const list=fs.readdirSync.bind(fs); fs.readdirSync=(p,...args)=>p==='/proc'?[${JSON.stringify(String(child.pid))}]:list(p,...args);syncBuiltinESMExports();`);
+    const result = spawnSync(process.execPath, [cli, "review", "--domain", "live_process", "--agent-registry", registry, "--project-registry", projects, "--deadline-ms", "3000", "--json"], {
+      encoding: "utf8", timeout: 5000, env: { ...env, NODE_OPTIONS: `--import=${ownedOnly}` },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const data = JSON.parse(result.stdout).data;
+    assert.ok(data.agents.find(a => a.agent_id === "alpha").observations.some(o => o.field === `processes.${child.pid}`), "owned real /proc startup is attributed");
+    assert.match(data.host.find(f => f.rule_id === "live_process.host").observed, /1 selected process/);
+  } finally {
+    child.kill("SIGKILL");
+    await new Promise(ok => child.once("close", ok));
+  }
+  console.log("live-process adversarial regressions: PASS (selection, identity, topology, CLI rollups, secrets, zero observed effects, bounded reads, timeout/deadline/cancel/failure, owned real /proc startup)");
 } finally { rmSync(scratch, { recursive: true, force: true }); }

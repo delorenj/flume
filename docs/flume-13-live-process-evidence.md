@@ -2,19 +2,19 @@
 
 ## Observation contract
 
-`flume review --domain live_process [--json]` observes Linux `/proc` numeric PIDs. Candidate comm names are `hermes` and Python interpreter names (`python`, `python3`, versioned Python). Selected entrypoints are Hermes comm/executable, Python console-script `hermes`, and `python -m hermes`, `hermes_cli`, or the installed `hermes_cli.main`. Readable unrelated Python commands and noncandidate comms are excluded. An unreadable candidate command is **incomplete visibility**, not an excluded process. Duplicate PID entries are deduplicated.
+`flume review --domain live_process [--json]` observes Linux `/proc` numeric PIDs. Candidate comm names are `hermes` and Python interpreter names (`python`, `python3`, versioned Python). Selected entrypoints are Hermes comm/executable, Python console-script `hermes`, and `python -m hermes`, `hermes_cli`, or the installed `hermes_cli.main`, including interpreter switches before the entrypoint (`-u`, `-I`, `-B`, `-W`, `-X`, `--check-hash-based-pycs`). Python `-c` source and unrelated script arguments are not interpreted as entrypoints; unsupported switches before a possible Hermes entrypoint produce incomplete visibility rather than empty success. Readable unrelated Python commands and noncandidate comms are excluded. An unreadable candidate command is **incomplete visibility**, not an excluded process. Duplicate PID entries are deduplicated.
 
 Each metadata read is capped at 16 KiB; enumeration is capped at 100,000 entries. Enumeration and parsing run in a child bounded by `org/runtime.ts`'s probe budget, whole-run deadline, cancellation and stdout cap. Only sanitized attribution facts cross stdout; raw argv/environment and exception messages do not. Timeout terminates only the spawned probe process group, never an observed process. There is no production fixture/environment bypass.
 
-Attribution uses the complete registered profile map, even for `--agent`. Supported selectors include `--profile name`, `--profile=name`, `-p name`, and the compatibility `--profile-name` forms, including selectors after an action. Value-taking options, `--`, and `mcp add --args` prevent nested payloads/prompts becoming identity evidence. Multiple or invalid identities, foreign/invalid `HERMES_HOME`, and shared-root/profile contradictions remain host-scoped; no employee is guessed. Unknown values are redacted.
+Attribution uses the complete registered profile map, even for `--agent`. Supported selectors include `--profile name`, `--profile=name`, `-p name`, and the compatibility `--profile-name` forms, including selectors after an action. Interior empty NUL-separated argv values are preserved so an empty model/query value does not swallow a later selector. Value-taking options, `--`, and `mcp add --args` prevent nested payloads/prompts becoming identity evidence. Multiple or invalid identities, foreign/invalid `HERMES_HOME`, and shared-root/profile contradictions remain host-scoped; no employee is guessed. Unknown values are redacted.
 
 Topology permits at most one shared gateway and any number of consistently attributed worker/interactive processes. A passing shared gateway must prove `HERMES_HOME` equals the declared shared root, without foreign or employee-profile claims. The installed launcher's explicit `--profile default` at that root is supported. Foreign, unregistered, missing-identity and duplicate gateways are non-pass host findings. A successfully observed empty set is complete observation, not evidence that a required service is running; service availability remains the systemd observer's job.
 
 ## Persistent regressions
 
-`tests/live-process-regressions.mjs` exercises the parser and **built CLI** with a test-only OS preload inherited by the real bounded probe child. It covers each repaired defect: installed module/console entrypoints, denied Python identity, equals/short/repeated/after-action selectors, foreign/invalid homes, unregistered and foreign gateways, legitimate multiprocess layouts, nested argv and prompt boundaries, duplicate registry claims/PIDs, empty/denied/exited/oversized metadata, aggregate domain/health rollups and remaining Bloodbank/release-provenance observations. Human/JSON/stderr planted-secret checks, recursive content/mode/mtime fixture snapshots, and side-effect guards run on success and failure. Only the observer's own spawned probe may be terminated.
+`tests/live-process-regressions.mjs` exercises the parser and **built CLI** with a test-only OS preload inherited by the real bounded probe child. It covers each repaired defect: interior empty model/query values with sole, repeated, and conflicting selectors; module/console entrypoints after Python boolean and value-taking switches; unknown interpreter options producing uncertainty; `-c` and script payloads excluded; and a real owned Python startup child whose actual `/proc` comm/cmdline/environ are read before importing Hermes. Only the task-owned startup child is terminated and reaped. It also covers denied Python identity, equals/short/repeated/after-action selectors, foreign/invalid homes, unregistered and foreign gateways, legitimate multiprocess layouts, nested argv and prompt boundaries, duplicate registry claims/PIDs, empty/denied/exited/oversized metadata, aggregate domain/health rollups and remaining Bloodbank/release-provenance observations. Human/JSON/stderr planted-secret checks, recursive content/mode/mtime fixture snapshots, and side-effect guards run on success and failure. Only the observer's own spawned probe may be terminated.
 
-A real synchronous ten-second fixture read returned in 52 ms under a 50 ms probe budget; cancellation returned `CANCELLED` in 101 ms and an 80 ms whole-run deadline returned `TIMEOUT` in 84 ms. These are measured results, not mocked clock assertions. Probe-spawn failure remains incomplete rather than empty-success. The suite is registered in `scripts/run-tests.mjs`.
+The repaired-head focused run measured a real synchronous ten-second fixture read at 54 ms under a 50 ms probe budget; cancellation returned `CANCELLED` in 100 ms and an 80 ms whole-run deadline returned `TIMEOUT` in 83 ms. These are measured results, not mocked clock assertions. Probe-spawn failure remains incomplete rather than empty-success. The suite is registered in `scripts/run-tests.mjs`.
 
 ## Actual checks
 
@@ -22,16 +22,20 @@ A real synchronous ten-second fixture read returned in 52 ms under a 50 ms probe
 | --- | ---: | --- |
 | `npm run typecheck` | 0 | Both workspaces |
 | `npm run build` | 0 | CLI and MCP bundles |
-| `node tests/live-process-regressions.mjs` | 0 | All adversarial parser/CLI/safety/budget cases |
+| `node tests/live-process-regressions.mjs` | 0 | Empty-argv and switched-Python adversarial parser/CLI cases, owned real `/proc` startup, safety/budget checks |
 | `node tests/fleet-contract-regressions.mjs` | 0 | Contract/authority suite |
-| `node tests/fleet-status-regressions.mjs` in isolated initialized candidate | 0 | No failures; two operator-live-registry cases skipped |
-| `node tests/fleet-health-regressions.mjs` in isolated initialized candidate | 0 | No failures/skips; CLI/MCP equality and baseline comparisons included |
+| `node tests/fleet-status-regressions.mjs` in isolated initialized repaired candidate | 0 | 54 passes; two operator-live-registry cases skipped |
+| `node tests/fleet-health-regressions.mjs` in isolated initialized repaired candidate | 0 | 30 passes, no skips; deterministic empty-process fixture, CLI/MCP and baseline assertions |
 | Same status suite against pre-feature `c360fae` with identical fixture adjustments | 0 | No failures; same two live cases skipped |
 | Same health suite against pre-feature `c360fae` with identical fixture adjustments | 0 | No failures/skips |
 | Bounded live review with `--deadline-ms 5000` | 0 | 488 ms; incomplete visibility honestly reported |
 | `git diff --check` | 0 | No whitespace errors |
 
-The full repository `npm test` was not run; no claim is made about unrelated suites. No board writes, integration, service changes or observed-process cleanup occurred.
+The full repository `npm test` was not run; no claim is made about unrelated suites. The prior bounded live review and paired pre-feature baseline rows below are earlier evidence, not reruns after this parser change. No board writes, integration, service changes or observed-process cleanup occurred.
+
+### Round-three isolated status/health run
+
+`/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume13-round3-evidence/` contains a fresh local shared-object candidate clone initialized at the pinned template gitlink, with the repaired parser copied in before building. `flume13-round3-suite.py` in profile scratch records the setup and commands; `fleet-status.log`, `fleet-health.log` and `*-result.json` record 54 status passes/two live-registry skips and 30 health passes/no skips. A scratch-only `/usr/bin/python3` symlink supplies PyYAML for the renderer. This is an isolated candidate verification, not a rerun of the pre-feature baseline. No prior reviewer artifacts were overwritten.
 
 ### Isolated baseline reconciliation
 
