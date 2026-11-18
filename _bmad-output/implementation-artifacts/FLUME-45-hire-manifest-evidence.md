@@ -19,4 +19,10 @@ The existing writer now verifies that the rendered `role.yaml` `agent_id` matche
 - `node scripts/run-tests.mjs flume-45`: typecheck/build passed, 1/1 suite passed after tightening PATH allowlist and sibling preservation assertion.
 - `npm test`: typecheck/build passed; 1–4 and 6–10/51 suites passed, but `runtime-singleton-targets-regressions` failed at line 143 (its remediation returned exit 1). `fleet-status-regressions` took 242.3 s; the full run was stopped during suite 11 after ~7 minutes, so no full-suite PASS is claimed. This failure exercises a runtime singleton remediation outside the manifest path; no fix to that unrelated rule was attempted.
 
+## Independent verification of candidate `f3990c497b264e44c4e4b0a05b3a97b79476debf`
+
+- SPEC: **PASS**, five public-CLI hire groups against the rebuilt candidate, including both absent `agents` and `agents: {}`, preservation of a provisioned sibling and non-agent fields, dry-run byte identity, and fatal controlled manifest-write failure. This is current behavior, not proof of the historic incident's root cause.
+- QUALITY: **PASS**, nine isolated ingredient guard probes (matching derived/explicit IDs, rejection of missing/empty/non-string/mismatched IDs without manifest mutation, malformed YAML, no-manifest compatibility, dry-run). These negative cases are independent review probes, not committed regression cases; adding them to the committed suite is advisory, not a landing blocker. The complete review is preserved at [`FLUME-45-independent-quality-review.md`](./FLUME-45-independent-quality-review.md).
+- Independent base **and** candidate `npm run typecheck` and `npm run build`: exit 0 on both. The unchanged runtime singleton suite fails on both revisions at line 143 because its strict-profile fixture has `.skillex-only` but lacks `.no-bundled-skills`. Diagnostic copies seeded only that missing marker and passed all original assertions on both revisions. This attributes the pre-existing failure; it does **not** claim the unmodified suite or full suite passed.
+
 No production provisioning, ticket-board mutation, or cross-system rollback was attempted.
