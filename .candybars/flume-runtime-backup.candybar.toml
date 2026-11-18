@@ -1,0 +1,13 @@
+[candybar]
+name = "flume-runtime-backup"
+description = "PJAN-14: stage every registered employee's physical runtime and SQLite snapshots; forever-ago one-shot, verified restore before retention."
+schedule = "17 3 * * *"
+timezone = "America/New_York"
+enabled = false
+tags = ["flume", "backup"]
+
+[candybar.runner]
+kind = "exec"
+argv = ["/usr/bin/python3", "./scripts/hermes-runtime-backup.py", "run"]
+timeout_s = 3600
+env = { TZ = "America/New_York" }

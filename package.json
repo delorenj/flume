@@ -13,7 +13,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "test:runtime-backups": "python3 tests/runtime-backup-regressions.py && node tests/runtime-backup-provisioning.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

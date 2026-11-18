@@ -28,12 +28,15 @@ __pycache__/
 logs/
 *.log
 
-# Backups — git is the backup
+# Editor backup files — never runtime archives
 *.bak
 *.bak-*
 *.orig
 *~
 *-backup.*
+# PJAN-14 backup source and clock definition, not generated backup data.
+!/scripts/hermes-runtime-backup.py
+!/.candybars/flume-runtime-backup.candybar.toml
 
 # Agent runtime state — never a git repo, never tracked
 agents/hermes/*/runtime/
