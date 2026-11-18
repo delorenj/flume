@@ -38,7 +38,9 @@ try {
     assert.ok(body, "pm soul has a ## Launch mode section");
     // Inert by default: the declaration file switches it, and absence means steady.
     assert.match(body, /committed `\.launch\.yaml` says `mode: launch`/);
-    assert.match(body, /With no file, or `mode: steady`,\s+this section is inert/);
+    assert.match(body, /its `\.project\.json` binds Plane/);
+    assert.match(body, /Trello launch-board automation is not supported/);
+    assert.match(body, /With no declaration, with a\s+Trello binding, or with `mode: steady`, this section is inert/);
     // The rules absorbed from the Launch Director charter.
     assert.match(body, /\*\*One finish line:\*\* the declaration's `finish_line`, `contract` and `epic`/);
     assert.match(body, /If the repo has a Launch Director desk, apply its cut line and\s+leave\s+verdicts to it/);
