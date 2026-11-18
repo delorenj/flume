@@ -217,7 +217,7 @@ lanes:
 // B3. The schema the overlay validates against.
 {
   const keys = hostConfigSchemaKeys("/placeholder-home");
-  assert.deepEqual(Object.keys(keys), ["fleet", "github", "plane", "hindsight"]);
+  assert.deepEqual(Object.keys(keys), ["fleet", "github", "plane", "telegram", "hindsight"]);
   for (const key of ["runtime_scaffold_dir", "vox_url", "onepassword_vault"]) assert.ok(keys.fleet.includes(key), `[fleet] ${key} is overridable`);
 }
 

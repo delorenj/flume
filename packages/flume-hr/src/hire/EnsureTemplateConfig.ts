@@ -104,6 +104,9 @@ function defaultHostSchema(home: string): ConfigSchema {
         ["workspace", quote("33god")],
       ],
     },
+    // The template's 30-telegram.sh always allows these ids (the fleet's operator), so a new bot never comes
+    // up denying its creator; the same built-in fallback the template ships.
+    { section: "telegram", values: [["operator_user_ids", '["7564050286"]']] },
     { section: "hindsight", values: [["agent_bank_template", quote("")]] },
   ];
 }
