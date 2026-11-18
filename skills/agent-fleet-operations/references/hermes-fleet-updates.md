@@ -178,7 +178,7 @@ For durable future-employee changes:
 Future employees receive the new behavior. Current ones do not change unless you
 run a backfill.
 
-The ticket-provider adapters (`plane.sh`, `linear.sh`, `trello.sh`) are canonical
+The ticket-provider adapters (`plane.sh`, `trello.sh`) supported by pjangler are canonical
 in `~/code/33GOD/krebs/adapters/tp/` and vendored into
 `template/.scripts/providers/`. Patch krebs first, then re-vendor; the two copies
 are expected to be byte-identical.
