@@ -1,4 +1,4 @@
-import { readFileSync, lstatSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync } from "node:fs";
 import { createConnection } from "node:net";
 import { isAbsolute, join, resolve } from "node:path";
 import { FleetError } from "./types";
@@ -56,16 +56,29 @@ function socketPath(home: string): string | null {
     if (stat.isSocket() && stat.uid === process.getuid?.()) return direct;
     return null;
   } catch { /* Hermes can publish a private pointer for a long home path. */ }
+  let fd: number | undefined;
   try {
     const pointer = join(home, "gateway.sock.path");
-    const stat = lstatSync(pointer);
+    // A renamed FIFO must not block the event loop; validate the inode we open,
+    // not a pathname that can change between validation and the read.
+    fd = openSync(pointer, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
+    const stat = fstatSync(fd);
     if (!stat.isFile() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || stat.size > 256) return null;
-    const target = readFileSync(pointer, "utf8").trim();
+    const bytes = Buffer.alloc(257);
+    let length = 0;
+    while (length < bytes.length) {
+      const count = readSync(fd, bytes, length, bytes.length - length, null);
+      if (count === 0) break;
+      length += count;
+    }
+    if (length > 256) return null;
+    const target = bytes.toString("utf8", 0, length).trim();
     if (!isAbsolute(target)) return null;
     const endpoint = lstatSync(target);
     if (!endpoint.isSocket() || endpoint.uid !== process.getuid?.()) return null;
     return target;
   } catch { return null; }
+  finally { if (fd !== undefined) closeSync(fd); }
 }
 
 /** Only the identify verb is sent; neither route lookup nor dispatch has a read-safe command verb. */

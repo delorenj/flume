@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, lstatSync, mkdtempSync, mkdirSync, readdirSync, readlinkSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { chmodSync, constants, lstatSync, mkdtempSync, mkdirSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import YAML from "yaml";
@@ -72,12 +72,14 @@ async function stop() {
   for (const client of clients) client.destroy();
   if (server?.listening) await new Promise((ok) => server.close(ok));
 }
-function snapshot() {
+function snapshot({ pointerMutation = false } = {}) {
   const entries = {};
   function walk(path) {
+    if (pointerMutation && path === pointer) return;
     const stat = lstatSync(path);
     const key = relative(fixture, path);
-    const data = [stat.mode, stat.mtimeMs, stat.size];
+    // A forced rename changes the parent directory, but no other fixture input.
+    const data = pointerMutation && path === home ? [stat.mode] : [stat.mode, stat.mtimeMs, stat.size];
     if (stat.isSymbolicLink()) data.push(readlinkSync(path));
     else if (stat.isFile()) data.push(createHash("sha256").update(readFileSync(path)).digest("hex"));
     entries[key] = data;
@@ -115,22 +117,69 @@ require('node:module').syncBuiltinESMExports();
 const cli = resolve(import.meta.dirname, "../packages/flume-hr/dist/index.js");
 const env = { ...process.env, HERMES_FLEET_HOME: home, HERMES_FLEET_ENV: join(root, "absent.env"),
   FLUME_HOST_OVERLAY: "none", NO_COLOR: "1", F14_SPY: spy, F14_SOCKET: socket };
-async function run({ json = true, domain = "bloodbank", deadline = 2000, cancel = false } = {}) {
-  const before = snapshot();
-  const child = spawn(process.execPath, ["--require", guard, cli, "review", "--domain", domain, "--agent", "alpha-pm",
-    ...(json ? ["--json"] : []), "--agent-registry", registry, "--project-registry", projects, "--deadline-ms", String(deadline)], { cwd: fixture, env });
+const interleaving = resolve(import.meta.dirname, "fixtures/flume-14-pointer-interleaving.cjs");
+const pointerEvents = join(root, "pointer-events.jsonl");
+const pending = join(root, "pending-pointer");
+async function withPointer(mode, fn) {
+  rmSync(pointer, { force: true });
+  rmSync(pending, { force: true });
+  writeFileSync(pointer, socket, { mode: 0o600 });
+  writeFileSync(pointerEvents, "");
+  if (mode.startsWith("fifo")) {
+    const made = spawnSync("mkfifo", ["-m", "600", pending], { encoding: "utf8" });
+    assert.equal(made.status, 0, made.stderr);
+  } else if (mode.startsWith("symlink")) {
+    const target = join(root, "symlink-target");
+    writeFileSync(target, socket, { mode: 0o600 });
+    symlinkSync(target, pending);
+  } else if (mode.startsWith("private-mode")) writeFileSync(pending, socket, { mode: 0o644 });
+  else if (mode.startsWith("replace-oversized")) writeFileSync(pending, socket + " ".repeat(1024 * 1024), { mode: 0o600 });
+  try { await fn(); }
+  finally {
+    rmSync(pointer, { force: true }); rmSync(pending, { force: true });
+    writeFileSync(pointer, socket, { mode: 0o600 });
+  }
+}
+async function run({ json = true, domain = "bloodbank", deadline = 2000, cancel = false, pointerMode } = {}) {
+  const pointerMutation = pointerMode && !["control", "short-reads"].includes(pointerMode);
+  const before = snapshot({ pointerMutation });
+  const started = Date.now();
+  const child = spawn(process.execPath, ["--require", guard, ...(pointerMode ? ["--require", interleaving] : []), cli, "review", "--domain", domain, "--agent", "alpha-pm",
+    ...(json ? ["--json"] : []), "--agent-registry", registry, "--project-registry", projects, "--deadline-ms", String(deadline)], {
+    cwd: fixture, env: { ...env, F14_POINTER_MODE: pointerMode, F14_POINTER: pointer, F14_PENDING: pending, F14_POINTER_EVENTS: pointerEvents },
+  });
   if (cancel) onRequest = () => child.kill("SIGINT");
   let output = "", errors = "";
   child.stdout.on("data", (part) => { output += part; });
   child.stderr.on("data", (part) => { errors += part; });
-  const timer = setTimeout(() => child.kill("SIGKILL"), 12000);
+  let killed = false;
+  const timer = setTimeout(() => { killed = true; child.kill("SIGKILL"); }, pointerMode ? 3000 : 12000);
   const code = await new Promise((ok, reject) => { child.on("error", reject); child.on("close", ok); });
   clearTimeout(timer);
   onRequest = undefined;
-  assert.deepEqual(snapshot(), before, "registry, authority absence, profile/role config and service tree must remain content/mode/mtime-identical");
+  assert.equal(killed, false, "real CLI blocked past outer watchdog (pointer open/read must not defeat deadline or SIGINT)");
+  assert.deepEqual(snapshot({ pointerMutation }), before, "registry, authority absence, profile/role config and service tree must remain content/mode/mtime-identical");
   assert.ok(!output.includes(secret) && !errors.includes(secret), "human and JSON output must not expose planted secrets");
   assert.equal(readFileSync(spy, "utf8"), "", "forbidden process/network operation");
-  return { code, output, errors, parsed: json ? JSON.parse(output) : null };
+  const events = pointerMode ? readFileSync(pointerEvents, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
+  const parsed = json ? JSON.parse(output) : null;
+  const elapsed = Date.now() - started;
+  if (pointerMode) console.log(`       pointer ${JSON.stringify({ mode: pointerMode, code, elapsed_ms: elapsed,
+    result: parsed?.ok ? route(parsed)?.summary : parsed?.error?.code,
+    reads: events.filter((event) => event.kind === "read").map(({ requested, count }) => ({ requested, count })),
+    opened: events.filter((event) => event.kind === "opened").length, closed: events.filter((event) => event.kind === "closed").length })}`);
+  return { code, output, errors, events, elapsed, parsed };
+}
+function assertPointerClosed(events) {
+  const attempts = events.filter((event) => event.kind === "open-attempt");
+  assert.equal(attempts.length, 1);
+  assert.equal(typeof attempts[0].flags, "number");
+  for (const flag of [constants.O_NONBLOCK, constants.O_NOFOLLOW]) assert.equal(attempts[0].flags & flag, flag);
+  const opened = events.filter((event) => event.kind === "opened");
+  assert.deepEqual(events.filter((event) => event.kind === "closed").map((event) => event.fd), opened.map((event) => event.fd), "every opened pointer descriptor must close, including rejection paths");
+  const reads = events.filter((event) => event.kind === "read");
+  assert.ok(reads.every((event) => event.requested <= 257));
+  assert.ok(reads.reduce((sum, event) => sum + event.count, 0) <= 257, "actual pointer reads must never exceed 257 bytes");
 }
 function route(parsed) { return parsed.data.agents[0].observations.find((o) => o.source === "gateway-control-identify"); }
 function assertGap(parsed) {
@@ -259,6 +308,66 @@ try {
       assert.equal(requests.length, before);
     }
     writeFileSync(pointer, socket); chmodSync(pointer, 0o600);
+  });
+  await check("valid private pointer reaches the actual identify socket, including short reads and exact 256-byte boundary", async () => {
+    reply = good; raw = undefined;
+    for (const mode of ["control", "short-reads"]) await withPointer(mode, async () => {
+      writeFileSync(pointer, socket.padEnd(256));
+      const before = requests.length;
+      const { code, parsed, events } = await run({ pointerMode: mode });
+      assert.equal(code, 0); assertGap(parsed);
+      assert.equal(route(parsed).state, "pass");
+      assert.equal(requests.length, before + 1);
+      assertPointerClosed(events);
+      assert.equal(events.filter((event) => event.kind === "read").reduce((sum, event) => sum + event.count, 0), 256);
+      assert.equal(events.find((event) => event.kind === "descriptor-stat").regular, true);
+    });
+  });
+  await check("real CLI rejects FIFO, symlink and nonprivate replacements before open without blocking or contacting peer", async () => {
+    for (const mode of ["fifo-before-open", "symlink-before-open", "private-mode-before-open"]) await withPointer(mode, async () => {
+      const before = requests.length;
+      const { code, parsed, events, elapsed } = await run({ pointerMode: mode, deadline: 250 });
+      assert.equal(code, 0); assertGap(parsed);
+      assert.equal(route(parsed).summary, "gateway-control-socket-unavailable");
+      assert.equal(requests.length, before);
+      assert.ok(elapsed < 2000, `raced pointer took ${elapsed}ms`);
+      assert.equal(events.find((event) => event.kind === "mutation").regularBefore, true);
+      if (mode.startsWith("fifo")) {
+        assert.equal(events.find((event) => event.kind === "mutation").fifoAfter, true);
+        assert.equal(events.find((event) => event.kind === "descriptor-stat").fifo, true);
+      }
+      assert.equal(events.some((event) => event.kind === "read"), false);
+      assertPointerClosed(events);
+    });
+  });
+  await check("real CLI caps actual reads across growth and oversized replacement, and keeps the opened inode after replacement", async () => {
+    for (const mode of ["grow-after-stat", "replace-oversized-before-open", "replace-oversized-after-stat"]) await withPointer(mode, async () => {
+      const before = requests.length;
+      const { code, parsed, events } = await run({ pointerMode: mode });
+      assert.equal(code, 0); assertGap(parsed);
+      const mutation = events.find((event) => event.kind === "mutation");
+      assert.ok(mutation.sizeBefore <= 256 && mutation.sizeAfter > 256);
+      const anchored = mode === "replace-oversized-after-stat";
+      assert.equal(route(parsed).summary, anchored ? "gateway-serves-declared-profile" : "gateway-control-socket-unavailable");
+      assert.equal(requests.length, before + (anchored ? 1 : 0));
+      assertPointerClosed(events);
+      if (mode === "grow-after-stat") assert.equal(events.filter((event) => event.kind === "read").reduce((sum, event) => sum + event.count, 0), 257);
+      if (mode === "replace-oversized-before-open") assert.equal(events.some((event) => event.kind === "read"), false);
+    });
+  });
+  await check("real CLI deadline and SIGINT complete after the checked pointer pathname becomes a FIFO", async () => {
+    reply = null;
+    try {
+      for (const options of [{ deadline: 250 }, { cancel: true }]) await withPointer("fifo-after-stat", async () => {
+        const { code, parsed, events, elapsed } = await run({ ...options, pointerMode: "fifo-after-stat" });
+        assert.equal(parsed.ok, false); assert.equal(parsed.data, null);
+        assert.equal(parsed.error.code, options.cancel ? "CANCELLED" : "TIMEOUT");
+        assert.equal(code, options.cancel ? 8 : 7);
+        assert.ok(elapsed < 2000, `deadline/cancellation took ${elapsed}ms`);
+        assert.equal(events.find((event) => event.kind === "mutation").fifoAfter, true);
+        assertPointerClosed(events);
+      });
+    } finally { reply = good; }
   });
   await check("probe timeout, shared deadline and cancellation retain explicit no-partial-data semantics", async () => {
     reply = null;
