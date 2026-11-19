@@ -4,7 +4,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
-import YAML from "yaml";
+import YAML, { isMap, isScalar } from "yaml";
+import roleSchema from "../contracts/role.schema.json" with { type: "json" };
 import { canonicalPolicy, policySection } from "./lib/scheduling-policy.mjs";
 import { readAuditText } from "./lib/read-audit-text.mjs";
 export { canonicalPolicy, policySection, START, END } from "./lib/scheduling-policy.mjs";
@@ -12,13 +13,20 @@ export { canonicalPolicy, policySection, START, END } from "./lib/scheduling-pol
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mapping = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+const rolePattern = new RegExp(roleSchema.properties.role.pattern, "u");
 
 export function auditSchedulingPolicy({ registry, fleetHome }) {
   const policy = canonicalPolicy(root);
   const document = YAML.parseDocument(readAuditText(registry, 4 * 1024 * 1024), { uniqueKeys: true });
   if (document.errors.length) throw new Error("Invalid registry YAML");
+  const rawAgents = document.get("agents", true);
+  if (!isMap(rawAgents) || rawAgents.items.some(({ key }) => !isScalar(key) || typeof key.value !== "string")) {
+    throw new Error("Registry agents must be a mapping with string employee keys");
+  }
   const agents = document.toJS({ maxAliasCount: 100 })?.agents;
-  if (!mapping(agents) || Object.keys(agents).length === 0) throw new Error("Registry must contain a non-empty agents mapping");
+  if (!mapping(agents) || Object.keys(agents).length === 0 || Object.keys(agents).length !== rawAgents.items.length) {
+    throw new Error("Registry must contain a non-empty agents mapping without lost employee keys");
+  }
   const profiles = new Map();
   for (const row of Object.values(agents)) if (mapping(row) && typeof row.profile_name === "string") {
     profiles.set(row.profile_name, (profiles.get(row.profile_name) ?? 0) + 1);
@@ -31,7 +39,7 @@ export function auditSchedulingPolicy({ registry, fleetHome }) {
       result.detail = "Invalid employee id or profile_name; no profile inferred";
       return result;
     }
-    if (typeof row.role !== "string" || !/^[a-z][a-z0-9_-]*$/u.test(row.role) ||
+    if (typeof row.role !== "string" || !rolePattern.test(row.role) ||
         (row.employment !== undefined && !["post", "portable-specialist"].includes(row.employment))) {
       result.detail = "Invalid or missing role/employment; coverage unproven";
       return result;

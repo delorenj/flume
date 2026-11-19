@@ -5,7 +5,7 @@ Observed 2026-11-19 UTC against Flume base
 `19ded0acc35c8e14ddcb94dd4ebde2b4421b5384`.
 This supersedes the status claims in `verification.md`, not its historical
 receipts. This phase produced no instruction deployment or schedule cutover.
-Independent adversarial review and integration remain with the parent workflow.
+Independent adversarial review of candidate `c0b8f8fb04496b55e0eeacb3a0c153a5c61ad6ce` found two AC5 gaps (R1/R2); narrow corrections and focused regressions are now in this branch. Independent re-review and integration remain with the parent workflow.
 
 ## Current coverage, not universal deployment
 
@@ -40,10 +40,17 @@ already implement ACs 1–4. Keep the one authored `roles/_base.md` section and
 the existing owning specialist adapter rather than add per-role copies.
 The genuine audit gap was a malformed registry row with a valid profile_name
 being certified current. Missing/invalid role or employment and duplicate
-profile identities now remain unproven. Canonical policy cannot be replaced by
-an optional caller argument; empty marker-only source fails. Missing, unreadable,
-nonregular, oversized and invalid UTF-8 inputs fail closed through bounded,
-nonblocking descriptor reads. Runtime SOUL links remain valid.
+profile identities now remain unproven. Independent review additionally found
+that YAML numeric/string (and boolean/string) employee keys could collide when
+converted to a JavaScript object and silently drop a missing employee, and
+that the audit's role regex diverged from `contracts/role.schema.json`. Raw
+employee keys now must be string scalars before conversion, with row-count
+preservation checked; the role check reads its pattern from that schema. The
+public validators and audit agree on `3d-artist`, `dev_`, and `dev--oops`.
+Canonical policy cannot be replaced by an optional caller argument; empty
+marker-only source fails. Missing, unreadable, nonregular, oversized and
+invalid UTF-8 inputs fail closed through bounded, nonblocking descriptor reads.
+Runtime SOUL links remain valid.
 
 Tests now exercise the real CLI over those cases, descriptor growth/short reads/
 rename/FIFO races, and preserve fixture bytes/mtimes. The public portable
@@ -63,7 +70,7 @@ and #3 Build LEGO, Not Statues.
 | 2 — Candybar WHEN, execution-only services/Hermes | `roles/_base.md` bounded section and policy contract assertions cover systemd, cron, Hermes, n8n and embedded recurring loops, bounded retries and event-driven consumers. No schedule created. |
 | 3 — installation/cutover proof | Same section requires committed manifest, API registered-schedule readback, terminal invocation plus intended effect, native clocks disabled; tests assert terms. No tests/dispatch/registration presented as installed scheduling proof. |
 | 4 — exact AD-22 exception | Same source explicitly limits exception to existing page-only `candybar-watchdog.timer`, excludes crank-watchdog, requires exact schedule/owner/scope/rationale for further exceptions and reports unfamiliar timers rather than disabling. |
-| 5 — read-only fail-closed deployed guard | `scheduling-policy-audit-regressions` (six groups) and existing scheduling audit cases; current CLI exit 1, paired read-only observation, invalid inputs and missing policy exit 2. |
+| 5 — read-only fail-closed deployed guard | `scheduling-policy-audit-regressions` (seven groups, including numeric/string and boolean/string YAML key collisions and contract-valid/invalid roles) and existing scheduling audit cases; corrected current CLI exit 1 with 49 audited, 46 pass, 2 drift, 1 unproven. Previous paired read-only observation remains historical for the initial candidate; the repair's read-only rerun is bounded to the current CLI output, not a new host-wide write trace. |
 | 6 — attributable deployment evidence and persona safety | Coverage/gap table above; `policy-refresh-regressions` exercises private fixtures only, preserving refusals, persona/config/link/receipt ownership and idempotence. Positive audit fields explicitly say on-disk bytes only, sessions/runtime false. No live refresh performed. |
 | 7 — separate agents ownership and honest gates | Global boundary below; exact command exits/logs and wider limitations recorded in current checks. Candybar linter/cutover remains separately owned. |
 
@@ -91,8 +98,9 @@ to the candidate worktree, not the dirty shared main checkout.
 - `npm run typecheck` and `npm run build`: exit 0.
 - Focused `node tests/scheduling-policy-regressions.mjs`: exit 0, 13 groups,
   seven distinct role variants × named/unnamed.
-- `node tests/scheduling-policy-audit-regressions.mjs`: exit 0, six groups;
-  final rerun supersedes its earlier five-group output.
+- `node tests/scheduling-policy-audit-regressions.mjs`: exit 0, seven groups
+  after repair; original six-group output belongs to the initial candidate.
+  The initial candidate's `checks-2026-11-19.json` has not been rewritten.
 - `node tests/policy-refresh-regressions.mjs`: exit 0, six groups.
 - Adjacent `soul-project-bank`, `named-agent`, `pjan-48`, `role-contract`,
   `specialist-hire`, `fleet-inventory`: exit 0.

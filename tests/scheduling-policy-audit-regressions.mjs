@@ -98,18 +98,30 @@ process.on("exit", () => fs.writeFileSync(process.env.RACE_RECEIPT, JSON.stringi
     rmSync(soul); put(soul, policy);
   });
   check("missing, duplicate-key, non-UTF8, nonregular and oversized registry inputs fail closed", () => {
-    for (const invalid of ["agents: {}\n", "agents: []\n", "agents: {a: {}, a: {}}\n", Buffer.from([0xff]), "x".repeat(4 * 1024 * 1024 + 1)]) {
+    for (const invalid of ["agents: {}\n", "agents: []\n", "agents: {a: {}, a: {}}\n", "agents:\n  1: {role: dev, profile_name: missing}\n  \"1\": {role: dev, profile_name: current}\n", "agents:\n  true: {role: dev, profile_name: missing}\n  \"true\": {role: dev, profile_name: current}\n", Buffer.from([0xff]), "x".repeat(4 * 1024 * 1024 + 1)]) {
       put(registry, invalid); assert.equal(report(2).ok, false);
     }
     rmSync(registry); assert.equal(report(2).ok, false);
     assert.equal(spawnSync("mkfifo", [registry]).status, 0); assert.equal(report(2).ok, false); rmSync(registry); save({ current: row });
+  });
+  check("audit role grammar follows the owning role contract", () => {
+    rmSync(soul); put(soul, policy);
+    save({ current: { ...row, role: "3d-artist" } });
+    assert.equal(report(0).counts.pass, 1);
+    for (const role of ["dev_", "dev--oops", "_dev", "dev-", "dev__ops"]) {
+      save({ current: { ...row, role } });
+      const result = report(1);
+      assert.equal(result.counts.unproven, 1);
+      assert.equal(result.counts.pass, 0);
+    }
+    save({ current: row });
   });
   check("missing, unreadable and malformed canonical policy cannot return a clean registry", () => {
     const source = join(work, "isolated-audit-source");
     try {
       mkdirSync(source);
       symlinkSync(join(root, "node_modules"), join(source, "node_modules"), "dir");
-      for (const file of ["scripts/audit-scheduling-policy.mjs", "scripts/lib/scheduling-policy.mjs", "scripts/lib/read-audit-text.mjs"]) {
+      for (const file of ["scripts/audit-scheduling-policy.mjs", "scripts/lib/scheduling-policy.mjs", "scripts/lib/read-audit-text.mjs", "contracts/role.schema.json"]) {
         mkdirSync(dirname(join(source, file)), { recursive: true }); copyFileSync(join(root, file), join(source, file));
       }
       const script = join(source, "scripts/audit-scheduling-policy.mjs"), base = join(source, "roles/_base.md");
