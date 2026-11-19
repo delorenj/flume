@@ -1,0 +1,28 @@
+{
+  "precleanup": {
+    "git_unpushed_roots": ["/home/delorenj/code/33GOD/flume/.worktrees/feat-FLUME-87-marketing", "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-87-marketing-brief"],
+    "git_unpushed_result": "1 repo(s) hold work that exists only on this disk: templates/hermes-agent DETACHED HEAD; no unpushed FLUME-87 branch commits",
+    "branch_ahead_of_upstream": {"feat/FLUME-87-marketing": 0, "feat/FLUME-87-marketing-brief": 0},
+    "template_sha": "3b9b7e89b95dc505031c36245a93effa17dd2781",
+    "template_matches_canonical_pin": true,
+    "ignored_flume": ["node_modules/", "packages/flume-hr/dist/", "scripts/__pycache__/"],
+    "ignored_template": ["scripts/__pycache__/", "template/.scripts/lib/__pycache__/"],
+    "ignored_parent_brief": ["33god-platform/scripts/__pycache__/"],
+    "runtime_inventory": {
+      "path": "agents/hermes/pm/runtime",
+      "real_directory": true,
+      "tracked_files": [],
+      "entries": ["decisions/", "logs/", "memories/"],
+      "files_or_links_beneath_runtime": [],
+      "note": "Empty directories only at inspection; no unique session, memory or log content found. Initialized submodule still prevents normal worktree removal."
+    }
+  },
+  "cleanup": {
+    "parent_brief": {"command": "git worktree remove /home/delorenj/code/33GOD/.worktrees/feat-FLUME-87-marketing-brief", "result": "success; absent from subsequent git worktree list"},
+    "flume": {"command": "git worktree remove /home/delorenj/code/33GOD/flume/.worktrees/feat-FLUME-87-marketing", "result": "refused", "error": "fatal: working trees containing submodules cannot be moved or removed", "retained": true},
+    "force_used": false,
+    "submodule_deinit_used": false,
+    "other_worktrees_touched": false,
+    "branches_deleted": false
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "argv": [
+    "flume",
+    "audit",
+    "/home/delorenj/code/33GOD",
+    "--rules",
+    "org.identity-conflict",
+    "--json"
+  ],
+  "cwd": "/home/delorenj/code/33GOD/flume",
+  "observed_at": "2026-11-19T08:57:41.142708+00:00",
+  "exit_code": 1,
+  "result": {
+    "repo": "/home/delorenj/code/33GOD",
+    "ok": false,
+    "hostOk": false,
+    "auditedAt": "2026-11-19T08:57:41.128Z",
+    "rules": [
+      {
+        "id": "org.identity-conflict",
+        "title": "No two rows claim one identity (repo, board, identifier, unit name)",
+        "status": "fail",
+        "summary": "16 unpermitted identity conflict group(s)",
+        "details": [
+          "agents.{agent_id}.plane.identifier 33GOD is claimed by 33god-art-director, 33god-pm",
+          "agents.{agent_id}.plane.identifier TOLT is claimed by lost-things-forge-pm, tolt-pm",
+          "agents.{agent_id}.project_path ~/code/tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+          "agents.{agent_id}.project_path ~/code/33GOD is claimed by 33god-art-director, 33god-pm",
+          "agents.{agent_id}.project_path ~/code/green-in-between is claimed by green-in-between-launch-director, green-in-between-pm",
+          "agents.{agent_id}.project_path ~/code/gruvato is claimed by gruvato-launch-director, gruvato-pm",
+          "agents.{agent_id}.repo green-in-between is claimed by green-in-between-launch-director, green-in-between-pm",
+          "agents.{agent_id}.repo 33god is claimed by 33god-art-director, 33god-pm",
+          "agents.{agent_id}.repo tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+          "agents.{agent_id}.repo gruvato is claimed by gruvato-launch-director, gruvato-pm",
+          "projects.{slug}.slug 33god is claimed by 33god-art-director, 33god-pm",
+          "projects.{slug}.slug tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+          "projects.{slug}.slug greeninbetween is claimed by green-in-between-launch-director, green-in-between-pm",
+          "projects.{slug}.slug gruvato is claimed by gruvato-launch-director, gruvato-pm",
+          "projects.{slug}.ticket_provider.board_id plane/33god/eb302959-0eac-48da-8fd5-ae1666bd500f is claimed by lost-things-forge, tolt, tower-of-lost-things",
+          "projects.{slug}.ticket_provider.identifier plane/33god/TOLT is claimed by lost-things-forge, tolt, tower-of-lost-things",
+          "resolve each group one of two ways, and only an operator can choose:",
+          "  (a) rule it intentional -- add the group to `classifications.intentionally_unmanaged.entries[]` in contracts/handbook.yaml, which makes it a permitted conflict rather than a silent one, or",
+          "  (b) change one claimant so the value is claimed once -- repoint the row/record, or retire the one that is abandoned"
+        ],
+        "fixable": false,
+        "scope": "host"
+      }
+    ]
+  },
+  "control": {
+    "removed_target": false,
+    "candidate_absent": true,
+    "registry_unchanged": true,
+    "note": "Candidate absent; without-target control is a no-op, not post-hire acceptance."
+  }
+}
