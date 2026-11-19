@@ -1,0 +1,50 @@
+PASS isolated cache reproduction: edit persists, ordinary read is stale, fresh read sees field
+PASS preview plans creates with remote GETs only and writes nothing
+PASS apply provisions token + rule + allowlist + vault item + binding; second apply is a no-op
+PASS a foreign rule or token name blocks provisioning instead of clobbering it
+PASS a failed vault write deletes the orphaned token at the provider
+PASS an unenrolled employee is refused before any provider call
+PASS documented JSON recovery preview exposes safe field IDs, provider comparison and receipt outcomes
+PASS section collision preserved; stranded metadata/provider/receipt conflict blocks minting; authorized fixture recovery converges
+PASS uncertain unreadable: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain wrong-value: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain partial: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain success-empty: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain duplicate-id: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain duplicate-field: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain signal: explicit partial result, retained token, retry does not mint/delete
+PASS nonzero edit with freshly confirmed persisted pair completes binding without deletion
+PASS binding refusal after confirmed vault persistence retains the live token
+PASS provider pagination finds later-page name collision before minting
+PASS secret-only partial pair blocks without disclosing it in JSON or human output
+PASS unavailable fresh vault inventory fails closed without treating read failure as item absence
+PASS failDelete: cleanup not claimed without provider absence confirmation
+PASS lieDelete: cleanup not claimed without provider absence confirmation
+PASS real CLI provision failure to credentials and permissioned retirement: retained token inventoried, failed DELETE incomplete, verified retry and no-op repeat
+PASS retained receipt with changed provider ownership cannot authorize Access deletion or complete revocation
+PASS retained token with matching name but changed client ID cannot be deleted from issuance receipt
+PASS pending-token inventory and permissioned retirement read clamped provider pages through verified absence
+PASS historical unscoped issuance receipt blocks complete revocation but never permits provider delete
+PASS live named provider token defeats historical deleted receipt when issuance cannot be attributed
+PASS clamped served per_page without total_pages discovers later-page token before apply
+PASS metadata-less inventory reads through empty page instead of minting duplicate
+PASS repeated provider page blocks token mint instead of claiming inventory complete
+PASS inconsistent total_pages metadata blocks mint without claiming authoritative absence
+PASS bounded 100-page inventory fails closed without mint or unbounded provider reads
+PASS later-page stranded token overrides historical deleted receipt; JSON preview reports actual provider match
+PASS Q1 same-page duplicate IDs block preview/apply mint, retained inventory absence and false-clean retirement
+PASS Q1 malformed duplicate page blocks bound-token retry even with a remembered failed DELETE ID
+PASS Q2 normal CLI bind refuses another subject's pending Access issuance
+PASS Q2 pending retirement preserves active owner's bound token and reports incomplete
+PASS Q2 pending retirement preserves suspended owner's bound token and reports incomplete
+PASS Q2 pending retirement preserves tombstone owner's bound token and reports incomplete
+PASS Q2 re-reads census after status publication and provider listing before pending DELETE
+PASS Q3 minted: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 created: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 deleted: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 bound: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 during-list: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 deleted-client: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS identical issuance receipts retain original attribution and allow verified retirement
+PASS all CLI JSON/stdout/stderr, receipts and definitions withhold secrets on success and every failure
+identity-provision-regressions: 49 passed

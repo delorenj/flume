@@ -1,0 +1,15 @@
+
+> flume@1.0.0 build
+> npm run build --workspaces --if-present
+
+
+> @delorenj/flume-hr@1.0.0 build
+> esbuild src/index.ts src/mcp-server.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist
+
+
+  dist/index.js             1.5mb ⚠️
+  dist/mcp-server.js      928.3kb
+  dist/index.js.map         3.4mb
+  dist/mcp-server.js.map    2.3mb
+
+⚡ Done in 71ms

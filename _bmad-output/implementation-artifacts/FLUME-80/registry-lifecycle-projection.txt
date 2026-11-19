@@ -1,0 +1,1 @@
+registry lifecycle projection regressions: all assertions passed

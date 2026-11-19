@@ -1,0 +1,178 @@
+{
+  "at": "2026-11-19T09:13:58.427Z",
+  "base": "f85a126835ce3f4a4b5f30198b949d865a9b54b6",
+  "evidence": "isolated-fixture; no live provider/vault reads or mutations",
+  "results": [
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "env": {},
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 3291,
+      "log": "typecheck.txt"
+    },
+    {
+      "name": "build",
+      "command": "npm run build",
+      "env": {},
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 275,
+      "log": "build.txt"
+    },
+    {
+      "name": "baseline-build",
+      "command": "node /home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/build-baseline.mjs",
+      "env": {},
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 87,
+      "log": "baseline-build.txt"
+    },
+    {
+      "name": "baseline-reproduction",
+      "command": "node tests/identity-provision-regressions.mjs",
+      "env": {
+        "FLUME_PROVISION_TEST_CLI": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/packages/flume-hr/dist/flume80-baseline.js",
+        "FLUME_PROVISION_EXPECT_OLD_FAILURE": "1"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 1443,
+      "log": "baseline-reproduction.txt"
+    },
+    {
+      "name": "provision",
+      "command": "node tests/identity-provision-regressions.mjs",
+      "env": {},
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 55219,
+      "log": "provision.txt"
+    },
+    {
+      "name": "direct-company-identity-lifecycle",
+      "command": "node tests/company-identity-lifecycle-regressions.mjs",
+      "env": {
+        "FLUME_HOST_OVERLAY": "",
+        "HERMES_FLEET_ENV": ""
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 146353,
+      "log": "direct-company-identity-lifecycle.txt"
+    },
+    {
+      "name": "company-identity-lifecycle",
+      "command": "node tests/company-identity-lifecycle-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 1,
+      "signal": null,
+      "duration_ms": 4750,
+      "log": "company-identity-lifecycle.txt"
+    },
+    {
+      "name": "employee-access-lifecycle",
+      "command": "node tests/employee-access-lifecycle-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 1,
+      "signal": null,
+      "duration_ms": 6638,
+      "log": "employee-access-lifecycle.txt"
+    },
+    {
+      "name": "company-identity",
+      "command": "node tests/company-identity-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 17225,
+      "log": "company-identity.txt"
+    },
+    {
+      "name": "registry-lifecycle-projection",
+      "command": "node tests/registry-lifecycle-projection-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 11449,
+      "log": "registry-lifecycle-projection.txt"
+    },
+    {
+      "name": "company-identity-registry-plane",
+      "command": "node tests/company-identity-registry-plane-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 4866,
+      "log": "company-identity-registry-plane.txt"
+    },
+    {
+      "name": "company-identity-plane",
+      "command": "node tests/company-identity-plane-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 40602,
+      "log": "company-identity-plane.txt"
+    },
+    {
+      "name": "baseline-company-identity-lifecycle",
+      "command": "node tests/company-identity-lifecycle-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs",
+        "FLUME80_BASELINE_CLI": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/packages/flume-hr/dist/flume80-baseline.js"
+      },
+      "exit": 1,
+      "signal": null,
+      "duration_ms": 4496,
+      "log": "baseline-company-identity-lifecycle.txt"
+    },
+    {
+      "name": "baseline-employee-access-lifecycle",
+      "command": "node tests/employee-access-lifecycle-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs",
+        "FLUME80_BASELINE_CLI": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/packages/flume-hr/dist/flume80-baseline.js"
+      },
+      "exit": 1,
+      "signal": null,
+      "duration_ms": 6220,
+      "log": "baseline-employee-access-lifecycle.txt"
+    },
+    {
+      "name": "baseline-company-identity",
+      "command": "node tests/company-identity-regressions.mjs",
+      "env": {
+        "NODE_OPTIONS": "--import=/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/_bmad-output/implementation-artifacts/FLUME-80/scratch-temp.mjs",
+        "FLUME80_BASELINE_CLI": "/home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/packages/flume-hr/dist/flume80-baseline.js"
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 15507,
+      "log": "baseline-company-identity.txt"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "env": {},
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 8,
+      "log": "diff-check.txt"
+    }
+  ]
+}

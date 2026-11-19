@@ -90,6 +90,22 @@ whole point of the handbook.
 | `@delorenj/flume-core` | the HR domain — Employee, Title, Desk, Record, OrgChart, standing |
 | `@delorenj/flume-hr` | the `flume` CLI and its MCP server |
 
+## Development tests
+
+`npm test` typechecks, builds, and attempts every registered suite. Install Node
+24+, the npm dependencies, the template submodule (`git submodule update --init`),
+Python 3, Bash, Git, and **Copier 9.14.0** before running it. The Python test-tool
+pin is declared in `tests/requirements.txt`; `uv tool install 'copier==9.14.0'`
+puts the required CLI on PATH. Missing Copier is a failure, never a silent skip.
+
+`node scripts/run-tests.mjs pjan-103` runs the generated Plane consumer integration:
+real Copier `-T` render (no provisioning tasks), actual generated `tp` dispatcher
+against a recording curl fixture, forced regeneration, and the real
+`hermes.pm-scaffold` parity rule in a disposable project. It requires no live
+credentials, boards, schedules, or employee deployment. PJangler's separate gate
+continues to test the canonical Krebs adapter; it does not acquire Copier/Flume
+as an unrelated CI dependency.
+
 ## Position
 
 Flume owns the workforce. It does not own projects — that is

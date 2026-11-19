@@ -1,0 +1,11 @@
+
+> flume@1.0.0 typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @delorenj/flume-core@1.0.0 typecheck
+> tsc --noEmit -p tsconfig.json
+
+
+> @delorenj/flume-hr@1.0.0 typecheck
+> tsc --noEmit -p tsconfig.json

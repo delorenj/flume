@@ -1,0 +1,56 @@
+PASS every lifecycle command is a pure preview: no definition, state, ledger or provider mutation, with provider GETs only
+PASS suspend --apply writes status first, captures then deletes the allowlist key, and reports every credential honestly with complete_revocation false
+PASS a step recorded done is never executed again and names its original operation id
+PASS retire after suspend reuses the done allowlist step and disables only the employee's own routing rule; static rows become manual-action-required
+PASS restore re-puts the exact captured record, leaves foreign GitHub state alone, writes status last, and clears only what it reversed
+PASS restore refuses an active employee (not-suspended) and a retired one (retired-terminal) with zero provider calls
+PASS named --revoke adapters run in the fixed order; the installation is suspended-reversible, Access and gateway revoked by read-back, the App key still usable
+PASS restore un-suspends an installation this lifecycle suspended and reports the Access and gateway revocations as not reversible
+PASS an already-suspended installation is converged and restore never un-suspends what the lifecycle did not suspend
+PASS a gateway revoke that reports `revoked 0 tokens` is converged and read back as absent
+PASS --revoke plane|mail|bogus and suspend --revoke all are invalid-request: zero provider calls, nothing written
+PASS a shared gateway consumer (fleet base or another desk) blocks a NAMED --revoke gateway before any call and is a skipped step under --revoke all
+PASS a non-FLUME-39 gateway reference is an unverified row and a skipped step, never recorded and never a blocker
+PASS a desk inheriting the fleet base key is a shared consumer (manual-action-required on retire, never not-issued): a named --revoke gateway is refused before any call, while retire --revoke all retires and revokes everything else with the gateway skipped; only a desk with no key anywhere is not-issued
+PASS retire --revoke all with the Cloudflare DELETE failing (500) records succeeded and unresolved apart, and a retry runs only the failed step
+PASS retire --revoke all with the Cloudflare DELETE failing (500-after-delete) records succeeded and unresolved apart, and a retry runs only the failed step
+PASS a static credential is revoked only when the provider reads back its rejection (GET /app 401, px credential_rejected, status tokens [])
+PASS a local status, a grant TTL or a revoke that changed nothing never makes a static credential revoked
+PASS degraded providers report not-issued, unverified or unresolved with their code, and exit 1 only when an apply step stays unresolved; the gateway row follows the reference the desk RUNS with (its generated config.yaml when one exists, else its delta, else the fleet base)
+PASS credentials is read-only, and an unenrolled employee is refused before any provider call
+PASS legacy status retired is refused in preview and apply without writes or provider calls; lifecycle retirement is required
+PASS a retired identity's handle, subject and bindings survive `flume offboard`: handle-tombstoned (also for a fresh subject around the retired handle), subject-tombstoned, retired-terminal and binding-tombstoned, with nothing written
+PASS rotate changes credential_ref only, appends identity.rotate, reports the old key manual-action-required, and refuses principal changes, duplicates, gateway and retired employees
+PASS continuity reports rotation and a post move as such, stays stable on subject/handle/email/principal/actor/mailbox prefix/Plane comment provenance, and fails on drift
+PASS an irreversible step is scoped to the live resources it acted on: a re-minted gateway token is revoked again, a revoked one never twice
+PASS an employee suspended with no mailbox can be restored: nothing was captured, nothing is put back
+PASS restore fails closed: an unresolved step skips the status write and leaves the employee suspended until a retry succeeds
+PASS a KV delete, a routing-rule disable and a GitHub suspend that the provider does not honor are unresolved with their read-back code, never revoked
+PASS service tokens and routing rules are read across pages, and a foreign rule listed first never hides the employee's own
+PASS two concurrent applies serialize on the lifecycle lock: one KV DELETE and one token DELETE, the other reports already-done
+PASS an out-of-band `identity status active` between two suspensions loses no capture or record: the second suspend is already-done and restore re-puts the KV record and un-suspends the installation
+PASS after suspend --revoke gateway, restore and a FLUME-39 re-mint, an out-of-band `identity status suspended` then `retire --revoke all` revokes the new token
+PASS failed terminal status publication leaves a permanent fail-closed reservation and the original subject can retry retire
+PASS retire CLI crash after publishing terminal role status preserves permanent handle/binding reservation, rejects reactivation and reuse after offboard, and converges for the original subject
+PASS a suspend killed after writing status but before persisting anything converges on retry: the allowlist is deleted and the re-minted token revoked
+PASS a GitHub suspend whose PUT committed behind a 5xx, or whose read-back failed, is claimed done on retry (never converged) and un-suspended by restore
+PASS credentials rotated away from stay in the inventory as previous-credential-reference rows, manual-action-required until a probe of that exact old reference reads back the rejection; complete_revocation waits for them
+PASS once the App key is deleted the installation cannot be re-read (unverified http-401) unless an earlier apply recorded GitHub's 404; with it, revocation COMPLETE is reachable
+PASS a listing clamped below the asked page size is read to its end (by total_pages, or until an empty page when result_info is absent): absence is never concluded from a short first page
+PASS suspend, retire, restore, credentials and continuity refuse a symlinked or unreadable definition before any provider call, writing nothing
+PASS R3: a delta mapping a dedicated consumer while the generated config still runs the fleet key is drift: both blockers for a named --revoke gateway, a skipped step under --revoke all, the fleet token untouched
+PASS a drifted desk whose running key is its own consumer never reads as COMPLETE: no revoked gateway row until the desk is re-rendered
+PASS a generated config.yaml that cannot be read is drift too: no key is inferred, and a named --revoke gateway is refused gateway-ref-drift
+PASS R1: a mailbox re-provisioned by hand is deleted again by the next suspend (the capture is replaced) and restore puts back what that delete removed
+PASS a retire after a re-provision deletes the live allowlist key, and a routing rule re-enabled by hand is disabled by the next retire
+PASS restore never writes a stale capture over a re-provisioned allowlist key
+PASS R2: an installation un-suspended by hand is suspended again by the next suspend or retire, never reported already-done over a live installation
+PASS R4: a PUT that read back unsuspended keeps no capture, so restore never un-suspends an admin's later suspension
+PASS R4: a retry after a PUT that never committed calls an admin's later suspension someone else's, with no second PUT
+PASS a 4xx PUT is a definite refusal: no capture is kept
+PASS a capture kept for an ambiguous PUT never claims a suspension older than itself
+PASS not_reversed entries are dated facts of one operation, dropped once a re-mint or re-provision superseded them
+PASS no unrelated definition or registry byte changes across suspend, restore and retire
+PASS no planted secret (98 values incl. 90 app JWTs) appears in any of 778 state, ledger, definition or receipt files or any output, and each planted value demonstrably reached an input
+
+54 lifecycle scenarios passed

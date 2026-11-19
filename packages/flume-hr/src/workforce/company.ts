@@ -24,6 +24,7 @@ import { renderDeskContract } from "./desk";
 import { appendLifecycleLedger, readTombstones, tombstoneFor, type Tombstone } from "./lifecycle-state";
 import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, githubEvidence, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
+import { accessIssuanceReservation } from "./access-issuance";
 import { appendPlaneReceipt, isBoardArgument, planeBindingOf, planeBindingProblems, planeCredentialReport, planeEnrollmentPrerequisites, planeEvidence, verifyBoardViaPx, type PlaneBoardProof } from "./plane";
 import { withRegistryLock } from "./role";
 import { COMPANY_MAIL_DOMAIN, RESERVED_HANDLES, parseNamedAgentYaml, validateCompanyIdentity, validateNamedAgent, validateNamedAgentSchema } from "./validator";
@@ -167,6 +168,26 @@ function bindingKeys(block: CompanyIdentity | null): string[] {
 }
 
 const tombstoneBindingKeys = (tombstone: Tombstone): string[] => tombstone.bindings.map(b => `${b.provider}\u0000${b.instance ?? ""}\u0000${b.principal}`);
+
+/** Re-read the whole census and permanent reservations before an irreversible Access mutation. Caller holds registry lock. */
+export function accessRevocationConflict(subject: string, definition: string, principal: string, tokenId?: string): IdentityBlocker | undefined {
+  try {
+    const census = identityCensus();
+    const target = census.definitions.find(other => other.path === definition);
+    if (!target?.block || target.problem || target.block.subject !== subject) return { code: "access-owner-unverified", detail: "current employee definition cannot verify issuance ownership" };
+    const matches = (value: string) => Boolean(value && (value === principal || tokenId && value === tokenId));
+    for (const other of census.definitions) {
+      if (other.missing || other.problem) return { code: "access-owner-unverified", detail: "the whole identity census cannot be read; no Access delete authorized" };
+      if (other.path === definition) continue;
+      if (other.block?.subject === subject || matches(other.block?.bindings?.cloudflare_access?.principal ?? "")) return { code: "access-owner-conflict", detail: "another employee definition holds this Access identity; no delete authorized" };
+    }
+    for (const tombstone of readTombstones()) {
+      if (tombstone.subject === subject) continue;
+      if (tombstone.bindings.some(binding => binding.provider === "cloudflare_access" && matches(binding.principal))) return { code: "access-owner-conflict", detail: "another employee permanently reserves this Access identity; no delete authorized" };
+    }
+    return undefined;
+  } catch { return { code: "access-owner-unverified", detail: "identity census or permanent reservations unavailable; no Access delete authorized" }; }
+}
 
 /** Every reason this definition may not hold this handle. Reads the census and the retirement tombstones only. */
 function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: string): IdentityBlocker[] {
@@ -396,6 +417,11 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     for (const tombstone of tombstones) {
       if (tombstone.subject === target.block?.subject) continue;
       if (tombstoneBindingKeys(tombstone).includes(requestedKey)) blockers.push({ code: "binding-tombstoned", detail: `${provider} principal ${binding.principal} belonged to a retired employee (subject ${tombstone.subject}); it is never rebound` });
+    }
+    if (provider === "cloudflare_access" && target.block) {
+      const reservation = accessIssuanceReservation(binding.principal, target.block.subject);
+      if (reservation) blockers.push({ code: reservation, detail: "another subject's pending or uncertain Access issuance reserves this principal; owner-approved reconciliation required" });
+      for (const other of census.definitions) if (other.path !== target.path && (other.missing || other.problem)) blockers.push({ code: "invalid-definition", detail: "cannot verify Access ownership across the whole census", path: other.path });
     }
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider };
     if (blockers.length || !target.block) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], ...base };
