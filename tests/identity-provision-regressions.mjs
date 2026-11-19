@@ -134,12 +134,14 @@ const server = createServer((req, res) => {
     if (req.headers.authorization !== `Bearer ${CF_TOKEN}`) return send(403, { success: false, errors: [{ message: "bad token" }] });
     if (req.method === "GET" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
       const page = Number(url.searchParams.get("page") || "1"), size = cf.pageSize || 50;
-      const result = cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
-      return send(200, { success: true, result, ...(cf.noPageMetadata ? {} : { result_info: cf.inconsistentPages ? { total_pages: page === 1 ? 2 : 3 } : cf.clampedPageMetadata ? { per_page: size } : { total_pages: Math.max(1, Math.ceil(cf.tokens.length / size)) } }) });
+      if (cf.onTokenList) { const hook = cf.onTokenList; cf.onTokenList = undefined; hook(); }
+      const result = cf.samePageDuplicate ? [cf.tokens[0], cf.tokens[0]] : cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
+      return send(200, { success: true, result, ...(cf.samePageDuplicate ? { result_info: { total_pages: 1 } } : cf.noPageMetadata ? {} : { result_info: cf.inconsistentPages ? { total_pages: page === 1 ? 2 : 3 } : cf.clampedPageMetadata ? { per_page: size } : { total_pages: Math.max(1, Math.ceil(cf.tokens.length / size)) } }) });
     }
     if (req.method === "POST" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
       const token = { id: `token-${randomUUID().slice(0, 8)}`, name: JSON.parse(body).name, client_id: `${randomUUID().replace(/-/g, "")}.access`, client_secret: CREATED_SECRET, expires_at: "2027-10-13T00:00:00Z" };
       cf.tokens.push(token);
+      if (cf.onTokenCreate) { const hook = cf.onTokenCreate; cf.onTokenCreate = undefined; hook(token); }
       return ok(token);
     }
     const del = url.pathname.match(new RegExp(`^/accounts/${ACCOUNT}/access/service_tokens/([^/]+)$`));
@@ -168,7 +170,10 @@ const server = createServer((req, res) => {
     const kvMatch = url.pathname.match(new RegExp(`^/accounts/${ACCOUNT}/storage/kv/namespaces/${KVNS}/values/(.+)$`));
     if (kvMatch) {
       const key = decodeURIComponent(kvMatch[1]);
-      if (req.method === "GET") return cf.kv.has(key) ? send(200, cf.kv.get(key)) : send(404, { success: false, errors: [{ code: 10009, message: "key not found" }] });
+      if (req.method === "GET") {
+        if (cf.onAllowlistRead) { const hook = cf.onAllowlistRead; cf.onAllowlistRead = undefined; hook(); }
+        return cf.kv.has(key) ? send(200, cf.kv.get(key)) : send(404, { success: false, errors: [{ code: 10009, message: "key not found" }] });
+      }
       if (req.method === "PUT") { cf.kv.set(key, JSON.parse(body)); return ok({}); }
       if (req.method === "DELETE") { cf.kv.delete(key); return ok({}); }
     }
@@ -710,6 +715,144 @@ for (const failure of ["failDelete", "lieDelete"]) {
   assert.match(result.capabilities["access-token"].refs.receipt_comparison, /stranded-remote:deleted/u);
   cf.pageSize = undefined; cf.clampedPageMetadata = false;
   pass("later-page stranded token overrides historical deleted receipt; JSON preview reports actual provider match");
+}
+
+// -- Independent quality blockers: malformed inventory, cross-employee ownership, contradictory receipts --
+const fixtureBlock = name => YAML.parse(readFileSync(join(home, ".agents/workforce", name, "agent.yaml"), "utf8")).company_identity;
+const appendReceipt = row => writeFileSync(join(state, "receipts.jsonl"), readFileSync(join(state, "receipts.jsonl"), "utf8") + JSON.stringify(row) + "\n");
+const retained = async name => {
+  enrollFixture(name);
+  json(await runAsync(["identity", "provision", name, "--apply", "--json"], { OP_MODE: "unreadable" }), 1);
+  const token = cf.tokens.find(t => t.name === `employee-${name}`);
+  assert.ok(token);
+  return token;
+};
+const noTokenDelete = (before, token) => {
+  assert.ok(cf.tokens.some(t => t.id === token.id), "another employee's or quarantined token was deleted");
+  assert.ok(!calls.slice(before).some(c => c.method === "DELETE" && c.url.includes("service_tokens")), "unsafe Access DELETE attempted");
+};
+const bindFixture = (name, token, extra = {}) => {
+  const result = spawnSync(process.execPath, [cli, "identity", "bind", name, "cloudflare_access", "--principal", token.client_id, "--instance", ISSUER, "--credential-ref", "op://DeLoSecrets/item-fixture/secret", "--apply", "--json"], { env: { ...baseEnv, ...extra }, cwd: dir, encoding: "utf8", timeout: 30_000 });
+  cliArtifacts.push(result.stdout ?? "", result.stderr ?? "");
+  return result;
+};
+{
+  const token = await retained("duplicate-retained");
+  enrollFixture("duplicate-preflight");
+  assert.notEqual(cf.tokens[0].id, token.id);
+  cf.samePageDuplicate = true;
+  const before = calls.length;
+  for (const args of [[], ["--apply"]]) {
+    const result = json(await runAsync(["identity", "provision", "duplicate-preflight", ...args, "--json"]), 1);
+    assert.equal(result.capabilities["access-token"].action, "blocked");
+  }
+  const inventory = json(await runAsync(["identity", "credentials", "duplicate-retained", "--json"]));
+  const pending = inventory.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id);
+  assert.ok(pending && !["revoked", "not-issued"].includes(pending.status));
+  assert.equal(pending.read_back, undefined);
+  assert.equal(inventory.complete_revocation, false);
+  const result = json(await runAsync(["identity", "retire", "duplicate-retained", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "listing-incomplete"));
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.includes("service_tokens")));
+  noTokenDelete(before, token);
+  cf.samePageDuplicate = false;
+  pass("Q1 same-page duplicate IDs block preview/apply mint, retained inventory absence and false-clean retirement");
+}
+{
+  enrollFixture("duplicate-bound");
+  json(await runAsync(["identity", "provision", "duplicate-bound", "--apply", "--json"]));
+  const token = cf.tokens.find(t => t.name === "employee-duplicate-bound");
+  cf.failDelete = true;
+  json(await runAsync(["identity", "suspend", "duplicate-bound", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  cf.failDelete = false;
+  cf.samePageDuplicate = true;
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", "duplicate-bound", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "listing-incomplete"));
+  noTokenDelete(before, token);
+  cf.samePageDuplicate = false;
+  pass("Q1 malformed duplicate page blocks bound-token retry even with a remembered failed DELETE ID");
+}
+{
+  const token = await retained("reserved-issuance");
+  enrollFixture("reserved-recipient");
+  const rejected = json(bindFixture("reserved-recipient", token), 1);
+  assert.ok(rejected.blockers.some(b => b.code === "pending-issuance-reserved"));
+  assert.equal(fixtureBlock("reserved-recipient").bindings, undefined);
+  pass("Q2 normal CLI bind refuses another subject's pending Access issuance");
+}
+for (const ownerState of ["active", "suspended", "tombstone"]) {
+  const name = `owner-${ownerState}`, recipient = `recipient-${ownerState}`;
+  enrollFixture(recipient);
+  // Real CLI bind during issuance, before the minted journal line exists: also models pre-fix accepted bindings.
+  cf.onTokenCreate = token => json(bindFixture(recipient, token));
+  const token = await retained(name);
+  assert.equal(fixtureBlock(recipient).bindings.cloudflare_access.principal, token.client_id);
+  if (ownerState === "suspended") json(await runAsync(["identity", "status", recipient, "suspended", "--apply", "--json"]));
+  if (ownerState === "tombstone") {
+    json(await runAsync(["identity", "retire", recipient, "--revoke", "github", "--apply", "--json"]));
+    rmSync(join(home, ".agents/workforce", recipient), { recursive: true });
+    enrolledFixtures.splice(enrolledFixtures.indexOf(recipient), 1);
+  }
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "access-owner-conflict"));
+  assert.equal(result.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id)?.status, "unresolved");
+  noTokenDelete(before, token);
+  if (ownerState !== "tombstone") {
+    const recipientInventory = json(await runAsync(["identity", "credentials", recipient, "--json"]));
+    assert.equal(recipientInventory.credentials.find(r => r.kind === "access-service-token")?.status, "static-usable");
+  }
+  pass(`Q2 pending retirement preserves ${ownerState} owner's bound token and reports incomplete`);
+}
+{
+  const token = await retained("late-owner");
+  enrollFixture("late-recipient");
+  const before = calls.length;
+  cf.onAllowlistRead = () => {
+    assert.equal(fixtureBlock("late-owner").status, "retired", "race was not after status publication");
+    // Import a previously accepted binding through the real CLI with its old empty receipt projection.
+    json(bindFixture("late-recipient", token, { FLUME_PROVISION_STATE: join(dir, "old-receipt-projection") }));
+  };
+  const result = json(await runAsync(["identity", "retire", "late-owner", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.ok(result.steps.some(s => s.provider_code === "access-owner-conflict"));
+  assert.equal(result.complete_revocation, false);
+  noTokenDelete(before, token);
+  pass("Q2 re-reads census after status publication and provider listing before pending DELETE");
+}
+for (const variant of ["minted", "created", "deleted", "bound", "during-list", "deleted-client"]) {
+  const name = `contradictory-${variant}`, token = await retained(name);
+  const firstClient = token.client_id, block = fixtureBlock(name);
+  if (variant === "bound") json(bindFixture(name, token));
+  const contradictory = { employee: name, subject: block.subject, account_id: ACCOUNT, capability: "access-token", action: "minted", token_id: token.id, client_id: `changed-${variant}.access` };
+  token.client_id = contradictory.client_id;
+  if (variant === "during-list") cf.onTokenList = () => appendReceipt(contradictory);
+  else if (variant !== "deleted-client") appendReceipt(contradictory);
+  if (variant === "created") appendReceipt({ ...contradictory, action: "created" });
+  if (variant === "deleted" || variant === "deleted-client") appendReceipt({ ...contradictory, action: "deleted-orphan", deleted: true });
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]), variant === "during-list" ? 1 : 0);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "issuance-receipt-uncertain"));
+  assert.ok(result.credentials.some(r => r.provider_code === "issuance-receipt-uncertain" && r.status === "unverified"));
+  noTokenDelete(before, token);
+  // Contradiction stays quarantined on repeat even if the provider returns the original attribution or absence.
+  token.client_id = firstClient;
+  const again = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.equal(again.complete_revocation, false);
+  noTokenDelete(before, token);
+  pass(`Q3 ${variant}: contradictory scoped receipts quarantine Access deletion and prevent false completion`);
+}
+{
+  const name = "identical-receipts", token = await retained(name), block = fixtureBlock(name);
+  appendReceipt({ employee: name, subject: block.subject, account_id: ACCOUNT, capability: "access-token", action: "minted", token_id: token.id, client_id: token.client_id });
+  const result = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(result.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "done"));
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  pass("identical issuance receipts retain original attribution and allow verified retirement");
 }
 
 // -- no secret lands in any artifact ---------------------------------------------------------

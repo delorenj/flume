@@ -1,6 +1,8 @@
 {
-  "packages/flume-hr/src/workforce/provision.ts": "1801c1afe8690d085f1331c0bed35708e2870d77e96ac429d661a59fce697ca7",
-  "packages/flume-hr/src/workforce/lifecycle-adapters.ts": "7f184b03c8ac55ae1a4656b625fe52b0d2e50a776702e1f5103667054786e847",
-  "tests/identity-provision-regressions.mjs": "853ec52fd4b553578fd734fd8b9a018e3c4ba81303136befc9417af7fa219f70",
-  "docs/identity-provisioning.md": "f13cf687e466ff18a2710b2b3a30f0762fd0de26d1224e8805497d1852bcfb47"
+  "packages/flume-hr/src/workforce/access-issuance.ts": "e21df55dcb70aad2e66670876d4de77db29a48a8627ae24bb49621334bde4236",
+  "packages/flume-hr/src/workforce/company.ts": "d9ee9cb6b19355b804e4b48017334747b83c47a6ca02e66b1d65d0e966d5eb9d",
+  "packages/flume-hr/src/workforce/provision.ts": "f69678d490968b70eb6aec3f7eb0c21f40c435defc2268a4641f64ccadbd7307",
+  "packages/flume-hr/src/workforce/lifecycle-adapters.ts": "cf1978466c26ab2ddf6fa2458f299f139d1244fdbc8410c0f6252e7469356747",
+  "tests/identity-provision-regressions.mjs": "a2482eb047b604b870ec3786877758a56d81edfdc1bd6ae4902cb601604f7f65",
+  "docs/identity-provisioning.md": "83d74ae22982025d94f63ca42e63c2061543580b4f86dd6e900647d24009c90d"
 }

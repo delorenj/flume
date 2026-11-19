@@ -32,5 +32,19 @@ PASS repeated provider page blocks token mint instead of claiming inventory comp
 PASS inconsistent total_pages metadata blocks mint without claiming authoritative absence
 PASS bounded 100-page inventory fails closed without mint or unbounded provider reads
 PASS later-page stranded token overrides historical deleted receipt; JSON preview reports actual provider match
+PASS Q1 same-page duplicate IDs block preview/apply mint, retained inventory absence and false-clean retirement
+PASS Q1 malformed duplicate page blocks bound-token retry even with a remembered failed DELETE ID
+PASS Q2 normal CLI bind refuses another subject's pending Access issuance
+PASS Q2 pending retirement preserves active owner's bound token and reports incomplete
+PASS Q2 pending retirement preserves suspended owner's bound token and reports incomplete
+PASS Q2 pending retirement preserves tombstone owner's bound token and reports incomplete
+PASS Q2 re-reads census after status publication and provider listing before pending DELETE
+PASS Q3 minted: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 created: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 deleted: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 bound: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 during-list: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS Q3 deleted-client: contradictory scoped receipts quarantine Access deletion and prevent false completion
+PASS identical issuance receipts retain original attribution and allow verified retirement
 PASS all CLI JSON/stdout/stderr, receipts and definitions withhold secrets on success and every failure
-identity-provision-regressions: 35 passed
+identity-provision-regressions: 49 passed

@@ -53,7 +53,19 @@ unbound token against the complete provider listing rather than claiming
 (preview first, `--apply` only with lifecycle authority) can delete a pending
 issuance by its receipt ID only when the configured account and live provider
 name and client ID still match this employee's issuance record; it verifies
-absence with a fresh complete listing.
+absence with a fresh complete listing. Duplicate IDs anywhere in a listing,
+including within one page, make the inventory incomplete: no mint or claim of
+absence is allowed. Before any Access DELETE (including orphan cleanup), Flume
+re-reads the whole census and permanent retirement reservations under the registry
+lock. Another employee's binding or reservation blocks deletion, regardless of
+that employee's status. Normal `identity bind` also refuses a principal reserved
+by another subject's pending issuance; transferring it needs explicit reconciliation.
+
+Contradictory scoped receipts keep the first client-ID attribution and quarantine
+the employee's Access issuance journal. No pending or binding-scoped Access DELETE
+is authorized while it is uncertain, even if a later receipt says `created` or
+`deleted-orphan`. Inventory remains unverified and revocation incomplete; editing
+receipts is not an automatic recovery path.
 A failed DELETE remains incomplete and may be retried. Unscoped historical
 receipts, unreadable receipts, unknown named tokens and ownership mismatches
 stay unverified and never authorize a DELETE or complete-revocation claim.

@@ -31,7 +31,8 @@ import { isDeepStrictEqual } from "node:util";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { accessStateDir } from "./access";
 import { consumerOf, deskRefs, fleetBaseGatewayRef, gatewayRefShape, GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
-import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
+import { accessRevocationConflict, deskProfileOf, identityCensus, resolveEmployee, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
+import { withRegistryLock } from "./role";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS, planeBindingOf, planeEvidence, readPlaneReceipts, verifyBoardViaPx } from "./plane";
@@ -232,8 +233,10 @@ async function listAll<T extends { id: string }>(cf: { token: string }, path: st
     if (!cfOk(list)) return { ok: false, code: codeOf(list) };
     if (!Array.isArray(list.body?.result)) return { ok: false, code: "listing-incomplete" };
     const result = list.body.result as T[];
-    if (result.some(item => !item || typeof item.id !== "string" || !item.id || seen.has(item.id))) return { ok: false, code: "listing-incomplete" };
-    for (const item of result) { seen.add(item.id); items.push(item); }
+    for (const item of result) {
+      if (!item || typeof item.id !== "string" || !item.id || seen.has(item.id)) return { ok: false, code: "listing-incomplete" };
+      seen.add(item.id); items.push(item);
+    }
     const info = list.body?.result_info;
     const total = info?.total_pages, served = info?.per_page;
     if (total !== undefined && (!Number.isInteger(total) || total < page || total > MAX_PAGES || (expectedTotal !== undefined && total !== expectedTotal) || (result.length === 0 && (page > 1 || page < total)))) return { ok: false, code: "listing-incomplete" };
@@ -389,6 +392,27 @@ export const mailAdapter: LifecycleAdapter = {
 // cloudflare_access
 // ---------------------------------------------------------------------------
 
+/** Serialize Access revocation with binding writes and re-read after local status publication and provider reads. */
+async function accessMutation(ctx: LifecycleContext, action: (current: LifecycleContext) => Promise<StepOutcome>): Promise<StepOutcome> {
+  return withRegistryLock(ctx.census.registryPath, async () => {
+    const census = identityCensus(), target = resolveEmployee(census, ctx.employee);
+    if (target.problem || !target.block || target.block.subject !== ctx.block.subject || target.block.handle !== ctx.block.handle ||
+        !isDeepStrictEqual(target.block.bindings?.cloudflare_access, ctx.block.bindings?.cloudflare_access)) {
+      return { result: "unresolved", provider_code: "access-owner-unverified", detail: "Access binding or identity changed during lifecycle; no delete authorized" };
+    }
+    const cf = await cloudflareOf(ctx);
+    const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.ok ? cf.config.cloudflare.account_id : undefined);
+    if (pending.uncertain) return { result: "unresolved", provider_code: "issuance-receipt-uncertain", detail: "issuance history uncertain; no Access delete authorized" };
+    return action({ ...ctx, census, target, block: target.block });
+  });
+}
+
+function accessDeleteConflict(ctx: LifecycleContext, cf: { config: ProvisioningConfig }, principal: string, tokenId: string, pendingOnly = false): IdentityBlocker | undefined {
+  const history = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.config.cloudflare.account_id);
+  if (history.uncertain || (pendingOnly && (!history.token_ids.includes(tokenId) || history.client_ids[tokenId] !== principal))) return { code: "issuance-receipt-uncertain", detail: "issuance history changed or is uncertain; no Access delete authorized" };
+  return accessRevocationConflict(ctx.block.subject, ctx.target.path, principal, tokenId);
+}
+
 export const cloudflareAccessAdapter: LifecycleAdapter = {
   name: "cloudflare_access",
   blockers: () => [],
@@ -398,8 +422,8 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
     const base = { provider: "cloudflare_access" as const, kind: "access-service-token", static: true, evidence };
     const previous = rotatedAway(ctx, "cloudflare_access");
     const cf = await cloudflareOf(ctx);
-    const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.ok ? cf.config.cloudflare.account_id : undefined);
     const listed = cf.ok ? await listServiceTokens(cf) : undefined;
+    const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.ok ? cf.config.cloudflare.account_id : undefined);
     const named = listed?.ok ? listed.items.filter(token => token.name === `employee-${ctx.block.handle}`) : [];
     const rows: CredentialRow[] = [];
     if (!binding && !previous.length && !pending.token_ids.length && !pending.uncertain && listed?.ok && !named.length) return [{ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` }];
@@ -407,6 +431,8 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
     if (!binding && !listed?.ok && !pending.token_ids.length && !pending.uncertain) rows.push({ ...base, status: "unverified", provider_code: cf.ok ? listed?.code : cf.code, next_action: `flume identity credentials ${ctx.employee}` });
     for (const token of named.filter(token => !pending.token_ids.includes(token.id) && (!binding || token.client_id !== binding.principal))) rows.push({ ...base, kind: "unattributed-access-token", id: token.id, status: "unverified", provider_code: "issuance-not-attributed", next_action: "reconcile provider token with subject-scoped issuance receipts; name alone never authorizes deletion" });
     for (const id of pending.token_ids) {
+      const conflict = accessRevocationConflict(ctx.block.subject, ctx.target.path, pending.client_ids[id] ?? "", id);
+      if (conflict) { rows.push({ ...base, kind: "pending-access-issuance", id, status: "unresolved", provider_code: conflict.code, next_action: "reconcile the conflicting Access owner before any revocation", detail: conflict.detail }); continue; }
       if (listed?.ok && binding && listed.items.some(token => token.id === id && token.client_id === binding.principal && token.name === `employee-${ctx.block.handle}` && pending.client_ids[id] === token.client_id)) continue;
       const token = listed?.ok ? listed.items.find(candidate => candidate.id === id) : undefined;
       rows.push(staticRow({ ...base, kind: "pending-access-issuance", id, next_action: token
@@ -453,13 +479,15 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         if (token && (token.name !== `employee-${context.block.handle}` || pending.client_ids[id] !== token.client_id || (context.block.bindings?.cloudflare_access && context.block.bindings.cloudflare_access.principal !== token.client_id))) return null;
         return token ? [id] : [];
       },
-      async run(context) {
+      async run(ctx) { return accessMutation(ctx, async context => {
         const cf = await cloudflareOf(context);
         if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
         if (cf.config.cloudflare.account_id !== cfConfig?.cloudflare.account_id) return { result: "unresolved", provider_code: "account-mismatch", detail: "issuance account differs from configured account" };
         const listed = await listServiceTokens(cf);
         if (!listed.ok) return { result: "unresolved", provider_code: listed.code, detail: "could not list service tokens completely" };
         const token = listed.items.find(candidate => candidate.id === id);
+        const conflict = accessDeleteConflict(context, cf, pending.client_ids[id] ?? "", id, true);
+        if (conflict) return { result: "unresolved", provider_code: conflict.code, detail: conflict.detail };
         if (!token) return { result: "converged", detail: "retained token absent from complete provider listing", data: { resources: [] } };
         if (context.block.bindings?.cloudflare_access?.principal === token.client_id && token.name === `employee-${context.block.handle}` && pending.client_ids[id] === token.client_id)
           return { result: "converged", detail: "token is bound; the binding-scoped step owns its deletion", data: { resources: [] } };
@@ -470,9 +498,12 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         const verify = await listServiceTokens(cf);
         if (!verify.ok || verify.items.some(candidate => candidate.id === id)) return { result: "unresolved", provider_code: verify.ok ? "delete-not-effective" : verify.code, detail: "retained token absence not verified", data: { resources: [id] } };
         return { result: removed.http_status === 404 ? "converged" : "done", detail: "retained token absent from complete provider listing", data: { resources: [id] } };
-      },
+      }); },
     }));
-    if (pending.uncertain) pendingSteps.push(skipped({ key: "cloudflare_access:pending-issuance-uncertain", adapter: "cloudflare_access", action: "token-delete", resource: ctx.block.handle, description: "unscoped or unreadable issuance receipt needs manual reconciliation" }, "issuance-receipt-uncertain", "cannot safely authorize revocation from an unscoped or unreadable receipt"));
+    if (pending.uncertain) {
+      pendingSteps.push(skipped({ key: "cloudflare_access:pending-issuance-uncertain", adapter: "cloudflare_access", action: "token-delete", resource: ctx.block.handle, description: "uncertain issuance history needs manual reconciliation" }, "issuance-receipt-uncertain", "cannot safely authorize any Access revocation from uncertain issuance history"));
+      return pendingSteps;
+    }
     if (!binding) return pendingSteps;
     const key = `cloudflare_access:token-delete:${binding.principal}`;
     return [...pendingSteps, {
@@ -486,15 +517,17 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         const found = listed.items.find(candidate => candidate.client_id === binding.principal);
         return found ? [found.id] : [];
       },
-      async run(context) {
+      async run(ctx) { return accessMutation(ctx, async context => {
         const cf = await cloudflareOf(context);
         if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
         const remembered = (context.steps[key]?.data as { token_id?: string } | undefined)?.token_id;
         const listed = await listServiceTokens(cf);
-        if (!listed.ok && !remembered) return { result: "unresolved", provider_code: listed.code, detail: "could not list service tokens" };
+        if (!listed.ok && (!remembered || listed.code === "listing-incomplete")) return { result: "unresolved", provider_code: listed.code, detail: "could not list service tokens" };
         const found = listed.ok ? listed.items.find(candidate => candidate.client_id === binding.principal) : undefined;
         if (listed.ok && !found && !remembered) return { result: "converged", detail: "the service token is not at the provider", data: { resources: [] } };
         const id = found?.id ?? remembered!;
+        const conflict = accessDeleteConflict(context, cf, binding.principal, id);
+        if (conflict) return { result: "unresolved", provider_code: conflict.code, detail: conflict.detail };
         const removed = await cfRequest(cf.token, "DELETE", `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens/${id}`);
         const committed = cfOk(removed), absent = removed.http_status === 404;
         // The id is not a secret; keeping it lets a retry send the DELETE that a 500 left unanswered.
@@ -503,7 +536,7 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         if (!verify.ok) return { result: "unresolved", provider_code: verify.code, detail: "could not list service tokens to verify the delete", data: { token_id: id, resources: [id] } };
         if (verify.items.some(candidate => candidate.client_id === binding.principal)) return { result: "unresolved", provider_code: "delete-not-effective", detail: "the service token is still listed", data: { token_id: id, resources: [id] } };
         return { result: absent && !committed ? "converged" : "done", detail: "the service token is absent from the provider's listing", data: { token_id: id, resources: [id] } };
-      },
+      }); },
     }];
   },
   restorePlan: () => [],

@@ -23,8 +23,11 @@ import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
-import { bindEmployeeProvider, identityCensus, resolveEmployee, type IdentityBlocker, type IdentityDefinition } from "./company";
+import { pendingAccessIssuance, provisionStateDir } from "./access-issuance";
+export { pendingAccessIssuance, provisionStateDir } from "./access-issuance";
+import { accessRevocationConflict, bindEmployeeProvider, identityCensus, resolveEmployee, type IdentityBlocker, type IdentityDefinition } from "./company";
 import { provisioningConfigProblems, COMPANY_MAIL_DOMAIN } from "./validator";
+import { withRegistryLock } from "./role";
 
 export interface ProvisioningConfig {
   version: 1;
@@ -40,11 +43,6 @@ export interface CapabilityResult { action: CapabilityAction; detail: string; re
 
 export function provisioningConfigPath(): string {
   return process.env.FLUME_PROVISION_CONFIG || join(process.env.HOME || homedir(), ".config", "flume", "identity-provisioning.yaml");
-}
-
-export function provisionStateDir(): string {
-  const home = process.env.HOME || homedir();
-  return process.env.FLUME_PROVISION_STATE || join(process.env.XDG_STATE_HOME || join(home, ".local", "state"), "flume", "provision");
 }
 
 export function loadProvisioningConfig(path = provisioningConfigPath()): ProvisioningConfig {
@@ -228,8 +226,10 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     const list = await cfRequest(cfToken, "GET", `/accounts/${account_id}/access/service_tokens?per_page=50&page=${page}`);
     const result = list.body?.result as CfServiceToken[] | undefined;
     if (!cfOk(list) || !Array.isArray(result) || result.some(t => !t || typeof t.id !== "string" || !t.id || typeof t.name !== "string")) return stop("blocked", "cannot list service tokens completely (provider output withheld)");
-    if (result.some(t => seen.has(t.id))) return stop("blocked", "service-token inventory repeated an ID; reconcile by hand");
-    for (const token of result) { seen.add(token.id); tokens.push(token); }
+    for (const token of result) {
+      if (seen.has(token.id)) return stop("blocked", "service-token inventory repeated an ID; reconcile by hand");
+      seen.add(token.id); tokens.push(token);
+    }
     const info = list.body?.result_info;
     const total = info?.total_pages, served = info?.per_page;
     if (total !== undefined && (!Number.isInteger(total) || total < page || total > 100 || (expectedTotal !== undefined && total !== expectedTotal) || (result.length === 0 && (page > 1 || page < total)))) return stop("blocked", "service-token pagination metadata inconsistent; reconcile by hand");
@@ -294,13 +294,21 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
       return { action: "created", detail: `token ${token.id} vaulted and bound`, refs: { token_id: token.id, item_id: home.id } };
     } catch (error) {
       if (error instanceof AccessPersistenceError && error.cleanupSafe) {
-        const removed = await cfRequest(cfToken, "DELETE", `/accounts/${account_id}/access/service_tokens/${token.id}`);
-        const check = await cfRequest(cfToken, "GET", `/accounts/${account_id}/access/service_tokens/${token.id}`);
-        const deleted = cfOk(removed) && check.http_status === 404;
-        const action = deleted ? "deleted-orphan" : "cleanup-unconfirmed";
-        let recorded = true;
-        try { receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action, token_id: token.id, deleted }); } catch { recorded = false; }
-        return { action: "blocked", changed: true, detail: `vault write failed; orphan token ${token.id} ${deleted ? "deleted (provider absence verified)" : "cleanup FAILED or unconfirmed — owner reconciliation required"}${recorded ? "" : "; receipt write failed"}`, refs: { token_id: token.id, item_id: home.id } };
+        return withRegistryLock(identityCensus().registryPath, async () => {
+          const census = identityCensus(), target = resolveEmployee(census, block.handle);
+          const history = pendingAccessIssuance(block.handle, block.subject, account_id);
+          if (history.uncertain || !history.token_ids.includes(token.id) || history.client_ids[token.id] !== token.client_id ||
+              target.block?.bindings?.cloudflare_access || accessRevocationConflict(block.subject, target.path, token.client_id, token.id)) {
+            return { action: "blocked", changed: true, detail: "orphan ownership or issuance history uncertain; token retained for owner reconciliation", refs: { token_id: token.id, item_id: home.id } };
+          }
+          const removed = await cfRequest(cfToken, "DELETE", `/accounts/${account_id}/access/service_tokens/${token.id}`);
+          const check = await cfRequest(cfToken, "GET", `/accounts/${account_id}/access/service_tokens/${token.id}`);
+          const deleted = cfOk(removed) && check.http_status === 404;
+          const action = deleted ? "deleted-orphan" : "cleanup-unconfirmed";
+          let recorded = true;
+          try { receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action, token_id: token.id, deleted }); } catch { recorded = false; }
+          return { action: "blocked", changed: true, detail: `vault write failed; orphan token ${token.id} ${deleted ? "deleted (provider absence verified)" : "cleanup FAILED or unconfirmed — owner reconciliation required"}${recorded ? "" : "; receipt write failed"}`, refs: { token_id: token.id, item_id: home.id } };
+        });
       }
       let recorded = true;
       try { receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action: "reconciliation-required", token_id: token.id, item: home.id, deleted: false }); } catch { recorded = false; }
@@ -308,48 +316,6 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     }
   };
   return { plan, apply };
-}
-
-export interface PendingAccessIssuance { token_ids: string[]; client_ids: Record<string, string>; uncertain: boolean }
-/** Secret-free issuance journal. A minted ID remains pending until an authoritative deletion or a binding accounts for it. */
-export function pendingAccessIssuance(handle: string, subject: string, accountId?: string): PendingAccessIssuance {
-  const path = join(provisionStateDir(), "receipts.jsonl");
-  if (!existsSync(path)) return { token_ids: [], client_ids: {}, uncertain: false };
-  try {
-    const pending = new Set<string>();
-    const clientIds: Record<string, string> = {};
-    const accounted = new Set<string>();
-    let uncertain = false;
-    let any = false;
-    for (const text of readFileSync(path, "utf8").split("\n")) {
-      if (!text.trim()) continue;
-      const row = JSON.parse(text);
-      if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("invalid issuance receipt");
-      if (row.employee !== handle || row.capability !== "access-token") continue;
-      any = true;
-      if (row.subject !== subject || !accountId || row.account_id !== accountId || typeof row.token_id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(row.token_id)) {
-        // Historical unscoped receipts may help diagnosis, but cannot authorize a DELETE.
-        if (row.action === "minted" || row.action === "reconciliation-required" || row.action === "cleanup-unconfirmed" || (row.subject === subject && row.account_id)) uncertain = true;
-        continue;
-      }
-      if (row.action === "created") {
-        if (pending.has(row.token_id) && (!clientIds[row.token_id] || clientIds[row.token_id] === row.client_id)) { pending.delete(row.token_id); accounted.add(row.token_id); }
-        else uncertain = true;
-      } else if (row.action === "deleted-orphan" && row.deleted === true) {
-        if (!pending.has(row.token_id)) uncertain = true;
-        pending.delete(row.token_id);
-        accounted.add(row.token_id);
-      } else if (row.action === "minted" || row.action === "reconciliation-required" || row.action === "cleanup-unconfirmed") {
-        if (row.action === "minted" && accounted.has(row.token_id)) uncertain = true;
-        if (row.action === "minted" && typeof row.client_id === "string" && row.client_id) {
-          if (clientIds[row.token_id] && clientIds[row.token_id] !== row.client_id) uncertain = true;
-          clientIds[row.token_id] = row.client_id;
-        }
-        pending.add(row.token_id);
-      }
-    }
-    return { token_ids: [...pending], client_ids: Object.fromEntries([...pending].filter(id => clientIds[id]).map(id => [id, clientIds[id]!])), uncertain: uncertain || !accountId && any };
-  } catch { return { token_ids: [], client_ids: {}, uncertain: true }; }
 }
 
 /** Whitelist outcomes/IDs from existing receipts; never echo historical free-form reasons. */

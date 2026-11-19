@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-19T08:19:06.980Z",
+  "at": "2026-11-19T09:13:58.427Z",
   "base": "f85a126835ce3f4a4b5f30198b949d865a9b54b6",
   "evidence": "isolated-fixture; no live provider/vault reads or mutations",
   "results": [
@@ -9,7 +9,7 @@
       "env": {},
       "exit": 0,
       "signal": null,
-      "duration_ms": 4856,
+      "duration_ms": 3291,
       "log": "typecheck.txt"
     },
     {
@@ -18,7 +18,7 @@
       "env": {},
       "exit": 0,
       "signal": null,
-      "duration_ms": 303,
+      "duration_ms": 275,
       "log": "build.txt"
     },
     {
@@ -27,7 +27,7 @@
       "env": {},
       "exit": 0,
       "signal": null,
-      "duration_ms": 158,
+      "duration_ms": 87,
       "log": "baseline-build.txt"
     },
     {
@@ -39,7 +39,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 1886,
+      "duration_ms": 1443,
       "log": "baseline-reproduction.txt"
     },
     {
@@ -48,8 +48,20 @@
       "env": {},
       "exit": 0,
       "signal": null,
-      "duration_ms": 32987,
+      "duration_ms": 55219,
       "log": "provision.txt"
+    },
+    {
+      "name": "direct-company-identity-lifecycle",
+      "command": "node tests/company-identity-lifecycle-regressions.mjs",
+      "env": {
+        "FLUME_HOST_OVERLAY": "",
+        "HERMES_FLEET_ENV": ""
+      },
+      "exit": 0,
+      "signal": null,
+      "duration_ms": 146353,
+      "log": "direct-company-identity-lifecycle.txt"
     },
     {
       "name": "company-identity-lifecycle",
@@ -59,7 +71,7 @@
       },
       "exit": 1,
       "signal": null,
-      "duration_ms": 5127,
+      "duration_ms": 4750,
       "log": "company-identity-lifecycle.txt"
     },
     {
@@ -70,7 +82,7 @@
       },
       "exit": 1,
       "signal": null,
-      "duration_ms": 7803,
+      "duration_ms": 6638,
       "log": "employee-access-lifecycle.txt"
     },
     {
@@ -81,7 +93,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 19379,
+      "duration_ms": 17225,
       "log": "company-identity.txt"
     },
     {
@@ -92,7 +104,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 14077,
+      "duration_ms": 11449,
       "log": "registry-lifecycle-projection.txt"
     },
     {
@@ -103,7 +115,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 6899,
+      "duration_ms": 4866,
       "log": "company-identity-registry-plane.txt"
     },
     {
@@ -114,7 +126,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 46938,
+      "duration_ms": 40602,
       "log": "company-identity-plane.txt"
     },
     {
@@ -126,7 +138,7 @@
       },
       "exit": 1,
       "signal": null,
-      "duration_ms": 4860,
+      "duration_ms": 4496,
       "log": "baseline-company-identity-lifecycle.txt"
     },
     {
@@ -138,7 +150,7 @@
       },
       "exit": 1,
       "signal": null,
-      "duration_ms": 6982,
+      "duration_ms": 6220,
       "log": "baseline-employee-access-lifecycle.txt"
     },
     {
@@ -150,7 +162,7 @@
       },
       "exit": 0,
       "signal": null,
-      "duration_ms": 18482,
+      "duration_ms": 15507,
       "log": "baseline-company-identity.txt"
     },
     {
