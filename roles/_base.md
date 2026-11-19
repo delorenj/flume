@@ -40,6 +40,15 @@ You **MUST NOT** invent new event `type` values. Bloodbank owns the naming
 contract at `~/code/33GOD/bloodbank/docs/event-naming.md` —
 read it before publishing a type you haven't published before.
 
+## Hand over files as links, never local paths
+
+The operator is usually remote, so a path on this machine is useless to them. Publish every file
+you produce with the `artifacts` skill and give the public https URL from its verified receipt:
+`python3 ~/.agents/skills/artifacts/scripts/publish.py <file-or-dir> --name <name>`. Video goes
+through the same command to `https://v.delo.sh` with a player page. When you have several versions
+or samples to choose between, publish them as one gallery so the operator can watch each and pick:
+`publish.py --gallery <name> a.mp4::Label b.mp4::Label`.
+
 ## Close the loop: diagnosis needs a next step
 
 When you identify a problem, mismatch or surprising behavior, do not end with
