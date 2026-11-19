@@ -31,7 +31,6 @@ import { isDeepStrictEqual } from "node:util";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { accessStateDir } from "./access";
 import { consumerOf, deskRefs, fleetBaseGatewayRef, gatewayRefShape, GATEWAY_TOKENS_ITEM, type GatewayRefSource } from "./gateway-desk";
-import { hostVaultName } from "../kernel/host-overlay";
 import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
@@ -736,14 +735,9 @@ interface GatewayDesk {
   ref?: string; source?: GatewayRefSource; consumer?: string;
   shape: "ok" | "none" | "bad";
   shared: boolean;
-  /** The generated config disagrees with a render of the delta (and base), or cannot be read: what the render would run. */
+  /** The generated desk reference is also the specialist launcher reference. */
   drift?: { ref?: string; source?: "delta" | "base"; consumer?: string; unreadable: boolean };
-  /** A portable specialist only: the reference `launchSpecialist` injects whatever the desk maps. */
-  launcher?: string;
 }
-
-/** `launchSpecialist` reads this reference (not the FLUME-39 shape) and injects it whatever the desk config says. */
-const launcherRef = (target: IdentityDefinition, profile: string | null): string => `op://${hostVaultName()}/hermes-${target.person ?? profile ?? "unknown"}/credential`;
 
 function gatewayDesk(ctx: Pick<LifecycleContext, "census" | "target" | "env">): GatewayDesk {
   const fleet = fleetHome(ctx.census, ctx.env);
@@ -753,7 +747,6 @@ function gatewayDesk(ctx: Pick<LifecycleContext, "census" | "target" | "env">): 
   const pending = consumerOf(refs.predicted.ref);
   const extra = {
     ...(refs.drift ? { drift: { ...refs.predicted, ...(pending ? { consumer: pending } : {}), unreadable: refs.unreadable } } : {}),
-    ...(ctx.target.kind === "specialist" ? { launcher: launcherRef(ctx.target, profile) } : {}),
   };
   const ref = refs.running.ref;
   if (!ref) return { profile, shape: "none", shared: false, ...extra };
@@ -783,24 +776,6 @@ function gatewayRefusals(desk: GatewayDesk): IdentityBlocker[] {
   if (desk.shared) out.push({ code: "shared-consumer", detail: `the desk runs on ${desk.consumer ? `consumer ${desk.consumer}` : `reference ${desk.ref}`}${desk.source ? ` (from its ${desk.source === "base" ? "fleet base" : desk.source} config)` : ""}, which is shared with the fleet base or another desk; revoking it would cut them off too. Mint this employee a dedicated token first (FLUME-39), or name only the other adapters (--revoke cloudflare_access --revoke github)` });
   if (desk.drift) out.push({ code: "gateway-ref-drift", detail: desk.drift.unreadable ? "the desk's generated config.yaml cannot be read, so the gateway key it runs is unknown; repair and re-render it first" : `the desk's generated config.yaml runs ${desk.ref ?? "no gateway reference"}, but a render of its ${desk.drift.source === "delta" ? "config.delta.yaml" : desk.drift.source === "base" ? "fleet base" : "delta and the fleet base"} would run ${desk.drift.ref ?? "none"}; re-render the desk (gateway-member-tokens.py --render, or flume onboard) and restart its gateway so the key revoked is the key it runs` });
   return out;
-}
-
-/**
- * Does the vault item behind the specialist launcher's reference exist? `op item get <title> --vault <v> --format json` WITHOUT
- * `--reveal`, so concealed fields stay concealed; only the exit status and op's own "isn't an item" refusal are used, the
- * output is discarded unread, and the key itself is never read (`op read` is the launcher's alone).
- */
-function launcherItem(ctx: Pick<LifecycleContext, "cache">, ref: string): "present" | "absent" | "ambiguous" | "unreadable" {
-  return memoSync(ctx, `launcher-item:${ref}`, () => {
-    const [, vault, title] = /^op:\/\/([^/]+)\/([^/]+)\//u.exec(ref) ?? [];
-    if (!vault || !title) return "unreadable";
-    const got = op(["item", "get", title, "--vault", vault, "--format", "json"]);
-    if (got.ok) return "present";
-    // Two live spellings: an interactive session says "isn't an item"; the DeLoSecrets service account says "Found 0 item(s) in vault ... with title ..." (seen live by the FLUME-53 canary).
-    if (/isn't an item|found 0 item\(s\)/iu.test(got.stderr)) return "absent";
-    if (/more than one item/iu.test(got.stderr)) return "ambiguous";
-    return "unreadable";
-  });
 }
 
 function runGateway(env: NodeJS.ProcessEnv, args: string[]): { ok: true; stdout: string } | { ok: false; code: string } {
@@ -837,14 +812,10 @@ export const gatewayAdapter: LifecycleAdapter = {
     const rows: CredentialRow[] = [];
     const sharedFields = desk.shared ? { shared_consumer: true } : {};
     if (desk.shape === "none") {
-      // A post with no key anywhere has no gateway token. A specialist's launcher key is its own row below, and a drifted
-      // desk's pending key is the drift row: neither is `not-issued`.
-      if (!desk.launcher && !desk.drift) rows.push({ ...base, status: "not-issued", next_action: "FLUME-39 mints a per-employee gateway token; neither this desk nor the fleet base maps one" });
+      if (!desk.drift) rows.push({ ...base, status: "not-issued", next_action: "FLUME-39 mints a per-employee gateway token; neither this desk nor the fleet base maps one" });
     } else if (desk.shape === "bad") {
-      if (desk.ref !== desk.launcher) {
-        rows.push({ ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), ...sharedFields, status: "unverified", provider_code: "gateway-ref-shape",
-          next_action: `FLUME-39 owns the gateway reference shape (${gatewayRefShape()})`, ...(desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) });
-      }
+      rows.push({ ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), ...sharedFields, status: "unverified", provider_code: "gateway-ref-shape",
+        next_action: `FLUME-39 owns the gateway reference shape (${gatewayRefShape()})`, ...(desk.shared ? { detail: "the desk runs on the fleet base gateway reference" } : {}) });
     } else {
       const consumer = desk.consumer!;
       const row = { ...base, ref: desk.ref, ...(desk.source ? { ref_source: desk.source } : {}), id: consumer, consumer, ...sharedFields };
@@ -883,17 +854,6 @@ export const gatewayAdapter: LifecycleAdapter = {
         status: "unverified", provider_code: "gateway-ref-drift", detail: gatewayRefusals({ ...desk, shared: false })[0]!.detail,
         next_action: `re-render the desk (gateway-member-tokens.py --render, or flume onboard), restart its gateway, then flume identity credentials ${ctx.employee}; until then --revoke gateway is refused (gateway-ref-drift)` });
     }
-    if (desk.launcher) {
-      const ref = desk.launcher, item = launcherItem(ctx, ref);
-      const row = { ...base, ref, ref_source: "launcher" as const };
-      if (item === "absent") rows.push({ ...row, status: "not-issued", detail: "the vault has no item behind the launcher's reference: the launcher reference is dead (launchSpecialist refuses to start without it), so it injects no key", next_action: "none: no key exists at the launcher's reference" });
-      else if (item === "unreadable") rows.push({ ...row, status: "unresolved", provider_code: "vault-unavailable", detail: "the vault could not say whether the launcher's item exists", next_action: `flume identity credentials ${ctx.employee}` });
-      // Nothing proves the launcher's key is the desk's consumer without reading the key, which the lifecycle never does: it is
-      // usable and unproven while its item exists, so revoking the desk's consumer never makes the gateway complete on its own.
-      else rows.push({ ...row, status: "unverified", provider_code: item === "ambiguous" ? "launcher-ref-ambiguous" : "launcher-ref-unproven",
-        detail: `launchSpecialist injects this reference as AUTOMATICAI_GATEWAY_KEY whatever the desk maps; it is not the FLUME-39 shape, so its consumer cannot be named, proven equal to ${desk.consumer ? `the desk's consumer ${desk.consumer}` : "a desk consumer"} or revoked here${item === "ambiguous" ? " (more than one vault item has this title)" : ""}`,
-        next_action: `FLUME-39 owns the specialist's gateway key: map the launcher to the employee's own consumer, or delete the vault item behind ${ref} (the launcher then refuses to start); flume identity credentials ${ctx.employee} re-probes` });
-    }
     return rows;
   },
   plan(ctx, options) {
@@ -905,7 +865,7 @@ export const gatewayAdapter: LifecycleAdapter = {
     if (refusals.length) {
       // Reached only through `--revoke all`: a named `--revoke gateway` was refused by blockers() before any call.
       steps.push(skipped({ ...target, description: `not revoked: ${refusals.map(r => r.code).join(", ")}` }, refusals[0]!.code, refusals.map(r => r.detail).join("; ")));
-    } else if (desk.shape === "bad" && desk.ref !== desk.launcher) {
+    } else if (desk.shape === "bad") {
       steps.push(skipped({ ...target, description: `not revoked: ${desk.ref} is not the FLUME-39 shape` }, "gateway-ref-shape", `the desk's reference ${desk.ref} is not ${gatewayRefShape()}: no consumer can be named, so nothing can be revoked (FLUME-39 owns the shape)`));
     } else if (desk.shape === "ok") {
       const consumer = desk.consumer!;
@@ -928,11 +888,6 @@ export const gatewayAdapter: LifecycleAdapter = {
           return { result: count && Number(count[1]) === 0 ? "converged" : "done", detail: "gateway status lists no tokens", data: { resources } };
         },
       });
-    }
-    // A specialist's launcher key is never revoked here: say so in the step list, not only in its row.
-    if (desk.launcher && launcherItem(ctx, desk.launcher) !== "absent") {
-      steps.push(skipped({ key: `gateway:launcher-key:${desk.launcher}`, adapter: "gateway", action: "launcher-key", resource: desk.launcher, description: "not revoked: the specialist launcher's own key" },
-        "launcher-ref-unproven", `launchSpecialist injects ${desk.launcher}, which is not the FLUME-39 shape: its consumer cannot be named or revoked here (FLUME-39 owns it)`));
     }
     return steps;
   },

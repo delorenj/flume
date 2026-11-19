@@ -468,18 +468,11 @@ while its token is live -- never `not-issued`, so `complete_revocation` stays fa
 `shared-consumer` before any provider call; `--revoke all` reports it as a `skipped` step and revokes everything else. Only a desk with
 no key anywhere is `not-issued`.
 
-*Specialists.* `launchSpecialist` always injects `op://DeLoSecrets/hermes-<employee>/credential` as `AUTOMATICAI_GATEWAY_KEY`, whatever
-the desk maps, and the child it starts has no `OP_*` token to resolve the desk's own mapping. A specialist therefore always gets a
-SEPARATE `ref_source: launcher` row besides its desk's: while the vault item exists it is `unverified` (`launcher-ref-unproven`;
-`launcher-ref-ambiguous` when several items share the title), because nothing proves which consumer that key belongs to without
-reading it, so revoking the desk's own FLUME-39 consumer never completes the gateway on its own; once the item is gone the launcher
-reference is dead (the launcher refuses to start) and the row is `not-issued`. The item is probed with
-`op item get hermes-<employee> --vault DeLoSecrets --format json` WITHOUT `--reveal`: existence only, the output discarded unread; the
-key itself is never read. A `--revoke gateway` on a specialist also reports a `skipped` `gateway:launcher-key:<ref>` step while the
-item exists. FLUME-39 owns the fix (point the launcher at the employee's own consumer); this story changes neither the launcher nor
-its reference.
+*Specialists.* Initial hire projects the deterministic FLUME-39 shared-item field into the desk and Flume confirms/mints that consumer through the maintained `gateway-tokens.py` authority before marking hire complete. The launcher reads the generated profile's reference, resolves it in memory and gives the child only that member key; it never falls back to a separately named launcher item or a fleet key. A missing or unreadable member field refuses launch. Existing desks with a legacy launcher reference require an explicit operator migration; do not silently revoke an unknown shared key.
 
-Flume never mints or rotates gateway tokens (FLUME-39, `gateway-tokens.py`). Every gateway row and result carries
+*Retirement.* Do not revoke credentials merely because a local record is retired. For a proven, unshared employee consumer, `flume identity retire <e> --revoke all --apply` uses the maintained gateway authority, verifies `status` is empty, and reports residual/partial revocation. Otherwise inspect the inventory, use `python3 ~/code/client-portal/gateway/ops/gateway-tokens.py status <consumer>` and `revoke <consumer>` (or the authority's expiry/rotation operation), verify both the gateway and vault, and only then claim revocation. A never-expiring `--days -1` member key does not time out on its own. The hire helper cannot rotate or revoke.
+
+FLUME-39 provisions on hire through `gateway-tokens.py`. Every gateway row and result carries
 `owner_ticket: FLUME-39`, `evidence_path` (`FLUME_GATEWAY_EVIDENCE`, default `_bmad-output/implementation-artifacts/FLUME-39`) and
 `evidence_status`, which is `unverified` until that evidence exists.
 
