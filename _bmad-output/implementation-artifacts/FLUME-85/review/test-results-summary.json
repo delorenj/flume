@@ -1,0 +1,38 @@
+[
+  {
+    "label": "charter",
+    "exit": 0,
+    "stdout_tail": "",
+    "stderr_tail": "...\n----------------------------------------------------------------------\nRan 3 tests in 0.001s\n\nOK\n"
+  },
+  {
+    "label": "hire-static",
+    "exit": 0,
+    "stdout_tail": "",
+    "stderr_tail": "..\n----------------------------------------------------------------------\nRan 2 tests in 0.002s\n\nOK\n"
+  },
+  {
+    "label": "hire-behavioral",
+    "exit": 0,
+    "stdout_tail": "nge\nPASS unreadable-catalog: built hire preflight refuses before any provisioning or operator data change\nPASS built hire refuses invalid canonical fleet data before Copier or any fixture mutation\nPASS real Copier task failure exits nonzero, names the cause and never claims hire completion\nPASS arbitrary repo role SOUL drift is detected, not a vacuous PM-only pass\nPASS failed hire and failed onboard cannot complete without gateway; successful recovery converges\n\n24 role hire check groups passed\n",
+    "stderr_tail": ""
+  },
+  {
+    "label": "registry-projection",
+    "exit": 0,
+    "stdout_tail": "registry lifecycle projection regressions: all assertions passed\n",
+    "stderr_tail": ""
+  },
+  {
+    "label": "typecheck",
+    "exit": 0,
+    "stdout_tail": "\n> flume@1.0.0 typecheck\n> npm run typecheck --workspaces --if-present\n\n\n> @delorenj/flume-core@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json\n\n\n> @delorenj/flume-hr@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json\n\n",
+    "stderr_tail": ""
+  },
+  {
+    "label": "profile-inheritance",
+    "exit": 1,
+    "stdout_tail": "",
+    "stderr_tail": "the gateway/. Input:\n\n'Main, auxiliary, delegated, fallback and MoA inference gateway audit: 0 of 0 members carry their own token, 0 use the fleet token; 0 routing issue(s)'\n\n    at file:///home/delorenj/code/33GOD/flume/tests/hermes-profile-inheritance-regressions.mjs:648:10\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 'Main, auxiliary, delegated, fallback and MoA inference gateway audit: 0 of 0 members carry their own token, 0 use the fleet token; 0 routing issue(s)',\n  expected: /Main, auxiliary, delegated, fallback and MoA inference route through the gateway/,\n  operator: 'match',\n  diff: 'simple'\n}\n\nNode.js v26.5.0\n"
+  }
+]

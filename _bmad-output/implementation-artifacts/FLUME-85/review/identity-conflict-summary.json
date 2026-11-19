@@ -1,0 +1,11 @@
+{
+  "control_exit": 1,
+  "without_target_summary": "12 unpermitted identity conflict group(s)",
+  "with_target_summary": "16 unpermitted identity conflict group(s)",
+  "introduced_details": [
+    "agents.{agent_id}.plane.identifier 33GOD is claimed by 33god-art-director, 33god-pm",
+    "agents.{agent_id}.project_path ~/code/33GOD is claimed by 33god-art-director, 33god-pm",
+    "agents.{agent_id}.repo 33god is claimed by 33god-art-director, 33god-pm",
+    "projects.{slug}.slug 33god is claimed by 33god-art-director, 33god-pm"
+  ]
+}

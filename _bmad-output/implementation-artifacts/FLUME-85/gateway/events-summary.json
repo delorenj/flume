@@ -1,0 +1,29 @@
+[
+  {
+    "id": "6dfd88b1-b2ea-5650-9f2f-4aa8ef2a6b97",
+    "type": "bloodbank.agent.invocation.queued",
+    "time": "2026-11-19T07:51:11.664764Z",
+    "command_id": "7beb8253-9d0f-4913-8524-31493b3b3cc7",
+    "correlationid": "a7dea30c-61a3-4184-a5e4-ece8eafed008",
+    "error_code": null,
+    "error_message": null
+  },
+  {
+    "id": "6be5954f-c96c-58ba-8f64-a7b96a08bdd5",
+    "type": "bloodbank.agent.invocation.started",
+    "time": "2026-11-19T07:51:11.756161Z",
+    "command_id": "7beb8253-9d0f-4913-8524-31493b3b3cc7",
+    "correlationid": "a7dea30c-61a3-4184-a5e4-ece8eafed008",
+    "error_code": null,
+    "error_message": null
+  },
+  {
+    "id": "3a85cbd7-592b-5e0a-8d6b-850eed713965",
+    "type": "bloodbank.agent.invocation.failed",
+    "time": "2026-11-19T07:51:11.862915Z",
+    "command_id": "7beb8253-9d0f-4913-8524-31493b3b3cc7",
+    "correlationid": "a7dea30c-61a3-4184-a5e4-ece8eafed008",
+    "error_code": "final_answer_capture_unavailable_before_dispatch",
+    "error_message": "Hermes final-answer capture capability is unavailable"
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "review": "FLUME-85 independent final review",
+  "verdict": "Employee-specific FLUME-85 acceptance passes; host-wide audit is not green. Operator ruling remains for four newly introduced unpermitted identity-conflict groups. No board/production writes or actual Bloodbank delegation were performed by this reviewer.",
+  "landed": {
+    "flume_head_origin_main": "32f4894ac01ffd523852fc4fd8f4f90036f64df4",
+    "parent_head_origin_main": "989ba0657cb01f02fdd75b451107948803f3c595",
+    "scope": "Flume history 0c165291^..HEAD and parent 1f5aeb8^..HEAD inspected. Scope-owned paths had no current worktree edits. Other people's unrelated tracked/untracked changes remain untouched. Both FLUME-85 feature worktree heads are ancestors of main and their worktrees report no local changes. Parent git diff --check across history reports one trailing blank line at agents/hermes/art-director/.scripts/sentinel.prompt.md:181; Flume historical diff --check was clean."
+  },
+  "employee": {
+    "checks": "All 19 selected live checks true; registry row declares unique 33god-art-director / art-director, reports to 33god-pm, advisory board scope and no project_id/board_id claim, purpose names 33god-platform/atlas. Canonical project_path /home/delorenj/code/33GOD; role_dir /home/delorenj/code/33GOD/agents/hermes/art-director; generated terminal.cwd /home/delorenj/code/33GOD. Maintained renderer expected config equals generated config. Runtime/SOUL.md matches tracked SOUL.md. Profile is a real directory, role-owned symlinks resolve to canonical runtime, runtime is gitignored/untracked and has no .git, gateway state serves both PM and director, no director-specific retired units installed. The kanban.db symlink target was observed absent, but singleton audit passes; not evidence of production activity.",
+    "generated_bloodbank_toolsets": [
+      "delegation",
+      "skills",
+      "todo",
+      "session_search",
+      "terminal",
+      "file",
+      "web"
+    ],
+    "declared_behavior": "roles/art-director.md behavior.delegate_all_code_changes is YAML true. workforce/role.ts:45-47 accepts that flag as a delegating capability in addition to legacy pm/em/director titles. The new board scope is advisory. Atlas brief is explicitly queued; design system, page or artwork not delivered or authorized; role/brief preserve public-only export and manual privacy review.",
+    "actual_ingress_consumer": "Bundled and invoked Bloodbank integrations/n8n-nodes-bloodbank/src/fleet.ts resolveFleetAgentForBoard against live registry, board 15258893-0206-4e8f-aea6-340eb217988c, workspace 33god. Empty, art-director, repo:atlas and lifecycle:review labels all route to 33god-pm (eligible=true, matchedBy=board). This is a read-only invocation, not a message dispatch."
+  },
+  "audits": {
+    "scoped_command": "node packages/flume-hr/dist/index.js audit /home/delorenj/code/33GOD --agent 33god-art-director --rules hermes.pm-scaffold,hermes.runtime-singleton,hermes.registry-parity,hermes.bloodbank-toolsets --json",
+    "scoped_result": "exit 0, ok=true, hostOk=false, four rules PASS (one scaffold verified), zero details. Only four explicitly supported employee-scopable rules; --agent without --rules, --agent with org.identity-conflict, and missing declared employee are refused nonzero, so this cannot stand in for a global audit.",
+    "negative_controls": "Isolated scratch fleet, real checked-in CLI: generated list missing delegation/terminal/file => hermes.bloodbank-toolsets FAIL (exit 1); stale registry purpose and obsolete role_dir => hermes.registry-parity FAIL with both details (exit 1). A malformed role capability type exits 1 with NamedAgentValidationError but no JSON audit report: fail-closed, not a trustworthy typed finding; not present in live declaration.",
+    "aggregate": "Unscoped node packages/flume-hr/dist/index.js audit /home/delorenj/code/33GOD --json exits 1, ok=false, hostOk=false. Failures include PM scaffold (20), PM runtime singleton (13), other fleet Bloodbank toolsets (11), gateway-routing base (3), delta-list override (12), registry parity (3), org.identity-conflict (16); warnings also exist. None of these should be called host green merely because employee-scoped four pass."
+  },
+  "findings": [
+    {
+      "severity": "operator-ruling-needed; does not prove PM ingress theft",
+      "title": "Hire adds four unpermitted host identity conflict groups",
+      "evidence": "org.identity-conflict unscoped FAIL reports 16 groups. A read-only control re-auditing the same live fleet with only the art-director row removed from a scratch registry reports 12 groups. Newly introduced are agents.{agent_id}.plane.identifier 33GOD, agents.{agent_id}.project_path ~/code/33GOD, agents.{agent_id}.repo 33god, projects.{slug}.slug 33god, each shared by 33god-art-director and 33god-pm. src/parity/reconcile.ts:866-894 treats all unpermitted groups as fail; handbook permits explicit operator classification, not silent suppression. Runtime board ownership test still routes PM; do not automatically edit either employee's identity or weaken the rule."
+    },
+    {
+      "severity": "test coverage caveat; outside FLUME-85 behavior",
+      "title": "Profile-inheritance regression suite is red due to stale gateway fixture expectation",
+      "evidence": "tests/hermes-profile-inheritance-regressions.mjs exits 1 at line 648; expected /Main, auxiliary, delegated, fallback and MoA inference route through the gateway/, actual 'Main, auxiliary, delegated, fallback and MoA inference gateway audit: 0 of 0 members carry their own token, 0 use the fleet token; 0 routing issue(s)'. Its fixture has no registry members for that case (test file:158-226); do not claim this suite passed. This is a summary-contract mismatch, not evidence that the Art Director lacks delegation."
+    },
+    {
+      "severity": "low; broader audit robustness",
+      "title": "Malformed role capability crashes JSON audit before structured finding",
+      "evidence": "Scratch negative control replacing boolean delegate_all_code_changes with string true exited 1, stdout empty, stderr NamedAgentValidationError: Schema validation failed: must be boolean. Live declaration is boolean true and its scoped audit passes. The CLI does not falsely pass, but consumers requiring JSON cannot see a structured finding for invalid declarations."
+    }
+  ],
+  "verification": "Charter 3/3, Atlas hire static 2/2, role hire behavioral 24/24 check groups, registry lifecycle projection all assertions, TypeScript typecheck pass. Dist source map compared with 90 local sources and no mismatches. Actual production delegation was separately owned and not exercised here.",
+  "receipts": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume85-independent-final/ (scoped-live-audit.json, aggregate-live-audit.json, live-verification.json, audit-consumer-and-routing.json, identity-conflict-control.json, test-results.json)",
+  "writes": "Only review scripts and receipts under /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/. No production/fleet/board/repository file written by this reviewer."
+}
