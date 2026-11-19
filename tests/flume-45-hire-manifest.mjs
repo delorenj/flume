@@ -79,8 +79,9 @@ async function fixture(label,shape,extra={}) {
 }
 
 try {
-  for(const shape of ['absent','empty']) {
-    const f=await fixture(shape,shape);
+  for(const shape of ['absent','empty','shadow','managed']) {
+    const extra=['shadow','managed'].includes(shape) ? {execution:{mode:shape}} : {};
+    const f=await fixture(shape,shape,extra);
     const result=f.run();
     assert.equal(result.status,0,`${shape}: ${result.error?.message??''}\n${result.stdout}\n${result.stderr}`);
     const role=YAML.parse(readFileSync(join(f.repo,'agents/hermes/pm/role.yaml'),'utf8'));
@@ -105,14 +106,16 @@ try {
   assert.deepEqual(Object.fromEntries(Object.entries(actual).filter(([key])=>key!=='agents')),Object.fromEntries(Object.entries(beforeExisting).filter(([key])=>key!=='agents')));
   pass('existing provisioned agent and unrelated project fields preserved');
 
-  const preview=await fixture('dry-run','absent');
-  const before=readFileSync(join(preview.repo,'.project.json'),'utf8');
-  const planned=preview.run('--dry-run');
-  assert.equal(planned.status,0,`${planned.stdout}\n${planned.stderr}`);
-  assert.equal(readFileSync(join(preview.repo,'.project.json'),'utf8'),before);
-  assert.equal(existsSync(join(preview.repo,'agents/hermes/pm/role.yaml')),false);
-  assert.equal(existsSync(preview.blockedLog),false);
-  pass('public dry run leaves project manifest byte-identical');
+  for (const mode of [undefined,'shadow','managed']) {
+    const preview=await fixture(`dry-run-${mode??'absent'}`,'absent',mode ? {execution:{mode}} : {});
+    const before=readFileSync(join(preview.repo,'.project.json'),'utf8');
+    const planned=preview.run('--dry-run');
+    assert.equal(planned.status,0,`${planned.stdout}\n${planned.stderr}`);
+    assert.equal(readFileSync(join(preview.repo,'.project.json'),'utf8'),before);
+    assert.equal(existsSync(join(preview.repo,'agents/hermes/pm/role.yaml')),false);
+    assert.equal(existsSync(preview.blockedLog),false);
+  }
+  pass('public dry run leaves absent/shadow/managed project manifests byte-identical');
 
   const blockedWrite=await fixture('write-failure','empty');
   const manifestPath=join(blockedWrite.repo,'.project.json');

@@ -6,6 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
+import { obsoleteScaffoldScripts, scaffoldScriptsHaveSafeParents } from "../scaffold/obsolete";
 import { readRoleDeclaration, roleDelegatesWorkers, auditRoleSkills, projectRoleDeclaration, retiredRole, withRegistryLock } from "../workforce/role";
 import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
@@ -1307,7 +1308,7 @@ function renderSentinelPrompt(role: RoleMeta, templateRoleDir: string): string {
 
 function copyMissingRecursive(sourceDir: string, targetDir: string, changedFiles: string[], dryRun: boolean, skip?: (source: string) => boolean): void {
   if (!existsSync(sourceDir)) return;
-  mkdirSync(targetDir, { recursive: true });
+  if (!dryRun) mkdirSync(targetDir, { recursive: true });
   for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
     const sourcePath = join(sourceDir, entry.name);
     if (skip?.(sourcePath)) continue;
@@ -3182,6 +3183,9 @@ return [
           const shown = relative(ctx.repoRoot, join(role.roleDir, ...finding.path.split("/")));
           details.push(`${prefix}: ${word} ${shown}${finding.detail ? ` (${finding.detail})` : ""}`);
         }
+        for (const obsolete of obsoleteScaffoldScripts(ctx.repoRoot, role.roleDir, templateRoleDir)) {
+          details.push(`${prefix}: ${obsolete.detail} ${relative(ctx.repoRoot, join(role.roleDir, obsolete.path))}${obsolete.removable ? " (remove with hermes.pm-scaffold)" : " (preserved)"}`);
+        }
         // SOUL CONTENT, not presence. The shared scaffold core treats SOUL.md
         // as presence-only by contract (`contracts/handbook.yaml`), which is
         // why a soul two template generations stale audited as PASS. The
@@ -3222,6 +3226,10 @@ return [
         .filter((rel) => rel !== "sentinel.prompt.md.jinja");
       for (const role of selection.roles) {
         const prefix = role.agentId || role.role;
+        if (!scaffoldScriptsHaveSafeParents(ctx.repoRoot, role.roleDir)) {
+          preserved.push(`${prefix}: preserved unsafe scaffold parent directory`);
+          continue;
+        }
         if (!scriptsOnly) {
           const retirement = retireRuntimeSubmodule(ctx.repoRoot, role, changedFiles, ctx.dryRun);
           details.push(...retirement.details);
@@ -3266,6 +3274,16 @@ return [
           writeIfDifferent(join(role.roleDir, ".gitignore"), readText(join(templateRoleDir, ".gitignore.jinja")).replace(/\{\{\s*role\s*\}\}/g, role.role), ctx.dryRun, changedFiles);
           copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, ".runtime-scaffold"), changedFiles, ctx.dryRun);
           copyMissingRecursive(join(templateRoleDir, ".runtime-scaffold"), join(role.roleDir, "runtime"), changedFiles, ctx.dryRun);
+        }
+        for (const obsolete of obsoleteScaffoldScripts(ctx.repoRoot, role.roleDir, templateRoleDir)) {
+          if (!obsolete.removable) {
+            preserved.push(`${prefix}: preserved ${obsolete.path} (${obsolete.detail})`);
+            continue;
+          }
+          const target = join(role.roleDir, obsolete.path);
+          changedFiles.push(target);
+          details.push(`${prefix}: ${ctx.dryRun ? "would remove" : "removed"} obsolete template-owned ${obsolete.path}`);
+          if (!ctx.dryRun) unlinkSync(target);
         }
         for (const rel of managedScripts) {
           const source = join(templateRoleDir, ".scripts", rel);

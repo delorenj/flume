@@ -1,4 +1,3 @@
-import { validateExecutionBinding, executionReadiness } from "../kernel/executionBinding";
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join, dirname, relative } from "node:path";
@@ -46,7 +45,7 @@ export function scrubInteractiveChannelCredentials(env: NodeJS.ProcessEnv): void
   delete env.WIRE_SLACK;
 }
 
-function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: string, renderedAgentId: unknown): void {
+export function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: string, renderedAgentId: unknown): void {
   const manifestPath = join(ctx.targetDir, ".project.json");
   if (!existsSync(manifestPath)) return;
   const expectedAgentId = ctx.agentId ?? deriveAgentId(ctx.targetRepo!, role);
@@ -60,7 +59,6 @@ function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: s
     throw new Error(`${manifestPath} must contain a JSON object`);
   }
   const manifest = parsed as Record<string, unknown>;
-  validateExecutionBinding(manifest);
   const rawAgents = manifest.agents;
   if (rawAgents !== undefined && (!rawAgents || typeof rawAgents !== "object" || Array.isArray(rawAgents))) {
     throw new Error(`${manifestPath} agents must contain a JSON object`);
@@ -71,7 +69,6 @@ function registerRenderedAgent(ctx: HermesAgentContext, roleDir: string, role: s
       role,
       role_dir: relative(ctx.targetDir, roleDir),
       provisioning_state: "provisioned",
-      ...((manifest as any).execution ? { execution_readiness: executionReadiness(manifest), execution_mode: (manifest as any).execution.mode } : {}),
     },
     configurable: true,
     enumerable: true,

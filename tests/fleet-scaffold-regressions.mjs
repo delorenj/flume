@@ -852,6 +852,22 @@ try {
     for (const observation of agent.observations) assert.equal(observation.next_action_class, "read-only");
   });
 
+  check("a removed retired helper is not unexpected-owned while a real extra still is", () => {
+    const repo = join(reposRoot, "droppings");
+    const path = join(repo, "agents/hermes/pm/.scripts/lifecycle.sh");
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "historical helper fixture\n");
+    gitOk(repo, ["add", "--", "agents/hermes/pm/.scripts/lifecycle.sh"]);
+    gitOk(repo, ["commit", "--quiet", "-m", "historical helper"]);
+    rmSync(path);
+    const data = status(cliAt(mainRoot, [...STATUS_ARGS, "--agent", "droppings-pm"]));
+    const scripts = itemsOf(groupOf(agentNamed(data, "droppings-pm"), "scaffold.scripts"));
+    assert.equal(scripts.some(item => item.path === ".scripts/lifecycle.sh"), false);
+    assert.ok(scripts.some(item => item.path === ".scripts/.done-70-systemd" && item.kind === "unexpected-owned"));
+    gitOk(repo, ["add", "--", "agents/hermes/pm/.scripts/lifecycle.sh"]);
+    gitOk(repo, ["commit", "--quiet", "-m", "remove historical helper"]);
+  });
+
   check("ignored runtime, untracked notes and a foreign tracked file are counted, never named; only the WIP overlap is", () => {
     const data = status(cliAt(mainRoot, STATUS_ARGS));
     const agent = agentNamed(data, "wip-pm");

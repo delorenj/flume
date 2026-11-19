@@ -734,7 +734,11 @@ export async function collectScaffoldParity(ctx: FleetScaffoldContext): Promise<
       ));
     }
     const extras = classifyExtras({
-      trackedPaths: scan.tracked,
+      trackedPaths: scan.tracked.filter((path) => {
+        if (path !== ".scripts/lifecycle.sh" && path !== ".scripts/managed-execution.py") return true;
+        try { lstatSync(join(scan.roleDir!, path)); return true; }
+        catch (error) { return (error as NodeJS.ErrnoException).code !== "ENOENT"; }
+      }),
       ownedPaths,
       groups: manifest.groups,
       runtimeDir: manifest.runtime_dir,
