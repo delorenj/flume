@@ -46,6 +46,7 @@ import {
 import { writeStdout } from "../utils/stdout";
 import { buildOrgChart, formatOrgChart } from "./tree";
 import { readLiveState, readTickets } from "./live";
+import { placeSpecialist } from "../workforce/place";
 
 const VALIDATE_COMMAND = "fleet.contract.validate";
 const INVENTORY_COMMAND = "fleet.inventory";
@@ -502,8 +503,8 @@ export function registerOrgCli(program: Command): void {
 
   // `org` is the HIERARCHY; `roster` is the flat list. They were the same command
   // until 2026-09-20 (org was a bare alias), which is why no org chart existed.
-  program.command("org")
-    .description("The org chart: who reports to whom, from the top down (read-only)")
+  const org = program.command("org")
+    .description("The org chart: who reports to whom, from the top down")
     .option("--agent-registry <path>", "Read this agent registry instead of the configured one")
     .option("--org <path>", "Read this hierarchy file instead of ~/.hermes/org.yaml")
     .option("--json", "Emit the chart as JSON")
@@ -530,6 +531,26 @@ export function registerOrgCli(program: Command): void {
         ]);
         try { await write(envelope, json, () => formatFleetErrorReport("Org chart failed", normalized)); }
         catch { await emitLastResort(ORG_COMMAND); }
+      }
+    });
+
+  org.command("place")
+    .description("Declare a portable specialist's placement in an existing department (preview unless --apply)")
+    .argument("<employee>", "Owned portable specialist id")
+    .requiredOption("--department <id>", "Existing department id")
+    .option("--reports-to <id>", "Existing employee id or org CEO; otherwise use department manager")
+    .option("--title <text>", "Org persona title")
+    .option("--apply", "Publish the owning definition and refresh the employee")
+    .option("--json", "Output machine-parseable JSON")
+    .action(async (employee: string, options: { department: string; reportsTo?: string; title?: string; apply?: boolean; json?: boolean }, command: Command) => {
+      ignoreBrokenPipe();
+      const json = Boolean(options.json || command.parent?.opts().json);
+      try {
+        const result = await placeSpecialist(employee, options);
+        await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : `${employee}: ${result.apply ? "placed" : "placement preview"} ${JSON.stringify(result.to)}\n`);
+      } catch (error) {
+        await writeStdout(json ? `${JSON.stringify({ ok: false, error: (error as Error).message })}\n` : `Placement refused: ${(error as Error).message}\n`);
+        process.exitCode = 1;
       }
     });
 

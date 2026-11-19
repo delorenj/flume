@@ -82,6 +82,7 @@ const SUITES = [
   "tests/role-contract-regressions.mjs",
   "tests/named-agent-contract-regressions.ts",
   "tests/specialist-hire-regressions.mjs",
+  "tests/specialist-placement-regressions.mjs",
   "tests/persona-update-regressions.mjs",
   "tests/fleet-profile-regressions.mjs",
   "tests/fleet-systemd-regressions.mjs",

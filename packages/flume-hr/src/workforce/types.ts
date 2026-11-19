@@ -34,6 +34,11 @@ export interface NamedAgentContract {
   /** Optional TTS voice slug; overrides the fleet vox_voice default in the projection. */
   voice?: string;
   memory: AgentMemoryBinding;
+  /** Optional placement in an existing org department. */
+  department?: string;
+  reports_to?: string;
+  /** Optional org persona title, distinct from the employee's display name. */
+  title?: string;
   desk?: AgentDeskManifest;
   /** Requires schema_version 2; see contracts/company-identity.schema.json. */
   company_identity?: CompanyIdentity;

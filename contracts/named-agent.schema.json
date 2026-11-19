@@ -54,6 +54,9 @@
       "type": "object", "additionalProperties": false, "required": ["path"],
       "properties": {"path": {"type": "string", "minLength": 1}}
     },
+    "department": {"$ref": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/role.schema.json#/properties/department"},
+    "reports_to": {"$ref": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/role.schema.json#/properties/reports_to"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"},
     "company_identity": {"$ref": "https://raw.githubusercontent.com/delorenj/flume/main/contracts/company-identity.schema.json"}
   }
 }

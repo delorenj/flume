@@ -1,4 +1,4 @@
-import {existsSync, readFileSync, writeFileSync, mkdirSync, lstatSync, realpathSync} from "node:fs";
+import {existsSync, readFileSync, mkdirSync, lstatSync} from "node:fs";
 import {join, dirname, resolve} from "node:path";
 import {homedir} from "node:os";
 import {spawnSync} from "node:child_process";
@@ -6,6 +6,7 @@ import YAML from "yaml";
 import {resolveFlumeRoot} from "../kernel/paths";
 import {withFileLock} from "../kernel/file-lock";
 import {resolveAgentRegistryPath} from "../kernel/fleet-paths";
+import {placementProblems, projectPlacement} from "./placement";
 import {validateRoleDeclaration, type RoleDeclaration} from "./validator";
 import {applyRoleSelection, auditRoleSelection, planRoleSelection, preflightRoleSelection, previewRoleSelection, resolveRoleLoadout, roleSelectionManifest, type RoleSelectionPreview, type RoleSelectionResult, type SelectionContext} from "./selection";
 import type {ResolvedSkill, ValidationOptions} from "./types";
@@ -84,18 +85,10 @@ export function gatewayCatalog(options:RoleProjectionOptions={}): Set<string> {
   return new Set((raw.routes ?? raw).map((r:any)=>typeof r==="string"?r:r.id));
 }
 export function declarationProblems(role:RoleDeclaration, employee:string, options:RoleProjectionOptions={}): string[] {
-  const {registry,org}=paths(options), agents=read(registry).agents ?? {}, chart=read(org), departments=chart.departments ?? [];
-  const ceo=chart.ceo?.id;
+  const {registry,org}=paths(options);
   const problems:string[]=[];
   if(!role.department) problems.push(`${employee}: no department declared`);
-  const department=departments.find((d:any)=>d.id===role.department);
-  if(role.department && !department) problems.push(`${employee}: department ${role.department} absent from org.yaml`);
-  const superior=role.reports_to ?? department?.manager;
-  if(!superior) problems.push(`${employee}: reports_to absent and department ${role.department} has no manager`);
-  else if(superior!==ceo && !(superior in agents)) problems.push(`${employee}: reports_to ${superior} absent from registry or org CEO`);
-  const edges={...Object.fromEntries(Object.entries(agents).map(([id,row])=>[id,(row as any).reports_to])),[employee]:superior};
-  const seen=new Set<string>(); let cursor:string|undefined=employee;
-  while(cursor) {if(seen.has(cursor)){problems.push(`${employee}: reporting cycle ${[...seen,cursor].join(" -> ")}`);break;}seen.add(cursor);cursor=edges[cursor];}
+  problems.push(...placementProblems(employee,role,{registry,org},false));
   if(role.skills) {try {roleSelectionManifest(role.skills);} catch(error){problems.push(`${employee}: ${(error as Error).message}`);}}
   if(role.chain) {
     try {const catalog=gatewayCatalog(options);for(const route of role.chain) if(!catalog.has(route)) problems.push(`${employee}: chain route ${route} absent from gateway catalog`);}
@@ -103,21 +96,6 @@ export function declarationProblems(role:RoleDeclaration, employee:string, optio
   }
   return problems;
 }
-function updateDocument(path:string, edit:(doc:ReturnType<typeof YAML.parseDocument>)=>void, allowOrgLink=false) {
-  // The fleet org chart is deliberately a link into flume/org/org.yaml. Resolve
-  // only that documented link; write the target in place so the link and YAML
-  // comments survive. Every other projection still refuses a source symlink.
-  if(existsSync(path)&&lstatSync(path).isSymbolicLink()) {
-    if(!allowOrgLink) throw new Error(`Refusing source symlink ${path}`);
-    path=realpathSync(path);
-    if(!lstatSync(path).isFile()) throw new Error(`Org symlink target must be a regular file: ${path}`);
-  }
-  const before=existsSync(path)?readFileSync(path,"utf8"):"";
-  const doc=YAML.parseDocument(before||"{}\n",{uniqueKeys:true});
-  if(doc.errors.length) throw new Error(doc.errors[0]!.message);
-  edit(doc);const after=String(doc);if(after!==before){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,after);}
-}
-/** The same projection runs on hire and onboard. Never writes the fleet base. */
 export async function withRegistryLock<T>(path:string, action:()=>Promise<T>):Promise<T> {
   mkdirSync(dirname(path),{recursive:true});
   const lock=path+'.lock';
@@ -160,19 +138,6 @@ async function projectUnlocked(input:unknown, employee:string, profile:string, o
     {input:JSON.stringify({chain:role.chain,strict_skills:Boolean(role.skills)}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
   if(configured.status!==0) throw new Error(`Role config projection failed: ${configured.stderr}`);
   const selection=plan ? await applyRoleSelection(profile,plan,selected) : null;
-  updateDocument(p.registry,doc=>{doc.setIn(["agents",employee,"department"],role.department);doc.setIn(["agents",employee,"reports_to"],superior);});
-  updateDocument(p.org,doc=>{
-    const departments=doc.get("departments",true);
-    if(!YAML.isSeq(departments)) throw new Error("org departments must be a list");
-    for(const item of departments.items) {
-      if(!YAML.isMap(item)) continue;
-      let members=item.get("members",true);
-      if(!YAML.isSeq(members)) {if(item.get("id")!==role.department)continue;item.set("members",[]);members=item.get("members",true);}
-      if(YAML.isSeq(members)) {
-        for(let i=members.items.length-1;i>=0;i--) if(String(members.items[i])===employee&&item.get("id")!==role.department) members.delete(i);
-        if(item.get("id")===role.department&&item.get("manager")!==employee&&!members.items.some(x=>String(x)===employee)) members.add(employee);
-      }
-    }
-  },true);
+  projectPlacement(employee,{department:role.department!,reports_to:role.reports_to},{registry:p.registry,org:p.org});
   return {department:role.department,reports_to:superior,skills,selection,...JSON.parse(configured.stdout)};
 }

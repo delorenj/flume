@@ -13,6 +13,7 @@ import { provisionDesk, renderDeskContract, resolveDeskPath } from "./desk";
 import { readRoleIdentity } from "./identity";
 import { employeeAccessEnv, employeeChildEnv } from "./launcher";
 import { withRegistryLock } from "./role";
+import { placementProblems, placementDrift, projectPlacement, resolvedSuperior } from "./placement";
 import { applyRoleSelection, auditRoleSelection, planRoleSelection, previewRoleSelection, type SelectionContext } from "./selection";
 import { validateNamedAgent } from "./validator";
 import { specialistSchedulingRequest } from "./scheduling";
@@ -62,7 +63,7 @@ function environment(options: PolicyContext = {}) {
   const selection: SelectionContext = { home, hermesRoot, skillexRoot: process.env.PJ_SKILLS_REGISTRY_ROOT || join(home, "code/skillex"), stateHome: process.env.XDG_STATE_HOME || join(home, ".local/state") };
   return { home, hermesRoot, registryPath, fleetBin, selection };
 }
-async function prepare(definitionPath: string, expectedEmployee?: string, options: PolicyContext = {}) {
+async function prepare(definitionPath: string, expectedEmployee?: string, options: PolicyContext = {}, checkPlacement = true) {
   const p = environment(options);
   const source = resolve(definitionPath);
   safe(source);
@@ -88,7 +89,12 @@ async function prepare(definitionPath: string, expectedEmployee?: string, option
     const other = readRoleIdentity(YAML.stringify({ identity: definition.identity }), "", "");
     if (other.state !== "named" || !isDeepStrictEqual(other, identity)) throw new Error("identity and memory disagree");
   }
-  return { ...p, definition, bytes, source, desk, profile, plan, identity };
+  const placement = { registry: p.registryPath, org: process.env.HERMES_ORG_PATH || join(p.hermesRoot, "org.yaml") };
+  if (checkPlacement && (definition.department || definition.reports_to || definition.title)) {
+    const problems = placementProblems(definition.id, definition, placement, false);
+    if (problems.length) throw new Error(problems.join("; "));
+  }
+  return { ...p, definition, bytes, source, desk, profile, plan, identity, placement };
 }
 type Prepared = Awaited<ReturnType<typeof prepare>>;
 function projection(p: Prepared, check: boolean) {
@@ -193,7 +199,7 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
     bloodbankContinuity(p);
     const preview = projection(p, true);
     await profileOwnership(p);
-    if (options.dryRun) return { ok: true, dryRun: true, id: p.definition.id, desk: p.desk, profile: p.profile, projection: preview, selection: await previewRoleSelection(p.definition.id, p.plan, p.selection) };
+    if (options.dryRun) return { ok: true, dryRun: true, id: p.definition.id, desk: p.desk, profile: p.profile, projection: preview, placement: p.definition.department ? { department: p.definition.department, reports_to: resolvedSuperior(p.definition as { department: string; reports_to?: string }, p.placement), title: p.definition.title } : null, selection: await previewRoleSelection(p.definition.id, p.plan, p.selection) };
     let started = false;
     try {
       mkdirSync(p.desk, { recursive: true });
@@ -248,9 +254,10 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
           }
         }
       });
+      const placementChanged = p.definition.department ? projectPlacement(p.definition.id, { department: p.definition.department, reports_to: p.definition.reports_to, title: p.definition.title }, p.placement) : false;
       const completionChanged = write(markerPath, JSON.stringify({ ...marker, status: "complete" }, null, 2) + "\n");
       return { ok: true, id: p.definition.id, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks,
-        skills: p.plan.skills.map(s => s.name), changed: definitionChanged || contractChanged || completionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
+        skills: p.plan.skills.map(s => s.name), changed: placementChanged || definitionChanged || contractChanged || completionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
     } catch (error) {
       throw new Error(`${started ? "Partial specialist projection; inspect owned state and retry onboard" : "Specialist refused before projection"}: ${(error as Error).message}`);
     }
@@ -261,11 +268,15 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
 export async function auditSpecialist(employee: string) {
   if (!/^[a-z0-9][a-z0-9_-]{0,57}$/u.test(employee)) throw new Error("Unsafe employee identity");
   const { home } = environment();
-  const p = await prepare(join(home, ".agents/workforce", employee, "agent.yaml"), employee);
+  const p = await prepare(join(home, ".agents/workforce", employee, "agent.yaml"), employee, {}, false);
   const marker = ownership(p, false);
   if (marker.status !== "complete") throw new Error("Incomplete specialist publication: desk marker is pending");
   const config = projection(p, true);
   const problems = [...config.changed.map(file => `Profile projection differs: ${file}`), ...await auditRoleSelection(employee, p.profile, p.definition.skills, p.selection)];
+  if (p.definition.department || p.definition.reports_to || p.definition.title) {
+    try { problems.push(...placementDrift(employee, p.definition, p.placement)); }
+    catch (error) { problems.push(`Placement unreadable: ${(error as Error).message}`); }
+  }
   if (deskContractDiffers(p)) problems.push("Desk contract differs: contract.yaml");
   for (const skill of p.plan.skills) {
     const link = join(p.desk, ".agents/skills", skill.name);
@@ -319,6 +330,8 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
   // The employment record decides identity and memory routing: a record that disagrees with the
   // definition is refused for the operator to look at, never rewritten on the way to a launch.
   const recordDrift = audited.problems.some(problem => /^Record differs/u.test(problem));
+  const placementFault = audited.problems.some(problem => problem.startsWith("Placement unreadable:") || problem.startsWith(`${employee}: `));
+  if (placementFault) throw new Error(`Specialist launch refused: ${audited.problems.join("; ")}`);
   if (!audited.ok && !recordDrift) {
     // Ordinary use drifts a desk: a Hermes run re-dumps its YAML, a fleet base or catalog edit moves
     // the projection. Converge through the same onboarding refresh an operator would run; it still
