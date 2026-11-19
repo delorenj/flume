@@ -1,4 +1,5 @@
 // Target one configured application policy; never infer policy ownership from a name.
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { cfOk, cfRequest, opRead, type ProvisioningConfig } from "./provision";
 
@@ -46,8 +47,11 @@ const writable = (policy: Policy): Record<string, unknown> => {
   return body;
 };
 
+export const policyWritableDigest = (policy: Policy): string => createHash("sha256").update(JSON.stringify(writable(policy))).digest("hex");
+
 /** Re-read immediately before editing and verify the entire writable policy, not merely a successful PUT. */
-export async function reconcileAccessPolicy(config: ProvisioningConfig, ids: string[], present: boolean, apply: boolean) {
+export async function reconcileAccessPolicy(config: ProvisioningConfig, ids: string[], present: boolean, apply: boolean,
+  beforeWrite?: (expectedDigest: string, baselineDigest: string) => void) {
   const before = await readAccessPolicy(config);
   if (!before.ok) return { ...before, changed: false };
   const wanted = new Set(ids);
@@ -58,6 +62,8 @@ export async function reconcileAccessPolicy(config: ProvisioningConfig, ids: str
   if (isDeepStrictEqual(include, before.policy.include)) return { ok: true as const, changed: false, code: present ? "membership-present" : "membership-absent" };
   if (!apply) return { ok: true as const, changed: true, code: present ? "membership-add-planned" : "membership-remove-planned" };
   const expected = { ...writable(before.policy), include };
+  // Persist the intended full writable state before PUT: a crash or committed-but-error response remains inspectable.
+  beforeWrite?.(policyWritableDigest({ ...before.policy, include }), policyWritableDigest(before.policy));
   const put = await cfRequest(before.token, "PUT", before.path, expected);
   // Even an error may have committed. Report partial/uncertain, and let the next invocation observe convergence.
   if (!cfOk(put) || put.body?.success !== true) return { ...failure(codeOf(put.http_status), detailOf(put.http_status)), changed: true };

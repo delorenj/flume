@@ -141,7 +141,8 @@ const server = createServer((req, res) => {
       if (cf.policyDenied || (req.method === "PUT" && cf.policyWriteDenied)) return send(403, { success: false, errors: [{ message: POLICY_TOKEN + CREATED_SECRET }] });
       if (cf.policyUnavailable) return send(503, { success: false, errors: [{ message: POLICY_TOKEN }] });
       if (url.pathname === `/accounts/${ACCOUNT}/access/apps/${POLICY_CONFIG.application_id}` && req.method === "GET") return ok({ id: POLICY_CONFIG.application_id, domain: cf.wrongDomain ? "wrong.example" : POLICY_CONFIG.domain });
-      if (url.pathname === `/accounts/${ACCOUNT}/access/apps/${POLICY_CONFIG.application_id}/policies/${POLICY_CONFIG.policy_id}`) {
+      if (url.pathname === `/accounts/${ACCOUNT}/access/apps/${POLICY_CONFIG.application_id}/policies/${POLICY_CONFIG.policy_id}` && req.method === "GET" && cf.originalPolicy) return ok(cf.originalPolicy);
+      if (url.pathname === `/accounts/${ACCOUNT}/access/apps/${POLICY_CONFIG.application_id}/policies/${cf.policy.id}`) {
         if (req.method === "GET") {
           if (cf.policyMissing) return send(404, { success: false });
           return ok(cf.policy);
@@ -159,6 +160,7 @@ const server = createServer((req, res) => {
     }
     if (req.headers.authorization !== `Bearer ${CF_TOKEN}`) return send(403, { success: false, errors: [{ message: "bad token" }] });
     if (req.method === "GET" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
+      if (cf.listOutages) { cf.listOutages--; return send(503, { success: false }); }
       const page = Number(url.searchParams.get("page") || "1"), size = cf.pageSize || 50;
       if (cf.onTokenList) { const hook = cf.onTokenList; cf.onTokenList = undefined; hook(); }
       const full = cf.samePageDuplicate ? [cf.tokens[0], cf.tokens[0]] : cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
@@ -183,6 +185,7 @@ const server = createServer((req, res) => {
       if (index < 0) return send(404, { success: false, errors: [{ message: "not found" }] });
       cf.deleted.push(cf.tokens[index].id);
       cf.tokens.splice(index, 1);
+      if (cf.onDeleted) { const hook = cf.onDeleted; cf.onDeleted = undefined; hook(); }
       return ok({});
     }
     if (req.method === "GET" && url.pathname === `/zones/${ZONE}/email/routing/rules`) return send(200, { success: true, result: cf.rules, result_info: { total_pages: 1 } });
@@ -229,6 +232,7 @@ const cliArtifacts = [];
 /** The child talks to the in-process fake Cloudflare: a sync spawn would deadlock it. */
 const runAsync = (args, extra = {}) => new Promise((done) => {
   const child = spawn(process.execPath, [cli, ...args], { env: { ...baseEnv, ...extra }, cwd: dir, stdio: ["ignore", "pipe", "pipe"] });
+  cf.activeChild = child;
   let stdout = "", stderr = "";
   child.stdout.on("data", (b) => stdout += b);
   child.stderr.on("data", (b) => stderr += b);
@@ -410,15 +414,21 @@ const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"))
     assert.ok(calls.slice(start).every(call => call.method === "GET"));
   }
   cf.policy = validPolicy;
+  const policyBeforeDrift = structuredClone(cf.policy);
   cf.policy.include = cf.policy.include.filter(rule => rule.service_token?.token_id !== token.id);
   cf.policyDrift = true;
   const drifted = json(await runAsync(["identity", "provision", "rhea", "--apply", "--json"]), 1);
   assert.match(drifted.capabilities["access-policy"].detail, /readback-mismatch/);
   assert.ok(cf.policy.include.some(rule => rule.service_token?.token_id === token.id));
   cf.policyDrift = false;
-  cf.policy.session_duration = validPolicy.session_duration; // fixture-only operator correction, not an automatic rollback
+  const driftRetryStart = calls.length;
+  const unrepaired = json(await runAsync(["identity", "provision", "rhea", "--apply", "--json"]), 1);
+  assert.match(unrepaired.capabilities["access-policy"].detail, /readback-mismatch/);
+  assert.equal(cf.policy.session_duration, "12h");
+  assert.ok(calls.slice(driftRetryStart).every(call => call.method === "GET"), "unrepaired retry rewrote provider policy");
+  cf.policy = policyBeforeDrift; // fixture-only operator repair of the intended full policy
   json(await runAsync(["identity", "provision", "rhea", "--apply", "--json"]));
-  pass("FLUME-57 full-policy readback detects non-membership setting drift instead of reporting ready");
+  pass("FLUME-57 detected policy drift stays unresolved on plain retry; operator repairs full state before convergence");
   pass("FLUME-57 invalid, unresolved, shared and ambiguous policies fail closed with no policy write");
   pass("FLUME-57 missing config, missing explicit credential and broad policies block without global fallback");
 }
@@ -1121,6 +1131,68 @@ for (const command of ["suspend", "retire"]) {
   assert.equal(result.credentials.find(row => row.kind === "access-policy-membership").status, "revoked");
   assert.ok(!cf.policy.include.some(rule => rule.service_token?.token_id === token.id));
   pass("FLUME-57 subject-scoped receipt recovers policy membership after out-of-band token deletion");
+}
+
+{
+  const name = "policy-capture-gap";
+  enrollFixture(name);
+  json(await runAsync(["identity", "provision", name, "--apply", "--json"]));
+  const token = cf.tokens.find(t => t.name === `employee-${name}`);
+  const receiptsPath = join(state, "receipts.jsonl");
+  writeFileSync(receiptsPath, readFileSync(receiptsPath, "utf8").split("\n").filter(line => line && JSON.parse(line).employee !== name).join("\n") + "\n");
+  cf.listOutages = 1;
+  cf.onDeleted = () => process.kill(cf.activeChild.pid, "SIGKILL");
+  const killed = await runAsync(["identity", "suspend", name, "--revoke", "cloudflare_access", "--apply", "--json"]);
+  assert.equal(killed.status, null);
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  const capturePath = join(home, ".local/state/flume/identity/lifecycle-state.json");
+  const captured = JSON.parse(readFileSync(capturePath, "utf8")).captures[fixtureBlock(name).subject];
+  assert.ok(Object.values(captured).some(value => Array.isArray(value) && value.includes(token.id)), "token ID was not durable before DELETE");
+  const retry = json(await runAsync(["identity", "suspend", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.equal(retry.credentials.find(row => row.kind === "access-policy-membership").status, "revoked");
+  assert.ok(!cf.policy.include.some(rule => rule.service_token?.token_id === token.id));
+  pass("FLUME-57 Q1: failed cleanup inventory then SIGKILL after DELETE recovers durable token ID and removes membership");
+}
+{
+  const name = "policy-forgotten-binding";
+  enrollFixture(name);
+  json(await runAsync(["identity", "provision", name, "--apply", "--json"]));
+  const token = cf.tokens.find(t => t.name === `employee-${name}`);
+  cf.tokens = cf.tokens.filter(t => t.id !== token.id);
+  const definitionPath = join(home, ".agents/workforce", name, "agent.yaml");
+  const definition = YAML.parse(readFileSync(definitionPath, "utf8"));
+  delete definition.company_identity.bindings.cloudflare_access;
+  writeFileSync(definitionPath, YAML.stringify(definition));
+  const retired = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(retired.steps.some(step => step.action === "policy-membership-remove"));
+  assert.equal(retired.credentials.find(row => row.kind === "access-policy-membership").status, "revoked");
+  assert.ok(!cf.policy.include.some(rule => rule.service_token?.token_id === token.id));
+  pass("FLUME-57 Q2: completed issuance history survives manual unbind and external token deletion");
+}
+{
+  const name = "policy-config-drift";
+  enrollFixture(name);
+  json(await runAsync(["identity", "provision", name, "--apply", "--json"]));
+  const token = cf.tokens.find(t => t.name === `employee-${name}`);
+  const original = structuredClone(cf.policy);
+  cf.originalPolicy = original;
+  const originalConfig = readFileSync(configPath, "utf8"), changed = YAML.parse(originalConfig);
+  changed.cloudflare.access_policy.policy_id = "policy-second";
+  writeFileSync(configPath, YAML.stringify(changed));
+  cf.policy = { ...structuredClone(cf.policy), id: "policy-second", include: [{ service_token: { token_id: "another-employee" } }] };
+  const start = calls.length;
+  const drifted = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(drifted.complete_revocation, false);
+  assert.ok(drifted.steps.some(step => step.action === "policy-membership-remove" && step.provider_code === "access-policy-config-drift"));
+  assert.equal(drifted.credentials.find(row => row.kind === "access-policy-membership").provider_code, "access-policy-config-drift");
+  assert.ok(calls.slice(start).every(call => call.method !== "PUT" || !call.url.includes("/access/apps/")));
+  assert.ok(original.include.some(rule => rule.service_token?.token_id === token.id));
+  writeFileSync(configPath, originalConfig);
+  cf.policy = original; cf.originalPolicy = undefined;
+  const corrected = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(!cf.policy.include.some(rule => rule.service_token?.token_id === token.id));
+  assert.equal(corrected.credentials.find(row => row.kind === "access-policy-membership").status, "revoked");
+  pass("FLUME-57 Q3: changed configured policy cannot launder original grant; restoring scope reconciles it");
 }
 
 // -- no secret lands in any artifact ---------------------------------------------------------

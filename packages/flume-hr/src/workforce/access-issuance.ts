@@ -61,22 +61,46 @@ export function pendingAccessIssuance(handle: string, subject: string, accountId
   catch { return { token_ids: [], client_ids: {}, uncertain: true }; }
 }
 
-export function accessPolicyTokenHistory(handle: string, subject: string, accountId: string, principal?: string): { ids: string[]; uncertain: boolean } {
+export interface AccessPolicyHistory { ids: string[]; clients: Record<string, string>; scopes: Array<{ account_id: string; application_id: string; policy_id: string; domain?: string }>; uncertain: boolean }
+/** Scope is part of the grant: a later configuration must not silently replace the policy that admitted a token. */
+export function accessPolicyTokenHistory(handle: string, subject: string, accountId: string, principal?: string): AccessPolicyHistory {
+  const uncertain = (): AccessPolicyHistory => ({ ids: [], clients: {}, scopes: [], uncertain: true });
   try {
-    const ids = new Set<string>(), clients = new Map<string, string>(), rows = readReceipts();
+    const ids = new Set<string>(), clients = new Map<string, string>(), scopes = new Map<string, AccessPolicyHistory["scopes"][number]>(), rows = readReceipts();
     for (const row of rows) {
       if (row.capability !== "access-policy" || row.employee !== handle) continue;
       if (row.subject !== subject || row.account_id !== accountId || typeof row.client_id !== "string" || !row.client_id ||
           typeof row.token_id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(row.token_id) ||
-          (clients.has(row.token_id) && clients.get(row.token_id) !== row.client_id)) return { ids: [], uncertain: true };
+          typeof row.application_id !== "string" || !row.application_id || typeof row.policy_id !== "string" || !row.policy_id ||
+          (row.domain !== undefined && (typeof row.domain !== "string" || !row.domain)) ||
+          (clients.has(row.token_id) && clients.get(row.token_id) !== row.client_id)) return uncertain();
       clients.set(row.token_id, row.client_id);
-      if (!principal || row.client_id === principal) ids.add(row.token_id);
+      if (!principal || row.client_id === principal) {
+        ids.add(row.token_id);
+        scopes.set(`${row.application_id}:${row.policy_id}:${row.domain ?? ""}`, { account_id: accountId, application_id: row.application_id, policy_id: row.policy_id, ...(row.domain ? { domain: row.domain as string } : {}) });
+      }
     }
     for (const [id, client] of clients) {
-      if (rows.some(row => row.capability === "access-policy" && row.employee !== handle && (row.token_id === id || row.client_id === client))) return { ids: [], uncertain: true };
+      if (rows.some(row => row.capability === "access-policy" && row.employee !== handle && (row.token_id === id || row.client_id === client))) return uncertain();
     }
-    return { ids: [...ids], uncertain: false };
-  } catch { return { ids: [], uncertain: true }; }
+    return { ids: [...ids], clients: Object.fromEntries(clients), scopes: [...scopes.values()], uncertain: false };
+  } catch { return uncertain(); }
+}
+
+export function accessPolicyExpectedDigest(handle: string, subject: string, accountId: string, tokenId: string, applicationId: string, policyId: string): { digest?: string; baseline?: string; uncertain: boolean } {
+  try {
+    let digest: string | undefined, baseline: string | undefined;
+    for (const row of readReceipts()) {
+      if (row.capability !== "access-policy" || row.employee !== handle || row.subject !== subject || row.account_id !== accountId ||
+          row.token_id !== tokenId || row.application_id !== applicationId || row.policy_id !== policyId) continue;
+      if (row.action === "write-intent") {
+        if (typeof row.expected_digest !== "string" || !/^[0-9a-f]{64}$/u.test(row.expected_digest) ||
+            typeof row.baseline_digest !== "string" || !/^[0-9a-f]{64}$/u.test(row.baseline_digest)) return { uncertain: true };
+        digest = row.expected_digest; baseline = row.baseline_digest;
+      } else if (row.action === "verified" && digest === row.expected_digest) { digest = undefined; baseline = undefined; }
+    }
+    return { digest, baseline, uncertain: false };
+  } catch { return { uncertain: true }; }
 }
 
 /** A pending issuance cannot silently become a second employee's binding, even after its definition disappears. */

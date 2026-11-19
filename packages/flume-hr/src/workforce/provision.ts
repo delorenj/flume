@@ -23,12 +23,12 @@ import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import YAML from "yaml";
-import { accessPolicyTokenHistory, pendingAccessIssuance, provisionStateDir } from "./access-issuance";
+import { accessPolicyExpectedDigest, accessPolicyTokenHistory, pendingAccessIssuance, provisionStateDir } from "./access-issuance";
 export { pendingAccessIssuance, provisionStateDir } from "./access-issuance";
 import { accessRevocationConflict, bindEmployeeProvider, identityCensus, resolveEmployee, type IdentityBlocker, type IdentityDefinition } from "./company";
 import { provisioningConfigProblems, COMPANY_MAIL_DOMAIN } from "./validator";
 import { withRegistryLock } from "./role";
-import { policyHasToken, readAccessPolicy, reconcileAccessPolicy } from "./access-policy";
+import { policyHasToken, policyWritableDigest, readAccessPolicy, reconcileAccessPolicy } from "./access-policy";
 
 export interface ProvisioningConfig {
   version: 1;
@@ -433,9 +433,17 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
     ? { action: "blocked", detail: `${policy.code}: ${policy.detail}` }
     : ["blocked", "conflict"].includes(access.plan.action)
       ? { action: "blocked", detail: "Access token ownership not verified; no policy mutation authorized" }
-      : tokenId && policyHasToken(policy.policy, tokenId)
-        ? { action: "no-op", detail: "actual token ID is included in the configured policy", refs: { token_id: tokenId } }
-        : { action: "adopt", detail: "include the actual employee token ID in the configured Service Auth policy and read back" };
+      : tokenId && (() => {
+        const scope = config.cloudflare.access_policy!;
+        const history = accessPolicyTokenHistory(block.handle, block.subject, config.cloudflare.account_id);
+        const prior = accessPolicyExpectedDigest(block.handle, block.subject, config.cloudflare.account_id, tokenId, scope.application_id, scope.policy_id);
+        return history.uncertain || history.scopes.some(old => old.application_id !== scope.application_id || old.policy_id !== scope.policy_id || old.domain && old.domain !== scope.domain) ||
+          prior.uncertain || prior.digest && ![prior.digest, prior.baseline].includes(policyWritableDigest(policy.policy));
+      })()
+        ? { action: "blocked", detail: "access-policy-readback-mismatch or config-drift: historical scope/full-state write intent unresolved; inspect receipts and restore/repair original policy before retry" }
+        : tokenId && policyHasToken(policy.policy, tokenId)
+          ? { action: "no-op", detail: "actual token ID is included in the configured policy", refs: { token_id: tokenId } }
+          : { action: "adopt", detail: "include the actual employee token ID in the configured Service Auth policy and read back" };
 
   if (!options.apply) {
     const capabilities = { "vault-item": vaultItem.plan, "access-token": access.plan, "access-policy": policyPlan, mailbox: mailbox.plan };
@@ -459,6 +467,7 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
     const accessResult = capabilities["access-token"]!;
     const id = accessResult.refs?.token_id, clientId = accessResult.refs?.client_id;
     if (["blocked", "conflict"].includes(accessResult.action) || !id || !clientId) return policyPlan.action === "blocked" ? policyPlan : { action: "blocked", detail: "Access token not verified; no policy membership written" };
+    if (!policy.ok || policyPlan.action === "blocked") return policyPlan;
     return withRegistryLock(census.registryPath, async () => {
       const current = resolveEmployee(identityCensus(), employee);
       if (current.problem || current.block?.status !== "active" || current.block.subject !== block.subject || current.block.bindings?.cloudflare_access?.principal !== clientId || accessRevocationConflict(block.subject, current.path, clientId, id)) return { action: "blocked", detail: "employee identity/ownership changed; no membership mutation authorized" };
@@ -467,15 +476,31 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
       if (!cfOk(remote) || !validServiceTokenRow(remote.body?.result) || remote.body.result.id !== id || remote.body.result.client_id !== clientId) return { action: "blocked", detail: "actual token identity no longer verified; no membership mutation authorized", refs };
       const history = accessPolicyTokenHistory(block.handle, block.subject, config.cloudflare.account_id, clientId);
       if (history.uncertain) return { action: "blocked", detail: "policy token history uncertain; reconcile before membership mutation" };
+      const scope = config.cloudflare.access_policy!;
+      if (history.scopes.some(old => old.application_id !== scope.application_id || old.policy_id !== scope.policy_id || (old.domain && old.domain !== scope.domain)))
+        return { action: "blocked", detail: "access-policy-config-drift: historical membership belongs to a different application/policy/domain; restore the original configuration for scoped reconciliation", refs };
+      const previous = accessPolicyExpectedDigest(block.handle, block.subject, config.cloudflare.account_id, id, scope.application_id, scope.policy_id);
+      if (previous.uncertain || previous.digest && (!policy.ok || ![previous.digest, previous.baseline].includes(policyWritableDigest(policy.policy))))
+        return { action: "blocked", detail: "access-policy-readback-mismatch: prior writable-policy intent remains unreconciled; inspect and repair the policy before retry (no automatic overwrite)", refs };
       // Attribute the ID durably BEFORE the edit, including an already-bound employee with no issuance receipt.
       let recorded = false;
-      if (!history.ids.includes(id)) {
-        receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, action: "observed", evidence: cloudflareEvidence() });
+      if (!history.ids.includes(id) || history.scopes.some(old => !old.domain)) {
+        receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, domain: scope.domain, action: "observed", evidence: cloudflareEvidence() });
         recorded = true;
       }
-      const result = await reconcileAccessPolicy(config, [id], true, true);
+      let expectedDigest: string | undefined;
+      const result = await reconcileAccessPolicy(config, [id], true, true, (digest, baseline) => {
+        expectedDigest = digest;
+        receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, domain: scope.domain, action: "write-intent", expected_digest: digest, baseline_digest: baseline, evidence: cloudflareEvidence() });
+      });
+      if (result.ok && expectedDigest) {
+        // Even a previously uncertain PUT is cleared only when a fresh GET matches its full intended state.
+        receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, domain: scope.domain, action: "verified", expected_digest: expectedDigest, evidence: cloudflareEvidence() });
+      } else if (result.ok && previous.digest) {
+        receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, domain: scope.domain, action: "verified", expected_digest: previous.digest, evidence: cloudflareEvidence() });
+      }
       if (result.changed || !result.ok) {
-        try { receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, action: result.code, evidence: cloudflareEvidence() }); }
+        try { receipt({ capability: "access-policy", employee: block.handle, subject: block.subject, account_id: config.cloudflare.account_id, ...refs, domain: scope.domain, action: result.code, evidence: cloudflareEvidence() }); }
         catch { return { action: "blocked", detail: "policy outcome receipt failed; membership uncertain, token retained for retry", changed: result.changed, refs }; }
       }
       return { action: result.ok ? result.changed ? "adopted" : "no-op" : "blocked", detail: result.ok ? `${result.code}: membership read back` : `${result.code}: ${result.detail}; token retained, retry to reconcile`, changed: result.changed || recorded, refs };

@@ -149,6 +149,23 @@ reconcile its ID rather than Flume guessing from a name or claiming cleanup.
 A membership reintroduced after a completed step is detected as new work.
 Restore never silently re-adds revoked membership or recreates a deleted token.
 
+Provisioning receipts bind the subject, account, application, policy and domain to
+its actual token ID. If configuration later selects another policy or a binding
+is removed, retirement cannot substitute the new policy and call the old grant
+revoked: restore the original scoped configuration and retry. A completed issuance
+receipt remains a cleanup obligation even after an external token deletion and
+manual unbind. Before DELETE, the token step durably captures its verified ID
+itself, including when the preceding policy inventory failed; a killed process
+can therefore retry membership removal after the token is gone.
+
+A policy PUT records secret-free SHA-256 digests of the full writable baseline
+and intended state before sending the request. An unresolved readback mismatch
+blocks a plain retry (including preview) if the provider matches neither digest;
+Flume never overwrites externally changed settings automatically. Inspect the
+provider policy and receipt, repair it under operator authority to the intended
+full state (or the prior baseline), then retry for a fresh verification. This
+is not a claim of live authorization or a compare-and-swap guarantee.
+
 Preview all operations first (`--json` exposes each capability/credential row).
 These are targeted policy edits, not transactional policy ownership: local Flume
 writers serialize through the registry lock and each edit reads the latest policy,
