@@ -21,9 +21,16 @@
  *   3. every live chat channel is parked by calling `channelOffline` (never reimplemented), with
  *      noReload: the running gateway is left alone and the one restart is the operator's, below.
  * Then it reports, from the rows as they will be, who gets a ticket on every board the row claimed.
+ *
+ * With `--archive-desk` it also takes the desk out of the gateway's sight, since a retired employee's
+ * desk is otherwise loaded by the shared gateway forever (2026-11-19, tolt-launch-director: retired in
+ * the registry, desk still served). The desk is MOVED to `<fleet home>/profiles-retired/<name>-<UTC
+ * stamp>`, never deleted: memories, sessions and stores are kept, and moving it back restores it. Only
+ * a row that is retired once this run is done is archived, and only after its channels are parked
+ * (channelOffline renders the desk). The gateway restart stays the operator's one batched action.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -66,6 +73,8 @@ export interface RetireResult {
   flags: string[];
   nextActions: string[];
   leftBehind: string[];
+  /** The desk under `--archive-desk`: where it was and where it went (or would go). */
+  desk: { path: string; action: "archived" | "would-archive" | "absent" | "kept"; archivedTo: string | null };
   errors: string[];
 }
 
@@ -75,6 +84,10 @@ export interface RetireOptions {
   homeDir?: string;
   registryPath?: string;
   platform?: NodeJS.Platform;
+  /** Move the desk to `profiles-retired/` so the shared gateway stops loading it (record and desk kept). */
+  archiveDesk?: boolean;
+  /** The archive stamp's clock; tests pin it. */
+  now?: Date;
 }
 
 const isRow = (value: unknown): value is Row => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -115,6 +128,7 @@ export async function retireFromService(employeeId: string, options: RetireOptio
     employeeId, registryPath, found: false, applied: false, alreadyRetired: false, reason,
     bloodbank: { present: false, before: null, after: null, changed: false },
     removedPlane: null, channels: [], routing: [], flags: [], nextActions: [], leftBehind: [],
+    desk: { path: "", action: "absent", archivedTo: null },
   };
 
   if (!existsSync(registryPath)) return failure(base, [`org chart not found at ${registryPath}`]);
@@ -153,8 +167,12 @@ export async function retireFromService(employeeId: string, options: RetireOptio
   const profileName = typeof row.profile_name === "string" ? row.profile_name : employeeId;
   const desk = join(resolveFleetHomeDir(process.env, homeDir), "profiles", profileName);
   const restart = `hermes-gateway-restart --reason "retired ${employeeId}"`;
-  if (existsSync(desk)) {
-    result.leftBehind.push(`desk ${desk}: the shared gateway keeps loading it until the desk is removed AND the gateway restarted (${restart}; never raw systemctl)`);
+  const fleetHome = resolveFleetHomeDir(process.env, homeDir);
+  const stamp = (options.now ?? new Date()).toISOString().replace(/[-:]/gu, "").replace(/\.\d+Z$/u, "Z");
+  const archiveTo = join(fleetHome, "profiles-retired", `${profileName}-${stamp}`);
+  result.desk = { path: desk, action: existsSync(desk) ? "kept" : "absent", archivedTo: null };
+  if (existsSync(desk) && !options.archiveDesk) {
+    result.leftBehind.push(`desk ${desk}: the shared gateway keeps loading it until the desk is removed AND the gateway restarted (re-run with --archive-desk to move it to ${join(fleetHome, "profiles-retired")}/, then ${restart}; never raw systemctl)`);
   }
   const roleDir = typeof row.role_dir === "string" ? row.role_dir : undefined;
   if (roleDir && existsSync(roleDir)) result.leftBehind.push(`role directory ${roleDir} (tracked in its own repository)`);
@@ -217,9 +235,31 @@ export async function retireFromService(employeeId: string, options: RetireOptio
       if (options.apply) result.errors.push(`${platform}: could not be parked (${why})`);
     }
   }
+  // The desk goes last: channelOffline needed it, and only a fully retired row may lose its desk.
+  if (options.archiveDesk && existsSync(desk)) {
+    if (!options.apply) {
+      result.desk = { path: desk, action: "would-archive", archivedTo: archiveTo };
+    } else if (result.errors.length || result.channels.some((channel) => channel.action !== "parked")) {
+      result.leftBehind.push(`desk ${desk}: not archived, the retirement above did not finish (park every channel first)`);
+    } else if (existsSync(archiveTo)) {
+      result.errors.push(`desk not archived: ${archiveTo} already exists`);
+    } else {
+      try {
+        mkdirSync(join(fleetHome, "profiles-retired"), { recursive: true });
+        renameSync(desk, archiveTo);
+        result.desk = { path: desk, action: "archived", archivedTo: archiveTo };
+        result.alreadyRetired = false;
+      } catch (error) {
+        result.errors.push(`desk not archived: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
   if (result.errors.length) result.ok = false;
-  if (options.apply && result.channels.some((channel) => channel.action === "parked")) {
-    result.nextActions.push(`${restart}  # one restart, after the last change; --no-reload left the gateway alone`);
+  if (options.apply && (result.channels.some((channel) => channel.action === "parked") || result.desk.action === "archived")) {
+    result.nextActions.push(`${restart}  # one restart, after the last change; this run left the live gateway alone`);
+  }
+  if (roleDir && existsSync(roleDir) && result.desk.action !== "kept") {
+    result.nextActions.push(`git rm -r -q ${JSON.stringify(roleDir)} in its repository, then commit  # so no scaffold refresh re-provisions the role`);
   }
   return result;
 }
@@ -232,12 +272,14 @@ export function formatRetireResult(result: RetireResult): string {
     return lines.join("\n");
   }
   if (!result.ok) lines.push(`✗ retire ${result.employeeId}: ${result.applied ? "registry written, but" : ""} not finished`);
-  else if (result.alreadyRetired) lines.push(`${result.employeeId} is already retired (nothing to change)`);
-  else lines.push(result.applied ? `✓ ${result.employeeId} retired (record kept)` : `would retire ${result.employeeId}, keeping the record (dry run; pass --apply)`);
+  else if (result.alreadyRetired && result.desk.action !== "would-archive") lines.push(`${result.employeeId} is already retired (nothing to change)`);
+  else if (result.alreadyRetired) lines.push(`${result.employeeId} is already retired; would archive the desk (dry run; pass --apply)`);
+  else lines.push(result.applied || result.desk.action === "archived" ? `✓ ${result.employeeId} retired (record kept${result.desk.action === "archived" ? ", desk archived" : ""})` : `would retire ${result.employeeId}, keeping the record (dry run; pass --apply)`);
   lines.push(`    ${result.registryPath}`);
   const verb = result.applied ? "" : "would ";
   if (result.bloodbank.changed) lines.push(`  ${verb}set bloodbank.enabled ${String(result.bloodbank.before ?? "(absent)")} -> false`);
   if (result.removedPlane !== null) lines.push(`  ${verb}remove the plane claim: ${JSON.stringify(result.removedPlane)}`);
+  if (result.desk.action === "archived" || result.desk.action === "would-archive") lines.push(`  ${result.desk.action === "archived" ? "" : "would "}archive the desk ${result.desk.path} -> ${result.desk.archivedTo}`);
   for (const channel of result.channels) lines.push(`  ${channel.platform}: ${channel.action} - ${channel.detail}${channel.command ? `\n      run: ${channel.command}` : ""}`);
   for (const entry of result.routing) {
     lines.push(`  board ${entry.board}, tickets now go to:`);

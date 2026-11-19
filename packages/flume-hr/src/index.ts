@@ -276,11 +276,12 @@ program
   .argument("<employee>", "Employee id, e.g. 33god-pm")
   .description("Take an employee out of service but keep their record: bloodbank off, board claim removed, live channels parked, then who gets each ticket")
   .option("--reason <text>", "Why; recorded as offline_reason on any channel it parks")
+  .option("--archive-desk", "Also move the desk to <fleet home>/profiles-retired/ so the shared gateway stops loading it (kept, never deleted)")
   .option("--apply", "Write the change (default is a dry run)")
   .option("--json", "Output machine-parseable JSON (the full record, including the removed plane block)")
   .action(async (employee: string, options) => {
     guardBrokenPipe();
-    const result = await retireFromService(employee, { apply: Boolean(options.apply), reason: options.reason });
+    const result = await retireFromService(employee, { apply: Boolean(options.apply), reason: options.reason, archiveDesk: Boolean(options.archiveDesk) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatRetireResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
   });

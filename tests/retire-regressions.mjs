@@ -459,6 +459,58 @@ await check("when channelOffline cannot run (no desk) retire does not fake it: r
   assert.equal(preview.status, 0);
 });
 
+// ---- --archive-desk -----------------------------------------------------------------------------
+// 2026-11-19: tolt-launch-director was retired in the registry but its desk stayed under profiles/,
+// so the shared gateway kept loading it. --archive-desk moves the desk aside, never deletes it.
+
+await check("--archive-desk previews the move, then moves the desk to profiles-retired/ with its contents, and names one restart", async () => {
+  const f = fleet(liveChannelRegistry(), { desks: [PILE] });
+  const desk = join(f.fleetHome, "profiles", PILE);
+  writeFileSync(join(desk, "MEMORY.md"), "kept\n");
+  const preview = await f.json(["retire", PILE, "--archive-desk"]);
+  assert.equal(preview.status, 0, preview.stdout);
+  assert.equal(preview.body.desk.action, "would-archive");
+  assert.match(preview.body.desk.archivedTo, new RegExp(`/profiles-retired/${PILE}-\\d{8}T\\d{6}Z$`, "u"));
+  assert.ok(existsSync(desk), "a preview moves nothing");
+
+  const { body, status } = await f.json(["retire", PILE, "--archive-desk", "--apply"]);
+  assert.equal(status, 0, JSON.stringify(body));
+  assert.equal(body.channels[0].action, "parked", "channels are parked first, while the desk is still there");
+  assert.equal(body.desk.action, "archived");
+  assert.equal(existsSync(desk), false, "the gateway no longer sees the desk");
+  assert.equal(readFileSync(join(body.desk.archivedTo, "MEMORY.md"), "utf8"), "kept\n", "the desk is kept, not deleted");
+  assert.equal(YAML.parse(readFileSync(join(body.desk.archivedTo, "config.delta.yaml"), "utf8")).platforms.telegram.enabled, false);
+  assert.equal(body.nextActions.filter((a) => a.startsWith("hermes-gateway-restart --reason")).length, 1, "exactly one restart");
+  assert.ok(!body.leftBehind.some((item) => item.startsWith("desk ")), "nothing about the desk is left behind");
+  assert.equal(f.agents()[PILE].bloodbank.enabled, false, "the record is kept and retired");
+});
+
+await check("--archive-desk on an already-retired row archives the desk alone; a second run converges", async () => {
+  const f = fleet(registryText(), { desks: [PILE] });
+  assert.equal((await f.json(["retire", PILE, "--apply"])).status, 0);
+  const preview = await f.run(["retire", PILE, "--archive-desk"]);
+  assert.match(preview.stdout, /already retired; would archive the desk/u);
+  const { body, status } = await f.json(["retire", PILE, "--archive-desk", "--apply"]);
+  assert.equal(status, 0, JSON.stringify(body));
+  assert.equal(body.desk.action, "archived");
+  assert.equal(existsSync(join(f.fleetHome, "profiles", PILE)), false);
+  const again = await f.json(["retire", PILE, "--archive-desk", "--apply"]);
+  assert.equal(again.status, 0);
+  assert.equal(again.body.alreadyRetired, true);
+  assert.equal(again.body.desk.action, "absent");
+});
+
+await check("--archive-desk keeps the desk when the retirement did not finish (a channel could not be parked)", async () => {
+  const f = fleet(liveChannelRegistry(), { desks: [PILE] });
+  // An unreadable delta makes channelOffline refuse: it stands in for any parking failure.
+  writeFileSync(join(f.fleetHome, "profiles", PILE, "config.delta.yaml"), "platforms: [unclosed\n", { mode: 0o600 });
+  const { body, status } = await f.json(["retire", PILE, "--archive-desk", "--apply"]);
+  assert.notEqual(body.channels[0].action, "parked", JSON.stringify(body.channels));
+  assert.equal(status, 1);
+  assert.notEqual(body.desk.action, "archived");
+  assert.ok(existsSync(join(f.fleetHome, "profiles", PILE)), "an unfinished retirement keeps its desk");
+});
+
 // ---- the audit invariant ------------------------------------------------------------------------
 
 const auditRule = async (f) => {
