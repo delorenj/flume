@@ -1,0 +1,325 @@
+{
+  "projects": [
+    {
+      "agent": "bloodbank-pm",
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "branch": "main",
+      "head": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+      "remote_ref": "refs/heads/main",
+      "remote": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "33god-pm",
+      "repo": "/home/delorenj/code/33GOD",
+      "branch": "main",
+      "head": "88cd9893a6b19b1936acb318cd744be6ef0fdb22",
+      "remote_ref": "refs/heads/main",
+      "remote": "88cd9893a6b19b1936acb318cd744be6ef0fdb22",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "candystore-pm",
+      "repo": "/home/delorenj/code/33GOD/candystore",
+      "branch": "main",
+      "head": "06b03b33e082513a8e2148369ef9c9b7cc23b5e5",
+      "remote_ref": "refs/heads/main",
+      "remote": "06b03b33e082513a8e2148369ef9c9b7cc23b5e5",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "nautilus-trader-pm",
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "branch": "develop",
+      "head": "9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+      "remote_ref": "refs/heads/develop",
+      "remote": "9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "zshyzsh-pm",
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "branch": "main",
+      "head": "fa7b8b2919571d466ffe3b43e87398d6056873b3",
+      "remote_ref": "refs/heads/main",
+      "remote": "fa7b8b2919571d466ffe3b43e87398d6056873b3",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "holocene-pm",
+      "repo": "/home/delorenj/code/33GOD/holocene",
+      "branch": "main",
+      "head": "abe32a35d860d4f0d9c181d2629e7988c1039f0e",
+      "remote_ref": "refs/heads/main",
+      "remote": "abe32a35d860d4f0d9c181d2629e7988c1039f0e",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "skillex-pm",
+      "repo": "/home/delorenj/code/skillex",
+      "branch": "main",
+      "head": "af026dee32d143ba315b23286130376a3c00d431",
+      "remote_ref": "refs/heads/main",
+      "remote": "af026dee32d143ba315b23286130376a3c00d431",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "voxxy-pm",
+      "repo": "/home/delorenj/code/voxxy",
+      "branch": "main",
+      "head": "12d861c169d259ff28612b008e32e5b11fbc024b",
+      "remote_ref": "refs/heads/main",
+      "remote": "12d861c169d259ff28612b008e32e5b11fbc024b",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "gruvato-pm",
+      "repo": "/home/delorenj/code/gruvato",
+      "branch": "main",
+      "head": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+      "remote_ref": "refs/heads/main",
+      "remote": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "keepy-money-pm",
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "branch": "main",
+      "head": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+      "remote_ref": "refs/heads/main",
+      "remote": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "slowburns-pm",
+      "repo": "/home/delorenj/code/slowburns",
+      "branch": "main",
+      "head": "e403154869e9eeb5ff0f74a923efdde9c949da31",
+      "remote_ref": "refs/heads/main",
+      "remote": "e403154869e9eeb5ff0f74a923efdde9c949da31",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "james-brennan-pm",
+      "repo": "/home/delorenj/code/james-brennan",
+      "branch": "main",
+      "head": "c7b9de7397bca91d6f301a165acf533e3c127aae",
+      "remote_ref": "refs/heads/fix/FLUME-97-pm-scaffold",
+      "remote": "00e7a1f0bb7f96882d179fed2be87eb3440b1712",
+      "head_equals_remote": false,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "pjangler-pm",
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "branch": "main",
+      "head": "b094e397af4ef4980be94bb6ec7059346b01cee5",
+      "remote_ref": "refs/heads/main",
+      "remote": "a3dfc4d03bf1fb26fea9156fba114c07aaa60d74",
+      "head_equals_remote": false,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "heyma-pm",
+      "repo": "/home/delorenj/HeyMa",
+      "branch": "main",
+      "head": "c9320793056e7dda678a6dd0645523847d7f3a64",
+      "remote_ref": "refs/heads/main",
+      "remote": "c9320793056e7dda678a6dd0645523847d7f3a64",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "deckard-pm",
+      "repo": "/home/delorenj/code/deckard",
+      "branch": "main",
+      "head": "31238c9f2b6e7aeffa77ea77fa9705b82eb0f87f",
+      "remote_ref": "refs/heads/main",
+      "remote": "31238c9f2b6e7aeffa77ea77fa9705b82eb0f87f",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "infra-pm",
+      "repo": "/home/delorenj/code/infra",
+      "branch": "main",
+      "head": "24e1aa56e435135497f5c855c76360519f0c70c7",
+      "remote_ref": "refs/heads/main",
+      "remote": "24e1aa56e435135497f5c855c76360519f0c70c7",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "ssbnk-pm",
+      "repo": "/home/delorenj/code/ssbnk",
+      "branch": "main",
+      "head": "9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+      "remote_ref": "refs/heads/main",
+      "remote": "9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "tonnybox-pm",
+      "repo": "/home/delorenj/code/TonnyBox",
+      "branch": "main",
+      "head": "b3144f174eef593dafa67d95841c0431e9094968",
+      "remote_ref": "refs/heads/main",
+      "remote": "b3144f174eef593dafa67d95841c0431e9094968",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "sidepiece-pm",
+      "repo": "/home/delorenj/code/sidepiece",
+      "branch": "main",
+      "head": "8e43e94a421d45469756b83dbe46c564a05e1616",
+      "remote_ref": "refs/heads/main",
+      "remote": "8e43e94a421d45469756b83dbe46c564a05e1616",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "client-portal-pm",
+      "repo": "/home/delorenj/code/client-portal",
+      "branch": "main",
+      "head": "3fa485c28475d2738d3d7cbb241d484e359588e6",
+      "remote_ref": "refs/heads/main",
+      "remote": "3fa485c28475d2738d3d7cbb241d484e359588e6",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "flume-pm",
+      "repo": "/home/delorenj/code/33GOD/flume",
+      "branch": "main",
+      "head": "4ca431475f7532905cec71e3f38ecfc1f60c4e1a",
+      "remote_ref": "refs/heads/main",
+      "remote": "4ca431475f7532905cec71e3f38ecfc1f60c4e1a",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "pile-of-dumb-things-pm",
+      "repo": "/home/delorenj/code/tolt/tower-of-lost-things",
+      "branch": "main",
+      "head": "cd46f5ad87dcfcef76af93eeb4d9f72a98cd219c",
+      "remote_ref": "refs/heads/main",
+      "remote": "cd46f5ad87dcfcef76af93eeb4d9f72a98cd219c",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "green-in-between-pm",
+      "repo": "/home/delorenj/code/green-in-between",
+      "branch": "main",
+      "head": "428a5ab1e0014a2cc322aa94a017fe3ec3d5f829",
+      "remote_ref": "refs/heads/main",
+      "remote": "428a5ab1e0014a2cc322aa94a017fe3ec3d5f829",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "monitoring-pm",
+      "repo": "/home/delorenj/code/33GOD/monitoring",
+      "branch": "main",
+      "head": "a369813d55afcc6a1a699dfb41394f4b81d4cff6",
+      "remote_ref": "refs/heads/main",
+      "remote": "a369813d55afcc6a1a699dfb41394f4b81d4cff6",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "idealscenario-pm",
+      "repo": "/home/delorenj/code/IdealScenario",
+      "branch": "main",
+      "head": "3e8061d5e5b22858b75ba28fbe49b2cd960cbed9",
+      "remote_ref": "refs/heads/main",
+      "remote": "3e8061d5e5b22858b75ba28fbe49b2cd960cbed9",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "navi-pm",
+      "repo": "/home/delorenj/code/navi",
+      "branch": "main",
+      "head": "1d751185ed61eed0a2b78cd80cc030da4c643a70",
+      "remote_ref": "refs/heads/main",
+      "remote": "1d751185ed61eed0a2b78cd80cc030da4c643a70",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "milkshake-pm",
+      "repo": "/home/delorenj/code/Milkshake",
+      "branch": "main",
+      "head": "0814747e4d8bddc66ecff2cdbd933cab960bbdf5",
+      "remote_ref": "refs/heads/main",
+      "remote": "0814747e4d8bddc66ecff2cdbd933cab960bbdf5",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "pilot-pm",
+      "repo": "/home/delorenj/code/33GOD/pilot",
+      "branch": "main",
+      "head": "71dfe740815cea801055959afd799175b0fa85c5",
+      "remote_ref": "refs/heads/main",
+      "remote": "71dfe740815cea801055959afd799175b0fa85c5",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "tolt-pm",
+      "repo": "/home/delorenj/code/tolt",
+      "branch": "main",
+      "head": "9a6d85dd00b5d2bede92ee42c77db17b71b52ad5",
+      "remote_ref": "refs/heads/main",
+      "remote": "9a6d85dd00b5d2bede92ee42c77db17b71b52ad5",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "lost-things-forge-pm",
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "branch": "main",
+      "head": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+      "remote_ref": "refs/heads/main",
+      "remote": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "jacksnaps-pm",
+      "repo": "/home/delorenj/code/jacksnaps",
+      "branch": "main",
+      "head": "27b24f5a87ae8881423d05441db70d951943bf4e",
+      "remote_ref": "refs/heads/main",
+      "remote": "27b24f5a87ae8881423d05441db70d951943bf4e",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    },
+    {
+      "agent": "earshot-pm",
+      "repo": "/home/delorenj/code/earshot",
+      "branch": "main",
+      "head": "00bef9ad6017901c85d728c5311e60e501c85e03",
+      "remote_ref": "refs/heads/main",
+      "remote": "00bef9ad6017901c85d728c5311e60e501c85e03",
+      "head_equals_remote": true,
+      "ticket_commit_published": true
+    }
+  ],
+  "unrelated_changed_since_apply": {}
+}

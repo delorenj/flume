@@ -27,8 +27,8 @@
   ],
   "scope": "Machine-wide output reports unrelated work; no blanket cleanup authorized. Per-project tracked_paths and origin reachability are separately verified.",
   "known_ticket_effects": {
-    "flume_rollout_evidence": "awaiting explicit evidence commit, then pushed",
-    "james_main": "scaffold commit merged through PR1015; full local HEAD backed by origin/fix/FLUME-97-pm-scaffold; upstream-main count includes pre-existing application work and pull merges",
+    "flume_rollout_evidence": "evidence committed and published; latest read-only publication recheck recorded separately",
+    "james_main":"scaffold commit merged through PR1015; a scoped backup branch holds the previously observed local application history. A later concurrent local main advance is not claimed published by this ticket; it is unrelated to scoped rollout and was not absorbed",
     "parent_gitlinks": "only clean-at-baseline child pins advanced; pre-existing gitlink drift retained",
     "other_listings": "not owned by this ticket; preserved"
   }
