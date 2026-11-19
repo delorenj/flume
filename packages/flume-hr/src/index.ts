@@ -375,8 +375,8 @@ identityCmd
 identityCmd
   .command("status")
   .argument("<employee>", "Registry id, unhired specialist, or person name")
-  .argument("<status>", "active | suspended | retired (retired is terminal)")
-  .description("Record local employment status; provider access is not revoked here")
+  .argument("<status>", "active | suspended (for retired use identity retire)")
+  .description("Record local employment status; provider access is not revoked here; retirement requires identity retire")
   .option("--apply", "Write the change (default is a preview)")
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, status: string, options) => {

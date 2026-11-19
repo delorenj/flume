@@ -255,6 +255,17 @@ out(99, { ok: false, code: "forbidden_verb", error: "only identity verify and sh
 `, { mode: 0o755 });
 }
 
+/** Hire-time confirmation only; no live gateway or vault is reachable from this double. */
+export function writeFakeMemberGateway(path) {
+  writeFileSync(path, `#!/usr/bin/env python3
+import sys
+assert sys.argv[1] == "mint" and sys.argv[3:6] == ["--preset", "owner-no-anthropic", "--group"]
+consumer = sys.argv[2]
+assert consumer.startswith("hermes-")
+print(f"{consumer}: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/{consumer}")
+`, { mode: 0o755 });
+}
+
 /** gateway-tokens.py, reduced to status and revoke. State in GW_STATE; every argv logged to GW_LOG. status carries extra fields it must never be copied from. */
 export function writeFakeGateway(path) {
   writeFileSync(path, `#!/usr/bin/env node

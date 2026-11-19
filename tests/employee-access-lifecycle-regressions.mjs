@@ -7,18 +7,19 @@
 // Every secret planted is scanned for in every state file, receipt and output at the end.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { addSetSkills, createSet } from "@delorenj/skillex";
-import { fakeCloudflare, fakeGithub, rsa, writeFakeGateway, writeFakeOp } from "./lifecycle-fixtures.mjs";
+import { fakeCloudflare, fakeGithub, rsa, writeFakeGateway, writeFakeMemberGateway, writeFakeOp } from "./lifecycle-fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages/flume-hr/dist/index.js");
-const work = mkdtempSync("/tmp/flume53b-");
+const work = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "flume53b-"));
 let count = 0;
 const pass = (name) => { count++; console.log(`PASS ${name}`); };
 
@@ -27,11 +28,11 @@ const ISSUER_CF = "https://fixture.cloudflareaccess.com";
 const CLIENT = { ada: "ada-client-id.access", bob: "bob-client-id.access" };
 const SECRET = { ada: "ada-client-secret-value", bob: "bob-client-secret-value" };
 const VAULT = "vault-service-token-value";
-const GATEWAY = "ada-gateway-key-value";
+const GATEWAY = "ada-gateway-key-value-long-enough-for-readback";
 const CF_TOKEN = "fixture-cloudflare-provisioning-token-secret";
 const TOKEN_REF = "op://DeLoSecrets/Cloudflare/provisioning-token";
 const SIGNING_REF = "op://DeLoSecrets/flume-launcher/signing-key";
-const HERMES_REF = "op://DeLoSecrets/hermes-ada/credential";
+const HERMES_REF = "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada";
 const ACCOUNT = "a".repeat(32), ZONE = "b".repeat(32), KVNS = "c".repeat(32);
 const MAIL_CODE = "mail-body-one-time-code-424242";
 // bob's own GitHub App: its token mint is what a queued request waits behind (FLUME-53 review #8).
@@ -145,6 +146,7 @@ for (const p of [fleet, join(home, ".agents/workforce"), join(dir, "repos"), bin
 writeFileSync(registry, "schema_version: 1\nagents: {}\n");
 writeFakeOp(join(bin, "op"), VAULT);
 writeFakeGateway(join(bin, "gateway-tokens.py"));
+writeFakeMemberGateway(join(bin, "member-confirm.py"));
 // A fake hermes: it asks for access and lists mail as the launched process, and records only what it saw.
 writeFileSync(join(bin, "hermes"), `#!/usr/bin/env node
 const fs = require("fs"), cp = require("child_process");
@@ -207,7 +209,9 @@ const binding = (name) => ({ cloudflare_access: { principal: CLIENT[name], insta
 const setBinding = (path, bindings) => { const doc = YAML.parseDocument(readFileSync(path, "utf8")); doc.setIn(["company_identity", "bindings"], bindings); writeFileSync(path, String(doc)); };
 const source = join(dir, "ada.yaml");
 writeFileSync(source, YAML.stringify({ schema_version: 1, id: "ada", display_name: "Ada", role: "infra", charter: { purpose: "Keep infra boring" }, skills: { set: "first" }, memory: { write_bank: "agent-ada", recall_banks: ["infra"] } }));
-json(run(["hire", "--definition", source, "--json"]));
+const hireEnv = { FLUME_GATEWAY_TOKENS_BIN: join(bin, "member-confirm.py") };
+json(run(["hire", "--definition", source, "--json"], hireEnv));
+assert.ok(existsSync(join(fleet, "profiles/ada/.no-bundled-skills")), "pinned template must project the strict-skill marker");
 const adaDesk = join(home, ".agents/workforce/ada/agent.yaml");
 const bobRoleDir = join(dir, "repos/bob-pm/agents/hermes/pm");
 mkdirSync(bobRoleDir, { recursive: true });
@@ -218,7 +222,7 @@ const subject = {};
 for (const [name, id] of [["ada", "ada"], ["bob", "bob-pm"]]) subject[name] = json(run(["identity", "enroll", id, "--apply", "--json"])).identity.subject;
 setBinding(adaDesk, binding("ada"));
 setBinding(bobRole, { ...binding("bob"), github: { principal: "3001", instance: "3002", credential_ref: BOB_GITHUB_REF, attribution_mode: "native" } });
-json(run(["onboard", "--employee", "ada", "--json"]));
+json(run(["onboard", "--employee", "ada", "--json"], hireEnv));
 assert.ok(json(run(["audit", "--employee", "ada", "--json"])).ok);
 
 const writeConfig = () => writeFileSync(configPath, YAML.stringify({
@@ -281,7 +285,8 @@ const mapAdaGateway = (ref, { render }) => {
   for (const name of render ? ["config.delta.yaml", "config.yaml"] : ["config.delta.yaml"]) {
     const path = join(fleet, "profiles/ada", name);
     const doc = YAML.parseDocument(existsSync(path) ? readFileSync(path, "utf8") : "{}\n");
-    doc.setIn(["secrets", "onepassword", "env", "AUTOMATICAI_GATEWAY_KEY"], ref);
+    if (ref) doc.setIn(["secrets", "onepassword", "env", "AUTOMATICAI_GATEWAY_KEY"], ref);
+    else doc.deleteIn(["secrets", "onepassword", "env", "AUTOMATICAI_GATEWAY_KEY"]);
     writeFileSync(path, String(doc));
   }
 };
@@ -369,11 +374,8 @@ try {
     const suspended = json(await runAsync(["identity", "suspend", "ada", "--apply", "--json"]));
     assert.equal(suspended.ok, true, JSON.stringify(suspended));
     assert.equal(suspended.complete_revocation, false);
-    // ada is a portable specialist whose desk maps no gateway reference: the launcher's own reference is what runs. Its vault item
-    // exists, nothing proves which consumer it is, and it can be neither named nor revoked, so the row is unverified (never
-    // not-issued) -- probed for existence only, never read.
     const gatewayRows = suspended.credentials.filter((r) => r.provider === "gateway");
-    assert.deepEqual(gatewayRows.map((r) => [r.status, r.provider_code, r.ref, r.ref_source]), [["unverified", "launcher-ref-unproven", HERMES_REF, "launcher"]], JSON.stringify(gatewayRows));
+    assert.deepEqual(gatewayRows.map((r) => [r.status, r.ref, r.ref_source]), [["revoked", HERMES_REF, "generated"]], JSON.stringify(gatewayRows));
     assert.equal(cf.kv.has("allowlist/ada@agents.delo.sh"), false);
     const grantsBefore = readFileSync(join(state, "fixture-ledger.jsonl"), "utf8").split("\n").filter(Boolean).length;
     const accessAfter = await viaEdge("ada", "/v1/access/requests", accessBody("ac1-after"), adaRun);
@@ -461,7 +463,13 @@ try {
     const recent = json(await runAsync(["access", "receipts", "--employee", "ada", "--since", sinceMark, "--json"]));
     assert.deepEqual([...recent.run_ids].sort(), [hermesRun.creds.run_id, plainRun.creds.run_id].sort(), "exactly the hermes and the plain run");
     // The FLUME-39 evidence branch: an existing evidence path links the attribution.
-    const present = json(await runAsync(["access", "receipts", "--employee", "ada", "--json"], { FLUME_GATEWAY_EVIDENCE: dir }));
+    const ownerEvidence = join(dir, "FLUME-39");
+    mkdirSync(ownerEvidence);
+    writeFileSync(join(ownerEvidence, "empty.md"), "  \n");
+    const emptyEvidence = json(await runAsync(["access", "receipts", "--employee", "ada", "--json"], { FLUME_GATEWAY_EVIDENCE: ownerEvidence }));
+    assert.equal(emptyEvidence.gateway.evidence_status, "unverified", "an empty directory is not owner evidence");
+    writeFileSync(join(ownerEvidence, "fixture-receipt.md"), "Fixture owner-link content only; not live runtime evidence.\n");
+    const present = json(await runAsync(["access", "receipts", "--employee", "ada", "--json"], { FLUME_GATEWAY_EVIDENCE: ownerEvidence }));
     assert.equal(present.gateway.evidence_status, "present"); assert.equal(present.gateway.attribution, "linked");
     const human = await runAsync(["access", "receipts", "--employee", "ada", "--since", sinceMark]);
     const escaped = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -471,6 +479,7 @@ try {
     const base = { status: "ok", receipts: [{ token_name: "aai:ada:1700000001", request_id: "r1", session_id: "s1", created_at: "2026-10-14T00:00:00Z" }] };
     const proof = (name, body) => { const p = join(dir, name); writeFileSync(p, JSON.stringify(body)); return p; };
     // The fixture desk maps no gateway reference, so no consumer exists: unverified even for a matching-looking proof.
+    mapAdaGateway(undefined, { render: true });
     const noConsumer = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-none.json", { ...base, verified: true }), "--json"]));
     assert.equal(noConsumer.gateway.proof.status, "unverified"); assert.equal(noConsumer.gateway.proof.reason, "no-consumer");
     // `gateway-member-tokens.py --apply` alone edits only the delta: the generated config Hermes runs has drifted from it, so
@@ -481,15 +490,61 @@ try {
     // ...until `--render` writes it into the generated config.yaml too.
     mapAdaGateway("op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/ada", { render: true });
     const match = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-ok.json", { ...base, verified: true }), "--json"]));
-    assert.equal(match.gateway.proof.status, "verified"); assert.equal(match.gateway.consumer, "ada"); assert.equal(match.gateway.evidence_status, "unverified");
+    assert.equal(match.gateway.proof.status, "unverified"); assert.equal(match.gateway.proof.reason, "uncorrelated-session"); assert.equal(match.gateway.consumer, "ada"); assert.equal(match.gateway.evidence_status, "unverified");
     const mismatch = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-bad.json", { ...base, verified: true, receipts: [...base.receipts, { token_name: "aai:bob:1700000002", request_id: "r2", session_id: "s2", created_at: "2026-10-14T00:00:01Z" }] }), "--json"]));
     assert.equal(mismatch.gateway.proof.status, "mismatch");
     const unverifiedProof = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-no.json", { ...base, verified: false }), "--json"]));
     assert.equal(unverifiedProof.gateway.proof.status, "unverified");
     const prefixTrick = json(await runAsync(["access", "receipts", "--employee", "ada", "--gateway-proof", proof("proof-prefix.json", { ...base, verified: true, receipts: [{ ...base.receipts[0], token_name: "aai:adamant:1700000001" }] }), "--json"]));
     assert.equal(prefixTrick.gateway.proof.status, "mismatch", "a consumer that merely starts with the employee's name is not the employee's");
+    const hiddenProofField = "unlisted-sensitive-value";
+    const correlated = { status: "verified", verified: true, proof_kind: "gateway_usage", receipts: [{ token_name: "aai:ada:1700000001", request_id: "gateway-request-1", session_id: hermesRun.creds.run_id, created_at: Math.floor(Date.parse(request.at) / 1000), unlisted_secret: hiddenProofField }] };
+    const checkProof = async (name, body, flags = ["--run", hermesRun.creds.run_id]) => json(await runAsync(["access", "receipts", ...flags, "--gateway-proof", proof(name, body), "--json"]));
+    const imported = await checkProof("proof-session-header.json", correlated);
+    assert.equal(imported.gateway.proof.status, "unverified", JSON.stringify(imported.gateway.proof));
+    assert.equal(imported.gateway.proof.reason, "trusted-run-mapping-missing");
+    assert.equal(imported.gateway.proof.correlation, undefined);
+    assert.deepEqual(Object.keys(imported.gateway.proof.receipts[0]).sort(), ["created_at", "request_id", "session_id", "token_name"]);
+    assert.equal((await checkProof("proof-employee-session-header.json", correlated, ["--employee", "ada"])).gateway.proof.reason, "trusted-run-mapping-missing");
+    // The same consumer and second can be a completely unrelated request: its caller chooses the session header.
+    const spoofed = { ...correlated, receipts: [{ ...correlated.receipts[0], request_id: "unrelated-gateway-request", session_id: hermesRun.creds.run_id }] };
+    const unrelated = await checkProof("proof-unrelated-spoofed-session.json", spoofed);
+    assert.equal(unrelated.gateway.proof.status, "unverified");
+    assert.equal(unrelated.gateway.proof.reason, "trusted-run-mapping-missing");
+    assert.equal(unrelated.gateway.proof.receipts[0].request_id, "unrelated-gateway-request");
+    const deniedAt = new Date(Date.now() + 60_000).toISOString();
+    appendFileSync(join(baseEnv.FLUME_ACCESS_STATE, "audit.jsonl"), `${JSON.stringify({ at: deniedAt, event: "access.request", outcome: "employee-suspended", http_status: 403, run_id: hermesRun.creds.run_id, subject: subject.ada, handle: "ada" })}\n`);
+    const rejectedOnly = { ...correlated, receipts: [{ ...correlated.receipts[0], created_at: Math.floor(Date.parse(deniedAt) / 1000) }] };
+    const deniedProof = await checkProof("proof-denied-only.json", rejectedOnly);
+    assert.equal(deniedProof.gateway.proof.reason, "outside-run-window", "a denied-only timestamp cannot establish gateway usage");
+    const negativeProofs = [
+      ["same-consumer-other-run", { ...correlated.receipts[0], session_id: plainRun.creds.run_id }, "uncorrelated-session"],
+      ["same-run-old-time", { ...correlated.receipts[0], created_at: "2020-01-01T00:00:00Z" }, "outside-run-window"],
+      ["same-run-future-time", { ...correlated.receipts[0], created_at: Math.floor(Date.now() / 1000) + 86400 }, "outside-run-window"],
+      ["missing-session", { ...correlated.receipts[0], session_id: undefined }, "malformed-receipt"],
+      ["missing-request", { ...correlated.receipts[0], request_id: undefined }, "malformed-receipt"],
+      ["malformed-time", { ...correlated.receipts[0], created_at: {} }, "malformed-receipt"],
+      ["foreign-token", { ...correlated.receipts[0], token_name: "aai:bob:1700000002" }, "foreign-token-name"],
+      ["nested-secret", { ...correlated.receipts[0], session_id: { secret: hiddenProofField } }, "malformed-receipt"],
+    ];
+    for (const [name, receipt, reason] of negativeProofs) {
+      const result = await checkProof(`proof-${name}.json`, { ...correlated, receipts: [receipt] });
+      assert.notEqual(result.gateway.proof.status, "verified", name);
+      assert.equal(result.gateway.proof.reason, reason, name);
+      assert.equal(JSON.stringify(result).includes(hiddenProofField), false, name);
+    }
+    for (const malformed of [null, [], { ...correlated, receipts: [null] }, { ...correlated, receipts: [] }, { ...correlated, proof_kind: "synthetic_probe" }]) {
+      assert.notEqual((await checkProof(`proof-malformed-${randomUUID()}.json`, malformed)).gateway.proof.status, "verified");
+    }
+    const sharedRef = "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/ada";
+    const bobProfile = join(fleet, "profiles/bob-pm");
+    mkdirSync(bobProfile, { recursive: true });
+    writeFileSync(join(bobProfile, "config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: sharedRef } } } }));
+    const sharedProof = await checkProof("proof-shared.json", correlated);
+    assert.equal(sharedProof.gateway.proof.reason, "shared-consumer");
+    writeFileSync(join(bobProfile, "config.delta.yaml"), "{}\n");
     json(await runAsync(["identity", "restore", "ada", "--apply", "--json"]));
-    pass("access receipts joins a hermes run, a plain run, grants, mail authorizations, denials and the lifecycle operation by subject, run_id and operation_id; --run windows; the gateway link is unverified and a proof matches only the employee's own consumer");
+    pass("receipts join actual CLI-launched runs and lifecycle operations; gateway proof rejects shared/foreign consumers and out-of-window usage, never treats caller-selected session headers as authenticated run mapping, and emits scalar whitelisted fields only");
   }
 
   // -- 5b. a request queued behind a slow mint is re-checked INSIDE the queue -----------------------------------------------
@@ -587,50 +642,29 @@ try {
     pass("the facade and the launcher refuse employee-retired when the subject OR handle is tombstoned (a reverted retired definition, a fresh subject around a retired handle), bind refuses the retired handle, and tombstones that cannot be read (bad JSON, an unsearchable directory, an unreadable file) fail closed");
   }
 
-  // -- 5d. a specialist with a FLUME-39 desk key still runs the key its LAUNCHER injects (review2 N2) -------------------------------
+  // The specialist launcher and lifecycle now use the same generated member reference.
   {
-    // ada's desk now maps its own FLUME-39 consumer (section 5), and that consumer holds a live token. launchSpecialist still
-    // injects op://DeLoSecrets/hermes-ada/credential whatever the desk maps: two keys, and only one of them is provably ada's.
-    writeFileSync(baseEnv.GW_STATE, JSON.stringify({ mode: "ok", consumers: { ada: [{ id: 51, name: "aai:ada:1700000051", status: 1, expired_time: -1 }] } }));
+    mapAdaGateway(HERMES_REF, { render: true });
+    writeFileSync(baseEnv.GW_STATE, JSON.stringify({ mode: "ok", consumers: { "hermes-ada": [{ id: 51, name: "aai:hermes-ada:1700000051", status: 1, expired_time: -1 }] } }));
     const calls0 = opCalls().length;
     const read = json(await runAsync(["identity", "credentials", "ada", "--json"]));
     const gateway = read.credentials.filter((r) => r.provider === "gateway");
-    assert.deepEqual(gateway.map((r) => [r.ref_source, r.consumer ?? null, r.status, r.provider_code ?? null]), [["generated", "ada", "static-usable", null], ["launcher", null, "unverified", "launcher-ref-unproven"]], JSON.stringify(gateway));
-    assert.equal(gateway[1].ref, HERMES_REF);
-    // The vault was asked whether the launcher's item EXISTS, never for its value.
-    const asked = opCalls().slice(calls0);
-    assert.ok(asked.some((argv) => argv.join(" ") === "item get hermes-ada --vault DeLoSecrets --format json"), JSON.stringify(asked));
-    assert.equal(asked.some((argv) => argv[0] === "read" && argv[1] === HERMES_REF), false, "the lifecycle read the launcher's key");
-    assert.equal(asked.some((argv) => argv.includes("--reveal")), false);
-    // Revoking the desk's own consumer does not make the gateway complete: the launcher's key is still unproven, and the step
-    // list says it was not revoked.
+    assert.deepEqual(gateway.map((r) => [r.ref_source, r.consumer, r.status]), [["generated", "hermes-ada", "static-usable"]]);
+    assert.equal(opCalls().slice(calls0).some((argv) => argv[0] === "read" && argv[1] === HERMES_REF), false, "inventory must not resolve the member secret");
     const revoked = json(await runAsync(["identity", "suspend", "ada", "--revoke", "gateway", "--apply", "--json"]));
-    assert.equal(revoked.ok, true, JSON.stringify(revoked.steps));
-    assert.deepEqual(revoked.steps.filter((s) => s.adapter === "gateway").map((s) => `${s.key}:${s.outcome}${s.provider_code ? `:${s.provider_code}` : ""}`), ["gateway:token-revoke:ada:done", `gateway:launcher-key:${HERMES_REF}:skipped:launcher-ref-unproven`]);
-    const after = revoked.credentials.filter((r) => r.provider === "gateway");
-    assert.deepEqual(after.map((r) => `${r.ref_source}:${r.status}`), ["generated:revoked", "launcher:unverified"]);
-    assert.equal(revoked.complete_revocation, false);
-    assert.ok(revoked.incomplete.some((r) => r.provider === "gateway" && r.ref === HERMES_REF && r.provider_code === "launcher-ref-unproven"), JSON.stringify(revoked.incomplete));
-    assert.ok(revoked.incomplete.some((r) => r.kind === "skipped-step" && r.provider_code === "launcher-ref-unproven"));
-    assert.deepEqual(JSON.parse(readFileSync(baseEnv.GW_STATE, "utf8")).consumers.ada, []);
+    assert.deepEqual(revoked.steps.filter((s) => s.adapter === "gateway").map((s) => `${s.key}:${s.outcome}`), ["gateway:token-revoke:hermes-ada:done"]);
+    assert.equal(revoked.credentials.find((r) => r.provider === "gateway").status, "revoked");
+    assert.equal(revoked.complete_revocation, false, "Access and other residual credentials are still usable");
     json(await runAsync(["identity", "restore", "ada", "--apply", "--json"]));
-
-    // No vault item behind the launcher's reference: the launcher is dead (it refuses to start), so that row is not-issued and
-    // no launcher step is reported.
-    const opFixture = join(dir, "op.json"), withItem = readFileSync(opFixture, "utf8");
-    const withoutItem = JSON.parse(withItem); delete withoutItem[HERMES_REF];
-    writeFileSync(opFixture, JSON.stringify(withoutItem));
+    const fixture = readFileSync(baseEnv.OP_FIXTURE, "utf8");
+    const missing = JSON.parse(fixture); delete missing[HERMES_REF];
+    writeFileSync(baseEnv.OP_FIXTURE, JSON.stringify(missing));
     try {
-      const dead = json(await runAsync(["identity", "credentials", "ada", "--json"]));
-      const launcherRow = dead.credentials.find((r) => r.provider === "gateway" && r.ref_source === "launcher");
-      assert.deepEqual([launcherRow.status, launcherRow.ref], ["not-issued", HERMES_REF], JSON.stringify(launcherRow));
-      assert.match(launcherRow.detail, /launcher reference is dead/u);
-      assert.equal(dead.incomplete.some((r) => r.ref === HERMES_REF), false);
-      const plan = json(await runAsync(["identity", "suspend", "ada", "--revoke", "gateway", "--json"]));
-      assert.equal(plan.steps.some((s) => s.key.startsWith("gateway:launcher-key:")), false, "a dead launcher reference was reported as a skipped revocation");
-      assert.ok(plan.steps.some((s) => s.key === "gateway:token-revoke:ada"));
-    } finally { writeFileSync(opFixture, withItem); }
-    pass("a specialist with a FLUME-39 desk key inventories the launcher's own key as a separate row (vault item probed for existence only): unverified launcher-ref-unproven while it exists, so revoking the desk consumer never completes the gateway; not-issued once the item is gone");
+      const launch = await runAsync(["launch", "ada", "--", "chat"], hireEnv);
+      assert.notEqual(launch.status, 0);
+      assert.match(launch.stderr, /employee member token unavailable/u);
+    } finally { writeFileSync(baseEnv.OP_FIXTURE, fixture); }
+    pass("current specialist member ref is inventoried without resolving its value; gateway revoke reads back absence and a missing vault member field refuses launch without fallback");
   }
 
   // -- 6. secrets ---------------------------------------------------------------------------------------------------------

@@ -209,7 +209,9 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     if (prepared.block?.status === "retired" && command === "suspend") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone; it cannot be suspended" });
     // A definition carrying a retired subject or handle without being retired is refused before anything is written.
     const tombstoned = tombstoneBlocker(state, prepared.block);
-    if (tombstoned) blockers.push(tombstoned);
+    // A reservation written before status publication belongs to this same subject: retrying retire must finish the transition.
+    const reservation = prepared.block && state.tombstones[prepared.block.subject];
+    if (tombstoned && !(command === "retire" && reservation && reservation.handle === prepared.block?.handle && reservation.email === prepared.block?.email)) blockers.push(tombstoned);
     let ctx: LifecycleContext | undefined;
     if (prepared.block) {
       // No episode reset: records and captures persist until restore reverses them. An out-of-band status change
@@ -264,8 +266,20 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     const reports: StepReport[] = [];
     ledger({ event: "lifecycle.operation", phase: "started", revoke, from: block.status, to });
 
-    // 1. Local status, first. If it cannot be written nothing else is attempted: the next request would not be denied.
-    const status = await setEmployeeStatus(employee, to, { apply: true });
+    // Reserve the subject, handle and bindings BEFORE publishing terminal status. If the status write fails or the process
+    // dies after publication, the reservation remains fail-closed; the same subject may retry retire under this lock.
+    if (command === "retire" && !state.tombstones[block.subject]) {
+      const tombstone: Tombstone = {
+        subject: block.subject, handle: block.handle, email: block.email, retired_at: new Date().toISOString(), operation_id: operationId,
+        bindings: Object.entries(block.bindings ?? {}).map(([provider, binding]) => ({ provider, principal: binding.principal, ...(binding.instance ? { instance: binding.instance } : {}) })),
+      };
+      state.tombstones[block.subject] = tombstone;
+      persist();
+      ledger({ event: "lifecycle.tombstone", outcome: "reserved" });
+    }
+
+    // 1. Local status, first provider-affecting mutation. If it cannot be written nothing else is attempted.
+    const status = await setEmployeeStatus(employee, to, { apply: true, lifecycle: true });
     const local: StepReport = { ...localStep(employee, to), outcome: status.ok ? (status.changed ? "done" : "converged") : "unresolved", ...(status.ok ? { detail: status.changed ? `${block.status} -> ${to}` : `already ${to}` } : { provider_code: status.blockers[0]?.code ?? "status-refused", detail: status.blockers[0]?.detail }) };
     reports.push(local);
     ledger({ event: "lifecycle.step", step: local.key, outcome: local.outcome, ...(local.provider_code ? { provider_code: local.provider_code } : {}) });
@@ -275,18 +289,14 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     }
     ctx.status = to;
 
-    // 2. Retire records a tombstone so the identity survives `flume offboard` removing its registry row.
+    // 2. Report the permanent reservation after terminal status is visible; it was already persisted before publication.
     if (command === "retire") {
-      if (!state.tombstones[block.subject]) {
-        const tombstone: Tombstone = {
-          subject: block.subject, handle: block.handle, email: block.email, retired_at: new Date().toISOString(), operation_id: operationId,
-          bindings: Object.entries(block.bindings ?? {}).map(([provider, binding]) => ({ provider, principal: binding.principal, ...(binding.instance ? { instance: binding.instance } : {}) })),
-        };
-        state.tombstones[block.subject] = tombstone;
-        persist();
-        reports.push({ key: "tombstone", adapter: "local", action: "tombstone", resource: block.subject, outcome: "done", detail: `handle ${block.handle}, subject and ${tombstone.bindings.length} binding key(s) recorded` });
-        ledger({ event: "lifecycle.tombstone", outcome: "done" });
-      } else reports.push({ key: "tombstone", adapter: "local", action: "tombstone", resource: block.subject, outcome: "already-done", operation_id: state.tombstones[block.subject]!.operation_id });
+      const tombstone = state.tombstones[block.subject]!;
+      const created = tombstone.operation_id === operationId;
+      reports.push({ key: "tombstone", adapter: "local", action: "tombstone", resource: block.subject,
+        outcome: created ? "done" : "already-done", operation_id: tombstone.operation_id,
+        ...(created ? { detail: `handle ${block.handle}, subject and ${tombstone.bindings.length} binding key(s) recorded` } : {}) });
+      if (created) ledger({ event: "lifecycle.tombstone", outcome: "done" });
     }
 
     // 3. Provider steps: the allowlist/routing first, then only the adapters named, in the fixed order.
