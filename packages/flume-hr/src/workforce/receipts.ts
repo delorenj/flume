@@ -4,7 +4,7 @@
 // It reads secret-free logs (the facade's audit and ledgers, the lifecycle ledger, Pilot's comment receipts) and emits a
 // FIELD WHITELIST per record. It never echoes a raw line, so a field some future writer adds is not leaked by accident.
 // Gateway attribution links owner evidence; a generated desk config is never runtime proof.
-// Imported gateway usage needs an unshared consumer, an authenticated session_id matching an audited run, and bounded time.
+// Imported gateway usage can check consumer and time, but its session_id is a caller-supplied header, not run attestation.
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { accessStateDir } from "./access";
@@ -132,8 +132,8 @@ export function accessReceipts(options: ReceiptsOptions) {
   };
 }
 
-// Gateway usage must name the launcher-signed run in its authenticated session_id.
-// Request IDs in access requests are caller-chosen and cannot establish that link.
+// Gateway request IDs and session IDs are caller-controlled; neither attests to the signed Flume launcher run.
+// Retain negative consumer/window checks, but never promote a header match to verified until a trusted upstream mapping exists.
 function gatewayProof(path: string, consumer: string | undefined, shared: boolean, selected: Line[], audit: Line[]): Line {
   const base = { path };
   const text = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_:.-]{1,200}$/u.test(value);
@@ -171,7 +171,8 @@ function gatewayProof(path: string, consumer: string | undefined, shared: boolea
       if (at < Math.floor(from / 1000) * 1000 || at > Math.floor(to / 1000) * 1000 + 999) return refuse("outside-run-window");
     }
     if (parsed.status !== "verified" || parsed.proof_kind !== "gateway_usage") return refuse("not-gateway-usage");
-    return { ...base, status: "verified", consumer, correlation: "authenticated-session-to-audited-run", receipts: shown };
+    // Matching the caller's session header to a signed local run is not a trusted upstream request-to-run mapping.
+    return { ...base, status: "unverified", reason: "trusted-run-mapping-missing", consumer, receipts: shown };
   } catch {
     return { ...base, status: "unverified", reason: "unreadable" };
   }

@@ -33,13 +33,16 @@ deferred:
     severity: low
 ---
 
-**Current acceptance clarification (FLUME-53 follow-up).** The historical intent below is retained as an implementation record,
+**Current acceptance clarification (FLUME-53 follow-up, 2026-11-19 repair).** The historical intent below is retained as an implementation record,
 but its earlier prohibition on changing the legacy `identity status` path is superseded: `identity status <e> retired`
 now refuses with `retirement-requires-lifecycle`, including `--apply`. Only `identity retire` records the permanent
-tombstone and reports residual access. For `access receipts --run`, a consumer prefix or a separately verified historical
-request is insufficient: the imported gateway usage receipt must carry an authenticated session matching a successful
-audited run and a timestamp within its bounded window. An empty FLUME-39 evidence directory is not an owner link.
-Fixture tests establish code behavior, not the live canary or provider revocation.
+reservation; it persists that reservation **before** publishing terminal status, so an interrupted status write or
+crash after publication cannot reissue the handle or subject. The same subject can retry retire. For `access receipts
+--run`, a consumer prefix, a separately verified historical request, or a gateway `session_id` matching a Flume run
+is insufficient: that gateway field originates in caller headers, not an authenticated launcher mapping. Imported
+usage remains `unverified` with `trusted-run-mapping-missing` after the negative consumer/session/time checks.
+Fixtures establish code behavior; selected-run provider attribution (AC5) and the live provider canary (AC6)
+remain HOLD pending trusted gateway mapping and operator/provider prerequisites. See `FLUME-53/repair-verification.md`.
 
 <intent-contract>
 

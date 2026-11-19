@@ -500,11 +500,18 @@ try {
     const hiddenProofField = "unlisted-sensitive-value";
     const correlated = { status: "verified", verified: true, proof_kind: "gateway_usage", receipts: [{ token_name: "aai:ada:1700000001", request_id: "gateway-request-1", session_id: hermesRun.creds.run_id, created_at: Math.floor(Date.parse(request.at) / 1000), unlisted_secret: hiddenProofField }] };
     const checkProof = async (name, body, flags = ["--run", hermesRun.creds.run_id]) => json(await runAsync(["access", "receipts", ...flags, "--gateway-proof", proof(name, body), "--json"]));
-    const positive = await checkProof("proof-correlated.json", correlated);
-    assert.equal(positive.gateway.proof.status, "verified", JSON.stringify(positive.gateway.proof));
-    assert.equal(positive.gateway.proof.correlation, "authenticated-session-to-audited-run");
-    assert.deepEqual(Object.keys(positive.gateway.proof.receipts[0]).sort(), ["created_at", "request_id", "session_id", "token_name"]);
-    assert.equal((await checkProof("proof-employee-correlated.json", correlated, ["--employee", "ada"])).gateway.proof.status, "verified");
+    const imported = await checkProof("proof-session-header.json", correlated);
+    assert.equal(imported.gateway.proof.status, "unverified", JSON.stringify(imported.gateway.proof));
+    assert.equal(imported.gateway.proof.reason, "trusted-run-mapping-missing");
+    assert.equal(imported.gateway.proof.correlation, undefined);
+    assert.deepEqual(Object.keys(imported.gateway.proof.receipts[0]).sort(), ["created_at", "request_id", "session_id", "token_name"]);
+    assert.equal((await checkProof("proof-employee-session-header.json", correlated, ["--employee", "ada"])).gateway.proof.reason, "trusted-run-mapping-missing");
+    // The same consumer and second can be a completely unrelated request: its caller chooses the session header.
+    const spoofed = { ...correlated, receipts: [{ ...correlated.receipts[0], request_id: "unrelated-gateway-request", session_id: hermesRun.creds.run_id }] };
+    const unrelated = await checkProof("proof-unrelated-spoofed-session.json", spoofed);
+    assert.equal(unrelated.gateway.proof.status, "unverified");
+    assert.equal(unrelated.gateway.proof.reason, "trusted-run-mapping-missing");
+    assert.equal(unrelated.gateway.proof.receipts[0].request_id, "unrelated-gateway-request");
     const deniedAt = new Date(Date.now() + 60_000).toISOString();
     appendFileSync(join(baseEnv.FLUME_ACCESS_STATE, "audit.jsonl"), `${JSON.stringify({ at: deniedAt, event: "access.request", outcome: "employee-suspended", http_status: 403, run_id: hermesRun.creds.run_id, subject: subject.ada, handle: "ada" })}\n`);
     const rejectedOnly = { ...correlated, receipts: [{ ...correlated.receipts[0], created_at: Math.floor(Date.parse(deniedAt) / 1000) }] };
@@ -537,7 +544,7 @@ try {
     assert.equal(sharedProof.gateway.proof.reason, "shared-consumer");
     writeFileSync(join(bobProfile, "config.delta.yaml"), "{}\n");
     json(await runAsync(["identity", "restore", "ada", "--apply", "--json"]));
-    pass("receipts join actual CLI-launched runs and lifecycle operations; gateway proof requires an unshared consumer, exact authenticated session/run and bounded time, rejects unrelated/malformed/synthetic proof, and emits scalar whitelisted fields only");
+    pass("receipts join actual CLI-launched runs and lifecycle operations; gateway proof rejects shared/foreign consumers and out-of-window usage, never treats caller-selected session headers as authenticated run mapping, and emits scalar whitelisted fields only");
   }
 
   // -- 5b. a request queued behind a slow mint is re-checked INSIDE the queue -----------------------------------------------

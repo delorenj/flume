@@ -515,15 +515,18 @@ key still exists (suspension removes it, so the mailbox is closed even if the or
 
 **Receipts.** `flume access receipts` joins the facade's audit and ledgers, the lifecycle ledger and Pilot's comment receipts by `subject`,
 `run_id` and `operation_id`, emitting a field whitelist and never a raw line. `--run` adds that subject's lifecycle operations inside the run window.
-Gateway attribution links nonempty FLUME-39 owner evidence (`unverified` if absent), never a generated config. A
-`--gateway-proof` file is `verified` only for a `gateway_usage` proof with `verified: true`, an unshared employee consumer,
-and every receipt's exact `aai:<consumer>:` token prefix, authenticated `session_id` equal to a facade-audited launcher run
-for the selected employee (and, for `--run`, that selected run), plus a successful authenticated access or mail event
-and `created_at` within those successful events' bounded window to the gateway's one-second timestamp resolution. A caller-chosen `request_id`, token prefix alone, another run's historical
-usage, shared consumer, missing session or timestamp, and a separate synthetic probe cannot verify the selected run.
-The gateway-proof producer's matched prompt marker is not independently authenticated by Flume; this join attributes
-the authenticated session and bounded time, not a particular prompt. A live claim needs the producer's real provider
-receipt and an independently audited canary; fixture proof is not live acceptance. The live canary procedure is
+Gateway attribution links nonempty FLUME-39 owner evidence (`unverified` if absent), never a generated config.
+`--gateway-proof` filters imported `gateway_usage` records for an unshared employee consumer, exact
+`aai:<consumer>:` token prefix, successful selected-run audit event, and bounded timestamp. These are **negative
+checks, not positive run identity proof**: the gateway derives `session_id` from caller-provided `session-id`,
+`thread-id` or `X-Claude-Code-Session-Id` headers. A request on the same consumer in the same second can spoof
+the Flume run UUID in that header. Even when all checks pass, the CLI reports `status: unverified` and
+`reason: trusted-run-mapping-missing`; it never calls the header authenticated. Consumer ownership proves token
+usage, not which launcher run made that request. Shared consumers, foreign prefixes, wrong runs, malformed
+records and out-of-window usage continue to fail earlier checks. The proof producer's prompt marker is not an
+authenticated mapping either. AC5's selected-run gateway attribution remains HOLD until the gateway/launcher
+owner provides a trusted upstream request-to-run anchor; do not substitute a synthetic fixture or historical
+consumer-level evidence. The live canary procedure is
 `_bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md`; `employee_lifecycle_canary` stays `unproven` in
 `flume identity readiness` until the supervisor runs it.
 

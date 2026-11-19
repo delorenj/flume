@@ -925,6 +925,60 @@ try {
     pass("after suspend --revoke gateway, restore and a FLUME-39 re-mint, an out-of-band `identity status suspended` then `retire --revoke all` revokes the new token");
   }
 
+  // -- 12g0. reservation survives status publication failure and remains retryable --------------------------------------------
+  {
+    const w = await world("retire-status-failure");
+    const before = DEFINITIONS(w), mutations = providerMutations();
+    const stopped = await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"], {
+      NODE_OPTIONS: `--import=${join(root, "tests/fixtures/retire-status-crash.mjs")}`,
+      FLUME_TEST_RETIRE_ROLE: w.adaRole, FLUME_TEST_RETIRE_BEFORE_STATUS: "1",
+    });
+    assert.equal(stopped.status, 88, stopped.stdout + stopped.stderr);
+    assert.equal(w.block(w.adaRole).status, "active", "status was published despite the injected failure");
+    assert.equal(stateOf(w).tombstones[w.ada.subject].handle, "ada");
+    assert.deepEqual(DEFINITIONS(w), before);
+    assert.deepEqual(providerMutations(), mutations);
+    const status = w.json(await w.runAsync(["identity", "status", "ada-pm", "suspended", "--apply", "--json"]), 1);
+    blockedWith(status, "retired-terminal");
+    const restored = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]), 1);
+    blockedWith(restored, "retired-terminal");
+    const retry = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(w.block(w.adaRole).status, "retired");
+    assert.equal(stepOf(retry, "tombstone").outcome, "already-done");
+    pass("failed terminal status publication leaves a permanent fail-closed reservation and the original subject can retry retire");
+  }
+
+  // -- 12h0. retirement reservation survives a real CLI crash at atomic terminal publication -------------------------------
+  {
+    const w = await world("retire-crash");
+    const before = DEFINITIONS(w), mutations = providerMutations();
+    const stopped = await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"], {
+      NODE_OPTIONS: `--import=${join(root, "tests/fixtures/retire-status-crash.mjs")}`,
+      FLUME_TEST_RETIRE_ROLE: w.adaRole,
+    });
+    assert.equal(stopped.status, 87, stopped.stdout + stopped.stderr);
+    assert.equal(w.block(w.adaRole).status, "retired");
+    const tomb = stateOf(w).tombstones[w.ada.subject];
+    assert.equal(tomb.handle, "ada"); assert.equal(tomb.email, "ada@agents.delo.sh");
+    assert.deepEqual(providerMutations(), mutations, "provider mutated before terminal status publication");
+    assert.deepEqual(DEFINITIONS(w), before, "unrelated records changed in a crashed retire");
+    const reactivation = w.json(await w.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]), 1);
+    blockedWith(reactivation, "retired-terminal");
+    const rebind = w.json(await w.runAsync(["identity", "bind", "bob-pm", "cloudflare_access", "--principal", CLIENT.ada, "--instance", ISSUER, "--credential-ref", REF.adaAccess, "--apply", "--json"]), 1);
+    blockedWith(rebind, "binding-tombstoned");
+    assert.equal(readFileSync(w.bobRole, "utf8"), before.bob);
+    const retry = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(stepOf(retry, "tombstone").outcome, "already-done");
+    assert.equal(stateOf(w).tombstones[w.ada.subject].operation_id, tomb.operation_id);
+    w.json(await w.runAsync(["offboard", "ada-pm", "--apply", "--json"]));
+    w.post("eve-pm", "eve");
+    const reuse = w.json(await w.runAsync(["identity", "enroll", "eve-pm", "--handle", "ada", "--apply", "--json"]), 1);
+    blockedWith(reuse, "handle-tombstoned");
+    assert.equal(w.block(w.adaRole).subject, w.ada.subject);
+    assert.equal(readFileSync(w.bobRole, "utf8"), before.bob);
+    pass("retire CLI crash after publishing terminal role status preserves permanent handle/binding reservation, rejects reactivation and reuse after offboard, and converges for the original subject");
+  }
+
   // -- 12h. a crash between the status write and the first persist ---------------------------------------------------------------
   {
     const w = await world("crash");
