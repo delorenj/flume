@@ -342,7 +342,7 @@ export async function enrollEmployee(employee: string, options: IdentityOptions 
 }
 
 /** Record local employment status. Never touches a provider. */
-export async function setEmployeeStatus(employee: string, status: string, options: IdentityOptions = {}) {
+export async function setEmployeeStatus(employee: string, status: string, options: IdentityOptions & { lifecycle?: true } = {}) {
   const run = async () => {
     const census = identityCensus();
     const target = resolveEmployee(census, employee);
@@ -353,6 +353,7 @@ export async function setEmployeeStatus(employee: string, status: string, option
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
     else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
+    if (status === "retired" && !options.lifecycle) blockers.push({ code: "retirement-requires-lifecycle", detail: `use flume identity retire ${employee} [--apply] to preserve the permanent identity tombstone and report residual provider access` });
     if (target.block && target.block.status !== "retired" && status !== "retired") {
       // The registry row may be gone and the block hand-edited back to active (or hand-written around a retired handle): the tombstone still answers.
       const retired = tombstoneFor(readTombstones(), target.block);

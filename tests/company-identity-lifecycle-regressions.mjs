@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
@@ -13,7 +14,7 @@ import { fakeCloudflare, fakeGithub, rsa, tree, writeFakeGateway, writeFakeOp, w
 
 const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages/flume-hr/dist/index.js");
-const work = mkdtempSync("/tmp/flume53-");
+const work = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "flume53-"));
 let count = 0;
 const pass = (name) => { count++; console.log(`PASS ${name}`); };
 
@@ -604,6 +605,19 @@ try {
   // -- 10. tombstones ----------------------------------------------------------------------------------------------------
   {
     const w = await world("tombstone");
+    const beforeLegacy = { home: tree(w.home), state: tree(join(w.dir, "state")), definition: readFileSync(w.adaRole, "utf8"), calls: providerMutations(), gateway: w.gw.calls() };
+    for (const flags of [[], ["--apply"]]) {
+      const legacy = w.json(await w.runAsync(["identity", "status", "ada-pm", "retired", ...flags, "--json"]), 1);
+      blockedWith(legacy, "retirement-requires-lifecycle");
+      assert.match(legacy.blockers[0].detail, /flume identity retire ada-pm/u);
+      assert.deepEqual(legacy.writes, []);
+    }
+    assert.deepEqual(tree(w.home), beforeLegacy.home);
+    assert.deepEqual(tree(join(w.dir, "state")), beforeLegacy.state);
+    assert.equal(readFileSync(w.adaRole, "utf8"), beforeLegacy.definition);
+    assert.deepEqual(providerMutations(), beforeLegacy.calls);
+    assert.deepEqual(w.gw.calls(), beforeLegacy.gateway);
+    pass("legacy status retired is refused in preview and apply without writes or provider calls; lifecycle retirement is required");
     const retired = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
     assert.equal(retired.ok, true);
     const tomb = stateOf(w).tombstones[w.ada.subject];
@@ -909,6 +923,60 @@ try {
     assert.equal(cf.count("DELETE", /\/kv\//u), 2, "one KV DELETE per suspension (restore re-put the key in between)");
     assert.equal(cf.count("DELETE", /service_tokens/u), 1); assert.equal(gh.count("PUT", /suspended$/u), 1); assert.equal(cf.count("PUT", /email\/routing\/rules/u), 1);
     pass("after suspend --revoke gateway, restore and a FLUME-39 re-mint, an out-of-band `identity status suspended` then `retire --revoke all` revokes the new token");
+  }
+
+  // -- 12g0. reservation survives status publication failure and remains retryable --------------------------------------------
+  {
+    const w = await world("retire-status-failure");
+    const before = DEFINITIONS(w), mutations = providerMutations();
+    const stopped = await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"], {
+      NODE_OPTIONS: `--import=${join(root, "tests/fixtures/retire-status-crash.mjs")}`,
+      FLUME_TEST_RETIRE_ROLE: w.adaRole, FLUME_TEST_RETIRE_BEFORE_STATUS: "1",
+    });
+    assert.equal(stopped.status, 88, stopped.stdout + stopped.stderr);
+    assert.equal(w.block(w.adaRole).status, "active", "status was published despite the injected failure");
+    assert.equal(stateOf(w).tombstones[w.ada.subject].handle, "ada");
+    assert.deepEqual(DEFINITIONS(w), before);
+    assert.deepEqual(providerMutations(), mutations);
+    const status = w.json(await w.runAsync(["identity", "status", "ada-pm", "suspended", "--apply", "--json"]), 1);
+    blockedWith(status, "retired-terminal");
+    const restored = w.json(await w.runAsync(["identity", "restore", "ada-pm", "--apply", "--json"]), 1);
+    blockedWith(restored, "retired-terminal");
+    const retry = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(w.block(w.adaRole).status, "retired");
+    assert.equal(stepOf(retry, "tombstone").outcome, "already-done");
+    pass("failed terminal status publication leaves a permanent fail-closed reservation and the original subject can retry retire");
+  }
+
+  // -- 12h0. retirement reservation survives a real CLI crash at atomic terminal publication -------------------------------
+  {
+    const w = await world("retire-crash");
+    const before = DEFINITIONS(w), mutations = providerMutations();
+    const stopped = await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"], {
+      NODE_OPTIONS: `--import=${join(root, "tests/fixtures/retire-status-crash.mjs")}`,
+      FLUME_TEST_RETIRE_ROLE: w.adaRole,
+    });
+    assert.equal(stopped.status, 87, stopped.stdout + stopped.stderr);
+    assert.equal(w.block(w.adaRole).status, "retired");
+    const tomb = stateOf(w).tombstones[w.ada.subject];
+    assert.equal(tomb.handle, "ada"); assert.equal(tomb.email, "ada@agents.delo.sh");
+    assert.deepEqual(providerMutations(), mutations, "provider mutated before terminal status publication");
+    assert.deepEqual(DEFINITIONS(w), before, "unrelated records changed in a crashed retire");
+    const reactivation = w.json(await w.runAsync(["identity", "status", "ada-pm", "active", "--apply", "--json"]), 1);
+    blockedWith(reactivation, "retired-terminal");
+    const rebind = w.json(await w.runAsync(["identity", "bind", "bob-pm", "cloudflare_access", "--principal", CLIENT.ada, "--instance", ISSUER, "--credential-ref", REF.adaAccess, "--apply", "--json"]), 1);
+    blockedWith(rebind, "binding-tombstoned");
+    assert.equal(readFileSync(w.bobRole, "utf8"), before.bob);
+    const retry = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
+    assert.equal(stepOf(retry, "tombstone").outcome, "already-done");
+    assert.equal(stateOf(w).tombstones[w.ada.subject].operation_id, tomb.operation_id);
+    w.json(await w.runAsync(["offboard", "ada-pm", "--apply", "--json"]));
+    w.post("eve-pm", "eve");
+    const reuse = w.json(await w.runAsync(["identity", "enroll", "eve-pm", "--handle", "ada", "--apply", "--json"]), 1);
+    blockedWith(reuse, "handle-tombstoned");
+    assert.equal(w.block(w.adaRole).subject, w.ada.subject);
+    assert.equal(readFileSync(w.bobRole, "utf8"), before.bob);
+    pass("retire CLI crash after publishing terminal role status preserves permanent handle/binding reservation, rejects reactivation and reuse after offboard, and converges for the original subject");
   }
 
   // -- 12h. a crash between the status write and the first persist ---------------------------------------------------------------

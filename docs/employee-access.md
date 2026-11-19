@@ -356,9 +356,14 @@ session after the build lands (`_bmad-output/implementation-artifacts/FLUME-52/`
 
 ## Suspension, rotation and retirement (FLUME-53)
 
-`flume identity status` records LOCAL employment state and revokes nothing. The lifecycle commands below are what
-closes the mailbox, revokes or reports each provider credential, rotates a key while keeping who the person is, and proves
-afterwards that history still points at the same person.
+`flume identity status <e> active|suspended` changes local status only; it does not revoke provider access. The legacy
+`flume identity status <e> retired` path is refused (`retirement-requires-lifecycle`) even with `--apply`: use
+`flume identity retire <e> [--revoke all] --apply` instead. Only that lifecycle path records the permanent subject/handle
+tombstone and inventories residual credentials. A fixture run is not evidence that live Access, GitHub, gateway or mail
+providers have been revoked.
+
+The lifecycle commands below close the mailbox, revoke or report each provider credential, rotate a key while keeping
+who the person is, and check afterwards that history still points at the same person.
 
 ```
 flume identity suspend  <e> [--revoke cloudflare_access|github|gateway ...] [--apply]
@@ -474,7 +479,8 @@ no key anywhere is `not-issued`.
 
 FLUME-39 provisions on hire through `gateway-tokens.py`. Every gateway row and result carries
 `owner_ticket: FLUME-39`, `evidence_path` (`FLUME_GATEWAY_EVIDENCE`, default `_bmad-output/implementation-artifacts/FLUME-39`) and
-`evidence_status`, which is `unverified` until that evidence exists.
+`evidence_status`. A missing path, empty directory or blank document is `unverified`; a nonempty regular owner document
+links the evidence (`present`), but does not prove a live gateway request. A generated desk config is never usage evidence.
 
 **Tombstones.** Retire records the subject, handle, email and binding keys in the lifecycle state. `flume offboard` removes only the
 registry row, but enroll, bind, status, suspend, restore and rotate consult the tombstone: `handle-tombstoned`, `subject-tombstoned`,
@@ -509,11 +515,20 @@ key still exists (suspension removes it, so the mailbox is closed even if the or
 
 **Receipts.** `flume access receipts` joins the facade's audit and ledgers, the lifecycle ledger and Pilot's comment receipts by `subject`,
 `run_id` and `operation_id`, emitting a field whitelist and never a raw line. `--run` adds that subject's lifecycle operations inside the run window.
-Gateway attribution links the FLUME-39 evidence (`unverified` while absent), never a generated config; a `--gateway-proof` file is `verified` only
-if it says `verified: true`, every `token_name` starts with `aai:<consumer>:`, and that consumer is the employee's alone (a shared consumer's
-proof is `unverified`, reason `shared-consumer`). The live canary procedure is
-`_bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md`; `employee_lifecycle_canary` stays `unproven` in `flume identity readiness`
-until the supervisor runs it.
+Gateway attribution links nonempty FLUME-39 owner evidence (`unverified` if absent), never a generated config.
+`--gateway-proof` filters imported `gateway_usage` records for an unshared employee consumer, exact
+`aai:<consumer>:` token prefix, successful selected-run audit event, and bounded timestamp. These are **negative
+checks, not positive run identity proof**: the gateway derives `session_id` from caller-provided `session-id`,
+`thread-id` or `X-Claude-Code-Session-Id` headers. A request on the same consumer in the same second can spoof
+the Flume run UUID in that header. Even when all checks pass, the CLI reports `status: unverified` and
+`reason: trusted-run-mapping-missing`; it never calls the header authenticated. Consumer ownership proves token
+usage, not which launcher run made that request. Shared consumers, foreign prefixes, wrong runs, malformed
+records and out-of-window usage continue to fail earlier checks. The proof producer's prompt marker is not an
+authenticated mapping either. AC5's selected-run gateway attribution remains HOLD until the gateway/launcher
+owner provides a trusted upstream request-to-run anchor; do not substitute a synthetic fixture or historical
+consumer-level evidence. The live canary procedure is
+`_bmad-output/implementation-artifacts/FLUME-53/live-canary-procedure.md`; `employee_lifecycle_canary` stays `unproven` in
+`flume identity readiness` until the supervisor runs it.
 
 ## Registry projection for the lifecycle
 

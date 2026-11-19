@@ -312,7 +312,10 @@ try {
     const f = world("adopt-gates", { adopt: false });
     f.json(f.run(["identity", "status", "rere-pm", "suspended", "--apply", "--json"]));
     f.employee("third-pm", "third");
-    f.json(f.run(["identity", "status", "third-pm", "retired", "--apply", "--json"]));
+    const legacyRetire = f.json(f.run(["identity", "status", "third-pm", "retired", "--apply", "--json"]), 1);
+    assert.deepEqual(codes(legacyRetire), ["retirement-requires-lifecycle"]);
+    const lifecycleRetire = f.json(f.run(["identity", "retire", "third-pm", "--apply", "--json"]), 1);
+    assert.ok(lifecycleRetire.steps.some((step) => step.key === "tombstone" && step.outcome === "done"), "even without provisioning configuration, lifecycle retirement records a tombstone and reports unresolved mail");
     f.named("raw-pm", "rawperson"); // never enrolled
     const suspended = f.json(f.adopt("rere-pm", ["TEST"]), 1);
     assert.deepEqual(codes(suspended), ["employee-suspended"]);
@@ -532,7 +535,8 @@ try {
   // -- verify-plane: history survives status changes, and no write verb is ever used --------------------------------
   {
     const f = world("verify-history");
-    f.json(f.run(["identity", "status", "33god-pm", "retired", "--apply", "--json"]));
+    const retirement = f.json(f.run(["identity", "retire", "33god-pm", "--apply", "--json"]), 1);
+    assert.ok(retirement.steps.some((step) => step.key === "tombstone" && step.outcome === "done"));
     f.json(f.run(["identity", "status", "rere-pm", "suspended", "--apply", "--json"]));
     const result = f.json(f.run(verifyArgs(["grolf", C1], ["rererere", C2])));
     assert.equal(result.verdict, "native-distinct-verified");

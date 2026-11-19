@@ -7,14 +7,16 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
 import { addSetSkills, createSet } from "@delorenj/skillex";
+import { writeFakeMemberGateway, writeFakeOp } from "./lifecycle-fixtures.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages/flume-hr/dist/index.js");
-const work = mkdtempSync("/tmp/flume47-");
+const work = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "flume47-"));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 let count = 0;
 const pass = (name) => { count++; console.log(`PASS ${name}`); };
@@ -72,6 +74,14 @@ async function specialistFixture(label) {
   f.env.PJ_SKILLS_REGISTRY_ROOT = catalog;
   const source = join(f.dir, "agent.yaml");
   writeFileSync(source, "# specialist source\n" + YAML.stringify({ schema_version: 1, id: "specialist", display_name: "The Specialist", role: "infra", charter: { purpose: "Keep infra boring" }, skills: { set: "first" }, memory: { write_bank: "agent-specialist", recall_banks: ["infra"] } }));
+  f.env.FLUME_GATEWAY_TOKENS_BIN = join(f.dir, "member-confirm.py");
+  f.env.PATH = `${join(f.dir, "bin")}:${process.env.PATH}`;
+  f.env.OP_SERVICE_ACCOUNT_TOKEN = "fixture-vault-session";
+  f.env.OP_FIXTURE = join(f.dir, "op.json");
+  mkdirSync(join(f.dir, "bin"));
+  writeFakeMemberGateway(f.env.FLUME_GATEWAY_TOKENS_BIN);
+  writeFakeOp(join(f.dir, "bin/op"), f.env.OP_SERVICE_ACCOUNT_TOKEN);
+  writeFileSync(f.env.OP_FIXTURE, JSON.stringify({ "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-specialist": "fixture-member-value-long-enough-for-readback" }));
   f.json(f.run(["hire", "--definition", source, "--json"]));
   assert.ok(f.json(f.run(["audit", "--employee", "specialist", "--json"])).ok);
   return { ...f, source, desk: join(f.home, ".agents/workforce/specialist"), profile: join(f.fleet, "profiles/specialist") };
@@ -441,15 +451,16 @@ try {
     assert.equal(stored.subject, enrolled.identity.subject);
     assert.ok(readFileSync(rolePath, "utf8").startsWith("# operator note: keep me\n"));
     const human = f.run(["identity", "status", "jo-pm", "retired", "--apply"]);
-    assert.equal(human.status, 0, human.stderr);
-    assert.match(human.stdout, /provider access was not revoked/);
-    assert.equal(YAML.parse(readFileSync(rolePath, "utf8")).company_identity.status, "retired");
-    const retired = blocked(f, ["status", "jo-pm", "active"], "retired-terminal");
+    assert.equal(human.status, 1, human.stderr);
+    assert.match(human.stdout, /retirement-requires-lifecycle/);
+    assert.equal(YAML.parse(readFileSync(rolePath, "utf8")).company_identity.status, "suspended");
+    f.named("old-pm", "old", f.yamlBlock({ subject: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", handle: "old", status: "retired" }));
+    const retired = blocked(f, ["status", "old-pm", "active"], "retired-terminal");
     assert.equal(retired.provider_revocation, "not_performed");
     blocked(f, ["status", "kim-pm", "suspended"], "not-enrolled");
     blocked(f, ["status", "jo-pm", "fired"], "invalid-status");
     blocked(f, ["enroll", "kim-pm", "--handle", "jo"], "handle-taken");
-    pass("suspend/retire are recorded locally with provider_revocation not_performed; retired is terminal and keeps its handle");
+    pass("local suspension reports provider_revocation not_performed; retirement requires lifecycle; existing retired identities remain terminal");
 
     // A block in the middle of the file is replaced in place; what follows it keeps every byte.
     const head = "role: pm\nagent_id: mid-pm\nidentity:\n  name: mo\n";
