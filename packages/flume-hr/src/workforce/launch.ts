@@ -10,11 +10,14 @@
  *   wrappers      <profile>/scripts/launch-{monitor,brief}.sh   real files that exec the driver
  *   Hermes job    profile cron job, pinned scheduler=external, lean (interval-driver)
  *   Candybar      <repo>/.candybars/<repo>-pm-launch-pass.candybar.toml, registered and enabled
+ *   crank         pjangler crank on for the repo (`pj crank enable`), so its interactive agent
+ *                 sessions keep moving too; skipped for a repo with no `.project.json`
  *
  * Candybar is the only clock: the job is pinned `external`, and nothing here schedules anything.
  * `enable` is idempotent and adopts what already exists (zero changes on a wired repo); `disable`
  * only pauses the Candybar job (manifest and Hermes job stay, so going steady is reversible).
- * Writes only the wrappers, the Hermes job and the manifest; it commits nothing.
+ * Writes only the wrappers, the Hermes job and the manifest, and asks pj to turn crank on (pj writes
+ * `.project.json`); it commits nothing. `disable` leaves crank alone: crank also serves steady repos.
  */
 
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -345,6 +348,42 @@ function lastCandybarRun(repoRoot: string, name: string): { when?: string; resul
 }
 
 // ---------------------------------------------------------------------------------------------
+// Crank (pjangler): a launching repo keeps its interactive agent sessions cranked
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The repo's crank policy as `pj crank status --json` resolves it. pj owns the crank block (project
+ * `.project.json` over the global crank.toml), so flume asks rather than re-deriving the rule.
+ * `applicable: false` = not a pjangler project (no `.project.json`): crank does not apply.
+ */
+export interface CrankState { applicable: boolean; observable: boolean; enabled?: boolean; source?: string; interval?: string; error?: string }
+
+function pjBin(): string { return process.env.FLUME_PJ_BIN?.trim() || "pj"; }
+
+function runPj(args: string[], cwd: string, timeout = 60_000) {
+  return spawnSync(pjBin(), args, { cwd, encoding: "utf8", timeout, shell: false, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, NO_COLOR: "1" } });
+}
+
+export function crankState(repoRoot: string): CrankState {
+  if (!existsSync(join(repoRoot, ".project.json"))) return { applicable: false, observable: true };
+  const run = runPj(["crank", "status", "--json"], repoRoot, 30_000);
+  if (run.error || run.status !== 0) {
+    return { applicable: true, observable: false, error: `pj crank status failed: ${String(run.error?.message ?? run.stderr).trim().slice(0, 200)}` };
+  }
+  try {
+    const policy = mapping(mapping(JSON.parse(String(run.stdout)))?.policy);
+    if (!policy || typeof policy.enabled !== "boolean") return { applicable: true, observable: false, error: "pj crank status --json has no policy.enabled" };
+    return {
+      applicable: true, observable: true, enabled: policy.enabled,
+      ...(typeof policy.enabledSource === "string" ? { source: policy.enabledSource } : {}),
+      ...(typeof policy.interval === "string" ? { interval: policy.interval } : {}),
+    };
+  } catch (error) {
+    return { applicable: true, observable: false, error: `pj crank status output unreadable: ${(error as Error).message}` };
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
 // status
 // ---------------------------------------------------------------------------------------------
 
@@ -358,6 +397,7 @@ export interface LaunchStatus {
   job: { id: string; enabled: boolean; scheduler: string; schedule: string; lastRun: string | null; lastStatus: string | null } | null;
   manifest: { path: string; exists: boolean; inSync: boolean };
   candybar: CandybarState & { lastRun: { when?: string; result?: string } | null };
+  crank: CrankState;
   retiredDesks: string[];
   problems: string[];
 }
@@ -365,7 +405,7 @@ export interface LaunchStatus {
 /** What the audit and `status` both conclude: launch passes must follow the declaration, and retired roles must go. */
 export function launchProblems(input: {
   declaration: LaunchDeclaration; desk: PmDeskResult; deskExtras: Desk[]; driver: boolean; wrappers: { monitor: boolean; brief: boolean };
-  jobs: Job[]; manifestExists: boolean; candybar: CandybarState; names?: LaunchNames;
+  jobs: Job[]; manifestExists: boolean; candybar: CandybarState; names?: LaunchNames; crank?: CrankState;
 }): { problems: string[]; fixable: boolean } {
   const problems: string[] = [];
   let fixable = true;
@@ -390,6 +430,12 @@ export function launchProblems(input: {
       if (!candybar.observable) problems.push(`Candybar not observable (${candybar.error ?? "unknown"}); launch pass state unverified`);
       else if (!enabled) problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is ${candybar.state}, mode is launch; run: flume launch enable`);
     }
+    // A launch keeps momentum in the interactive sessions too: crank on is part of launch mode.
+    const crank = input.crank;
+    if (crank?.applicable) {
+      if (!crank.observable) problems.push(`Crank not observable (${crank.error ?? "unknown"}); crank policy unverified`);
+      else if (crank.enabled === false) problems.push(`crank is off (${crank.source ?? "default"}), mode is launch; run: flume launch enable`);
+    }
   } else if (enabled) {
     problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is enabled but ${LAUNCH_DECLARATION} is ${declaration.mode === "absent" ? "absent" : declaration.mode} (steady); run: flume launch disable`);
   }
@@ -409,7 +455,8 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
   const manifest = names ? readManifest(names.manifestPath) : { exists: false };
   const extras = desksOfRepo(repoRoot, env).filter((d) => !d.retired && (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
   const driver = names ? existsSync(names.driverPath) : false;
-  const { problems } = launchProblems({ declaration, desk: found, deskExtras: extras, driver, wrappers, jobs, manifestExists: manifest.exists, candybar, ...(names ? { names } : {}) });
+  const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
+  const { problems } = launchProblems({ declaration, desk: found, deskExtras: extras, driver, wrappers, jobs, manifestExists: manifest.exists, candybar, crank, ...(names ? { names } : {}) });
   const job = jobs[0];
   const jobFacts = job ? {
     id: String(job.id), enabled: job.enabled !== false, scheduler: String(job.scheduler ?? "internal"),
@@ -425,6 +472,7 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
     driver, wrappers, job: jobFacts,
     manifest: { path: names?.manifestPath ?? "", exists: manifest.exists, inSync },
     candybar: { ...candybar, lastRun: candybar.state === "unregistered" || !candybar.observable ? null : lastCandybarRun(repoRoot, candybarName) },
+    crank,
     retiredDesks: extras.map((d) => `${d.id} (${d.role})`),
     problems,
   };
@@ -439,6 +487,7 @@ export function formatLaunchStatus(s: LaunchStatus): string {
     `  hermes job   ${s.job ? `${s.job.id} ${s.job.enabled ? "enabled" : "disabled"} scheduler=${s.job.scheduler} "${s.job.schedule}" last ${s.job.lastStatus ?? "never"}${s.job.lastRun ? ` at ${s.job.lastRun}` : ""}` : "none"}`,
     `  manifest     ${s.manifest.exists ? `${s.manifest.path} (${s.manifest.inSync ? "matches job" : "differs from job"})` : "missing"}`,
     `  candybar     ${s.candybar.state}${s.candybar.sync ? ` (sync ${s.candybar.sync})` : ""}${s.candybar.lastRun?.when ? `  last run ${s.candybar.lastRun.when} ${s.candybar.lastRun.result ?? ""}` : ""}`,
+    `  crank        ${!s.crank.applicable ? "n/a (no .project.json)" : !s.crank.observable ? `unknown (${s.crank.error ?? "unreadable"})` : `${s.crank.enabled ? "on" : "off"}${s.crank.interval ? ` every ${s.crank.interval}` : ""}${s.crank.source ? ` (${s.crank.source})` : ""}`}`,
   ];
   if (s.retiredDesks.length) lines.push(`  retired roles still live: ${s.retiredDesks.join(", ")}`);
   lines.push(s.problems.length ? `problems:\n${s.problems.map((p) => `  - ${p}`).join("\n")}` : "ok");
@@ -550,6 +599,17 @@ export function enableLaunch(repoArg: string | undefined, options: LaunchOptions
     if (manifestWrite || !cb || cb.state !== "enabled") actions.push({ target: `candybar ${names.candybar}`, action: "update", detail: "candybar resume (enabled)" });
   }
 
+  // 5. Crank: a launching pjangler project cranks its interactive sessions (pj owns the write)
+  const crank = crankState(repoRoot);
+  let crankInterval: string | undefined;
+  if (!crank.applicable) { /* no .project.json: not a pjangler project, crank does not apply */ }
+  else if (!crank.observable) actions.push({ target: "crank", action: "skip", detail: `unverified (${crank.error ?? "pj unreadable"}); run: pj crank enable` });
+  else if (crank.enabled) actions.push({ target: "crank", action: "unchanged", detail: `on every ${crank.interval ?? "?"} (${crank.source ?? "?"})` });
+  else {
+    crankInterval = crank.interval ?? "5m";
+    actions.push({ target: "crank", action: "update", detail: `pj crank enable --interval ${crankInterval}` });
+  }
+
   const changes = actions.filter((a) => a.action === "create" || a.action === "update").length;
   const plan: LaunchPlan = { ok: true, repo: repoRoot, operation: "enable", dryRun, actions, changes };
   if (dryRun || changes === 0) return plan;
@@ -576,6 +636,12 @@ export function enableLaunch(repoArg: string | undefined, options: LaunchOptions
   }
   const final = candybarState(repoRoot, names.candybar);
   if (final.state !== "enabled") return { ...plan, ok: false, error: `candybar ${names.candybar} is ${final.state} after enable` };
+  if (crankInterval) {
+    const on = runPj(["crank", "enable", "--interval", crankInterval], repoRoot, 120_000);
+    if (on.error || on.status !== 0) return { ...plan, ok: false, error: `pj crank enable failed: ${String(on.error?.message ?? on.stderr ?? on.stdout).trim().slice(0, 300)}` };
+    const after = crankState(repoRoot);
+    if (!after.enabled) return { ...plan, ok: false, error: "crank is still off after pj crank enable" };
+  }
   return plan;
 }
 
@@ -612,7 +678,7 @@ export function formatLaunchPlan(plan: LaunchPlan): string {
 // ---------------------------------------------------------------------------------------------
 
 const LAUNCH_MODE_ID = "hermes.launch-mode";
-const LAUNCH_MODE_TITLE = "Launch passes follow .launch.yaml, and no retired launch role is live";
+const LAUNCH_MODE_TITLE = "Launch passes and crank follow .launch.yaml, and no retired launch role is live";
 
 interface LaunchModeReading {
   skip: boolean;
@@ -635,11 +701,12 @@ function readLaunchMode(repoRoot: string, homeDir: string): LaunchModeReading {
   const jobs = found.desk ? launchJobsOf(found.desk.profile, env) : [];
   const wrappers = names ? { monitor: wrapperOk(names.monitorPath, "monitor", names), brief: wrapperOk(names.briefPath, "brief", names) } : { monitor: false, brief: false };
   const extras = desks.filter((d) => !d.retired && (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
+  const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
   const { problems: all, fixable } = launchProblems({
     declaration, desk: found, deskExtras: extras, driver: names ? existsSync(names.driverPath) : false, wrappers, jobs,
-    manifestExists: names ? existsSync(names.manifestPath) : false, candybar, ...(names ? { names } : {}),
+    manifestExists: names ? existsSync(names.manifestPath) : false, candybar, crank, ...(names ? { names } : {}),
   });
-  const warnings = all.filter((p) => p.startsWith("Candybar not observable"));
+  const warnings = all.filter((p) => p.startsWith("Candybar not observable") || p.startsWith("Crank not observable"));
   return { skip: false, problems: all.filter((p) => !warnings.includes(p)), warnings, fixable, checked: `mode ${declaration.mode}, ${desks.length} desk(s)` };
 }
 

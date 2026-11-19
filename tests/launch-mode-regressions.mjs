@@ -47,6 +47,7 @@ const env = {
   HERMES_AGENTS_REGISTRY: "", HERMES_FLEET_REGISTRY_FILE: "",
   FLUME_CANDYBAR_BIN: join(ROOT, "tests/helpers/fake-candybar.py"),
   FLUME_HERMES_PYTHON: join(ROOT, "tests/helpers/fake-hermes-python.py"),
+  FLUME_PJ_BIN: join(ROOT, "tests/helpers/fake-pj.py"), FAKE_PJ_LOG: join(work, "pj.log"),
   FAKE_CANDYBAR_STATE: state, FAKE_CANDYBAR_LOG: cbLog, NO_COLOR: "1",
 };
 const flume = (args, cwd = repo, extra = {}) => {
@@ -184,6 +185,42 @@ await check("remediate hermes.launch-mode re-enables the pass (dry run first)", 
   const run = json(["remediate", "hermes.launch-mode", repo]);
   assert.equal(run.status, 0, run.out);
   assert.equal(cbState()["demo-pm-launch-pass"].enabled, true);
+});
+
+await check("crank: n/a without .project.json; a launching pjangler repo with crank off fails, enable turns it on via pj", () => {
+  assert.equal(json(["launch", "status", repo]).doc.crank.applicable, false, "no .project.json: crank does not apply");
+  const project = join(repo, ".project.json");
+  writeFileSync(project, JSON.stringify({ slug: "demo" }));
+  const bad = json(["audit", repo, "--rules", "hermes.launch-mode"]);
+  assert.equal(bad.doc.rules[0].status, "fail");
+  assert.match(bad.doc.rules[0].details.join("\n"), /crank is off \(built-in default\), mode is launch; run: flume launch enable/);
+  assert.equal(bad.doc.rules[0].fixable, true);
+  const dry = json(["launch", "enable", repo, "--dry-run"]);
+  const crankAction = dry.doc.actions.find((a) => a.target === "crank");
+  assert.equal(crankAction.action, "update");
+  assert.match(crankAction.detail, /pj crank enable --interval 5m/);
+  assert.equal(dry.doc.changes, 1, "only crank is missing");
+  assert.equal(JSON.parse(readFileSync(project, "utf8")).crank, undefined, "dry run changed nothing");
+  const fix = json(["remediate", "hermes.launch-mode", repo]);
+  assert.equal(fix.status, 0, fix.out);
+  assert.deepEqual(JSON.parse(readFileSync(project, "utf8")).crank, { enabled: true, interval: "5m" });
+  assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass");
+  const status = json(["launch", "status", repo]);
+  assert.deepEqual([status.doc.crank.enabled, status.doc.crank.interval], [true, "5m"]);
+  assert.match(flume(["launch", "status", repo]).out, /crank\s+on every 5m \(project\)/);
+  const again = json(["launch", "enable", repo]);
+  assert.equal(again.doc.changes, 0, JSON.stringify(again.doc.actions));
+  assert.equal(again.doc.actions.find((a) => a.target === "crank").action, "unchanged");
+});
+
+await check("crank: an unreadable pj warns in the audit and is skipped by enable, never guessed", () => {
+  const broken = { FAKE_PJ_BROKEN: "1" };
+  const r = json(["audit", repo, "--rules", "hermes.launch-mode"], broken);
+  assert.equal(r.doc.rules[0].status, "warn");
+  assert.match(r.doc.rules[0].details.join("\n"), /Crank not observable \(pj crank status failed/);
+  const plan = json(["launch", "enable", repo, "--dry-run"], broken);
+  assert.equal(plan.doc.ok, true);
+  assert.equal(plan.doc.actions.find((a) => a.target === "crank").action, "skip");
 });
 
 await check("disable pauses the Candybar and keeps the manifest and the Hermes job; twice is a no-op", () => {

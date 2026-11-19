@@ -36,12 +36,16 @@ launcher) is unchanged and is the default when the first word is not `status|ena
   the two wrappers; one Hermes launch job (adopts the profile's job whose script is
   `launch-brief.sh` and monitor is `launch-monitor.sh`, else creates one at `--schedule`, default
   hourly 08-22 at a per-repo minute, America/New_York) pinned `scheduler: external` and lean; the
-  Candybar manifest; `candybar register --name <repo>-pm-launch-pass`; `candybar resume`. Idempotent:
+  Candybar manifest; `candybar register --name <repo>-pm-launch-pass`; `candybar resume`; and, for a
+  pjangler project (a `.project.json`), crank on via `pj crank enable --interval <resolved interval>`
+  so the repo's interactive agent sessions keep moving too (pj writes `.project.json`; commit it).
+  An unreadable `pj` skips crank with a note rather than failing the enable. Idempotent:
   a wired repo reports `nothing to change`. An adopted job keeps its own schedule unless `--schedule`
   is given. It writes the wrappers, the job and the manifest, and commits nothing: commit the
   manifest to the repo.
 - **disable** pauses the Candybar job and keeps the manifest and the Hermes job, so going steady is
-  reversible. Use it when `.launch.yaml` goes `steady`.
+  reversible. Use it when `.launch.yaml` goes `steady`. It leaves crank alone: crank also serves
+  steady repos (`pj crank disable` turns it off).
 
 ## Audit rule `hermes.launch-mode` (project scope)
 
@@ -49,7 +53,8 @@ launcher) is unchanged and is the default when the first word is not `status|ena
 
 - `mode: launch` fails unless there is a live `pm` desk, the driver, both wrappers, a Hermes launch
   job that is enabled and `scheduler: external`, the manifest, and an **enabled** Candybar
-  `<repo>-pm-launch-pass`. An unreadable Candybar is a `warn` (unverified), not a pass.
+  `<repo>-pm-launch-pass`, and, in a pjangler project, crank on (`pj crank status --json`
+  `policy.enabled`). An unreadable Candybar or `pj` is a `warn` (unverified), not a pass.
 - `mode: steady` or no `.launch.yaml` fails if the `<repo>-pm-launch-pass` Candybar is enabled
   (`flume launch disable`).
 - Any non-retired registry row (`bloodbank.enabled` not false) for the repo with role

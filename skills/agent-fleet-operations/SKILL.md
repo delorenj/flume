@@ -325,8 +325,9 @@ the first fire with `candybar history <repo>-pm-launch-pass` and the second
 `b0a35860840f`, `.candybars/earshot-pm-launch-pass.candybar.toml`).
 
 **Audit.** `flume audit --rules hermes.launch-mode` (project scope): `mode: launch`
-requires the enabled Candybar `<repo>-pm-launch-pass` and an external Hermes job on
-the repo's pm desk; `mode: steady` or no file requires no enabled launch pass; any
+requires the enabled Candybar `<repo>-pm-launch-pass`, an external Hermes job on
+the repo's pm desk and, in a pjangler project, crank on (`flume launch enable`
+runs `pj crank enable` for you); `mode: steady` or no file requires no enabled launch pass; any
 non-retired registry row whose role is `launch-director`, `paired-launch-director`
 or `em` is a finding that names `flume retire` (directors) or the em-to-pm
 conversion below.
