@@ -1,6 +1,18 @@
 # FLUME-32 worker evidence
 
-Status: SOURCE_LANDED_AND_PUSHED; independent review complete; combined typecheck/build PASS and 22/23 suites PASS with one pre-existing fleet-status assertion failure
+## Current delivery — 2026-11-18
+
+Status: integrated source and combined acceptance verified on isolated branch `feat/FLUME-32-delivery-20261118` (base `origin/main` `5fe691595057de867ccae38d492720aa30d5f54a`). The exact merged reviewed tips are `8012a45c16eb8b7eff393ce6727e287a8c69ff15` (role reconciliation), `5cb57252cd0004315eb698c177e530b42203fb57` (AC6 projected proof), and `b354f030fb92871c6890508ab1be2db751764f79` (specialist placement). Delivery results and scope: [delivery-20261118.md](delivery-20261118.md). This block supersedes historical pending-gate language below; the October 5 seam-only receipt is historical, not the current AC6 proof.
+
+- AC1–AC5: PASS on the real hire/onboard, strict Skillex loadout, model/organization projection, audit negatives and shared contract regressions. The AC4 reconciliation proves no-chain inheritance and preservation/reporting of explicit desk overrides.
+- Specialist extension: PASS on existing-department placement, explicit/derived superior and title projection; audited drift, malformed memberships and manager-duplication refusal; preview/apply/idempotency regressions. This is not authority to create departments or edit the live org.
+- AC6: PASS for the permitted isolated installed-Hermes desk ingress; the new immutable [role-projected receipt](ac6-role-projected-20261118.json) records member `hermes-flume-pm`, first fallback `automaticai/personal/sol-6.1`, gateway request `202611182326544908510298268d9d6othtUQIR`, actual `medium` effort and `effort_defaulted=false`. It does not prove multiplexed Bloodbank ingress. The validator-only revision has a different runner hash from the original receipt; no new inference was claimed.
+- Combined runner: typecheck and build PASS, **12/12** selected suites PASS (`org-chart`, `hermes-profile-inheritance`, `named-agent`, `named-agent-recency`, `role-projection`, `role-selection`, `role-hire`, `registry-comments`, `role-contract`, `named-agent-contract`, `specialist-hire`, `specialist-placement`). Durable log: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume32-combined-20261118.log`.
+- AC6 offline safety regressions: **14/14 PASS**, log `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume32-ac6-offline-20261118.log`. `node --check scripts/ac6-project-role.mjs`, canonical `flume handbook validate` and `git diff --check` PASS after the ticket-owned handbook line-wrap was corrected. No full-suite claim; the separate legacy persona-update Skillex fixture and prior full-suite timeout are outside this selected gate.
+
+## Historical worker evidence (October 2026; not the current delivery)
+
+Status at that time: SOURCE_LANDED_AND_PUSHED; independent review complete; combined typecheck/build PASS and 22/23 suites PASS with one pre-existing fleet-status assertion failure
 Worker: flume-32-hire-proof
 Worktree: /home/delorenj/code/33GOD/flume/.worktrees/flume-32-hire
 Branch: feat/flume-32-hire-proof

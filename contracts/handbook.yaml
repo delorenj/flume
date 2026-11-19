@@ -277,8 +277,8 @@ authorities:
         <desk>/.skillex-selection/.agents/skills.json; it is not an
         operator-edited profile override. Skillex alone syncs that selection
         into <desk>/skills/ as catalog symlinks and maintains its receipt and
-        strict markers. The profile tree's runtime-template ownership above
-        does not make Flume the owner of those projected skill entries.
+        strict markers. The profile tree's runtime-template ownership above does
+        not make Flume the owner of those projected skill entries.
       - >-
         Was two blocks -- generated_profile_inputs (the renderer) and
         provisioned_profile_state (the provisioning step). Both resolved to the
