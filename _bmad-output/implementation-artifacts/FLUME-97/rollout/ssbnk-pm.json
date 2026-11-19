@@ -1,0 +1,1085 @@
+{
+  "agent": "ssbnk-pm",
+  "repo": "/home/delorenj/code/ssbnk",
+  "role_dir": "/home/delorenj/code/ssbnk/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:06:13.831518+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "ea6d71835c3a4e646586b3cd436419010dbebdf9",
+    "origin": "git@github.com:delorenj/ssbnk.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/spec-remote-capture-tray-clients.md",
+      " M clients/linux/gnome/ssbnk@delo.sh/extension.js",
+      " M clients/linux/packaging/PKGBUILD",
+      " M clients/linux/scripts/package.py",
+      " M clients/linux/src/ssbnk_client/config.py",
+      " M clients/linux/src/ssbnk_client/desktop.py",
+      " M clients/linux/src/ssbnk_client/gnome_bridge.py",
+      " M clients/linux/src/ssbnk_client/legacy.py",
+      " M clients/linux/src/ssbnk_client/scanner.py",
+      " M clients/linux/src/ssbnk_client/store.py",
+      " M clients/linux/src/ssbnk_client/upload.py",
+      " M clients/linux/src/ssbnk_client/worker.py",
+      " M clients/linux/tests/test_bridge.py",
+      " M clients/linux/tests/test_handover.py",
+      " M clients/macos/Sources/SSBNKClient/AppModel.swift",
+      " M clients/macos/Sources/SSBNKClient/CaptureScanner.swift",
+      " M clients/macos/Sources/SSBNKClient/ClipboardCoordinator.swift",
+      " M clients/macos/Sources/SSBNKClient/HealthMonitor.swift",
+      " M clients/macos/Sources/SSBNKClient/LegacyMigration.swift",
+      " M clients/macos/Sources/SSBNKClient/TransferQueue.swift",
+      " M clients/macos/Sources/SSBNKClient/UploadClient.swift",
+      " M clients/macos/Tests/SSBNKClientTests/LegacyMigrationTests.swift",
+      " M clients/macos/Tests/SSBNKClientTests/TestSupport.swift",
+      " M clients/macos/scripts/build-dmg.sh",
+      " M clients/protocol/upload-v2.schema.json",
+      " M mise.toml",
+      " M watcher/hosted.go",
+      " M watcher/intake.go",
+      " M watcher/main.go",
+      " M watcher/media.go",
+      " M watcher/spool.go",
+      " M watcher/upload.go",
+      " M watcher/upload_protocol.go",
+      "?? PIC.PNG",
+      "?? clients/linux/tests/shell_copy_test.mjs",
+      "?? clients/linux/tests/test_dispatch_packaging.py",
+      "?? clients/linux/tests/test_repairs.py",
+      "?? clients/macos/Tests/SSBNKClientTests/RepairTests.swift",
+      "?? clients/protocol/check_schema.py",
+      "?? runtime/",
+      "?? watcher/checkpoint_test.go",
+      "?? watcher/live_upload_test.go",
+      "?? watcher/media_production_test.go",
+      "?? watcher/repair_test.go",
+      "?? watcher/schema_test.go",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/ssbnk",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/ssbnk\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "ea6d71835c3a4e646586b3cd436419010dbebdf9",
+    "origin": "git@github.com:delorenj/ssbnk.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/spec-remote-capture-tray-clients.md",
+      " M clients/linux/gnome/ssbnk@delo.sh/extension.js",
+      " M clients/linux/packaging/PKGBUILD",
+      " M clients/linux/scripts/package.py",
+      " M clients/linux/src/ssbnk_client/config.py",
+      " M clients/linux/src/ssbnk_client/desktop.py",
+      " M clients/linux/src/ssbnk_client/gnome_bridge.py",
+      " M clients/linux/src/ssbnk_client/legacy.py",
+      " M clients/linux/src/ssbnk_client/scanner.py",
+      " M clients/linux/src/ssbnk_client/store.py",
+      " M clients/linux/src/ssbnk_client/upload.py",
+      " M clients/linux/src/ssbnk_client/worker.py",
+      " M clients/linux/tests/test_bridge.py",
+      " M clients/linux/tests/test_handover.py",
+      " M clients/macos/Sources/SSBNKClient/AppModel.swift",
+      " M clients/macos/Sources/SSBNKClient/CaptureScanner.swift",
+      " M clients/macos/Sources/SSBNKClient/ClipboardCoordinator.swift",
+      " M clients/macos/Sources/SSBNKClient/HealthMonitor.swift",
+      " M clients/macos/Sources/SSBNKClient/LegacyMigration.swift",
+      " M clients/macos/Sources/SSBNKClient/TransferQueue.swift",
+      " M clients/macos/Sources/SSBNKClient/UploadClient.swift",
+      " M clients/macos/Tests/SSBNKClientTests/LegacyMigrationTests.swift",
+      " M clients/macos/Tests/SSBNKClientTests/TestSupport.swift",
+      " M clients/macos/scripts/build-dmg.sh",
+      " M clients/protocol/upload-v2.schema.json",
+      " M mise.toml",
+      " M watcher/hosted.go",
+      " M watcher/intake.go",
+      " M watcher/main.go",
+      " M watcher/media.go",
+      " M watcher/spool.go",
+      " M watcher/upload.go",
+      " M watcher/upload_protocol.go",
+      "?? PIC.PNG",
+      "?? clients/linux/tests/shell_copy_test.mjs",
+      "?? clients/linux/tests/test_dispatch_packaging.py",
+      "?? clients/linux/tests/test_repairs.py",
+      "?? clients/macos/Tests/SSBNKClientTests/RepairTests.swift",
+      "?? clients/protocol/check_schema.py",
+      "?? runtime/",
+      "?? watcher/checkpoint_test.go",
+      "?? watcher/live_upload_test.go",
+      "?? watcher/media_production_test.go",
+      "?? watcher/repair_test.go",
+      "?? watcher/schema_test.go",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "26affe81d3a944bb6b7e638e0f925242550c1c4446942233de95a746b0e590a6",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "26affe81d3a944bb6b7e638e0f925242550c1c4446942233de95a746b0e590a6",
+        "mode": 33152
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/ssbnk",
+      "--agent",
+      "ssbnk-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/ssbnk",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:06:16.917Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "ssbnk-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "ssbnk-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "ssbnk-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "ssbnk-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "ssbnk-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/ssbnk",
+      "--agent",
+      "ssbnk-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/ssbnk",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "ssbnk-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "ssbnk-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "ssbnk-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "ssbnk-pm: preserved locally-modified .scripts/01-config.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/_lib.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "_bmad-output/implementation-artifacts/spec-remote-capture-tray-clients.md": {
+      "sha256": "3b34a7a1549451051635f2b1e946f5acfbd9ef94c1b379e185e72ad94410315a",
+      "mode": 33204
+    },
+    "clients/linux/gnome/ssbnk@delo.sh/extension.js": {
+      "sha256": "2d50dfb80631bd23992591b555d2afe52a42a3a238d0df89ea3e2f94ee0038a9",
+      "mode": 33204
+    },
+    "clients/linux/packaging/PKGBUILD": {
+      "sha256": "52a568dc90f93d430c07c534735dc3eca4e4af529d592efc4e29a1f15232d25f",
+      "mode": 33204
+    },
+    "clients/linux/scripts/package.py": {
+      "sha256": "9ca4e3495cbb9fb620753842026f1ecd0ff19763749949a08d2ddcbf6a8c54c1",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/config.py": {
+      "sha256": "c316e05a920c402ebc898ffb5e851c3fa6b3e5c352e28074248bc7d2c3b50087",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/desktop.py": {
+      "sha256": "420bb2d6bb94f70e79641c1182e23e5161f288509e71de1156fa3ba6fee8696c",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/gnome_bridge.py": {
+      "sha256": "4ded66a0c46db817e585286916460de6567b19c00cd0be642d7917c2c6a4288b",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/legacy.py": {
+      "sha256": "bceb53e95a897754d751a8a253dcddc991bb17cc5cb91cc38915c12e0168023b",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/scanner.py": {
+      "sha256": "b8eb4094b76d99b5a310cf2cc077c4d3db1fe1a9d6590bb12f98a9be92d9738f",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/store.py": {
+      "sha256": "7d2d7241f4790dfaea21e100df5ec4e95dfd659c13f1d45ef9fb9958725009f6",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/upload.py": {
+      "sha256": "58e891271eaa24071c21883e729385f088908eabb2b5ed6c12d99ebcc8c35f25",
+      "mode": 33204
+    },
+    "clients/linux/src/ssbnk_client/worker.py": {
+      "sha256": "d346776d3afed538f3acbb76f5d9f8598609d220ca3fe256428ebb6a4145d768",
+      "mode": 33204
+    },
+    "clients/linux/tests/test_bridge.py": {
+      "sha256": "cf1cd1d1e4369f33420d8a73bd23ae769eb863e82d302a14f46c860592e809c8",
+      "mode": 33204
+    },
+    "clients/linux/tests/test_handover.py": {
+      "sha256": "76daaf955257cf73ebbe213f55210b415d596b4c818b935b648af7d5026f0b11",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/AppModel.swift": {
+      "sha256": "db5b026432c8a404659d3636c857c5fe22800d1be820dc4da527ee630d0c4664",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/CaptureScanner.swift": {
+      "sha256": "9280ca5fb2b0c2e420acd79a35ff06c8728a9210b66b400ade1ad0057075cc30",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/ClipboardCoordinator.swift": {
+      "sha256": "6dab04ca16870f6298e155ee2644335a366de80dd444a5d4e51d95a387bd723e",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/HealthMonitor.swift": {
+      "sha256": "f7f3184c40285c977f6e49c95b6898910e86613c49a0582642d74399b9e2f94c",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/LegacyMigration.swift": {
+      "sha256": "4480e8ac8e8213db3b701ed78c34fbd82ef7fdd7ea478047fc19b29b2b9bbdb0",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/TransferQueue.swift": {
+      "sha256": "134eaa4e838e3417f5798438a7874e181e1e8b3199973bb1584f29f14d8b6148",
+      "mode": 33204
+    },
+    "clients/macos/Sources/SSBNKClient/UploadClient.swift": {
+      "sha256": "ec4135330361d7e8335e72a362faba6035f2470a54edd84ff6d387fd9391513e",
+      "mode": 33204
+    },
+    "clients/macos/Tests/SSBNKClientTests/LegacyMigrationTests.swift": {
+      "sha256": "fc72e81127949b1d2a37886489457e42b1e416544d5f25d411571bb1cea2af3a",
+      "mode": 33204
+    },
+    "clients/macos/Tests/SSBNKClientTests/TestSupport.swift": {
+      "sha256": "6fde32cc63ee3f74922ea7976600025eb5207de0b93afe87d87c7d4045ce497c",
+      "mode": 33204
+    },
+    "clients/macos/scripts/build-dmg.sh": {
+      "sha256": "e477d3ffe0dbbcf4871f3cf5a9862e9d04e935e5190bdcc4623c4ecfde38b2dd",
+      "mode": 33277
+    },
+    "clients/protocol/upload-v2.schema.json": {
+      "sha256": "15243d51cb0072014179f9bda8b3a14e580791bf1cbfd55aa623dfdaf9fc37c3",
+      "mode": 33204
+    },
+    "mise.toml": {
+      "sha256": "b2593cea42be23b9b2d5227d73d2e5ab2039b583a6e46fb20bc7367a4f5e7e84",
+      "mode": 33204
+    },
+    "watcher/hosted.go": {
+      "sha256": "d046f7c37780765175b2565646fe371ad4c4f1c78a9849250c6814903303a7a3",
+      "mode": 33204
+    },
+    "watcher/intake.go": {
+      "sha256": "0cb6d9b0b11738846ec390a91b84dce21e20f60ac5893ad623d77d3a1f72b811",
+      "mode": 33204
+    },
+    "watcher/main.go": {
+      "sha256": "6058c0a00e4424a3e1da8287973caf90a9a93aa783483fce9c66b55b043a5abe",
+      "mode": 33204
+    },
+    "watcher/media.go": {
+      "sha256": "1a59d8a6808a23d1b92fbf5f8404e913c3fe3d7c5f31509726a98fd1ac34c25f",
+      "mode": 33204
+    },
+    "watcher/spool.go": {
+      "sha256": "b70edeac3c85f3cf4abdd1ebf72a9d1fe9193daa8f0f8d104470217c28d5329f",
+      "mode": 33204
+    },
+    "watcher/upload.go": {
+      "sha256": "a2f5fab9d680bf92abd54b41e360c0728c7e4e50f673a01d52bac15cbd3d50f2",
+      "mode": 33204
+    },
+    "watcher/upload_protocol.go": {
+      "sha256": "d4e6aaff86839233e6be248c3fae25bb439f35a951c449db66cd408be5b04676",
+      "mode": 33204
+    },
+    "PIC.PNG": {
+      "sha256": "447cf092c816999a213961977dc352e734abb756c75f9805bb68ac118377c860",
+      "mode": 33188
+    },
+    "clients/linux/tests/shell_copy_test.mjs": {
+      "sha256": "d86529f4a3fb3b1b631ddc1ceac68c653b6a2184237eeff7934c6b737e1386a4",
+      "mode": 33204
+    },
+    "clients/linux/tests/test_dispatch_packaging.py": {
+      "sha256": "365b2490a50e085e2a55744e37fa410641b01fbb6e31d9fd6de1ea469fd46efc",
+      "mode": 33204
+    },
+    "clients/linux/tests/test_repairs.py": {
+      "sha256": "4be617db4229ea08a26839d363d6801c59b4454e9485ee7463e58494936fb708",
+      "mode": 33204
+    },
+    "clients/macos/Tests/SSBNKClientTests/RepairTests.swift": {
+      "sha256": "8351ec2682da409a4931fdc308952b4ad44b64222a98a11b12de63d1a3e52ad2",
+      "mode": 33204
+    },
+    "clients/protocol/check_schema.py": {
+      "sha256": "52fad9f28013ec20f095390472d10a79c40490f5f3e93427b49dbe856b97b12a",
+      "mode": 33204
+    },
+    "watcher/checkpoint_test.go": {
+      "sha256": "56864092c5c3497039f60b46424aa43ecbc062d4808020ebef8b4aa412e1eeaa",
+      "mode": 33204
+    },
+    "watcher/live_upload_test.go": {
+      "sha256": "5d48d379a36bb334e5fef4efcc29fda3fce5e3e10def7b5160c31c0dd83dee48",
+      "mode": 33204
+    },
+    "watcher/media_production_test.go": {
+      "sha256": "9fa4d656ca4ff80b1f87e09f223e2c80938c4a64565dca2f45a7f18182abc74e",
+      "mode": 33204
+    },
+    "watcher/repair_test.go": {
+      "sha256": "3617ec5127f6119cc67a74665886417030af7a528c6d15a46c59bbeb79d99392",
+      "mode": 33204
+    },
+    "watcher/schema_test.go": {
+      "sha256": "6acd383b418edbdc46437550a698fec3518b5b88d92a4e5e888ff4f473a977ed",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/ssbnk",
+      "--agent",
+      "ssbnk-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/ssbnk",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "ssbnk-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "ssbnk-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "ssbnk-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "ssbnk-pm: preserved locally-modified .scripts/01-config.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/_lib.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "b832d31753cee0345cbe97ce2559de3420cfce44f7388999c63811b79c953980",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "b832d31753cee0345cbe97ce2559de3420cfce44f7388999c63811b79c953980",
+        "mode": 33152
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/ssbnk",
+      "--agent",
+      "ssbnk-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/ssbnk",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "ssbnk-pm: preserved locally-modified .scripts/01-config.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/_lib.sh",
+            "ssbnk-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/ssbnk",
+      "--agent",
+      "ssbnk-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/ssbnk",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:06:20.882Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+    "origin": "git@github.com:delorenj/ssbnk.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/spec-remote-capture-tray-clients.md",
+      " M clients/linux/gnome/ssbnk@delo.sh/extension.js",
+      " M clients/linux/packaging/PKGBUILD",
+      " M clients/linux/scripts/package.py",
+      " M clients/linux/src/ssbnk_client/config.py",
+      " M clients/linux/src/ssbnk_client/desktop.py",
+      " M clients/linux/src/ssbnk_client/gnome_bridge.py",
+      " M clients/linux/src/ssbnk_client/legacy.py",
+      " M clients/linux/src/ssbnk_client/scanner.py",
+      " M clients/linux/src/ssbnk_client/store.py",
+      " M clients/linux/src/ssbnk_client/upload.py",
+      " M clients/linux/src/ssbnk_client/worker.py",
+      " M clients/linux/tests/test_bridge.py",
+      " M clients/linux/tests/test_handover.py",
+      " M clients/macos/Sources/SSBNKClient/AppModel.swift",
+      " M clients/macos/Sources/SSBNKClient/CaptureScanner.swift",
+      " M clients/macos/Sources/SSBNKClient/ClipboardCoordinator.swift",
+      " M clients/macos/Sources/SSBNKClient/HealthMonitor.swift",
+      " M clients/macos/Sources/SSBNKClient/LegacyMigration.swift",
+      " M clients/macos/Sources/SSBNKClient/TransferQueue.swift",
+      " M clients/macos/Sources/SSBNKClient/UploadClient.swift",
+      " M clients/macos/Tests/SSBNKClientTests/LegacyMigrationTests.swift",
+      " M clients/macos/Tests/SSBNKClientTests/TestSupport.swift",
+      " M clients/macos/scripts/build-dmg.sh",
+      " M clients/protocol/upload-v2.schema.json",
+      " M mise.toml",
+      " M watcher/hosted.go",
+      " M watcher/intake.go",
+      " M watcher/main.go",
+      " M watcher/media.go",
+      " M watcher/spool.go",
+      " M watcher/upload.go",
+      " M watcher/upload_protocol.go",
+      "?? PIC.PNG",
+      "?? clients/linux/tests/shell_copy_test.mjs",
+      "?? clients/linux/tests/test_dispatch_packaging.py",
+      "?? clients/linux/tests/test_repairs.py",
+      "?? clients/macos/Tests/SSBNKClientTests/RepairTests.swift",
+      "?? clients/protocol/check_schema.py",
+      "?? runtime/",
+      "?? watcher/checkpoint_test.go",
+      "?? watcher/live_upload_test.go",
+      "?? watcher/media_production_test.go",
+      "?? watcher/repair_test.go",
+      "?? watcher/schema_test.go",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/ssbnk",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/ssbnk.git\n   ea6d718..9e1058b  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/ssbnk",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/ssbnk",
+    "exit_code": 0,
+    "stdout": "9e1058b4a67a16ff031b4017cf73d0585543dbc1\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/ssbnk/commit/9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:06:22.865476+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+      "origin": "git@github.com:delorenj/ssbnk.git",
+      "status": [
+        " M _bmad-output/implementation-artifacts/spec-remote-capture-tray-clients.md",
+        " M clients/linux/gnome/ssbnk@delo.sh/extension.js",
+        " M clients/linux/packaging/PKGBUILD",
+        " M clients/linux/scripts/package.py",
+        " M clients/linux/src/ssbnk_client/config.py",
+        " M clients/linux/src/ssbnk_client/desktop.py",
+        " M clients/linux/src/ssbnk_client/gnome_bridge.py",
+        " M clients/linux/src/ssbnk_client/legacy.py",
+        " M clients/linux/src/ssbnk_client/scanner.py",
+        " M clients/linux/src/ssbnk_client/store.py",
+        " M clients/linux/src/ssbnk_client/upload.py",
+        " M clients/linux/src/ssbnk_client/worker.py",
+        " M clients/linux/tests/test_bridge.py",
+        " M clients/linux/tests/test_handover.py",
+        " M clients/macos/Sources/SSBNKClient/AppModel.swift",
+        " M clients/macos/Sources/SSBNKClient/CaptureScanner.swift",
+        " M clients/macos/Sources/SSBNKClient/ClipboardCoordinator.swift",
+        " M clients/macos/Sources/SSBNKClient/HealthMonitor.swift",
+        " M clients/macos/Sources/SSBNKClient/LegacyMigration.swift",
+        " M clients/macos/Sources/SSBNKClient/TransferQueue.swift",
+        " M clients/macos/Sources/SSBNKClient/UploadClient.swift",
+        " M clients/macos/Tests/SSBNKClientTests/LegacyMigrationTests.swift",
+        " M clients/macos/Tests/SSBNKClientTests/TestSupport.swift",
+        " M clients/macos/scripts/build-dmg.sh",
+        " M clients/protocol/upload-v2.schema.json",
+        " M mise.toml",
+        " M watcher/hosted.go",
+        " M watcher/intake.go",
+        " M watcher/main.go",
+        " M watcher/media.go",
+        " M watcher/spool.go",
+        " M watcher/upload.go",
+        " M watcher/upload_protocol.go",
+        "?? PIC.PNG",
+        "?? clients/linux/tests/shell_copy_test.mjs",
+        "?? clients/linux/tests/test_dispatch_packaging.py",
+        "?? clients/linux/tests/test_repairs.py",
+        "?? clients/macos/Tests/SSBNKClientTests/RepairTests.swift",
+        "?? clients/protocol/check_schema.py",
+        "?? runtime/",
+        "?? watcher/checkpoint_test.go",
+        "?? watcher/live_upload_test.go",
+        "?? watcher/media_production_test.go",
+        "?? watcher/repair_test.go",
+        "?? watcher/schema_test.go",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "b832d31753cee0345cbe97ce2559de3420cfce44f7388999c63811b79c953980",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "b832d31753cee0345cbe97ce2559de3420cfce44f7388999c63811b79c953980",
+          "mode": 33152
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1adb51c170fa4ed93db55f195a603e7efda07bbdc81c2f605d351abdbe23ef90",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/ssbnk",
+        "--agent",
+        "ssbnk-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/ssbnk",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/ssbnk",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "ssbnk-pm: preserved locally-modified .scripts/01-config.sh",
+              "ssbnk-pm: preserved locally-modified .scripts/_lib.sh",
+              "ssbnk-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/ssbnk",
+        "--agent",
+        "ssbnk-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/ssbnk",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/ssbnk",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:35.247Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "ssbnk-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/ssbnk",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/ssbnk",
+      "exit_code": 0,
+      "stdout": "9e1058b4a67a16ff031b4017cf73d0585543dbc1\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

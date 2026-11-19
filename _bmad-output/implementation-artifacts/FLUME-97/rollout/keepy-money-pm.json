@@ -1,0 +1,763 @@
+{
+  "agent": "keepy-money-pm",
+  "repo": "/home/delorenj/code/KeepyMoney",
+  "role_dir": "/home/delorenj/code/KeepyMoney/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:05:18.232750+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "e92e7978971a1b18fd5cfffa705762f05be8b4e0",
+    "origin": "git@github.com:delorenj/keepy-money",
+    "status": [
+      "?? DesignSystem.zip",
+      "?? GEMINI.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/KeepyMoney",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/keepy-money\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "e92e7978971a1b18fd5cfffa705762f05be8b4e0",
+    "origin": "git@github.com:delorenj/keepy-money",
+    "status": [
+      "?? DesignSystem.zip",
+      "?? GEMINI.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "674c413e19f6c0a93f4c3b2de5a55457acfa017feffb3b9bb14f8dc85638a7c6",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "674c413e19f6c0a93f4c3b2de5a55457acfa017feffb3b9bb14f8dc85638a7c6",
+        "mode": 33152
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/KeepyMoney",
+      "--agent",
+      "keepy-money-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:20.825Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "25 orchestrator scaffold issue(s) detected",
+          "details": [
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/80-registry.sh",
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "keepy-money-pm: missing agents/hermes/pm/.scripts/board-lease.py",
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "keepy-money-pm: missing agents/hermes/pm/.scripts/land-outputs.sh",
+            "keepy-money-pm: missing agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "keepy-money-pm: missing agents/hermes/pm/.scripts/launch-pass.py",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "keepy-money-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "keepy-money-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "keepy-money-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "keepy-money-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "keepy-money-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/KeepyMoney",
+      "--agent",
+      "keepy-money-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "keepy-money-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "keepy-money-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "keepy-money-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "keepy-money-pm: preserved locally-modified .scripts/01-config.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/_lib.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "DesignSystem.zip": {
+      "sha256": "6d4b905b8f117848b8c19d2f22fc8e622605043cdcc8b30c06690c43a7c8ea04",
+      "mode": 33204
+    },
+    "GEMINI.md": {
+      "link": "AGENTS.md",
+      "mode": 41471
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33261
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/KeepyMoney",
+      "--agent",
+      "keepy-money-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "keepy-money-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "keepy-money-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "keepy-money-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "keepy-money-pm: preserved locally-modified .scripts/01-config.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/_lib.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "248b6b934ff32bbcecc0cf26bcefa5b776ff032ad116d82ef03cac500d46e910",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "248b6b934ff32bbcecc0cf26bcefa5b776ff032ad116d82ef03cac500d46e910",
+        "mode": 33152
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/KeepyMoney",
+      "--agent",
+      "keepy-money-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "keepy-money-pm: preserved locally-modified .scripts/01-config.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/_lib.sh",
+            "keepy-money-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/KeepyMoney",
+      "--agent",
+      "keepy-money-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:23.381Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/80-registry.sh",
+    "agents/hermes/pm/.scripts/board-lease.py",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/land-outputs.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+    "origin": "git@github.com:delorenj/keepy-money",
+    "status": [
+      "?? DesignSystem.zip",
+      "?? GEMINI.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/KeepyMoney",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/keepy-money\n   e92e797..d3a5bd1  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/KeepyMoney",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/KeepyMoney",
+    "exit_code": 0,
+    "stdout": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/keepy-money/commit/d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:05:25.524581+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+      "origin": "git@github.com:delorenj/keepy-money",
+      "status": [
+        "?? DesignSystem.zip",
+        "?? GEMINI.md",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "248b6b934ff32bbcecc0cf26bcefa5b776ff032ad116d82ef03cac500d46e910",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "248b6b934ff32bbcecc0cf26bcefa5b776ff032ad116d82ef03cac500d46e910",
+          "mode": 33152
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "085f111fa18808664ed618c49b8efa2b77aa3beec3dc359611ab463da1020b34",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/KeepyMoney",
+        "--agent",
+        "keepy-money-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/KeepyMoney",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/KeepyMoney",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "keepy-money-pm: preserved locally-modified .scripts/01-config.sh",
+              "keepy-money-pm: preserved locally-modified .scripts/_lib.sh",
+              "keepy-money-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/KeepyMoney",
+        "--agent",
+        "keepy-money-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/KeepyMoney",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/KeepyMoney",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:19.741Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "keepy-money-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/KeepyMoney",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/KeepyMoney",
+      "exit_code": 0,
+      "stdout": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

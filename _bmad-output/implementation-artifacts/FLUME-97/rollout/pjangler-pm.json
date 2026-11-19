@@ -1,0 +1,741 @@
+{
+  "agent": "pjangler-pm",
+  "repo": "/home/delorenj/code/33GOD/pjangler",
+  "role_dir": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:05:41.672705+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "c1c4e0700c3b3bf35e6af633cc19513274e887f3",
+    "origin": "git@github.com:delorenj/pjangler.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+      "?? runtime/",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/pjangler",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/pjangler\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "c1c4e0700c3b3bf35e6af633cc19513274e887f3",
+    "origin": "git@github.com:delorenj/pjangler.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+      "?? runtime/",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "21a3ee6dd4e68bcc7ab764f7dd0453f7795ef1f1a6fad04b1094bb0348a7c5ea",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "21a3ee6dd4e68bcc7ab764f7dd0453f7795ef1f1a6fad04b1094bb0348a7c5ea",
+        "mode": 33188
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/pjangler",
+      "--agent",
+      "pjangler-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:44.776Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "pjangler-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "pjangler-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "pjangler-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "pjangler-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "pjangler-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/pjangler",
+      "--agent",
+      "pjangler-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "pjangler-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "pjangler-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "pjangler-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "pjangler-pm: preserved locally-modified .scripts/01-config.sh",
+            "pjangler-pm: preserved locally-modified .scripts/_lib.sh",
+            "pjangler-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "_bmad-output/implementation-artifacts/bloodbank-events.jsonl": {
+      "sha256": "81a908f566d9ab3e9c5cae713c42323698b47a5000b1a0ca17d4a3565e826a3a",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33277
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/pjangler",
+      "--agent",
+      "pjangler-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "pjangler-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "pjangler-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "pjangler-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "pjangler-pm: preserved locally-modified .scripts/01-config.sh",
+            "pjangler-pm: preserved locally-modified .scripts/_lib.sh",
+            "pjangler-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "39daec59489790552ba3b982d3a440c15bc71faf6eae3a7d1eedb22a75166d0c",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "39daec59489790552ba3b982d3a440c15bc71faf6eae3a7d1eedb22a75166d0c",
+        "mode": 33188
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/pjangler",
+      "--agent",
+      "pjangler-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "pjangler-pm: preserved locally-modified .scripts/01-config.sh",
+            "pjangler-pm: preserved locally-modified .scripts/_lib.sh",
+            "pjangler-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/pjangler",
+      "--agent",
+      "pjangler-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:49.124Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "pjangler-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "cc2907bc8901f9f277215d42b8343779d2e874e6",
+    "origin": "git@github.com:delorenj/pjangler.git",
+    "status": [
+      " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+      "?? runtime/",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/pjangler",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/pjangler.git\n   c1c4e07..cc2907b  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/pjangler",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/pjangler",
+    "exit_code": 0,
+    "stdout": "cc2907bc8901f9f277215d42b8343779d2e874e6\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/pjangler/commit/cc2907bc8901f9f277215d42b8343779d2e874e6",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:05:51.289646+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "a3dfc4d03bf1fb26fea9156fba114c07aaa60d74",
+      "origin": "git@github.com:delorenj/pjangler.git",
+      "status": [
+        " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+        "?? runtime/",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "39daec59489790552ba3b982d3a440c15bc71faf6eae3a7d1eedb22a75166d0c",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "39daec59489790552ba3b982d3a440c15bc71faf6eae3a7d1eedb22a75166d0c",
+          "mode": 33188
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f2639e97e72a70b9785e498b153fb67048a82a65ac921f7c04c1a3238efb440b",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/33GOD/pjangler",
+        "--agent",
+        "pjangler-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/pjangler",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/pjangler",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "pjangler-pm: preserved locally-modified .scripts/01-config.sh",
+              "pjangler-pm: preserved locally-modified .scripts/_lib.sh",
+              "pjangler-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/33GOD/pjangler",
+        "--agent",
+        "pjangler-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/pjangler",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/pjangler",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:27.140Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "pjangler-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "pjangler-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "pjangler-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/33GOD/pjangler",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/pjangler",
+      "exit_code": 0,
+      "stdout": "a3dfc4d03bf1fb26fea9156fba114c07aaa60d74\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "timeout_seconds": 500,
+  "terminated_owned_pgid": 4172429,
+  "cause": "Temporary -c core.hooksPath leaked via GIT_CONFIG_PARAMETERS into test fixture pushes, recursively re-entering gate; no remote push occurred. Correct wrapper must also unset GIT_CONFIG_PARAMETERS and GIT_CONFIG_COUNT."
+}

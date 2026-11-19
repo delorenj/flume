@@ -1,0 +1,777 @@
+{
+  "agent": "infra-pm",
+  "repo": "/home/delorenj/code/infra",
+  "role_dir": "/home/delorenj/code/infra/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:06:07.301995+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "3df4080735cf8758638275727a190a2e82b68cd7",
+    "origin": "git@github.com:delorenj/infra.git",
+    "status": [
+      " M hosts/carries-macbook-air/README.md",
+      "?? brule.jpg",
+      "?? gct.py",
+      "?? hosts/carries-macbook-air/README-xcode-auth.md",
+      "?? hosts/carries-macbook-air/xcode-auth-setup.sh",
+      "?? scripts/user-logrotate.fixed",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/infra",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/infra\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "3df4080735cf8758638275727a190a2e82b68cd7",
+    "origin": "git@github.com:delorenj/infra.git",
+    "status": [
+      " M hosts/carries-macbook-air/README.md",
+      "?? brule.jpg",
+      "?? gct.py",
+      "?? hosts/carries-macbook-air/README-xcode-auth.md",
+      "?? hosts/carries-macbook-air/xcode-auth-setup.sh",
+      "?? scripts/user-logrotate.fixed",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "63dd75e92de3cb2d3d7b8dca92ae41d0f0238cdee90378da4bc7febd6e612587",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "63dd75e92de3cb2d3d7b8dca92ae41d0f0238cdee90378da4bc7febd6e612587",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/infra",
+      "--agent",
+      "infra-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/infra",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:06:09.483Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "infra-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "infra-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "infra-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "infra-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "infra-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "infra-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "infra-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "infra-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "infra-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "infra-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "infra-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "infra-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/infra",
+      "--agent",
+      "infra-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/infra",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "infra-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "infra-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "infra-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "infra-pm: preserved locally-modified .scripts/01-config.sh",
+            "infra-pm: preserved locally-modified .scripts/_lib.sh",
+            "infra-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "hosts/carries-macbook-air/README.md": {
+      "sha256": "3ace1cb40adbdb6dcf6b6998980f4cea384c26b132c32f4280876c129de99738",
+      "mode": 33204
+    },
+    "brule.jpg": {
+      "sha256": "b78611cc975d867052bd02e8f7326cc79a09b65652a8ca85c2ee60035d202913",
+      "mode": 33204
+    },
+    "gct.py": {
+      "sha256": "05c3569b787c0ae750463e4bdaa2c5e33662ae2f81a5c9a7c4a52a32a162ecfe",
+      "mode": 33204
+    },
+    "hosts/carries-macbook-air/README-xcode-auth.md": {
+      "sha256": "483f5b1166940d976f60d5767a9473b71a7d3b7b15264f5974c2536adae80473",
+      "mode": 33204
+    },
+    "hosts/carries-macbook-air/xcode-auth-setup.sh": {
+      "sha256": "64ed66f44e1feac2f9c53a9407d2a27f18ea3003fcd2aad425ae85bb099b310b",
+      "mode": 33277
+    },
+    "scripts/user-logrotate.fixed": {
+      "sha256": "035fd49a804e85ae6ff7d9b8e5a3dac9dac119f128a495ba510a7770747028b9",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/infra",
+      "--agent",
+      "infra-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/infra",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "infra-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "infra-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "infra-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "infra-pm: preserved locally-modified .scripts/01-config.sh",
+            "infra-pm: preserved locally-modified .scripts/_lib.sh",
+            "infra-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "3c559dde69ca66dc0901c50719d354e3753ad134405fa05a9d5057646c842980",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "3c559dde69ca66dc0901c50719d354e3753ad134405fa05a9d5057646c842980",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/infra",
+      "--agent",
+      "infra-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/infra",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "infra-pm: preserved locally-modified .scripts/01-config.sh",
+            "infra-pm: preserved locally-modified .scripts/_lib.sh",
+            "infra-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/infra",
+      "--agent",
+      "infra-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/infra",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:06:12.029Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "infra-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "24e1aa56e435135497f5c855c76360519f0c70c7",
+    "origin": "git@github.com:delorenj/infra.git",
+    "status": [
+      " M hosts/carries-macbook-air/README.md",
+      "?? brule.jpg",
+      "?? gct.py",
+      "?? hosts/carries-macbook-air/README-xcode-auth.md",
+      "?? hosts/carries-macbook-air/xcode-auth-setup.sh",
+      "?? scripts/user-logrotate.fixed",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/infra",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/infra.git\n   4191ffe..24e1aa5  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/infra",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/infra",
+    "exit_code": 0,
+    "stdout": "24e1aa56e435135497f5c855c76360519f0c70c7\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/infra/commit/24e1aa56e435135497f5c855c76360519f0c70c7",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:06:13.830925+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "24e1aa56e435135497f5c855c76360519f0c70c7",
+      "origin": "git@github.com:delorenj/infra.git",
+      "status": [
+        " M hosts/carries-macbook-air/README.md",
+        "?? brule.jpg",
+        "?? gct.py",
+        "?? hosts/carries-macbook-air/README-xcode-auth.md",
+        "?? hosts/carries-macbook-air/xcode-auth-setup.sh",
+        "?? scripts/user-logrotate.fixed",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/infra/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "3c559dde69ca66dc0901c50719d354e3753ad134405fa05a9d5057646c842980",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "3c559dde69ca66dc0901c50719d354e3753ad134405fa05a9d5057646c842980",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "dc50ea263a23aacfc0cd146774f23704830675eb1e7578dc03519439cdd63797",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/infra",
+        "--agent",
+        "infra-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/infra",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/infra",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "infra-pm: preserved locally-modified .scripts/01-config.sh",
+              "infra-pm: preserved locally-modified .scripts/_lib.sh",
+              "infra-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/infra",
+        "--agent",
+        "infra-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/infra",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/infra",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:33.328Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "infra-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "infra-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "infra-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/infra",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/infra",
+      "exit_code": 0,
+      "stdout": "24e1aa56e435135497f5c855c76360519f0c70c7\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

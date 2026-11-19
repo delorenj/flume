@@ -1,0 +1,35 @@
+{
+  "exit_code": 1,
+  "selected": [
+    "code/33GOD/main                                6 uncommitted change(s)",
+    "code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/flume DETACHED HEAD \u2014 commits here belong to no branch",
+    "code/33GOD/_bmad-output/implementation-artifacts/board-cranker/33GOD-50/main 6 uncommitted change(s)",
+    "code/33GOD/_bmad-output/implementation-artifacts/board-cranker/33GOD-53/main 6 uncommitted change(s)",
+    "code/33GOD/bloodbank/main                      13 uncommitted change(s)",
+    "code/33GOD/flume/main                          3 uncommitted change(s)",
+    "code/33GOD/flume/.worktrees/verify-FLUME-97-baseline/verify-FLUME-97-baseline NO UPSTREAM \u2014 nothing is tracking this branch",
+    "code/33GOD/flume/templates/hermes-agent        DETACHED HEAD \u2014 commits here belong to no branch",
+    "code/33GOD/holocene/main                       3 uncommitted change(s)",
+    "code/33GOD/holocene/_bmad-output/implementation-artifacts/main 3 uncommitted change(s)",
+    "code/33GOD/pjangler/main                       2 uncommitted change(s)",
+    "code/33GOD/pjangler/templates/commonproject    DETACHED HEAD \u2014 commits here belong to no branch",
+    "code/james-brennan/.claude/worktrees/wf_ce92a7b3-0e2-2/worktree-wf_ce92a7b3-0e2-2 1 uncommitted change(s)",
+    "code/james-brennan/main                        14 commit(s) UNPUSHED",
+    "code/james-brennan/.worktrees/navi-48-reviewer-backend/navi-48-reviewer-backend NO UPSTREAM \u2014 nothing is tracking this branch",
+    "code/james-brennan/apps/navi                   DETACHED HEAD \u2014 commits here belong to no branch",
+    "code/skillex/.worktrees/33GOD-35-mcp-standalone/33GOD-35-mcp-standalone NO UPSTREAM \u2014 nothing is tracking this branch",
+    "code/skillex/.worktrees/skillex-retire-mise/skillex-retire-mise 21 commit(s) UNPUSHED",
+    "code/skillex/all-skills/main                   18 uncommitted change(s)",
+    "code/skillex/all-skills/.worktrees/33GOD-35-mcp-guidance/33GOD-35-mcp-guidance NO UPSTREAM \u2014 nothing is tracking this branch",
+    "code/tolt/main                                 1 uncommitted change(s)",
+    "code/tolt/tower-of-lost-things/.worktrees/lane-story-tolt160-parent-gate/lane/story-tolt160-parent-gate 3 commit(s) UNPUSHED",
+    "code/tolt/tower-of-lost-things/.worktrees/lane-story-tolt163-ssh-retry/lane/story-tolt163-ssh-retry 3 commit(s) UNPUSHED"
+  ],
+  "scope": "Machine-wide output reports unrelated work; no blanket cleanup authorized. Per-project tracked_paths and origin reachability are separately verified.",
+  "known_ticket_effects": {
+    "flume_rollout_evidence": "awaiting explicit evidence commit, then pushed",
+    "james_main": "scaffold commit merged through PR1015; full local HEAD backed by origin/fix/FLUME-97-pm-scaffold; upstream-main count includes pre-existing application work and pull merges",
+    "parent_gitlinks": "only clean-at-baseline child pins advanced; pre-existing gitlink drift retained",
+    "other_listings": "not owned by this ticket; preserved"
+  }
+}

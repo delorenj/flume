@@ -1,0 +1,732 @@
+{
+  "agent": "nautilus-trader-pm",
+  "repo": "/home/delorenj/code/nautilus_trader",
+  "role_dir": "/home/delorenj/code/nautilus_trader/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:03:16.438496+00:00",
+  "before_pull": {
+    "branch": "develop",
+    "head": "2e375dbb05b3e370e0d513718f7fd2c911f6d0c9",
+    "origin": "git@github.com:delorenj/nautilus_trader.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "landing_constraint": "Nonmain branch retained; no incompatible main merge or branch switch. Changes pushed to existing branch.",
+  "before": {
+    "branch": "develop",
+    "head": "2e375dbb05b3e370e0d513718f7fd2c911f6d0c9",
+    "origin": "git@github.com:delorenj/nautilus_trader.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+        "mode": 33277
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "aa72360c92d0bafb4181f2006c40f6cabd547f3d20fee10e9756a909665ff834",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "aa72360c92d0bafb4181f2006c40f6cabd547f3d20fee10e9756a909665ff834",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/nautilus_trader",
+      "--agent",
+      "nautilus-trader-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:18.320Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "25 orchestrator scaffold issue(s) detected",
+          "details": [
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/80-registry.sh",
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "nautilus-trader-pm: missing agents/hermes/pm/.scripts/board-lease.py",
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "nautilus-trader-pm: missing agents/hermes/pm/.scripts/land-outputs.sh",
+            "nautilus-trader-pm: missing agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "nautilus-trader-pm: missing agents/hermes/pm/.scripts/launch-pass.py",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "nautilus-trader-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "nautilus-trader-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "nautilus-trader-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "nautilus-trader-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "nautilus-trader-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/nautilus_trader",
+      "--agent",
+      "nautilus-trader-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "nautilus-trader-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "nautilus-trader-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "nautilus-trader-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "nautilus-trader-pm: preserved locally-modified .scripts/01-config.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/_lib.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33261
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/nautilus_trader",
+      "--agent",
+      "nautilus-trader-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "nautilus-trader-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "nautilus-trader-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "nautilus-trader-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "nautilus-trader-pm: preserved locally-modified .scripts/01-config.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/_lib.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "95429ebbd1e24b014c433a72b1e843bd6bf43650898f9db077e5413af40a4194",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "95429ebbd1e24b014c433a72b1e843bd6bf43650898f9db077e5413af40a4194",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/nautilus_trader",
+      "--agent",
+      "nautilus-trader-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "nautilus-trader-pm: preserved locally-modified .scripts/01-config.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/_lib.sh",
+            "nautilus-trader-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/nautilus_trader",
+      "--agent",
+      "nautilus-trader-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:21.684Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/80-registry.sh",
+    "agents/hermes/pm/.scripts/board-lease.py",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/land-outputs.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "develop",
+    "head": "9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+    "origin": "git@github.com:delorenj/nautilus_trader.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/nautilus_trader",
+      "push",
+      "origin",
+      "HEAD:refs/heads/develop"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/nautilus_trader.git\n   2e375dbb05..9a0149de9e  HEAD -> develop\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/nautilus_trader",
+      "ls-remote",
+      "origin",
+      "refs/heads/develop"
+    ],
+    "cwd": "/home/delorenj/code/nautilus_trader",
+    "exit_code": 0,
+    "stdout": "9a0149de9ef1f5501b6011f6ad4fc2de92803762\trefs/heads/develop\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/nautilus_trader/commit/9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:03:23.997064+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "develop",
+      "head": "9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+      "origin": "git@github.com:delorenj/nautilus_trader.git",
+      "status": [
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "95429ebbd1e24b014c433a72b1e843bd6bf43650898f9db077e5413af40a4194",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "95429ebbd1e24b014c433a72b1e843bd6bf43650898f9db077e5413af40a4194",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "2244847368943aca333385ddbd7730ca7dac94d94eb81d8e8a16ae56a4a8fa18",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/nautilus_trader",
+        "--agent",
+        "nautilus-trader-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/nautilus_trader",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/nautilus_trader",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "nautilus-trader-pm: preserved locally-modified .scripts/01-config.sh",
+              "nautilus-trader-pm: preserved locally-modified .scripts/_lib.sh",
+              "nautilus-trader-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/nautilus_trader",
+        "--agent",
+        "nautilus-trader-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/nautilus_trader",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/nautilus_trader",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:07.313Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "nautilus-trader-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/nautilus_trader",
+        "ls-remote",
+        "origin",
+        "refs/heads/develop"
+      ],
+      "cwd": "/home/delorenj/code/nautilus_trader",
+      "exit_code": 0,
+      "stdout": "9a0149de9ef1f5501b6011f6ad4fc2de92803762\trefs/heads/develop\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

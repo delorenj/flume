@@ -1,0 +1,743 @@
+{
+  "agent": "skillex-pm",
+  "repo": "/home/delorenj/code/skillex",
+  "role_dir": "/home/delorenj/code/skillex/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:03:39.244297+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "3dd14bd17620cb5911846cc7a401432ed72fe3d7",
+    "origin": "git@github.com:delorenj/skillex.git",
+    "status": [
+      " M .lastagent",
+      " M all-skills",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "--git-dir=/home/delorenj/code/skillex/.git",
+      "--work-tree=/home/delorenj/code/skillex",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/skillex\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "3dd14bd17620cb5911846cc7a401432ed72fe3d7",
+    "origin": "git@github.com:delorenj/skillex.git",
+    "status": [
+      " M .lastagent",
+      " M all-skills",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "7f0e729c241bd0fd0b9638a4fe0f6a59da394b0d8d29bf04f63e956d1eb69390",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "7f0e729c241bd0fd0b9638a4fe0f6a59da394b0d8d29bf04f63e956d1eb69390",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/skillex",
+      "--agent",
+      "skillex-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/skillex",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:46.795Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "skillex-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "skillex-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "skillex-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "skillex-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "skillex-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "skillex-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "skillex-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "skillex-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "skillex-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "skillex-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "skillex-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "skillex-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/skillex",
+      "--agent",
+      "skillex-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/skillex",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "skillex-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "skillex-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "skillex-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "skillex-pm: preserved locally-modified .scripts/01-config.sh",
+            "skillex-pm: preserved locally-modified .scripts/_lib.sh",
+            "skillex-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    ".lastagent": {
+      "sha256": "e01f4ee76ddcc7eac32e946dc9c2cf1fab1f9c3cd22a7339091888f898bf64b3",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33261
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/skillex",
+      "--agent",
+      "skillex-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/skillex",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "skillex-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "skillex-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "skillex-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "skillex-pm: preserved locally-modified .scripts/01-config.sh",
+            "skillex-pm: preserved locally-modified .scripts/_lib.sh",
+            "skillex-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "2a6f5abb9b9870e21fc3e5821abc5104a3fbedfa18e58c6c87f216cf16f15817",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "2a6f5abb9b9870e21fc3e5821abc5104a3fbedfa18e58c6c87f216cf16f15817",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/skillex",
+      "--agent",
+      "skillex-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/skillex",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "skillex-pm: preserved locally-modified .scripts/01-config.sh",
+            "skillex-pm: preserved locally-modified .scripts/_lib.sh",
+            "skillex-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/skillex",
+      "--agent",
+      "skillex-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/skillex",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:54.170Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "skillex-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "af026dee32d143ba315b23286130376a3c00d431",
+    "origin": "git@github.com:delorenj/skillex.git",
+    "status": [
+      " M .lastagent",
+      " M all-skills",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "--git-dir=/home/delorenj/code/skillex/.git",
+      "--work-tree=/home/delorenj/code/skillex",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 1,
+    "stdout": "\u001b[38;2;56;56;56m\u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\u001b[m\n\u001b[38;2;56;56;56m\u2502\u001b[m \ud83e\udd4a lefthook  v2.2.1   hook:  \u001b[1mpre-push\u001b[m \u001b[38;2;56;56;56m\u2502\u001b[m\n\u001b[38;2;56;56;56m\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\u001b[m\n\u2503  serialized-checks \u276f \n\n> @delorenj/skillex@0.4.9 check\n> npm run lint && npm run typecheck && npm test\n\n\n> @delorenj/skillex@0.4.9 lint\n> biome check src scripts tests/node schemas skills.schema.json package.json tsconfig.json tsconfig.build.json biome.json\n\nChecked 170 files in 125ms. No fixes applied.\n\n> @delorenj/skillex@0.4.9 typecheck\n> tsc --noEmit\n\n\n> @delorenj/skillex@0.4.9 test\n> npm run build && node --test --import ./tests/node/hermetic-tmp.mjs tests/node/*.test.mjs\n\n\n> @delorenj/skillex@0.4.9 build\n> node scripts/build.mjs\n\n\u25b6 acquisition CLI\n  \u2716 imports a git remote into the catalog over --json (569.251089ms)\n  \u2716 dry-run imports nothing and reports the plan (73.757138ms)\n  \u2716 repeated import of identical content is a reuse, not an error (42.979435ms)\n  \u2716 refuses a same-name conflict without touching the canonical (75.912389ms)\n  \u2716 add imports and enables in the current project, creating its manifest (30.702091ms)\n  \u2716 add -g enables in the global scope and leaves the project alone (36.317662ms)\n  \u2716 add rejects -p with -g before fetching or writing anything (99.693439ms)\n  \u2716 add -p selects the named project explicitly (67.005857ms)\n  \u2716 prints human text on stdout and keeps findings out of JSON mode (22.341207ms)\n  \u2716 accepts the shared flags before the command (root placement) (49.387429ms)\n  \u2714 reports usage errors inside the envelope (473.606079ms)\n\u2716 acquisition CLI (1543.805899ms)\n\u2714 first and repeated reads discover a stable path without creating state (11.651544ms)\n\u2714 location-only validation creates nothing and ignores unhealthy activation receipts (34.065078ms)\n\u2714 location-only validation still rejects source roots and symlinked state parents (6.620355ms)\n\u2714 writes return fresh complete snapshots, replace atomically, and retain mode 600 (106.931468ms)\n\u2714 an omitted write location reuses the snapshot's selected state home (53.01822ms)\n\u2714 receipt identity ignores pack target changes and canonicalizes the scope base (62.203608ms)\n\u2714 state selection honors explicit, environment, and injected-home precedence (5.210138ms)\n\u2714 invalid explicit or environment locations never fall through (1.128797ms)\n\u2714 a stale absence cannot overwrite a receipt created after its read (49.821457ms)\n\u2714 changed bytes in the same receipt inode refuse replacement (72.957101ms)\n\u2714 identical bytes in a replaced receipt inode do not retain authority (73.341355ms)\n\u2714 replaced receipt parents refuse even when document bytes still match (93.066131ms)\n\u2714 replaced scope bases and reconstructed snapshots require a fresh read (13.160859ms)\n\u2714 write options cannot redirect a previous snapshot into another state home (15.445133ms)\n\u2714 malformed, legacy, mismatched, and foreign envelopes refuse without rewriting (49.081082ms)\n\u2714 legacy Python projection receipts are neither read nor adopted (26.818092ms)\n\u2714 receipt symlinks and real-directory collisions are preserved (34.587662ms)\n\u2714 symlink state parents are rejected before missing descendants are created (9.194585ms)\n\u2714 a regular file in the parent chain is an unsafe path rather than absence (3.055868ms)\n\u2714 permission failures remain IO errors rather than missing state (2.049091ms)\n\ufe63 filesystem ownership is checked on receipts and managed directories (0.131718ms) # SKIP\n\u2714 Git directory ancestors forbid state even when target directories do not exist (1.987946ms)\n\u2714 Git file ancestors forbid state even when target directories do not exist (4.805665ms)\n\u2714 forbidden roots cover canonical aliases and nonexistent future roots (5.929302ms)\n\u2714 dangling forbidden-root aliases cannot become allowed through state creation (3.819857ms)\n\u2714 new repository markers or stricter forbidden roots are rechecked before writes (3.044237ms)\n\u2714 unserializable payloads cannot create or alter a receipt (4.803571ms)\n\u2714 readers in another Node process observe only complete atomically published documents (1438.038846ms)\n\u2714 freezes rendered skills into canonical all-skills and a reference-only versioned pack (109.967718ms)\n\u2714 re-freezing the same version is idempotent and changes nothing (59.88031ms)\n\u2714 dry-run plans without writing (8.729599ms)\n\u2714 refuses to overwrite foreign canonical content without provenance (9.109625ms)\n\u2714 refuses a source version switch without --replace and refuses --replace over edited bytes (86.43662ms)\n\u2714 bmad status traces frozen skills and reports drift and undeclared pack children (85.964981ms)\n\u2714 bmad explain reports provenance, baseline agreement, and references (27.369621ms)\n\u2714 refuses unsafe version overrides and missing source layouts (10.118135ms)\n\u2714 finding 1: --replace performs a real version upgrade with changed source bytes on a pristine canonical (58.995593ms)\n\u2714 finding 1b: --replace refuses an edited (locally modified) canonical even at a new version (29.004061ms)\n\u2714 finding 2: pack collision is detected before any registry write; dry-run reports the same refusal (45.293745ms)\n\u2714 finding 3: --replace retires the old version pack out of discoverable packs and old baselines no longer verify green (170.215111ms)\n\u2714 finding 4: --no-commands is honored on fresh freeze and preserves existing commands on repeat (476.524398ms)\n\u2714 finding 5: replace never destroys pre-existing swap/backup artifacts (unique owned temps) (515.532109ms)\n\u2714 finding 6: status picks the semantically highest pack version, not lexical (112.025165ms)\n\u2714 finding 7: status traced is grounded in composition membership; orphaned canonicals are excluded (283.816655ms)\n\u2714 QF1: --version override keeps installation provenance; pack verifies green and status succeeds (358.841011ms)\n\u2714 QF2: stamped crash-recovery backup does not brick bmad status; real drift still reported (192.23429ms)\n\u2714 QF3: --no-commands repeat preserves prior source.commands provenance and manifest bytes (684.563369ms)\n\u2714 QF3b: --no-commands repeat with a corrup",
+    "stderr": "error: failed to push some refs to 'github.com:delorenj/skillex.git'\n"
+  },
+  "outcome": "pushed main; managed cleanup and on-disk SOUL holds verified; legacy Python hook failures retained",
+  "ended": "2026-11-19T11:04:55.657045+00:00",
+  "publication_receipt": "skillex-publication.json",
+  "remote_verify": {
+    "command": [
+      "git",
+      "--git-dir=/home/delorenj/code/skillex/.git",
+      "--work-tree=/home/delorenj/code/skillex",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 0,
+    "stdout": "af026dee32d143ba315b23286130376a3c00d431\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "initial_error": "push failed; committed owned changes retained, needs safe reconciliation",
+  "commit_url": "https://github.com/delorenj/skillex/commit/af026dee32d143ba315b23286130376a3c00d431",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "af026dee32d143ba315b23286130376a3c00d431",
+      "origin": "git@github.com:delorenj/skillex.git",
+      "status": [
+        " M .lastagent",
+        " M all-skills",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "2a6f5abb9b9870e21fc3e5821abc5104a3fbedfa18e58c6c87f216cf16f15817",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "2a6f5abb9b9870e21fc3e5821abc5104a3fbedfa18e58c6c87f216cf16f15817",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "393d137afbb9f140f8ade7b47b07d97887f4ff479c6a9ab4097cbb60330a30fd",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/skillex",
+        "--agent",
+        "skillex-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/skillex",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "skillex-pm: preserved locally-modified .scripts/01-config.sh",
+              "skillex-pm: preserved locally-modified .scripts/_lib.sh",
+              "skillex-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/skillex",
+        "--agent",
+        "skillex-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/skillex",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:13.352Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "skillex-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "skillex-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "skillex-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "af026dee32d143ba315b23286130376a3c00d431\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

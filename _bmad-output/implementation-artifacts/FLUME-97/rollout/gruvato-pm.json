@@ -1,0 +1,697 @@
+{
+  "agent": "gruvato-pm",
+  "repo": "/home/delorenj/code/gruvato",
+  "role_dir": "/home/delorenj/code/gruvato/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:05:02.049145+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "1a06891d2eafa1505f40e7af2a2bb1faa488b388",
+    "origin": "git@github.com:delorenj/gruvato.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/gruvato",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/gruvato\n * branch              main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "1a06891d2eafa1505f40e7af2a2bb1faa488b388",
+    "origin": "git@github.com:delorenj/gruvato.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "8f1a7b8dc723549d1636ec04381517247cdd85b5f47129d197bf886cb2ad7da2",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "8f1a7b8dc723549d1636ec04381517247cdd85b5f47129d197bf886cb2ad7da2",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/gruvato",
+      "--agent",
+      "gruvato-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/gruvato",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:11.940Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "19 orchestrator scaffold issue(s) detected",
+          "details": [
+            "gruvato-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/_lib.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "gruvato-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "gruvato-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "gruvato-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "gruvato-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "gruvato-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/gruvato",
+      "--agent",
+      "gruvato-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/gruvato",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "gruvato-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "gruvato-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "gruvato-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "gruvato-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {},
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/gruvato",
+      "--agent",
+      "gruvato-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/gruvato",
+      "dryRun": false,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/gruvato/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "gruvato-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "gruvato-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "gruvato-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "gruvato-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "5666981f2f6533889536828a0f71e02671354ce429fe7fb542a3255d46c3f5e5",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "5666981f2f6533889536828a0f71e02671354ce429fe7fb542a3255d46c3f5e5",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/gruvato",
+      "--agent",
+      "gruvato-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/gruvato",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "noop",
+          "summary": "No changes required",
+          "changedFiles": [],
+          "details": []
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/gruvato",
+      "--agent",
+      "gruvato-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/gruvato",
+      "ok": true,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:15.902Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "pass",
+          "summary": "1 orchestrator scaffold(s) verified",
+          "details": [],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/_lib.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md",
+    "agents/hermes/pm/role.yaml"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+    "origin": "git@github.com:delorenj/gruvato.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/gruvato",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/gruvato.git\n   1a06891d..01b3877c  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/gruvato",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/gruvato",
+    "exit_code": 0,
+    "stdout": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/gruvato/commit/01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:05:18.226172+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+      "origin": "git@github.com:delorenj/gruvato.git",
+      "status": [
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "5666981f2f6533889536828a0f71e02671354ce429fe7fb542a3255d46c3f5e5",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "5666981f2f6533889536828a0f71e02671354ce429fe7fb542a3255d46c3f5e5",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7de81ac9eba5119f8e33b1aa79037082f75c7ad2751cfbafe3fcce4a5af09dfb",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/gruvato",
+        "--agent",
+        "gruvato-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/gruvato",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/gruvato",
+        "dryRun": true,
+        "ok": true,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "noop",
+            "summary": "No changes required",
+            "changedFiles": [],
+            "details": []
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/gruvato",
+        "--agent",
+        "gruvato-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/gruvato",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/gruvato",
+        "ok": true,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:17.797Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "pass",
+            "summary": "1 orchestrator scaffold(s) verified",
+            "details": [],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/gruvato",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/gruvato",
+      "exit_code": 0,
+      "stdout": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

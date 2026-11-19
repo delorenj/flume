@@ -1,0 +1,703 @@
+{
+  "agent": "lost-things-forge-pm",
+  "repo": "/home/delorenj/code/tolt/lost-things-forge",
+  "role_dir": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:08:40.124119+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "ec3e54ab4b0a61f6152166f2a17b2e37bfb21692",
+    "origin": "git@github.com:delorenj/lost-things-forge.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/lost-things-forge\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "ec3e54ab4b0a61f6152166f2a17b2e37bfb21692",
+    "origin": "git@github.com:delorenj/lost-things-forge.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "4afc64cb0922b893339143b5f16ee610104ca22b070892763da04ef835d15bb7",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "4afc64cb0922b893339143b5f16ee610104ca22b070892763da04ef835d15bb7",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/lost-things-forge-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "--agent",
+      "lost-things-forge-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:08:52.359Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "20 orchestrator scaffold issue(s) detected",
+          "details": [
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/_lib.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "lost-things-forge-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "lost-things-forge-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "lost-things-forge-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "lost-things-forge-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "lost-things-forge-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "--agent",
+      "lost-things-forge-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "lost-things-forge-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)",
+            "lost-things-forge-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "lost-things-forge-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "lost-things-forge-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {},
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "--agent",
+      "lost-things-forge-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "dryRun": false,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "lost-things-forge-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)",
+            "lost-things-forge-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "lost-things-forge-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "lost-things-forge-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "cc4d0a4bc8f696b876448dbb9f49f9bd9d93fda461c5567928d8853c3931a2ae",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "cc4d0a4bc8f696b876448dbb9f49f9bd9d93fda461c5567928d8853c3931a2ae",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/lost-things-forge-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "--agent",
+      "lost-things-forge-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "noop",
+          "summary": "No changes required",
+          "changedFiles": [],
+          "details": []
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "--agent",
+      "lost-things-forge-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "ok": true,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:08:57.991Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "pass",
+          "summary": "1 orchestrator scaffold(s) verified",
+          "details": [],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/_lib.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md",
+    "agents/hermes/pm/role.yaml"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+    "origin": "git@github.com:delorenj/lost-things-forge.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/lost-things-forge.git\n   ec3e54a..aa3ce4f  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/tolt/lost-things-forge",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+    "exit_code": 0,
+    "stdout": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/lost-things-forge/commit/aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:09:00.333210+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+      "origin": "git@github.com:delorenj/lost-things-forge.git",
+      "status": [
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "cc4d0a4bc8f696b876448dbb9f49f9bd9d93fda461c5567928d8853c3931a2ae",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "cc4d0a4bc8f696b876448dbb9f49f9bd9d93fda461c5567928d8853c3931a2ae",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/lost-things-forge-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "62ed52211831f68d8797d00041be7b2d5f468199388026f32dd319092151d7cf",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/tolt/lost-things-forge",
+        "--agent",
+        "lost-things-forge-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/tolt/lost-things-forge",
+        "dryRun": true,
+        "ok": true,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "noop",
+            "summary": "No changes required",
+            "changedFiles": [],
+            "details": []
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/tolt/lost-things-forge",
+        "--agent",
+        "lost-things-forge-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/tolt/lost-things-forge",
+        "ok": true,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:29:02.589Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "pass",
+            "summary": "1 orchestrator scaffold(s) verified",
+            "details": [],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/tolt/lost-things-forge",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/tolt/lost-things-forge",
+      "exit_code": 0,
+      "stdout": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

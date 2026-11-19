@@ -1,0 +1,697 @@
+{
+  "agent": "earshot-pm",
+  "repo": "/home/delorenj/code/earshot",
+  "role_dir": "/home/delorenj/code/earshot/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:09:07.522410+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "978a78c3d5a457990f60880b8185d710ccf47e36",
+    "origin": "git@github.com:delorenj/earshot.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/earshot",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/earshot\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "978a78c3d5a457990f60880b8185d710ccf47e36",
+    "origin": "git@github.com:delorenj/earshot.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "8e291f0df5414519a01854d6343717f7ad4b3cb2a56e1c518e6e9b59dda52319",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "8e291f0df5414519a01854d6343717f7ad4b3cb2a56e1c518e6e9b59dda52319",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/earshot-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/earshot",
+      "--agent",
+      "earshot-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/earshot",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:10.739Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "19 orchestrator scaffold issue(s) detected",
+          "details": [
+            "earshot-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/_lib.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "earshot-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "earshot-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "earshot-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "earshot-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "earshot-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "earshot-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "earshot-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "earshot-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "earshot-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "earshot-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/earshot",
+      "--agent",
+      "earshot-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/earshot",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "earshot-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)",
+            "earshot-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "earshot-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "earshot-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {},
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/earshot",
+      "--agent",
+      "earshot-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/earshot",
+      "dryRun": false,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/code/earshot/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "earshot-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)",
+            "earshot-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "earshot-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "earshot-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/earshot/agents/hermes/pm/role.yaml",
+        "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "6f63e427cd31b3bdb770849d4cb4caab53fa2f1599a27585f82285e5944e64bd",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "6f63e427cd31b3bdb770849d4cb4caab53fa2f1599a27585f82285e5944e64bd",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/earshot-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/earshot",
+      "--agent",
+      "earshot-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/earshot",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "noop",
+          "summary": "No changes required",
+          "changedFiles": [],
+          "details": []
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/earshot",
+      "--agent",
+      "earshot-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/earshot",
+      "ok": true,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:15.167Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "pass",
+          "summary": "1 orchestrator scaffold(s) verified",
+          "details": [],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/_lib.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md",
+    "agents/hermes/pm/role.yaml"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "00bef9ad6017901c85d728c5311e60e501c85e03",
+    "origin": "git@github.com:delorenj/earshot.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/earshot",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/earshot.git\n   978a78c..00bef9a  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/earshot",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/earshot",
+    "exit_code": 0,
+    "stdout": "00bef9ad6017901c85d728c5311e60e501c85e03\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/earshot/commit/00bef9ad6017901c85d728c5311e60e501c85e03",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:09:16.986617+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "00bef9ad6017901c85d728c5311e60e501c85e03",
+      "origin": "git@github.com:delorenj/earshot.git",
+      "status": [
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "6f63e427cd31b3bdb770849d4cb4caab53fa2f1599a27585f82285e5944e64bd",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "6f63e427cd31b3bdb770849d4cb4caab53fa2f1599a27585f82285e5944e64bd",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/earshot-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "bffa0e7e8424cb2074898d35abf52780a90bd01ec99cf9cf76c3d3240f3da15f",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/earshot",
+        "--agent",
+        "earshot-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/earshot",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/earshot",
+        "dryRun": true,
+        "ok": true,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "noop",
+            "summary": "No changes required",
+            "changedFiles": [],
+            "details": []
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/earshot",
+        "--agent",
+        "earshot-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/earshot",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/earshot",
+        "ok": true,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:29:06.881Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "pass",
+            "summary": "1 orchestrator scaffold(s) verified",
+            "details": [],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/earshot",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/earshot",
+      "exit_code": 0,
+      "stdout": "00bef9ad6017901c85d728c5311e60e501c85e03\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

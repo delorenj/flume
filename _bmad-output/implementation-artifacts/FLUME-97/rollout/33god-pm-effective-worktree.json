@@ -1,0 +1,771 @@
+{
+  "agent": "33god-pm",
+  "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+  "role_dir": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm",
+  "scripts_only": true,
+  "started": "2026-11-19T11:09:16.987348+00:00",
+  "before_pull": {
+    "branch": "feat/FLUME-85-atlas-hire",
+    "head": "752cc7aadbfd507990d37c41b1448925bc813994",
+    "origin": "git@github.com:delorenj/33GOD.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "landing_constraint": "Nonmain branch retained; no incompatible main merge or branch switch. Changes pushed to existing branch.",
+  "before": {
+    "branch": "feat/FLUME-85-atlas-hire",
+    "head": "752cc7aadbfd507990d37c41b1448925bc813994",
+    "origin": "git@github.com:delorenj/33GOD.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33277
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "b684ba214e9bac79283a1c5f5dfb4d969099ad5112cb88ba478f02cb77cedb06",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "241291605b3711fdd3efbad5b7e1b0f65ead1a107f690dbbc1c6dc6e12ab25f8",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "--agent",
+      "33god-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:19.747Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "21 orchestrator scaffold issue(s) detected",
+          "details": [
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "33god-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "33god-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "33god-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "33god-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "33god-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "33god-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "33god-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "33god-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "33god-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "33god-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "33god-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "--agent",
+      "33god-pm",
+      "--scripts-only",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone",
+            "33god-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "33god-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "33god-pm: preserved locally-modified .scripts/01-config.sh",
+            "33god-pm: preserved locally-modified .scripts/_lib.sh",
+            "33god-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33277
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "--agent",
+      "33god-pm",
+      "--scripts-only",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone",
+            "33god-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "33god-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "33god-pm: preserved locally-modified .scripts/01-config.sh",
+            "33god-pm: preserved locally-modified .scripts/_lib.sh",
+            "33god-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "b684ba214e9bac79283a1c5f5dfb4d969099ad5112cb88ba478f02cb77cedb06",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "241291605b3711fdd3efbad5b7e1b0f65ead1a107f690dbbc1c6dc6e12ab25f8",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "--agent",
+      "33god-pm",
+      "--scripts-only",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone",
+            "33god-pm: preserved locally-modified .scripts/01-config.sh",
+            "33god-pm: preserved locally-modified .scripts/_lib.sh",
+            "33god-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "--agent",
+      "33god-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:23.581Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "4 orchestrator scaffold issue(s) detected",
+          "details": [
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "33god-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "33god-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "outcome": "pushed; scripts-only cleanup verified; effective runtime holds current; tracked worktree SOUL still older by authorized preservation",
+  "ended": "2026-11-19T11:09:23.596788+00:00",
+  "verification_note": "Initial harness incorrectly demanded current holds on extra-worktree tracked SOUL. This scripts-only target preserves both SOUL files; runtime and effective profile already contain all holds, but tracked SOUL lacks lifecycle:human. No SOUL change is authorized on this extra worktree.",
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md"
+  ],
+  "add": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "add",
+      "--",
+      "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+      "agents/hermes/pm/.scripts/30-telegram.sh",
+      "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+      "agents/hermes/pm/.scripts/70-systemd.sh",
+      "agents/hermes/pm/.scripts/heartbeat.sh",
+      "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+      "agents/hermes/pm/.scripts/launch-pass.py",
+      "agents/hermes/pm/.scripts/lib/project-skills.py",
+      "agents/hermes/pm/.scripts/lib/skills-policy.py",
+      "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+      "agents/hermes/pm/.scripts/lifecycle.sh",
+      "agents/hermes/pm/.scripts/managed-execution.py",
+      "agents/hermes/pm/.scripts/providers/plane.sh",
+      "agents/hermes/pm/.scripts/providers/trello.sh",
+      "agents/hermes/pm/.scripts/sentinel.prompt.md",
+      "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+      "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "commit": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "commit",
+      "--only",
+      "-m",
+      "chore(FLUME-97): retire managed execution on effective 33god PM worktree",
+      "--",
+      "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+      "agents/hermes/pm/.scripts/30-telegram.sh",
+      "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+      "agents/hermes/pm/.scripts/70-systemd.sh",
+      "agents/hermes/pm/.scripts/heartbeat.sh",
+      "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+      "agents/hermes/pm/.scripts/launch-pass.py",
+      "agents/hermes/pm/.scripts/lib/project-skills.py",
+      "agents/hermes/pm/.scripts/lib/skills-policy.py",
+      "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+      "agents/hermes/pm/.scripts/lifecycle.sh",
+      "agents/hermes/pm/.scripts/managed-execution.py",
+      "agents/hermes/pm/.scripts/providers/plane.sh",
+      "agents/hermes/pm/.scripts/providers/trello.sh",
+      "agents/hermes/pm/.scripts/sentinel.prompt.md",
+      "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+      "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 0,
+    "stdout": "[feat/FLUME-85-atlas-hire 96e6949] chore(FLUME-97): retire managed execution on effective 33god PM worktree\n 17 files changed, 530 insertions(+), 357 deletions(-)\n delete mode 100755 agents/hermes/pm/.scripts/lifecycle.sh\n delete mode 100644 agents/hermes/pm/.scripts/managed-execution.py\n",
+    "stderr": ""
+  },
+  "after": {
+    "branch": "feat/FLUME-85-atlas-hire",
+    "head": "96e6949ee6fc88fd719c56c7f3b5d8664301705d",
+    "origin": "git@github.com:delorenj/33GOD.git",
+    "status": [
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "push",
+      "origin",
+      "HEAD:refs/heads/feat/FLUME-85-atlas-hire"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/33GOD.git\n   752cc7a..96e6949  HEAD -> feat/FLUME-85-atlas-hire\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "ls-remote",
+      "origin",
+      "refs/heads/feat/FLUME-85-atlas-hire"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+    "exit_code": 0,
+    "stdout": "96e6949ee6fc88fd719c56c7f3b5d8664301705d\trefs/heads/feat/FLUME-85-atlas-hire\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/33GOD/commit/96e6949ee6fc88fd719c56c7f3b5d8664301705d",
+  "initial_error": "('tracked_soul', 'holds/human')",
+  "final_verification": {
+    "git": {
+      "branch": "feat/FLUME-85-atlas-hire",
+      "head": "96e6949ee6fc88fd719c56c7f3b5d8664301705d",
+      "origin": "git@github.com:delorenj/33GOD.git",
+      "status": [
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "b684ba214e9bac79283a1c5f5dfb4d969099ad5112cb88ba478f02cb77cedb06",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": false,
+          "agent:failed": true
+        },
+        "human_rule": false,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "241291605b3711fdd3efbad5b7e1b0f65ead1a107f690dbbc1c6dc6e12ab25f8",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+        "--agent",
+        "33god-pm",
+        "--scripts-only",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone",
+              "33god-pm: preserved locally-modified .scripts/01-config.sh",
+              "33god-pm: preserved locally-modified .scripts/_lib.sh",
+              "33god-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+        "--agent",
+        "33god-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:29:09.293Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "4 orchestrator scaffold issue(s) detected",
+            "details": [
+              "33god-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "33god-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "33god-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+              "33god-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+        "ls-remote",
+        "origin",
+        "refs/heads/feat/FLUME-85-atlas-hire"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire",
+      "exit_code": 0,
+      "stdout": "96e6949ee6fc88fd719c56c7f3b5d8664301705d\trefs/heads/feat/FLUME-85-atlas-hire\n",
+      "stderr": ""
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "source_head": "e31a785a2b8a64f67f0a5764143c4b09a65b9474",
+  "checks": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "stdout": "\n> flume@1.0.0 typecheck\n> npm run typecheck --workspaces --if-present\n\n\n> @delorenj/flume-core@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json\n\n\n> @delorenj/flume-hr@1.0.0 typecheck\n> tsc --noEmit -p tsconfig.json\n\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "stdout": "\n> flume@1.0.0 build\n> npm run build --workspaces --if-present\n\n\n> @delorenj/flume-hr@1.0.0 build\n> esbuild src/index.ts src/mcp-server.ts --bundle --packages=external --platform=node --format=esm --sourcemap --outdir=dist\n\n",
+      "stderr": "\n  dist/index.js             1.5mb \u26a0\ufe0f\n  dist/mcp-server.js      932.3kb\n  dist/index.js.map         3.4mb\n  dist/mcp-server.js.map    2.3mb\n\n\u26a1 Done in 42ms\n"
+    },
+    {
+      "command": [
+        "node",
+        "tests/flume-97-scaffold-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS canonical preview/apply removes only shipped obsolete helpers, updates heartbeat and composes four holds; runtime/local state survives and repeats converge\nPASS modified obsolete helper and authored persona remain visible failures, and a retired registry row stays disabled\nPASS symlink, directory and linked scripts parent refuse destructive removal and retain audit failures\nPASS supported scripts-only refresh removes obsolete helpers without touching SOUL/runtime/registry\nPASS actual CLI preserves and reports a child-local replacement after classification\nPASS quarantined old bytes remain recoverable when a public replacement arrives during removal\n6 FLUME-97 scaffold groups passed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "tests/flume-97-registration-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS absent execution: project registration preserves unrelated fields and prior employee without engine metadata or pins\nPASS shadow execution: project registration preserves unrelated fields and prior employee without engine metadata or pins\nPASS managed execution: project registration preserves unrelated fields and prior employee without engine metadata or pins\nPASS no project manifest: registration remains no-op\n4 FLUME-97 registration groups passed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "tests/fleet-scaffold-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "fleet scaffold parity: every role directory against the template at the committed gitlink\n  ok   a matching role reads eight passes with no items and is counted passing\n  ok   an older verbatim script is stale-content, with both blob-id prefixes\n  ok   an older RENDER of the launcher is stale-content by rendered lineage\n  ok   missing, wrong-mode, wrong-type and unsafe-symlink each land on their own group\n  ok   tracked provisioning droppings are unexpected-owned on their groups and never a delete proposal\n  ok   a removed retired helper is not unexpected-owned while a real extra still is\n  ok   ignored runtime, untracked notes and a foreign tracked file are counted, never named; only the WIP overlap is\n  ok   presence-only assets pass whatever their content, and control flow in them is not rendered\n  ok   a row missing a render input makes ONE group error with input-missing, and the agent incomplete\n  ok   a registry role_dir with a space is compared; a silent row resolves the canonical default\n  ok   data.scaffold counts every selected agent into exactly one bucket, and the source is a host pass\n  ok   a worktree at a different commit is source-mismatched, and dirty once it is back\n  ok   an uninitialized submodule, a missing object, a staged pin and a contaminated tree are each their own code\n  ok   a rendered path no group owns is manifest-uncovered, by name\n  ok   control flow or an undeclared placeholder in a content-compared template is render-unsupported, never rendered as best it can\n  ok   an agent_exceptions entry makes a drifted agent an exception and leaves health.healthy alone\n  ok   under --live the observer and hermes.pm-scaffold agree, disagree, or are not compared -- by name\n  ok   --agent reads one role directory and keeps fleet totals; --domain registry spawns no scaffold probe\n  ok   --domain profile carries data.scaffold: null and every agents[].scaffold: null, key present\n  ok   three hundred missing scripts cap the items at 100, note the clip, and leave the counts whole\n  ok   a blown --deadline-ms is TIMEOUT at exit 7 with no partial result\n  ok   two consecutive runs produce byte-identical data, and no secret or file body reaches either surface\n  ok   the MCP tool returns the same data as the CLI, scaffold summaries included\n  ok   a contract with no scaffold_manifest loads and reports the domain unsupported under scaffold.manifest\n  ok   fleet status refuses a manifest that matches nothing and a duplicate agent ruling, before any probe\n  ok   the runner knows about scaffold parity\n  ok   no invocation in this suite wrote to this repository\n  SKIP on the real fleet the pjangler agent's _lib.sh item agrees with an independent git blob-id comparison: the operator's live registries are not on this host\nfleet scaffold regressions passed (1 skipped)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "tests/policy-refresh-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS built command previews only owned instruction files without byte/mtime changes\nPASS apply preserves exact persona bytes, unrelated files, modes and profile links\nPASS second apply and preview are no-ops with unchanged bytes/mtime\nPASS hard links, non-UTF8, foreign SOUL identities and profile aliases refuse without publication\nPASS malformed registry and duplicate YAML keys fail without mutation\nPASS narrow portable adapter updates only SOUL and its receipt, preserving charter/config\npolicy-refresh: 6 check groups passed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "tests/pjan-103-generated-consumption.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "ok 1 - fresh real Copier role ships Todo default and executable vendor, never Linear\nok 2 - actual generated dispatcher on a true five-state stock board\nok 3 - project Ready override beats conflicting generated Todo role\nok 4 - legacy role fallback beats adapter Todo default with no project map\nok 5 - generated dispatcher refuses unknown key without PATCH\nok 6 - generated dispatcher refuses malformed map without PATCH\nok 7 - generated dispatcher refuses missing target without PATCH\nok 8 - generated dispatcher refuses wrong group without PATCH\nok 9 - generated dispatcher refuses duplicate target without PATCH\nok 10 - same-issue verification refuses wrong readback after exactly one PATCH\nok 11 - review/hold retain lifecycle labels and hold never moves Todo\nok 12 - forced real Copier regeneration retains supported project map and explicit role choices\n{\"phase\":\"before-parity\",\"report\":{\"id\":\"hermes.pm-scaffold\",\"title\":\"Hermes orchestrator scaffold parity\",\"status\":\"fail\",\"summary\":\"3 orchestrator scaffold issue(s) detected\",\"details\":[\"fixture-pm: missing agents/hermes/pm/runtime/memories/MEMORY.md\",\"fixture-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)\",\"fixture-pm: runtime/profile.yaml missing inherited default config metadata\"],\"fixable\":true}}\n{\"phase\":\"parity-migrate\",\"report\":{\"id\":\"hermes.pm-scaffold\",\"title\":\"Hermes orchestrator scaffold parity\",\"status\":\"applied\",\"summary\":\"1 orchestrator scaffold(s) normalized\",\"changedFiles\":[\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/SOUL.md\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/.runtime-scaffold/.gitignore.jinja\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/.gitattributes\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/.gitignore.jinja\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/README.md\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/decisions/.gitkeep\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/logs/.gitkeep\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/memories/MEMORY.md\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/memories/USER.md\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/role.yaml\",\"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/profile.yaml\"],\"details\":[\"fixture-pm: composed SOUL from roles/pm.md (tone direct, role.yaml)\",\"fixture-pm: template_rev -> af82ef1\",\"updated /home/delorenj/.hermes/profiles/flume-pm/cache/scratch/pjan103-generated-hkngRf/fixture/agents/hermes/pm/runtime/profile.yaml\"]}}\n{\"phase\":\"after-parity\",\"report\":{\"id\":\"hermes.pm-scaffold\",\"title\":\"Hermes orchestrator scaffold parity\",\"status\":\"pass\",\"summary\":\"1 orchestrator scaffold(s) verified\",\"details\":[],\"fixable\":true}}\nok 13 - actual hermes.pm-scaffold passes on regenerated fixed consumer, map retained, no Linear\nPJAN-103 generated consumption: 13 integration checks passed\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "tests/scheduling-policy-audit-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "stdout": "PASS current CLI audit is read-only and limits its positive claim to on-disk instructions\nPASS malformed role/employment and duplicate profile rows never certify current coverage\nPASS unreadable, non-UTF8 and nonregular SOUL inputs remain incomplete without mutation or hangs\nPASS opened descriptors bound raced growth and short reads while preserving valid runtime links\nPASS missing, duplicate-key, non-UTF8, nonregular and oversized registry inputs fail closed\nPASS audit role grammar follows the owning role contract\nPASS missing, unreadable and malformed canonical policy cannot return a clean registry\nscheduling-policy-audit: 7 check groups passed\n",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,236 @@
+{
+  "started": "2026-11-19T11:12:17.622573+00:00",
+  "cause": "pre-push inherited GIT_DIR/GIT_WORK_TREE into fixture Git subprocesses; fixture commits and branch selection affected real Git metadata; no fixture commits are authorized for publication",
+  "repair": [
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "rev-parse",
+        "main"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "29bea5daeb4d48f78853755f637464523894ec6d\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "symbolic-ref",
+        "HEAD"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "refs/heads/fixture\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "diff",
+        "--name-only",
+        "af026de",
+        "--",
+        "agents/hermes/pm"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "update-ref",
+        "refs/heads/main",
+        "af026dee32d143ba315b23286130376a3c00d431",
+        "29bea5daeb4d48f78853755f637464523894ec6d"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "symbolic-ref",
+        "HEAD",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "read-tree",
+        "af026dee32d143ba315b23286130376a3c00d431"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "core.bare",
+        "true"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--get",
+        "user.name"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "fixture\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--unset",
+        "user.name"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--get",
+        "user.email"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "fixture@test\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--unset",
+        "user.email"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--get",
+        "commit.gpgsign"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "false\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "config",
+        "--local",
+        "--unset",
+        "commit.gpgsign"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "--git-dir=/home/delorenj/code/skillex/.git",
+        "--work-tree=/home/delorenj/code/skillex",
+        "reflog",
+        "show",
+        "--date=iso",
+        "fixture"
+      ],
+      "cwd": "/home/delorenj/code/skillex",
+      "exit_code": 0,
+      "stdout": "00ec13c fixture@{2026-11-19 06:04:41 -0500}: \n",
+      "stderr": ""
+    }
+  ],
+  "fixture_ref_receipt": {
+    "command": [
+      "git",
+      "--git-dir=/home/delorenj/code/skillex/.git",
+      "--work-tree=/home/delorenj/code/skillex",
+      "reflog",
+      "show",
+      "--date=iso",
+      "fixture"
+    ],
+    "cwd": "/home/delorenj/code/skillex",
+    "exit_code": 0,
+    "stdout": "00ec13c fixture@{2026-11-19 06:04:41 -0500}: \n",
+    "stderr": ""
+  },
+  "after": {
+    "branch": "main",
+    "head": "af026dee32d143ba315b23286130376a3c00d431",
+    "origin": "git@github.com:delorenj/skillex.git",
+    "status": [
+      " M .lastagent",
+      " M all-skills",
+      ""
+    ],
+    "staged": ""
+  },
+  "ended": "2026-11-19T11:12:17.755937+00:00"
+}

@@ -1,0 +1,308 @@
+{
+  "links": [
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/bloodbank",
+      "relative": "bloodbank",
+      "parent_index": "160000 b8cc42f47abfc397434720878776a14476b18add 0\tbloodbank\n",
+      "child_head": "b8cc42f47abfc397434720878776a14476b18add",
+      "parent_dirty": "",
+      "updated_to": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/candystore",
+      "relative": "candystore",
+      "parent_index": "160000 89e458bb05779d06d3bcd8bf83881f737f03353d 0\tcandystore\n",
+      "child_head": "89e458bb05779d06d3bcd8bf83881f737f03353d",
+      "parent_dirty": "",
+      "updated_to": "06b03b33e082513a8e2148369ef9c9b7cc23b5e5"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/holocene",
+      "relative": "holocene",
+      "parent_index": "160000 6566f11acde0e53cbef340d54c8efa8a110eba8d 0\tholocene\n",
+      "child_head": "c6f5ac176e834a944ee01bbf8b3312863fcd5ec0",
+      "parent_dirty": "",
+      "preserved": "preexisting parent gitlink drift; not absorbed"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/pjangler",
+      "relative": "pjangler",
+      "parent_index": "160000 b934c5ceea503d3d47c3fffeb3f53f59f0c64118 0\tpjangler\n",
+      "child_head": "c1c4e0700c3b3bf35e6af633cc19513274e887f3",
+      "parent_dirty": "",
+      "preserved": "preexisting parent gitlink drift; not absorbed"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/flume",
+      "relative": "flume",
+      "parent_index": "160000 3a035d3a33fe67df49016d5f0e44f7ae044f6266 0\tflume\n",
+      "child_head": "c92d84523787bf41ead73272b9db6059d47969bb",
+      "parent_dirty": "",
+      "preserved": "preexisting parent gitlink drift; not absorbed"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/monitoring",
+      "relative": "monitoring",
+      "parent_index": "160000 b5ddecbf942f9373350893becddf3e47d52544d7 0\tmonitoring\n",
+      "child_head": "b5ddecbf942f9373350893becddf3e47d52544d7",
+      "parent_dirty": "",
+      "updated_to": "a369813d55afcc6a1a699dfb41394f4b81d4cff6"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/33GOD",
+      "nested_repo": "/home/delorenj/code/33GOD/pilot",
+      "relative": "pilot",
+      "parent_index": "160000 167e3d150d0b0af5073cece7104b5ffcb22c62a6 0\tpilot\n",
+      "child_head": "e81d921cfbfe04e346b3e2942f67410e85529d9e",
+      "parent_dirty": "",
+      "preserved": "preexisting parent gitlink drift; not absorbed"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/tolt",
+      "nested_repo": "/home/delorenj/code/tolt/tower-of-lost-things",
+      "relative": "tower-of-lost-things",
+      "parent_index": "160000 c9c997cbca582f0019d21814f4ee2b4461dfbd25 0\ttower-of-lost-things\n",
+      "child_head": "8fef20aae2884cbd78700b6ebe7da68bd1c26eee",
+      "parent_dirty": "",
+      "preserved": "preexisting parent gitlink drift; not absorbed"
+    },
+    {
+      "owner_repo": "/home/delorenj/code/tolt",
+      "nested_repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "relative": "lost-things-forge",
+      "parent_index": "160000 ec3e54ab4b0a61f6152166f2a17b2e37bfb21692 0\tlost-things-forge\n",
+      "child_head": "ec3e54ab4b0a61f6152166f2a17b2e37bfb21692",
+      "parent_dirty": "",
+      "updated_to": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b"
+    }
+  ],
+  "parents": {
+    "/home/delorenj/code/33GOD": {
+      "before": {
+        "branch": "main",
+        "head": "b2e7e11bf8fc5bde1899ef832f80b351743877ac",
+        "origin": "git@github.com:delorenj/33GOD.git",
+        "status": [
+          " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+          " M bloodbank",
+          " M candystore",
+          " M flume",
+          " M holocene",
+          " M monitoring",
+          " M pilot",
+          " M pjangler",
+          "?? _bmad-output/planning-artifacts/research/",
+          ""
+        ],
+        "staged": ""
+      },
+      "paths": [
+        "bloodbank",
+        "candystore",
+        "monitoring"
+      ],
+      "pull": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/33GOD",
+          "pull",
+          "--no-rebase",
+          "origin",
+          "main"
+        ],
+        "cwd": "/home/delorenj/code/33GOD",
+        "exit_code": 0,
+        "stdout": "Already up to date.\n",
+        "stderr": "From github.com:delorenj/33GOD\n * branch            main       -> FETCH_HEAD\n"
+      },
+      "add": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/33GOD",
+          "add",
+          "--",
+          "bloodbank",
+          "candystore",
+          "monitoring"
+        ],
+        "cwd": "/home/delorenj/code/33GOD",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "commit": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/33GOD",
+          "commit",
+          "--only",
+          "-m",
+          "chore(FLUME-97): pin refreshed PM scaffold repositories",
+          "--",
+          "bloodbank",
+          "candystore",
+          "monitoring"
+        ],
+        "cwd": "/home/delorenj/code/33GOD",
+        "exit_code": 0,
+        "stdout": "[main 88cd989] chore(FLUME-97): pin refreshed PM scaffold repositories\n 3 files changed, 3 insertions(+), 3 deletions(-)\n",
+        "stderr": ""
+      },
+      "push": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/33GOD",
+          "push",
+          "origin",
+          "main"
+        ],
+        "cwd": "/home/delorenj/code/33GOD",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "To github.com:delorenj/33GOD.git\n   b2e7e11..88cd989  main -> main\n"
+      },
+      "after": {
+        "branch": "main",
+        "head": "88cd9893a6b19b1936acb318cd744be6ef0fdb22",
+        "origin": "git@github.com:delorenj/33GOD.git",
+        "status": [
+          " M _bmad-output/implementation-artifacts/bloodbank-events.jsonl",
+          " M bloodbank",
+          " M flume",
+          " M holocene",
+          " M pilot",
+          " M pjangler",
+          "?? _bmad-output/planning-artifacts/research/",
+          ""
+        ],
+        "staged": ""
+      },
+      "remote": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/33GOD",
+          "ls-remote",
+          "origin",
+          "refs/heads/main"
+        ],
+        "cwd": "/home/delorenj/code/33GOD",
+        "exit_code": 0,
+        "stdout": "88cd9893a6b19b1936acb318cd744be6ef0fdb22\trefs/heads/main\n",
+        "stderr": ""
+      },
+      "commit_url": "https://github.com/delorenj/33GOD/commit/88cd9893a6b19b1936acb318cd744be6ef0fdb22"
+    },
+    "/home/delorenj/code/tolt": {
+      "before": {
+        "branch": "main",
+        "head": "408038398eeecf7574f238cc90467356d83bfe28",
+        "origin": "git@github.com:delorenj/tolt.git",
+        "status": [
+          " M lost-things-forge",
+          " M tower-of-lost-things",
+          ""
+        ],
+        "staged": ""
+      },
+      "paths": [
+        "lost-things-forge"
+      ],
+      "pull": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/tolt",
+          "pull",
+          "--no-rebase",
+          "origin",
+          "main"
+        ],
+        "cwd": "/home/delorenj/code/tolt",
+        "exit_code": 0,
+        "stdout": "Already up to date.\n",
+        "stderr": "From github.com:delorenj/tolt\n * branch            main       -> FETCH_HEAD\n"
+      },
+      "add": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/tolt",
+          "add",
+          "--",
+          "lost-things-forge"
+        ],
+        "cwd": "/home/delorenj/code/tolt",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "commit": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/tolt",
+          "commit",
+          "--only",
+          "-m",
+          "chore(FLUME-97): pin refreshed PM scaffold repositories",
+          "--",
+          "lost-things-forge"
+        ],
+        "cwd": "/home/delorenj/code/tolt",
+        "exit_code": 0,
+        "stdout": "[main 9a6d85d] chore(FLUME-97): pin refreshed PM scaffold repositories\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+        "stderr": ""
+      },
+      "push": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/tolt",
+          "push",
+          "origin",
+          "main"
+        ],
+        "cwd": "/home/delorenj/code/tolt",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "To github.com:delorenj/tolt.git\n   4080383..9a6d85d  main -> main\n"
+      },
+      "after": {
+        "branch": "main",
+        "head": "9a6d85dd00b5d2bede92ee42c77db17b71b52ad5",
+        "origin": "git@github.com:delorenj/tolt.git",
+        "status": [
+          " M tower-of-lost-things",
+          ""
+        ],
+        "staged": ""
+      },
+      "remote": {
+        "command": [
+          "git",
+          "-C",
+          "/home/delorenj/code/tolt",
+          "ls-remote",
+          "origin",
+          "refs/heads/main"
+        ],
+        "cwd": "/home/delorenj/code/tolt",
+        "exit_code": 0,
+        "stdout": "9a6d85dd00b5d2bede92ee42c77db17b71b52ad5\trefs/heads/main\n",
+        "stderr": ""
+      },
+      "commit_url": "https://github.com/delorenj/tolt/commit/9a6d85dd00b5d2bede92ee42c77db17b71b52ad5"
+    }
+  }
+}

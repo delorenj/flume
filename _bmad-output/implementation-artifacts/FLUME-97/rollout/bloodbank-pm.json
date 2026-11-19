@@ -1,0 +1,838 @@
+{
+  "agent": "bloodbank-pm",
+  "repo": "/home/delorenj/code/33GOD/bloodbank",
+  "role_dir": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:02:48.643530+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "b8cc42f47abfc397434720878776a14476b18add",
+    "origin": "git@github.com:delorenj/bloodbank.git",
+    "status": [
+      " M services/target-watch/README.md",
+      " M services/target-watch/target_watch/cli.py",
+      " M services/target-watch/target_watch/match_service.py",
+      " M services/target-watch/target_watch/sink.py",
+      " M services/target-watch/target_watch/targets.py",
+      "?? services/target-watch/ALERT-MODE.md",
+      "?? services/target-watch/target_watch/alert_cli.py",
+      "?? services/target-watch/target_watch/alert_mode.py",
+      "?? services/target-watch/target_watch/alert_runtime.py",
+      "?? services/target-watch/target_watch/identity.py",
+      "?? services/target-watch/tests/test_alert_mode.py",
+      "?? services/target-watch/tests/test_alert_runtime_boundaries.py",
+      "?? services/target-watch/tests/test_identity_runtime.py",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/bloodbank\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "b8cc42f47abfc397434720878776a14476b18add",
+    "origin": "git@github.com:delorenj/bloodbank.git",
+    "status": [
+      " M services/target-watch/README.md",
+      " M services/target-watch/target_watch/cli.py",
+      " M services/target-watch/target_watch/match_service.py",
+      " M services/target-watch/target_watch/sink.py",
+      " M services/target-watch/target_watch/targets.py",
+      "?? services/target-watch/ALERT-MODE.md",
+      "?? services/target-watch/target_watch/alert_cli.py",
+      "?? services/target-watch/target_watch/alert_mode.py",
+      "?? services/target-watch/target_watch/alert_runtime.py",
+      "?? services/target-watch/target_watch/identity.py",
+      "?? services/target-watch/tests/test_alert_mode.py",
+      "?? services/target-watch/tests/test_alert_runtime_boundaries.py",
+      "?? services/target-watch/tests/test_identity_runtime.py",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "4cbd88cb1987c91df725b97999af18501bf57048efd24f72917f6a4d2aebd089",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "4cbd88cb1987c91df725b97999af18501bf57048efd24f72917f6a4d2aebd089",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "--agent",
+      "bloodbank-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:02:51.323Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/launch-pass.py",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "bloodbank-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "bloodbank-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "bloodbank-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "bloodbank-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "bloodbank-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "--agent",
+      "bloodbank-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "4 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "bloodbank-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "bloodbank-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "bloodbank-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "bloodbank-pm: preserved locally-modified .scripts/01-config.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/_lib.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/config.example.toml",
+            "bloodbank-pm: preserved locally-modified .scripts/launch-pass.py"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "services/target-watch/README.md": {
+      "sha256": "4ef6624b427538b6ea4fa19d63f042024a33d0397edbad3433103d34d8131bfd",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/cli.py": {
+      "sha256": "f1d9ddaf5269d5846149011a0a1ca073ee58a5ec1b61308d08722c8fc7efee9f",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/match_service.py": {
+      "sha256": "f1b6da4f925bf9f46d903fb5f2ec059228d50a3d5a0f95e7a2425771ec78ca07",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/sink.py": {
+      "sha256": "749136741a31cea5ea902e009a1b0aba4809115a6197776220841298ae321b78",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/targets.py": {
+      "sha256": "bb2a84e50641263caffca025511019a56905f3d06767dc8398d1d778dbce6e03",
+      "mode": 33204
+    },
+    "services/target-watch/ALERT-MODE.md": {
+      "sha256": "abad65c1693e21f16f3cb836d267193b6bcfb223bb4427fb51024f2db748955f",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/alert_cli.py": {
+      "sha256": "652e2de457c1d11bbb709f423e0f4dce3d733308c9ef4597703554f0d8e023fb",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/alert_mode.py": {
+      "sha256": "0d9bd3648288a991b17e01683b59dd37da8f7aebae7c5b5012cc1a4975b2eff0",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/alert_runtime.py": {
+      "sha256": "2d2230e3bba7ab891b8b2e10e1ab8bee7269e77d29f4e0a13d2537a86268417f",
+      "mode": 33204
+    },
+    "services/target-watch/target_watch/identity.py": {
+      "sha256": "84b2d27790feb2e80f2deca56fb8d77a42a2c88e0a09952a27b0bb0f1d3e332d",
+      "mode": 33204
+    },
+    "services/target-watch/tests/test_alert_mode.py": {
+      "sha256": "169d09a6bb464f566903c9d699c5c57689dec4d4519e2e12a2b8fb7e34eb3848",
+      "mode": 33204
+    },
+    "services/target-watch/tests/test_alert_runtime_boundaries.py": {
+      "sha256": "5395e41c5db985d0b17a13904fdc9ac5b2d50bc1513edc80fdac3fd760ee7d2f",
+      "mode": 33204
+    },
+    "services/target-watch/tests/test_identity_runtime.py": {
+      "sha256": "db82202c55ac0bb90efea81d14330de16a3df750de3c333f985649ffe4d6534c",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33261
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33261
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    },
+    ".scripts/launch-pass.py": {
+      "sha256": "f3bb9a0bbe9e0dd3bebf45246d1636be4bf51642ed520add2e784e6df8de92c2",
+      "mode": 33261
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "--agent",
+      "bloodbank-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "4 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "bloodbank-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "bloodbank-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "bloodbank-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "bloodbank-pm: preserved locally-modified .scripts/01-config.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/_lib.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/config.example.toml",
+            "bloodbank-pm: preserved locally-modified .scripts/launch-pass.py"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "8be9ff9cbecf16bc0abbb6f10583e3946fd2abe38154af289351b2d6b7d75b52",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "8be9ff9cbecf16bc0abbb6f10583e3946fd2abe38154af289351b2d6b7d75b52",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "--agent",
+      "bloodbank-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "4 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "bloodbank-pm: preserved locally-modified .scripts/01-config.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/_lib.sh",
+            "bloodbank-pm: preserved locally-modified .scripts/config.example.toml",
+            "bloodbank-pm: preserved locally-modified .scripts/launch-pass.py"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "--agent",
+      "bloodbank-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:02:54.906Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "4 orchestrator scaffold issue(s) detected",
+          "details": [
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/launch-pass.py"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+    "origin": "git@github.com:delorenj/bloodbank.git",
+    "status": [
+      " M services/target-watch/README.md",
+      " M services/target-watch/target_watch/cli.py",
+      " M services/target-watch/target_watch/match_service.py",
+      " M services/target-watch/target_watch/sink.py",
+      " M services/target-watch/target_watch/targets.py",
+      "?? services/target-watch/ALERT-MODE.md",
+      "?? services/target-watch/target_watch/alert_cli.py",
+      "?? services/target-watch/target_watch/alert_mode.py",
+      "?? services/target-watch/target_watch/alert_runtime.py",
+      "?? services/target-watch/target_watch/identity.py",
+      "?? services/target-watch/tests/test_alert_mode.py",
+      "?? services/target-watch/tests/test_alert_runtime_boundaries.py",
+      "?? services/target-watch/tests/test_identity_runtime.py",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/bloodbank.git\n   b8cc42f..b99f593  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/33GOD/bloodbank",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/bloodbank",
+    "exit_code": 0,
+    "stdout": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/bloodbank/commit/b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:02:56.978335+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+      "origin": "git@github.com:delorenj/bloodbank.git",
+      "status": [
+        " M services/target-watch/README.md",
+        " M services/target-watch/target_watch/cli.py",
+        " M services/target-watch/target_watch/match_service.py",
+        " M services/target-watch/target_watch/sink.py",
+        " M services/target-watch/target_watch/targets.py",
+        "?? services/target-watch/ALERT-MODE.md",
+        "?? services/target-watch/target_watch/alert_cli.py",
+        "?? services/target-watch/target_watch/alert_mode.py",
+        "?? services/target-watch/target_watch/alert_runtime.py",
+        "?? services/target-watch/target_watch/identity.py",
+        "?? services/target-watch/tests/test_alert_mode.py",
+        "?? services/target-watch/tests/test_alert_runtime_boundaries.py",
+        "?? services/target-watch/tests/test_identity_runtime.py",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "8be9ff9cbecf16bc0abbb6f10583e3946fd2abe38154af289351b2d6b7d75b52",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "8be9ff9cbecf16bc0abbb6f10583e3946fd2abe38154af289351b2d6b7d75b52",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "7ffb4dda711bcb6a02afe352e01e995b2bbd94f6b4c207eefb974feda1103514",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/33GOD/bloodbank",
+        "--agent",
+        "bloodbank-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/bloodbank",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/bloodbank",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "4 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "bloodbank-pm: preserved locally-modified .scripts/01-config.sh",
+              "bloodbank-pm: preserved locally-modified .scripts/_lib.sh",
+              "bloodbank-pm: preserved locally-modified .scripts/config.example.toml",
+              "bloodbank-pm: preserved locally-modified .scripts/launch-pass.py"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/33GOD/bloodbank",
+        "--agent",
+        "bloodbank-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/bloodbank",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/33GOD/bloodbank",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:01.039Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "4 orchestrator scaffold issue(s) detected",
+            "details": [
+              "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+              "bloodbank-pm: locally-modified agents/hermes/pm/.scripts/launch-pass.py"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/33GOD/bloodbank",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/33GOD/bloodbank",
+      "exit_code": 0,
+      "stdout": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

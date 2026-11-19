@@ -1,0 +1,7 @@
+{
+  "flume_owned_worktree": "removed after clean source and nested template checks; no live profile target; only ignored dependency/build caches",
+  "flume_local_branch": "fix-FLUME-97-retire-managed-execution deleted after published and merged; remote branch retained",
+  "james_owned_worktree": "removed clean after scoped PR merged and branch pushed",
+  "james_local_branch": "fix/FLUME-97-scoped-rollout deleted after merged",
+  "not_removed": "extra 33GOD live worktree and all unrelated worktrees/branches"
+}

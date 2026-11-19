@@ -1,0 +1,305 @@
+{
+  "template_pin": "af82ef125f6cb7382f17f9e5dda596658a2784f5",
+  "before": {
+    "33god-pm-effective-worktree": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "ssbnk-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "infra-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "lost-things-forge-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "jacksnaps-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "keepy-money-pm": {
+      "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+      "shipped_blob": "11073207d0e57541976d9b2f583fea277346c443",
+      "was_managed": true
+    },
+    "pile-of-dumb-things-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "zshyzsh-pm": {
+      "sha256": "17a49c5dd302c1d151fcc04f7ef6f9f86a2f2adb1c16d861a3784bc83112a2ee",
+      "shipped_blob": "b0989b83a5ef12b3183f8bdf7d1f1da2c2b65422",
+      "was_managed": true
+    },
+    "green-in-between-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "navi-pm": {
+      "sha256": "68f5a88f255f58be7e8444a60fcc1986b441c7a333e228a3f126b9f3518a33ae",
+      "shipped_blob": "90f3f32099549611e5bd23e465bdc78958a92f82",
+      "was_managed": true
+    },
+    "bloodbank-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "monitoring-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "deckard-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "candystore-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "pjangler-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "pilot-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "gruvato-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "flume-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "earshot-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "voxxy-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "slowburns-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "holocene-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "milkshake-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "client-portal-pm": {
+      "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+      "shipped_blob": "11073207d0e57541976d9b2f583fea277346c443",
+      "was_managed": true
+    },
+    "nautilus-trader-pm": {
+      "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+      "shipped_blob": "11073207d0e57541976d9b2f583fea277346c443",
+      "was_managed": true
+    },
+    "sidepiece-pm": {
+      "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+      "shipped_blob": "11073207d0e57541976d9b2f583fea277346c443",
+      "was_managed": true
+    },
+    "james-brennan-pm": {
+      "sha256": "a98241e2ff9416faab150471fc9bcbd7a2caa0b3b03e3873568fbc9573cdb295",
+      "shipped_blob": "11073207d0e57541976d9b2f583fea277346c443",
+      "was_managed": true
+    },
+    "skillex-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "idealscenario-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "33god-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "tolt-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04",
+      "was_managed": false
+    },
+    "tonnybox-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    },
+    "heyma-pm": {
+      "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+      "shipped_blob": "7b7cb6fadeebe8ff414f40d48a8df88d5993e41d",
+      "was_managed": true
+    }
+  },
+  "after": {
+    "33god-pm-effective-worktree": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "ssbnk-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "infra-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "lost-things-forge-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "jacksnaps-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "keepy-money-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "pile-of-dumb-things-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "zshyzsh-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "green-in-between-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "navi-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "bloodbank-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "monitoring-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "deckard-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "candystore-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "pjangler-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "pilot-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "gruvato-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "flume-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "earshot-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "voxxy-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "slowburns-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "holocene-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "milkshake-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "client-portal-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "nautilus-trader-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "sidepiece-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "james-brennan-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "skillex-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "idealscenario-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "33god-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "tolt-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "tonnybox-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    },
+    "heyma-pm": {
+      "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+      "shipped_blob": "88a79e05d3816925dc3892f1dd1ea9127c101a04"
+    }
+  },
+  "not_in_lineage": []
+}

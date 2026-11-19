@@ -1,0 +1,715 @@
+{
+  "agent": "jacksnaps-pm",
+  "repo": "/home/delorenj/code/jacksnaps",
+  "role_dir": "/home/delorenj/code/jacksnaps/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:09:00.367803+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "b0a4c16db20f82c0f0226b1def10fa4af2e17ba4",
+    "origin": "git@github.com:delorenj/jacksnaps-pipeline",
+    "status": [
+      "?? artifacts/",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/jacksnaps",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/jacksnaps-pipeline\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "b0a4c16db20f82c0f0226b1def10fa4af2e17ba4",
+    "origin": "git@github.com:delorenj/jacksnaps-pipeline",
+    "status": [
+      "?? artifacts/",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "c905fa869b9b97b3b3c5347744ea63acf99874848cf95a094233c42bcde6fe02",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "c905fa869b9b97b3b3c5347744ea63acf99874848cf95a094233c42bcde6fe02",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/jacksnaps-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/jacksnaps",
+      "--agent",
+      "jacksnaps-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/jacksnaps",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:02.614Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "20 orchestrator scaffold issue(s) detected",
+          "details": [
+            "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "jacksnaps-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "jacksnaps-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "jacksnaps-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "jacksnaps-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "jacksnaps-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/jacksnaps",
+      "--agent",
+      "jacksnaps-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/jacksnaps",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "2 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "jacksnaps-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "jacksnaps-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "jacksnaps-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "jacksnaps-pm: preserved locally-modified .scripts/10-hermes-profile.sh",
+            "jacksnaps-pm: preserved locally-modified .scripts/_lib.sh"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {},
+  "preserved_local_scripts": {
+    ".scripts/10-hermes-profile.sh": {
+      "sha256": "db83d5ee39ba71a2c8192083cc1c281c32a76d0be79cc8e9c0032a3e710d0d65",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "b02f4686e1c1b56126c865295144154a1d533c1f64677bace7eb2f88a5c19ae6",
+      "mode": 33277
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/jacksnaps",
+      "--agent",
+      "jacksnaps-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/jacksnaps",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "2 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "jacksnaps-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "jacksnaps-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "jacksnaps-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "jacksnaps-pm: preserved locally-modified .scripts/10-hermes-profile.sh",
+            "jacksnaps-pm: preserved locally-modified .scripts/_lib.sh"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "0f13cf788b5d48a40126da353017c99a2c5f495ce8218cf5050de8b1a35c8b67",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "0f13cf788b5d48a40126da353017c99a2c5f495ce8218cf5050de8b1a35c8b67",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/jacksnaps-pm/SOUL.md",
+      "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/code/jacksnaps",
+      "--agent",
+      "jacksnaps-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/jacksnaps",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "2 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "jacksnaps-pm: preserved locally-modified .scripts/10-hermes-profile.sh",
+            "jacksnaps-pm: preserved locally-modified .scripts/_lib.sh"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/code/jacksnaps",
+      "--agent",
+      "jacksnaps-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/code/jacksnaps",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:09:05.174Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "2 orchestrator scaffold issue(s) detected",
+          "details": [
+            "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "27b24f5a87ae8881423d05441db70d951943bf4e",
+    "origin": "git@github.com:delorenj/jacksnaps-pipeline",
+    "status": [
+      "?? artifacts/",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/jacksnaps",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/jacksnaps-pipeline\n   b0a4c16..27b24f5  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/code/jacksnaps",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/code/jacksnaps",
+    "exit_code": 0,
+    "stdout": "27b24f5a87ae8881423d05441db70d951943bf4e\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/jacksnaps-pipeline/commit/27b24f5a87ae8881423d05441db70d951943bf4e",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:09:07.521546+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "27b24f5a87ae8881423d05441db70d951943bf4e",
+      "origin": "git@github.com:delorenj/jacksnaps-pipeline",
+      "status": [
+        "?? artifacts/",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "0f13cf788b5d48a40126da353017c99a2c5f495ce8218cf5050de8b1a35c8b67",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "0f13cf788b5d48a40126da353017c99a2c5f495ce8218cf5050de8b1a35c8b67",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/jacksnaps-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "4b1b80dd982f057d9e61c59f7d8db527ca032da7c293a55f210265bf6cb2e31d",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/code/jacksnaps",
+        "--agent",
+        "jacksnaps-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/jacksnaps",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/jacksnaps",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "2 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "jacksnaps-pm: preserved locally-modified .scripts/10-hermes-profile.sh",
+              "jacksnaps-pm: preserved locally-modified .scripts/_lib.sh"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/code/jacksnaps",
+        "--agent",
+        "jacksnaps-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/code/jacksnaps",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/code/jacksnaps",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:29:04.491Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "2 orchestrator scaffold issue(s) detected",
+            "details": [
+              "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/10-hermes-profile.sh",
+              "jacksnaps-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/code/jacksnaps",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/code/jacksnaps",
+      "exit_code": 0,
+      "stdout": "27b24f5a87ae8881423d05441db70d951943bf4e\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

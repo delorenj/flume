@@ -1,0 +1,848 @@
+{
+  "verified_at": "2026-11-19T11:27:58.908750+00:00",
+  "scope": "32 canonical PM projects plus 33god-pm effective feature-worktree scripts",
+  "source_integration": "28816587aaf3623758cb96c4167ed4b45276d3a8",
+  "source_reviewed": "2f3465bf38848e5707fa701145779c9b810078ed",
+  "template_pin": "af82ef125f6cb7382f17f9e5dda596658a2784f5",
+  "desks": [
+    {
+      "agent": "bloodbank-pm",
+      "repo": "/home/delorenj/code/33GOD/bloodbank",
+      "role_dir": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+      "commit_url": "https://github.com/delorenj/bloodbank/commit/b99f5936b4c12cddbb9bbf66dcb9e8771e733811",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/bloodbank/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/bloodbank-pm.json"
+    },
+    {
+      "agent": "33god-pm",
+      "repo": "/home/delorenj/code/33GOD",
+      "role_dir": "/home/delorenj/code/33GOD/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "b2e7e11bf8fc5bde1899ef832f80b351743877ac",
+      "commit_url": "https://github.com/delorenj/33GOD/commit/b2e7e11bf8fc5bde1899ef832f80b351743877ac",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/33god-pm.json"
+    },
+    {
+      "agent": "candystore-pm",
+      "repo": "/home/delorenj/code/33GOD/candystore",
+      "role_dir": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "06b03b33e082513a8e2148369ef9c9b7cc23b5e5",
+      "commit_url": "https://github.com/delorenj/candystore/commit/06b03b33e082513a8e2148369ef9c9b7cc23b5e5",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/candystore/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/candystore-pm.json"
+    },
+    {
+      "agent": "nautilus-trader-pm",
+      "repo": "/home/delorenj/code/nautilus_trader",
+      "role_dir": "/home/delorenj/code/nautilus_trader/agents/hermes/pm",
+      "branch": "develop",
+      "rollout_commit": "9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+      "commit_url": "https://github.com/delorenj/nautilus_trader/commit/9a0149de9ef1f5501b6011f6ad4fc2de92803762",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/nautilus_trader/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/nautilus-trader-pm.json"
+    },
+    {
+      "agent": "zshyzsh-pm",
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "role_dir": "/home/delorenj/.config/zshyzsh/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "fa7b8b2919571d466ffe3b43e87398d6056873b3",
+      "commit_url": "https://github.com/delorenj/zshyzsh/commit/fa7b8b2919571d466ffe3b43e87398d6056873b3",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/zshyzsh-pm.json"
+    },
+    {
+      "agent": "holocene-pm",
+      "repo": "/home/delorenj/code/33GOD/holocene",
+      "role_dir": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "abe32a35d860d4f0d9c181d2629e7988c1039f0e",
+      "commit_url": "https://github.com/delorenj/holocene/commit/abe32a35d860d4f0d9c181d2629e7988c1039f0e",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/holocene/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/holocene-pm.json"
+    },
+    {
+      "agent": "skillex-pm",
+      "repo": "/home/delorenj/code/skillex",
+      "role_dir": "/home/delorenj/code/skillex/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "af026dee32d143ba315b23286130376a3c00d431",
+      "commit_url": "https://github.com/delorenj/skillex/commit/af026dee32d143ba315b23286130376a3c00d431",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/skillex/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed main; managed cleanup and on-disk SOUL holds verified; legacy Python hook failures retained",
+      "evidence": "rollout/skillex-pm.json"
+    },
+    {
+      "agent": "voxxy-pm",
+      "repo": "/home/delorenj/code/voxxy",
+      "role_dir": "/home/delorenj/code/voxxy/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "12d861c169d259ff28612b008e32e5b11fbc024b",
+      "commit_url": "https://github.com/delorenj/voxxy/commit/12d861c169d259ff28612b008e32e5b11fbc024b",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/voxxy/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/voxxy-pm.json"
+    },
+    {
+      "agent": "gruvato-pm",
+      "repo": "/home/delorenj/code/gruvato",
+      "role_dir": "/home/delorenj/code/gruvato/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+      "commit_url": "https://github.com/delorenj/gruvato/commit/01b3877c6eab4c4968eab9ed9657a7dba2c7f056",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/gruvato/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/gruvato-pm.json"
+    },
+    {
+      "agent": "keepy-money-pm",
+      "repo": "/home/delorenj/code/KeepyMoney",
+      "role_dir": "/home/delorenj/code/KeepyMoney/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+      "commit_url": "https://github.com/delorenj/keepy-money/commit/d3a5bd11f9b07209ece89c434a2df07c2f2df1ec",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/KeepyMoney/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/keepy-money-pm.json"
+    },
+    {
+      "agent": "slowburns-pm",
+      "repo": "/home/delorenj/code/slowburns",
+      "role_dir": "/home/delorenj/code/slowburns/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "e403154869e9eeb5ff0f74a923efdde9c949da31",
+      "commit_url": "https://github.com/delorenj/slowburns/commit/e403154869e9eeb5ff0f74a923efdde9c949da31",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/slowburns/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/slowburns-pm.json"
+    },
+    {
+      "agent": "james-brennan-pm",
+      "repo": "/home/delorenj/code/james-brennan",
+      "role_dir": "/home/delorenj/code/james-brennan/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "84caab4cc11e31b5d3c9e162842196f65a92d3c4",
+      "commit_url": "https://github.com/AutomaticAI-io/james-brennan/commit/84caab4cc11e31b5d3c9e162842196f65a92d3c4",
+      "main_merge_url": "https://github.com/AutomaticAI-io/james-brennan/commit/2e6796abe464bf5929c403b968f58b5d73c28aad",
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/james-brennan/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": false,
+      "outcome": "scaffold-only PR merged on remote main; live authored SOUL preserved; AC4 unresolved",
+      "evidence": "rollout/james-brennan-pm.json"
+    },
+    {
+      "agent": "pjangler-pm",
+      "repo": "/home/delorenj/code/33GOD/pjangler",
+      "role_dir": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "cc2907bc8901f9f277215d42b8343779d2e874e6",
+      "commit_url": "https://github.com/delorenj/pjangler/commit/cc2907bc8901f9f277215d42b8343779d2e874e6",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/pjangler/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/pjangler-pm.json"
+    },
+    {
+      "agent": "heyma-pm",
+      "repo": "/home/delorenj/HeyMa",
+      "role_dir": "/home/delorenj/HeyMa/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "c9320793056e7dda678a6dd0645523847d7f3a64",
+      "commit_url": "https://github.com/delorenj/HeyMa/commit/c9320793056e7dda678a6dd0645523847d7f3a64",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/heyma-pm.json"
+    },
+    {
+      "agent": "deckard-pm",
+      "repo": "/home/delorenj/code/deckard",
+      "role_dir": "/home/delorenj/code/deckard/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "31238c9f2b6e7aeffa77ea77fa9705b82eb0f87f",
+      "commit_url": "https://github.com/delorenj/deckard/commit/31238c9f2b6e7aeffa77ea77fa9705b82eb0f87f",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/deckard/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/deckard-pm.json"
+    },
+    {
+      "agent": "infra-pm",
+      "repo": "/home/delorenj/code/infra",
+      "role_dir": "/home/delorenj/code/infra/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "24e1aa56e435135497f5c855c76360519f0c70c7",
+      "commit_url": "https://github.com/delorenj/infra/commit/24e1aa56e435135497f5c855c76360519f0c70c7",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/infra/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/infra-pm.json"
+    },
+    {
+      "agent": "ssbnk-pm",
+      "repo": "/home/delorenj/code/ssbnk",
+      "role_dir": "/home/delorenj/code/ssbnk/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+      "commit_url": "https://github.com/delorenj/ssbnk/commit/9e1058b4a67a16ff031b4017cf73d0585543dbc1",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/ssbnk/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/ssbnk-pm.json"
+    },
+    {
+      "agent": "tonnybox-pm",
+      "repo": "/home/delorenj/code/TonnyBox",
+      "role_dir": "/home/delorenj/code/TonnyBox/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "b3144f174eef593dafa67d95841c0431e9094968",
+      "commit_url": "https://github.com/delorenj/HeyMa-Satellite/commit/b3144f174eef593dafa67d95841c0431e9094968",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/TonnyBox/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/tonnybox-pm.json"
+    },
+    {
+      "agent": "sidepiece-pm",
+      "repo": "/home/delorenj/code/sidepiece",
+      "role_dir": "/home/delorenj/code/sidepiece/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "8e43e94a421d45469756b83dbe46c564a05e1616",
+      "commit_url": "https://github.com/delorenj/sidepiece/commit/8e43e94a421d45469756b83dbe46c564a05e1616",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/sidepiece/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/sidepiece-pm.json"
+    },
+    {
+      "agent": "client-portal-pm",
+      "repo": "/home/delorenj/code/client-portal",
+      "role_dir": "/home/delorenj/code/client-portal/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "3fa485c28475d2738d3d7cbb241d484e359588e6",
+      "commit_url": "https://github.com/AutomaticAI-io/client-portal/commit/3fa485c28475d2738d3d7cbb241d484e359588e6",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/client-portal/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/client-portal-pm.json"
+    },
+    {
+      "agent": "flume-pm",
+      "repo": "/home/delorenj/code/33GOD/flume",
+      "role_dir": "/home/delorenj/code/33GOD/flume/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "e31a785a2b8a64f67f0a5764143c4b09a65b9474",
+      "commit_url": "https://github.com/delorenj/flume/commit/e31a785a2b8a64f67f0a5764143c4b09a65b9474",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/flume/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/flume-pm.json"
+    },
+    {
+      "agent": "pile-of-dumb-things-pm",
+      "repo": "/home/delorenj/code/tolt/tower-of-lost-things",
+      "role_dir": "/home/delorenj/code/tolt/tower-of-lost-things/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "cd46f5ad87dcfcef76af93eeb4d9f72a98cd219c",
+      "commit_url": "https://github.com/delorenj/tower-of-lost-things/commit/cd46f5ad87dcfcef76af93eeb4d9f72a98cd219c",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/tolt/tower-of-lost-things/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/pile-of-dumb-things-pm.json"
+    },
+    {
+      "agent": "green-in-between-pm",
+      "repo": "/home/delorenj/code/green-in-between",
+      "role_dir": "/home/delorenj/code/green-in-between/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "428a5ab1e0014a2cc322aa94a017fe3ec3d5f829",
+      "commit_url": "https://github.com/delorenj/green-in-between/commit/428a5ab1e0014a2cc322aa94a017fe3ec3d5f829",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/green-in-between/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/green-in-between-pm.json"
+    },
+    {
+      "agent": "monitoring-pm",
+      "repo": "/home/delorenj/code/33GOD/monitoring",
+      "role_dir": "/home/delorenj/code/33GOD/monitoring/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "a369813d55afcc6a1a699dfb41394f4b81d4cff6",
+      "commit_url": "https://github.com/delorenj/monitoring/commit/a369813d55afcc6a1a699dfb41394f4b81d4cff6",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/monitoring/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/monitoring-pm.json"
+    },
+    {
+      "agent": "idealscenario-pm",
+      "repo": "/home/delorenj/code/IdealScenario",
+      "role_dir": "/home/delorenj/code/IdealScenario/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "3e8061d5e5b22858b75ba28fbe49b2cd960cbed9",
+      "commit_url": "https://github.com/delorenj/IdealScenario/commit/3e8061d5e5b22858b75ba28fbe49b2cd960cbed9",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/IdealScenario/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/idealscenario-pm.json"
+    },
+    {
+      "agent": "navi-pm",
+      "repo": "/home/delorenj/code/navi",
+      "role_dir": "/home/delorenj/code/navi/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "1d751185ed61eed0a2b78cd80cc030da4c643a70",
+      "commit_url": "https://github.com/AutomaticAI-io/navi/commit/1d751185ed61eed0a2b78cd80cc030da4c643a70",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/navi/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/navi-pm.json"
+    },
+    {
+      "agent": "milkshake-pm",
+      "repo": "/home/delorenj/code/Milkshake",
+      "role_dir": "/home/delorenj/code/Milkshake/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "0814747e4d8bddc66ecff2cdbd933cab960bbdf5",
+      "commit_url": "https://github.com/AutomaticAI-io/milkshake/commit/0814747e4d8bddc66ecff2cdbd933cab960bbdf5",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/Milkshake/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/milkshake-pm.json"
+    },
+    {
+      "agent": "pilot-pm",
+      "repo": "/home/delorenj/code/33GOD/pilot",
+      "role_dir": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "71dfe740815cea801055959afd799175b0fa85c5",
+      "commit_url": "https://github.com/delorenj/pilot/commit/71dfe740815cea801055959afd799175b0fa85c5",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/33GOD/pilot/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/pilot-pm.json"
+    },
+    {
+      "agent": "tolt-pm",
+      "repo": "/home/delorenj/code/tolt",
+      "role_dir": "/home/delorenj/code/tolt/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "408038398eeecf7574f238cc90467356d83bfe28",
+      "commit_url": "https://github.com/delorenj/tolt/commit/408038398eeecf7574f238cc90467356d83bfe28",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/tolt/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/tolt-pm.json"
+    },
+    {
+      "agent": "lost-things-forge-pm",
+      "repo": "/home/delorenj/code/tolt/lost-things-forge",
+      "role_dir": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+      "commit_url": "https://github.com/delorenj/lost-things-forge/commit/aa3ce4febf58028fdf577d6f2ba6bc8bbf98ba9b",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/tolt/lost-things-forge/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/lost-things-forge-pm.json"
+    },
+    {
+      "agent": "jacksnaps-pm",
+      "repo": "/home/delorenj/code/jacksnaps",
+      "role_dir": "/home/delorenj/code/jacksnaps/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "27b24f5a87ae8881423d05441db70d951943bf4e",
+      "commit_url": "https://github.com/delorenj/jacksnaps-pipeline/commit/27b24f5a87ae8881423d05441db70d951943bf4e",
+      "main_merge_url": null,
+      "apply_exit": 1,
+      "apply_status": "partial",
+      "repeat_exit": 1,
+      "repeat_changed": [],
+      "audit_status": "fail",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/jacksnaps/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/jacksnaps-pm.json"
+    },
+    {
+      "agent": "earshot-pm",
+      "repo": "/home/delorenj/code/earshot",
+      "role_dir": "/home/delorenj/code/earshot/agents/hermes/pm",
+      "branch": "main",
+      "rollout_commit": "00bef9ad6017901c85d728c5311e60e501c85e03",
+      "commit_url": "https://github.com/delorenj/earshot/commit/00bef9ad6017901c85d728c5311e60e501c85e03",
+      "main_merge_url": null,
+      "apply_exit": 0,
+      "apply_status": "applied",
+      "repeat_exit": 0,
+      "repeat_changed": [],
+      "audit_status": "pass",
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "managed_refs": [],
+      "effective_profile_soul": "/home/delorenj/code/earshot/agents/hermes/pm/runtime/SOUL.md",
+      "holds_current": true,
+      "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+      "evidence": "rollout/earshot-pm.json"
+    }
+  ],
+  "preservation": {
+    "registry_before": {
+      "sha256": "72ce74149a077d4941466088de3ff5f994ffc4eab9c4334c99e49330058ae30e",
+      "mode": 33152
+    },
+    "registry_after": {
+      "sha256": "72ce74149a077d4941466088de3ff5f994ffc4eab9c4334c99e49330058ae30e",
+      "mode": 33152
+    },
+    "profile_link_and_config_changes": {}
+  },
+  "extra_worktree": {
+    "commit_url": "https://github.com/delorenj/33GOD/commit/96e6949ee6fc88fd719c56c7f3b5d8664301705d",
+    "outcome": "pushed; scripts-only cleanup verified; effective runtime holds current; tracked worktree SOUL still older by authorized preservation",
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "b684ba214e9bac79283a1c5f5dfb4d969099ad5112cb88ba478f02cb77cedb06",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": false,
+          "agent:failed": true
+        },
+        "human_rule": false,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "241291605b3711fdd3efbad5b7e1b0f65ead1a107f690dbbc1c6dc6e12ab25f8",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+        "resolved": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/code/33GOD/.worktrees/feat-FLUME-85-atlas-hire/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "1437acb0b153fabdbd449402141d4b20f3e8b9ae866e22c2b0f98df39d89a410",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "evidence": "rollout/33god-pm-effective-worktree.json"
+  },
+  "summary": {
+    "canonical_pm_count": 32,
+    "extra_worktrees": 1,
+    "helpers_removed": 66,
+    "heartbeat_without_managed_refs": 33,
+    "canonical_effective_souls_current": 31,
+    "apply_partial": 24,
+    "apply_applied": 8,
+    "canonical_audit_pass": 8,
+    "canonical_audit_fail_preserved": 24
+  },
+  "limitations": [
+    "James Brennan authored tracked/runtime SOUL lacks all four holds and human ownership rule. Preserved byte-exact; AC4 unresolved.",
+    "33god-pm extra live worktree scripts were refreshed as authorized; its effective runtime SOUL is current, but tracked worktree SOUL remains older (no lifecycle:human) because scripts-only scope excludes SOUL. Canonical tracked SOUL is current.",
+    "nautilus_trader remains develop and is pushed to origin/develop, not silently merged into incompatible main.",
+    "Existing local script drift remains visible in 24 canonical audits and the extra worktree audit; repeat previews are write-free, not full parity.",
+    "Skillex pre-push Git-context leakage was repaired; original bare flag restored and unrelated .lastagent/all-skills work retained. Full gate has unrelated legacy Python alias failures; publication hook bypass disclosed.",
+    "No running-session reload is claimed; verification is effective on-disk profile targets. No board, service, schedule, channel or credential changes."
+  ]
+}

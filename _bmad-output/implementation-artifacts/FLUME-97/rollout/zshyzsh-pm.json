@@ -1,0 +1,910 @@
+{
+  "agent": "zshyzsh-pm",
+  "repo": "/home/delorenj/.config/zshyzsh",
+  "role_dir": "/home/delorenj/.config/zshyzsh/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:03:23.997887+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "5ef02df98e0cbf2a5128a7c81795d249034f3cd8",
+    "origin": "git@github.com:delorenj/zshyzsh.git",
+    "status": [
+      " M alacritty/alacritty.toml",
+      " M aliases.zsh",
+      " D claude/plans/so-i-want-to-jaunty-badger.md",
+      " M lazyvim/lazy-lock.json",
+      " M mise/config.toml",
+      " M remote-hosts.zsh",
+      " M systemd/op-token-guard.timer",
+      " M voice-audio.zsh",
+      "?? .copier-answers.yml",
+      "?? .mise/version-files.conf",
+      "?? bin/gct.py",
+      "?? claude/agents/dr-denny-grubbs.md",
+      "?? claude/agents/pr-crusher.md",
+      "?? claude/commands/momo.md",
+      "?? claude/plans/here-s-the-latest-senate-md-majestic-axolotl.md",
+      "?? claude/plans/velvety-discovering-stardust.md",
+      "?? lazyvim/lua/plugins/json-schema.lua",
+      "?? scripts/clean-garbage-agent-configs.sh",
+      "?? scripts/free-gpu.zsh",
+      "?? scripts/gpu-gaming-mode",
+      "?? scripts/sync-jamesbrennan-to-drive.sh",
+      "?? scripts/sync-jim-client-view.sh",
+      "?? scripts/today.rs",
+      "?? zellij/plugins/zellij-new-tab-next-to-current.wasm",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/.config/zshyzsh",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/zshyzsh\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "5ef02df98e0cbf2a5128a7c81795d249034f3cd8",
+    "origin": "git@github.com:delorenj/zshyzsh.git",
+    "status": [
+      " M alacritty/alacritty.toml",
+      " M aliases.zsh",
+      " D claude/plans/so-i-want-to-jaunty-badger.md",
+      " M lazyvim/lazy-lock.json",
+      " M mise/config.toml",
+      " M remote-hosts.zsh",
+      " M systemd/op-token-guard.timer",
+      " M voice-audio.zsh",
+      "?? .copier-answers.yml",
+      "?? .mise/version-files.conf",
+      "?? bin/gct.py",
+      "?? claude/agents/dr-denny-grubbs.md",
+      "?? claude/agents/pr-crusher.md",
+      "?? claude/commands/momo.md",
+      "?? claude/plans/here-s-the-latest-senate-md-majestic-axolotl.md",
+      "?? claude/plans/velvety-discovering-stardust.md",
+      "?? lazyvim/lua/plugins/json-schema.lua",
+      "?? scripts/clean-garbage-agent-configs.sh",
+      "?? scripts/free-gpu.zsh",
+      "?? scripts/gpu-gaming-mode",
+      "?? scripts/sync-jamesbrennan-to-drive.sh",
+      "?? scripts/sync-jim-client-view.sh",
+      "?? scripts/today.rs",
+      "?? zellij/plugins/zellij-new-tab-next-to-current.wasm",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "17a49c5dd302c1d151fcc04f7ef6f9f86a2f2adb1c16d861a3784bc83112a2ee",
+        "mode": 33261
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "2b254af01e05a98dfc56a87999be2c84470ef20e3745a554fee0f7586d87342b",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "2b254af01e05a98dfc56a87999be2c84470ef20e3745a554fee0f7586d87342b",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": false,
+        "lifecycle:blocked": false,
+        "lifecycle:human": false,
+        "agent:failed": false
+      },
+      "human_rule": false,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/.config/zshyzsh",
+      "--agent",
+      "zshyzsh-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:26.221Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "23 orchestrator scaffold issue(s) detected",
+          "details": [
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/80-registry.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/_lib.sh",
+            "zshyzsh-pm: missing agents/hermes/pm/.scripts/board-lease.py",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "zshyzsh-pm: missing agents/hermes/pm/.scripts/land-outputs.sh",
+            "zshyzsh-pm: missing agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "zshyzsh-pm: missing agents/hermes/pm/.scripts/launch-pass.py",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "zshyzsh-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "zshyzsh-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "zshyzsh-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "zshyzsh-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "zshyzsh-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/.config/zshyzsh",
+      "--agent",
+      "zshyzsh-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "zshyzsh-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "zshyzsh-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "zshyzsh-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "zshyzsh-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/role.yaml",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "alacritty/alacritty.toml": {
+      "sha256": "0d6731a5136ec02378c72cc0bbf5bc616e84ffb791cfc07ff60b0e552a1fcf15",
+      "mode": 33204
+    },
+    "aliases.zsh": {
+      "sha256": "3c6b96652b920d78daa9da15d66c31f9c2c42f1ed8059acbb8ff61d0e0974e6a",
+      "mode": 33204
+    },
+    "lazyvim/lazy-lock.json": {
+      "sha256": "0b24685c7419fd0e18eab9a9af9ee4c5457c9a099b3e5bc902d4c76bceeaa2cf",
+      "mode": 33204
+    },
+    "mise/config.toml": {
+      "sha256": "28f3cb1ea8cf1c337446a1ed31eeb3032bfa5bc5ef5e50c0c916483add8adbee",
+      "mode": 33204
+    },
+    "remote-hosts.zsh": {
+      "sha256": "c53ee12486bb06818ff4bc26cd371fe00910f294709f4495ee82cd1c242373f7",
+      "mode": 33204
+    },
+    "systemd/op-token-guard.timer": {
+      "sha256": "290ee7560f9e0a09e849bb0b27f75f6445af231e64f3e5d10650475106ccf4ef",
+      "mode": 33204
+    },
+    "voice-audio.zsh": {
+      "sha256": "ae2d1e8390ccc5ececba3477b4e1f755c0ddf4c73874d49fe55b701fb1514f85",
+      "mode": 33204
+    },
+    ".copier-answers.yml": {
+      "sha256": "5bc84b66e296b5249962b56ecd86355d89d5349274fc726e667ce762ed9f6cdd",
+      "mode": 33204
+    },
+    ".mise/version-files.conf": {
+      "sha256": "dc215fec4f1bcb6955f048b6212b9d552181bd8addfdcae3c87ba1e2e1e24335",
+      "mode": 33204
+    },
+    "bin/gct.py": {
+      "sha256": "87654bfd13f7fe11d9173263ddcf202e721f343011b03dd91c1b2c422657ff40",
+      "mode": 33277
+    },
+    "claude/agents/dr-denny-grubbs.md": {
+      "sha256": "5576c78cac192fdb14c4a1f0cf83347842aad58419fe6fad73bfdbd31913a4cc",
+      "mode": 33204
+    },
+    "claude/agents/pr-crusher.md": {
+      "sha256": "3b846602d839ab2a7f62eaebffde91d74a152e143868580126c01f063034d78d",
+      "mode": 33204
+    },
+    "claude/commands/momo.md": {
+      "sha256": "b8f432cee72239c8859217a3686a72de198bc45b4ae378f6d547df7e743bfe0c",
+      "mode": 33204
+    },
+    "claude/plans/here-s-the-latest-senate-md-majestic-axolotl.md": {
+      "sha256": "1a27edfccec11b0fac3be5dab887b2b76593baade21da3cb5bb48b4eaec576f2",
+      "mode": 33204
+    },
+    "claude/plans/velvety-discovering-stardust.md": {
+      "sha256": "47b425b04a39d04f209c837eeee897b5a2fd1fa9598c00aa8fb50b1efe1f65d6",
+      "mode": 33204
+    },
+    "lazyvim/lua/plugins/json-schema.lua": {
+      "sha256": "3f58576ff36be1eb13ecaf9185fff4d806181b1cadf4152dfc791bfa6d3ee5f9",
+      "mode": 33204
+    },
+    "scripts/clean-garbage-agent-configs.sh": {
+      "sha256": "ed1901ec77f3118bb54c32ab1d075fd5e5d3ea62103c2c27d6f4f76bc40e4d0c",
+      "mode": 33277
+    },
+    "scripts/free-gpu.zsh": {
+      "sha256": "d85b9e4c39f169f8d64afbcda728f1abe9a55ade927ca5e2be3d7b79e6af0631",
+      "mode": 33277
+    },
+    "scripts/gpu-gaming-mode": {
+      "sha256": "d138669a63fc9b465b6c16b6146f0078d18e2709bb1b55f1b85704780a72c50e",
+      "mode": 33261
+    },
+    "scripts/sync-jamesbrennan-to-drive.sh": {
+      "sha256": "ad74a2af2ea5b1ad21e6c6b8066b2b59baa7f5a29cc221df9214a17c80a424db",
+      "mode": 33277
+    },
+    "scripts/sync-jim-client-view.sh": {
+      "sha256": "2c57884f6e7c0a6f84d6a64a75e31364a2fc0ca8da74dd6414cca8d6513f9efc",
+      "mode": 33277
+    },
+    "scripts/today.rs": {
+      "sha256": "eed8e48a9ce2d38f41fa5f2420ba9cabf78e9804ff97992f2cfc49f467e61c48",
+      "mode": 33204
+    },
+    "zellij/plugins/zellij-new-tab-next-to-current.wasm": {
+      "sha256": "61bd82e73f4be687b93066bb8259e2de206893730068579329b58b691fdc5288",
+      "mode": 33277
+    }
+  },
+  "preserved_local_scripts": {},
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/.config/zshyzsh",
+      "--agent",
+      "zshyzsh-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "dryRun": false,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "applied",
+          "summary": "1 orchestrator scaffold(s) normalized",
+          "changedFiles": [
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/80-registry.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/_lib.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/board-lease.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/land-outputs.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "/home/delorenj/.config/zshyzsh/agents/hermes/pm/role.yaml"
+          ],
+          "details": [
+            "zshyzsh-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "zshyzsh-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "zshyzsh-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "zshyzsh-pm: template_rev -> af82ef1"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/80-registry.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/_lib.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/board-lease.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/land-outputs.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/role.yaml",
+        "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "78413af18098dc35c277d75995651364544db2c8840c9ab260e779163109518b",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "78413af18098dc35c277d75995651364544db2c8840c9ab260e779163109518b",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+      "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/.config/zshyzsh",
+      "--agent",
+      "zshyzsh-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "dryRun": true,
+      "ok": true,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "noop",
+          "summary": "No changes required",
+          "changedFiles": [],
+          "details": []
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/.config/zshyzsh",
+      "--agent",
+      "zshyzsh-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/.config/zshyzsh",
+      "ok": true,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:03:28.731Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "pass",
+          "summary": "1 orchestrator scaffold(s) verified",
+          "details": [],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/80-registry.sh",
+    "agents/hermes/pm/.scripts/_lib.sh",
+    "agents/hermes/pm/.scripts/board-lease.py",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/land-outputs.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md",
+    "agents/hermes/pm/role.yaml"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "fa7b8b2919571d466ffe3b43e87398d6056873b3",
+    "origin": "git@github.com:delorenj/zshyzsh.git",
+    "status": [
+      " M alacritty/alacritty.toml",
+      " M aliases.zsh",
+      " D claude/plans/so-i-want-to-jaunty-badger.md",
+      " M lazyvim/lazy-lock.json",
+      " M mise/config.toml",
+      " M remote-hosts.zsh",
+      " M systemd/op-token-guard.timer",
+      " M voice-audio.zsh",
+      "?? .copier-answers.yml",
+      "?? .mise/version-files.conf",
+      "?? bin/gct.py",
+      "?? claude/agents/dr-denny-grubbs.md",
+      "?? claude/agents/pr-crusher.md",
+      "?? claude/commands/momo.md",
+      "?? claude/plans/here-s-the-latest-senate-md-majestic-axolotl.md",
+      "?? claude/plans/velvety-discovering-stardust.md",
+      "?? lazyvim/lua/plugins/json-schema.lua",
+      "?? scripts/clean-garbage-agent-configs.sh",
+      "?? scripts/free-gpu.zsh",
+      "?? scripts/gpu-gaming-mode",
+      "?? scripts/sync-jamesbrennan-to-drive.sh",
+      "?? scripts/sync-jim-client-view.sh",
+      "?? scripts/today.rs",
+      "?? zellij/plugins/zellij-new-tab-next-to-current.wasm",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/.config/zshyzsh",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/zshyzsh.git\n   5ef02df..fa7b8b2  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/.config/zshyzsh",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/.config/zshyzsh",
+    "exit_code": 0,
+    "stdout": "fa7b8b2919571d466ffe3b43e87398d6056873b3\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/zshyzsh/commit/fa7b8b2919571d466ffe3b43e87398d6056873b3",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:03:30.777782+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "fa7b8b2919571d466ffe3b43e87398d6056873b3",
+      "origin": "git@github.com:delorenj/zshyzsh.git",
+      "status": [
+        " M alacritty/alacritty.toml",
+        " M aliases.zsh",
+        " D claude/plans/so-i-want-to-jaunty-badger.md",
+        " M lazyvim/lazy-lock.json",
+        " M mise/config.toml",
+        " M remote-hosts.zsh",
+        " M systemd/op-token-guard.timer",
+        " M voice-audio.zsh",
+        "?? .copier-answers.yml",
+        "?? .mise/version-files.conf",
+        "?? bin/gct.py",
+        "?? claude/agents/dr-denny-grubbs.md",
+        "?? claude/agents/pr-crusher.md",
+        "?? claude/commands/momo.md",
+        "?? claude/plans/here-s-the-latest-senate-md-majestic-axolotl.md",
+        "?? claude/plans/velvety-discovering-stardust.md",
+        "?? lazyvim/lua/plugins/json-schema.lua",
+        "?? scripts/clean-garbage-agent-configs.sh",
+        "?? scripts/free-gpu.zsh",
+        "?? scripts/gpu-gaming-mode",
+        "?? scripts/sync-jamesbrennan-to-drive.sh",
+        "?? scripts/sync-jim-client-view.sh",
+        "?? scripts/today.rs",
+        "?? zellij/plugins/zellij-new-tab-next-to-current.wasm",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "78413af18098dc35c277d75995651364544db2c8840c9ab260e779163109518b",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "78413af18098dc35c277d75995651364544db2c8840c9ab260e779163109518b",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+        "resolved": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/.config/zshyzsh/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "797d88d4a5ab7e764f83418a28fac449b95ee6ff26bd29720a6d15f00572bcbc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/.config/zshyzsh",
+        "--agent",
+        "zshyzsh-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/.config/zshyzsh",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/.config/zshyzsh",
+        "dryRun": true,
+        "ok": true,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "noop",
+            "summary": "No changes required",
+            "changedFiles": [],
+            "details": []
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/.config/zshyzsh",
+        "--agent",
+        "zshyzsh-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/.config/zshyzsh",
+      "exit_code": 0,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/.config/zshyzsh",
+        "ok": true,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:09.183Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "pass",
+            "summary": "1 orchestrator scaffold(s) verified",
+            "details": [],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/.config/zshyzsh",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/.config/zshyzsh",
+      "exit_code": 0,
+      "stdout": "fa7b8b2919571d466ffe3b43e87398d6056873b3\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}

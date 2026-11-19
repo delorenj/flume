@@ -1,0 +1,753 @@
+{
+  "agent": "heyma-pm",
+  "repo": "/home/delorenj/HeyMa",
+  "role_dir": "/home/delorenj/HeyMa/agents/hermes/pm",
+  "scripts_only": false,
+  "started": "2026-11-19T11:05:51.290725+00:00",
+  "before_pull": {
+    "branch": "main",
+    "head": "a3af9292e8a4a4bf754b678b24d58e6c38678f06",
+    "origin": "git@github.com:delorenj/HeyMa.git",
+    "status": [
+      " M bin/telephony",
+      " M components/wax/bin/wax",
+      " M skills/heyma/references/telephony.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "pull": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/HeyMa",
+      "pull",
+      "--no-rebase",
+      "origin",
+      "main"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 0,
+    "stdout": "Already up to date.\n",
+    "stderr": "From github.com:delorenj/HeyMa\n * branch            main       -> FETCH_HEAD\n"
+  },
+  "before": {
+    "branch": "main",
+    "head": "a3af9292e8a4a4bf754b678b24d58e6c38678f06",
+    "origin": "git@github.com:delorenj/HeyMa.git",
+    "status": [
+      " M bin/telephony",
+      " M components/wax/bin/wax",
+      " M skills/heyma/references/telephony.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "predicates_before": {
+    "helpers_absent": {
+      "lifecycle.sh": false,
+      "managed-execution.py": false
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "e103ad16ee6ffe448c50b37c6f3ee940312bc49dd2fd1ba891a1002beaec2d09",
+        "mode": 33277
+      },
+      "managed_refs": true
+    },
+    "remaining_managed_refs": [
+      ".scripts/managed-execution.py",
+      ".scripts/heartbeat.sh"
+    ],
+    "tracked_soul": {
+      "path": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "f149ed43ccd3b62c621174535df8065ae5ac54163a01b3b904e2a282f6e1faad",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "f149ed43ccd3b62c621174535df8065ae5ac54163a01b3b904e2a282f6e1faad",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": false,
+        "agent:failed": true
+      },
+      "human_rule": false,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "audit_before": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/HeyMa",
+      "--agent",
+      "heyma-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/HeyMa",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:55.765Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "22 orchestrator scaffold issue(s) detected",
+          "details": [
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+            "heyma-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "heyma-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+            "heyma-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+            "heyma-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "heyma-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+            "heyma-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+            "heyma-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "heyma-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "heyma-pm: obsolete template-owned helper agents/hermes/pm/.scripts/lifecycle.sh (remove with hermes.pm-scaffold)",
+            "heyma-pm: obsolete template-owned helper agents/hermes/pm/.scripts/managed-execution.py (remove with hermes.pm-scaffold)",
+            "heyma-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+            "heyma-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/HeyMa",
+      "--agent",
+      "heyma-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/HeyMa",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "heyma-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "heyma-pm: would remove obsolete template-owned .scripts/lifecycle.sh",
+            "heyma-pm: would remove obsolete template-owned .scripts/managed-execution.py",
+            "heyma-pm: preserved locally-modified .scripts/01-config.sh",
+            "heyma-pm: preserved locally-modified .scripts/_lib.sh",
+            "heyma-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "unrelated_before": {
+    "bin/telephony": {
+      "sha256": "8cc6ff0bf4331da4b2c5e09fd01ebb251112ecddd44ffda16e61ef9603ef9f50",
+      "mode": 33277
+    },
+    "components/wax/bin/wax": {
+      "sha256": "c2ac7fbb697b2be9855717ef579ca4408b4180a06ba0c47e0ce471f644435caf",
+      "mode": 33277
+    },
+    "skills/heyma/references/telephony.md": {
+      "sha256": "5fd67c08cbbff0261b05436c1124450ae8e9bea57243e503a083129a6f333982",
+      "mode": 33204
+    }
+  },
+  "preserved_local_scripts": {
+    ".scripts/01-config.sh": {
+      "sha256": "1018bcf7a94d72849ffd81f5886357ec63a97fe7f5688a3466162fa3df5b4ed6",
+      "mode": 33277
+    },
+    ".scripts/_lib.sh": {
+      "sha256": "5614209fb42fd8e537b5b2b07d4211c014754ad0e7fc952bd2df881ef4af6d4c",
+      "mode": 33277
+    },
+    ".scripts/config.example.toml": {
+      "sha256": "1d2031d32c80caedb74610e432cd05311b9b7441069c58b6babaf41222cc8ab1",
+      "mode": 33204
+    }
+  },
+  "apply": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/HeyMa",
+      "--agent",
+      "heyma-pm",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/HeyMa",
+      "dryRun": false,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [
+            "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lifecycle.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/managed-execution.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/30-telegram.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/70-systemd.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/heartbeat.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/project-skills.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/skills-policy.py",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/plane.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/trello.sh",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+            "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel.prompt.md"
+          ],
+          "details": [
+            "heyma-pm: composed SOUL from roles/pm.md (tone direct, recognised)",
+            "heyma-pm: removed obsolete template-owned .scripts/lifecycle.sh",
+            "heyma-pm: removed obsolete template-owned .scripts/managed-execution.py",
+            "heyma-pm: preserved locally-modified .scripts/01-config.sh",
+            "heyma-pm: preserved locally-modified .scripts/_lib.sh",
+            "heyma-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": [
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/30-telegram.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/70-systemd.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/heartbeat.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/launch-pass.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/project-skills.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/lifecycle.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/managed-execution.py",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/plane.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/providers/trello.sh",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+        "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md"
+      ]
+    }
+  },
+  "predicates_after": {
+    "helpers_absent": {
+      "lifecycle.sh": true,
+      "managed-execution.py": true
+    },
+    "heartbeat": {
+      "file": {
+        "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+        "mode": 33261
+      },
+      "managed_refs": false
+    },
+    "remaining_managed_refs": [],
+    "tracked_soul": {
+      "path": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+      "file": {
+        "sha256": "968f6e97ab9fb60c2ff1ec46070505aa1f02d99cdf4fb3f472c959e557b5b195",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "runtime_soul": {
+      "path": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "sha256": "968f6e97ab9fb60c2ff1ec46070505aa1f02d99cdf4fb3f472c959e557b5b195",
+        "mode": 33204
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    },
+    "effective_profile_soul": {
+      "path": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+      "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+      "file": {
+        "link": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+        "mode": 41471
+      },
+      "holds": {
+        "lifecycle:needs-input": true,
+        "lifecycle:blocked": true,
+        "lifecycle:human": true,
+        "agent:failed": true
+      },
+      "human_rule": true,
+      "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+      "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+      "composed": true
+    }
+  },
+  "unexpected_scope_changes": [],
+  "unrelated_preserved": true,
+  "local_scripts_preserved": true,
+  "persona_preserved": true,
+  "repeat_preview": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "remediate",
+      "hermes.pm-scaffold",
+      "/home/delorenj/HeyMa",
+      "--agent",
+      "heyma-pm",
+      "--dry-run",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/HeyMa",
+      "dryRun": true,
+      "ok": false,
+      "selectedRules": [
+        "hermes.pm-scaffold"
+      ],
+      "results": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "partial",
+          "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+          "changedFiles": [],
+          "details": [
+            "heyma-pm: preserved locally-modified .scripts/01-config.sh",
+            "heyma-pm: preserved locally-modified .scripts/_lib.sh",
+            "heyma-pm: preserved locally-modified .scripts/config.example.toml"
+          ]
+        }
+      ],
+      "changedFiles": []
+    }
+  },
+  "audit_after": {
+    "command": [
+      "node",
+      "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+      "audit",
+      "/home/delorenj/HeyMa",
+      "--agent",
+      "heyma-pm",
+      "--rules",
+      "hermes.pm-scaffold",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 1,
+    "stderr": "",
+    "report": {
+      "repo": "/home/delorenj/HeyMa",
+      "ok": false,
+      "hostOk": false,
+      "auditedAt": "2026-11-19T11:05:58.707Z",
+      "rules": [
+        {
+          "id": "hermes.pm-scaffold",
+          "title": "Hermes orchestrator scaffold parity",
+          "status": "fail",
+          "summary": "3 orchestrator scaffold issue(s) detected",
+          "details": [
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+            "heyma-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+          ],
+          "fixable": true,
+          "scope": "project"
+        }
+      ]
+    }
+  },
+  "tracked_paths": [
+    "agents/hermes/pm/.scripts/10-hermes-profile.sh",
+    "agents/hermes/pm/.scripts/30-telegram.sh",
+    "agents/hermes/pm/.scripts/42-ticket-provider.sh",
+    "agents/hermes/pm/.scripts/70-systemd.sh",
+    "agents/hermes/pm/.scripts/heartbeat.sh",
+    "agents/hermes/pm/.scripts/launch-pass.prompt.md",
+    "agents/hermes/pm/.scripts/launch-pass.py",
+    "agents/hermes/pm/.scripts/lib/project-skills.py",
+    "agents/hermes/pm/.scripts/lib/skills-policy.py",
+    "agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+    "agents/hermes/pm/.scripts/lifecycle.sh",
+    "agents/hermes/pm/.scripts/managed-execution.py",
+    "agents/hermes/pm/.scripts/providers/plane.sh",
+    "agents/hermes/pm/.scripts/providers/trello.sh",
+    "agents/hermes/pm/.scripts/sentinel.prompt.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+    "agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+    "agents/hermes/pm/SOUL.md"
+  ],
+  "ignored_deployment_paths": [
+    "agents/hermes/pm/runtime/SOUL.md"
+  ],
+  "after": {
+    "branch": "main",
+    "head": "c9320793056e7dda678a6dd0645523847d7f3a64",
+    "origin": "git@github.com:delorenj/HeyMa.git",
+    "status": [
+      " M bin/telephony",
+      " M components/wax/bin/wax",
+      " M skills/heyma/references/telephony.md",
+      ""
+    ],
+    "staged": ""
+  },
+  "push": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/HeyMa",
+      "push",
+      "origin",
+      "HEAD:refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "To github.com:delorenj/HeyMa.git\n   a3af929..c932079  HEAD -> main\n"
+  },
+  "remote_verify": {
+    "command": [
+      "git",
+      "-C",
+      "/home/delorenj/HeyMa",
+      "ls-remote",
+      "origin",
+      "refs/heads/main"
+    ],
+    "cwd": "/home/delorenj/HeyMa",
+    "exit_code": 0,
+    "stdout": "c9320793056e7dda678a6dd0645523847d7f3a64\trefs/heads/main\n",
+    "stderr": ""
+  },
+  "commit_url": "https://github.com/delorenj/HeyMa/commit/c9320793056e7dda678a6dd0645523847d7f3a64",
+  "outcome": "pushed; managed cleanup and on-disk SOUL holds verified",
+  "ended": "2026-11-19T11:06:00.685470+00:00",
+  "final_verification": {
+    "git": {
+      "branch": "main",
+      "head": "c9320793056e7dda678a6dd0645523847d7f3a64",
+      "origin": "git@github.com:delorenj/HeyMa.git",
+      "status": [
+        " M bin/telephony",
+        " M components/wax/bin/wax",
+        " M skills/heyma/references/telephony.md",
+        ""
+      ],
+      "staged": ""
+    },
+    "predicates": {
+      "helpers_absent": {
+        "lifecycle.sh": true,
+        "managed-execution.py": true
+      },
+      "heartbeat": {
+        "file": {
+          "sha256": "6c1bd958c229e2b4f1dea112429319b746d080fba29370498efd829ad4983184",
+          "mode": 33261
+        },
+        "managed_refs": false
+      },
+      "remaining_managed_refs": [],
+      "tracked_soul": {
+        "path": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+        "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/SOUL.md",
+        "file": {
+          "sha256": "968f6e97ab9fb60c2ff1ec46070505aa1f02d99cdf4fb3f472c959e557b5b195",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "runtime_soul": {
+        "path": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+        "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "sha256": "968f6e97ab9fb60c2ff1ec46070505aa1f02d99cdf4fb3f472c959e557b5b195",
+          "mode": 33204
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      },
+      "effective_profile_soul": {
+        "path": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+        "resolved": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+        "file": {
+          "link": "/home/delorenj/HeyMa/agents/hermes/pm/runtime/SOUL.md",
+          "mode": 41471
+        },
+        "holds": {
+          "lifecycle:needs-input": true,
+          "lifecycle:blocked": true,
+          "lifecycle:human": true,
+          "agent:failed": true
+        },
+        "human_rule": true,
+        "identity_sha256": "f38ac16b5669489258b697aa92297291dafa74403b78af5c5017f7f1bfba97dc",
+        "tone_sha256": "6ae605c86ca021723a7180074877ee87da95319645abeac650a21fb46b54c9c6",
+        "composed": true
+      }
+    },
+    "repeat_preview": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "remediate",
+        "hermes.pm-scaffold",
+        "/home/delorenj/HeyMa",
+        "--agent",
+        "heyma-pm",
+        "--dry-run",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/HeyMa",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/HeyMa",
+        "dryRun": true,
+        "ok": false,
+        "selectedRules": [
+          "hermes.pm-scaffold"
+        ],
+        "results": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "partial",
+            "summary": "3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass",
+            "changedFiles": [],
+            "details": [
+              "heyma-pm: preserved locally-modified .scripts/01-config.sh",
+              "heyma-pm: preserved locally-modified .scripts/_lib.sh",
+              "heyma-pm: preserved locally-modified .scripts/config.example.toml"
+            ]
+          }
+        ],
+        "changedFiles": []
+      }
+    },
+    "audit": {
+      "command": [
+        "node",
+        "/home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js",
+        "audit",
+        "/home/delorenj/HeyMa",
+        "--agent",
+        "heyma-pm",
+        "--rules",
+        "hermes.pm-scaffold",
+        "--json"
+      ],
+      "cwd": "/home/delorenj/HeyMa",
+      "exit_code": 1,
+      "stderr": "",
+      "report": {
+        "repo": "/home/delorenj/HeyMa",
+        "ok": false,
+        "hostOk": false,
+        "auditedAt": "2026-11-19T11:28:29.428Z",
+        "rules": [
+          {
+            "id": "hermes.pm-scaffold",
+            "title": "Hermes orchestrator scaffold parity",
+            "status": "fail",
+            "summary": "3 orchestrator scaffold issue(s) detected",
+            "details": [
+              "heyma-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+              "heyma-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+              "heyma-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml"
+            ],
+            "fixable": true,
+            "scope": "project"
+          }
+        ]
+      }
+    },
+    "remote": {
+      "command": [
+        "git",
+        "-C",
+        "/home/delorenj/HeyMa",
+        "ls-remote",
+        "origin",
+        "refs/heads/main"
+      ],
+      "cwd": "/home/delorenj/HeyMa",
+      "exit_code": 0,
+      "stdout": "c9320793056e7dda678a6dd0645523847d7f3a64\trefs/heads/main\n",
+      "stderr": ""
+    },
+    "local_script_preservation": true,
+    "scope_dirty": "",
+    "ticket_path_dirty": ""
+  }
+}
