@@ -18,10 +18,32 @@ that provisioning does not own is a **conflict blocker**, never a clobber.
 | `access-token` | `POST /accounts/…/access/service_tokens` named `employee-<handle>` (8760h) | secret lands in the vault item as `Client Secret`; the definition gains `company_identity.bindings.cloudflare_access` with the signed `principal` (client id), the pinned `instance` (issuer) and a `credential_ref` **by field id** |
 | `mailbox` | literal Email Routing rule `<handle>@agents.delo.sh` → worker; KV `allowlist/<address>` in the facade's projection namespace | receipt only |
 
-Order is deliberate: the vault item exists before any secret is minted. If the
-vault write after a token creation fails, the orphaned token is **deleted at
-the provider** and the receipt says so (`deleted-orphan`) — no secret-less
-credential is ever left live.
+Order is deliberate: the vault item exists before any secret is minted. Item
+lists and item reads use a **per-command `--cache=false`** flag, including
+preflight and read-after-write verification; no operator-wide `OP_CACHE=off`
+is needed. Reads and edits target the immutable item ID after title resolution.
+The provisioner writes the `Identity Service Token.Client ID` and
+`Identity Service Token.Client Secret` pair in one edit, then compares both
+values from a fresh read and binds the secret's unique **field ID**, never a
+same-named field in another section.
+
+Failure handling is deliberately asymmetric:
+
+| observation | outcome |
+| --- | --- |
+| Fresh read confirms the exact pair, even if `op item edit` returned nonzero | finish the binding; repeat apply is a no-op |
+| Edit returned a normal nonzero status (not timeout/signal) **and** fresh read confirms neither Access field persisted | attempt orphan DELETE, then GET by token ID; only successful DELETE plus HTTP 404 is `deleted-orphan` / `deleted: true` |
+| DELETE fails, absence cannot be verified, or provider still returns the token | blocked; `cleanup-unconfirmed`, `deleted: false`; owner reconciliation required |
+| Read unavailable, values/field IDs ambiguous, partial pair, or edit reports success but pair is absent | blocked; token **retained, not deleted**, `reconciliation-required` |
+| Pair persisted but binding or receipt write fails | blocked; retain the vaulted token for reconciliation, never roll it back |
+
+A blocked Access step does not erase completed `vault-item` or `mailbox`
+results. `ok: false` is not an all-or-nothing rollback. Access mutations also
+set `changed: true` when their final action is blocked. Receipts record `minted`
+before attempting the vault write, then `created`, `deleted-orphan`,
+`cleanup-unconfirmed` or `reconciliation-required`. Provider free-form errors
+are withheld because they can echo secrets. Do not treat a receipt alone as
+current provider truth.
 
 ## Configuration
 
@@ -47,6 +69,58 @@ State: `$FLUME_PROVISION_STATE` (default `~/.local/state/flume/provision`)
 holds `receipts.jsonl` — one secret-free line per applied action: IDs,
 references, outcomes. Secrets pass through process memory and `op` argv only;
 they are never written to receipts, logs, stdout or definitions.
+
+## Stranded credentials: diagnose first, recover only with approval
+
+A fresh preflight refuses **any existing Access field without a binding**, even
+an empty field or a secret-only partial pair. It does not repeatedly mint and
+delete replacements. A bound employee is a no-op only when the fresh sectioned
+fields, field-ID reference, issuer and complete provider inventory agree.
+Conflicts report only item/token/field IDs, field presence, `provider_match` (token
+ID or `absent`) and the last five receipt token IDs/deletion outcomes.
+`receipt_comparison: unavailable` is not proof of absence. Preview performs
+these comparisons with reads only; it never repairs credentials or writes a
+receipt.
+
+For FLUME-80's reported employee, the surviving Client ID plus historical
+`deleted-orphan` receipts suggests a dangling vault credential, **not** a
+credential to silently replace. The historical report has not been independently
+validated against live providers by this patch. Live recovery remains pending
+explicit owner approval; isolated fixture recovery is not live approval.
+
+Bounded operator procedure (one employee, one item, one account):
+
+1. Run preview, not `--apply`. Record the subject/handle, immutable item and
+   field IDs, section labels/presence and conflict outcome. Keep raw item JSON,
+   resolved credentials and secret values out of terminals, tickets and logs.
+   The provisioner compares the Client ID internally; output needs no secret.
+2. Compare fresh vault data with provider GETs in the configured account
+   (all pages, then GET the receipt token IDs) and the employee's existing
+   provisioning receipts. Confirm which token exists, which vault pair it
+   matches, and whether a local binding exists. A non-404 outage or denied GET
+   is uncertainty, not evidence that a token is gone. Old `deleted: true`
+   receipts are historical claims, not authorization for another deletion.
+3. If a live token and complete vaulted pair match, preserve them. Request
+   approval to finish **only** the missing binding using the existing
+   `identity bind` path and the vaulted secret field-ID reference. Do not rotate
+   merely because binding previously failed. Re-run preview after approval.
+4. If the referenced token is authoritatively absent, request explicit approval
+   naming the employee, account, item, exact Access field IDs and proposed
+   removal of those **stale fields only**. Preserve other sections, item content,
+   mailbox and every other employee. No automatic clear/delete/rotation command
+   is introduced here. Have the owner perform or separately authorize the
+   scoped vault repair, retaining a secret-free approval/audit record.
+5. Only after approved reconciliation, preview again; if Access now plans
+   `create` and other capabilities agree, obtain approval for a single apply.
+   Verify the binding/reference and repeat apply is a no-op. Stop on any new
+   mismatch rather than looping. Cleanup failures or secret-less live tokens
+   require a separately approved provider action and absence verification.
+
+This procedure does not grant Access-policy membership (FLUME-57), change
+suspension/rotation/retirement semantics (FLUME-53), or authorize workforce-wide
+repair. Source/fixture verification is documented under
+`_bmad-output/implementation-artifacts/FLUME-80/`; no installed/deployed or live
+recovery claim follows from it.
 
 ## Boundaries
 

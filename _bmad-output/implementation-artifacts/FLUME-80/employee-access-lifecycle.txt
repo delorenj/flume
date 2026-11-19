@@ -1,0 +1,24 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {
+  "ok": false,
+  "standing": "unable to assess",
+  "error": "Partial specialist projection; inspect owned state and retry onboard: Member gateway credential not verified: token=failed delta=planned-present render=not-attempted gateway-mint-or-confirm-failed"
+}
+
+
+1 !== 0
+
+    at json (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/employee-access-lifecycle-regressions.mjs:197:42)
+    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/employee-access-lifecycle-regressions.mjs:210:1 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.5.0

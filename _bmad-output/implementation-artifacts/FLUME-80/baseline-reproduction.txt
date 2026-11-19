@@ -1,0 +1,3 @@
+PASS isolated cache reproduction: edit persists, ordinary read is stale, fresh read sees field
+PASS preview plans creates with remote GETs only and writes nothing
+PASS baseline reproduces persisted Client ID + stale verification + token deletion; retry mints/deletes again

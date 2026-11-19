@@ -1,0 +1,30 @@
+PASS post-holder preview proposes subject and grolf@agents.delo.sh without writing
+PASS apply appends one block to role.yaml; post id, registry row, memory bank and template readers unchanged
+PASS second apply is a no-op that keeps bytes, mtimes and the subject
+PASS handle is immutable once enrolled
+PASS existing Grolf Plane candidates are listed under reconcile[] as unadopted and none is bound
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {
+  "ok": false,
+  "standing": "unable to assess",
+  "error": "Partial specialist projection; inspect owned state and retry onboard: Member gateway credential not verified: token=failed delta=planned-present render=not-attempted gateway-mint-or-confirm-failed"
+}
+
+
+1 !== 0
+
+    at Object.json (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:46:44)
+    at specialistFixture (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:75:5)
+    at async file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:162:15 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.5.0

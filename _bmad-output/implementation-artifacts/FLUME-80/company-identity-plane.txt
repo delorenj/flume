@@ -1,0 +1,22 @@
+PASS bind previews, writes bindings.plane on --apply, and an identical re-apply is changed:false; no px call
+PASS invalid principals, instances, references and attribution are refused at bind time and again at runtime, with no write and no px call
+PASS the four stale or foreign candidates are stale-candidate blockers at bind and at adopt, naming their disposition
+PASS bind without a credential and adopt without a binding list the manual enrollment prerequisites and call px zero times
+PASS adopt verifies every board through px argv exactly, stamps native_actor_id, reports static PAT semantics, warns on the legacy registry id without writing it, and is idempotent
+PASS a suspended, retired or unenrolled employee, and a request without a valid board, are refused with zero px calls
+PASS every px refusal code is a provider-refused blocker carrying px's code, and a refusal on any board writes nothing even when other boards passed
+PASS an exit-0 px answer that disagrees with the binding or the request is provider-result-mismatch and writes nothing
+PASS expires_at and lifetime_seconds that px reports are stripped from the adopt result, the receipt and identity show
+PASS a missing binary, a timeout and non-JSON stdout are provider-unavailable, with no write and no retry
+PASS a native user adopted by another employee, or a different native_actor_id already on this binding, is refused before any px call
+PASS verify-plane reads the ticket once through px show and records two distinct native-verified authors and one receipt
+PASS not-adopted, spoofed-author, missing-comment, shared-actor, single-employee and unusable-px runs all exit 1 without trusting text
+PASS verify-plane still verifies the historical comments of a retired or suspended employee
+PASS identity show reports a static Plane PAT with unobservable expiry and px's revocation route, and readiness keeps plane_native_identity unproven
+PASS identity show only trusts a receipt for exactly the current, still-adopted principal, credential_ref and instance
+PASS a UUID native_actor_id on a github binding is refused at runtime
+PASS a missing or unparseable candidate inventory fails closed at bind and adopt: nothing written, zero px calls
+PASS without FLUME_PX_BIN the adopt result and its receipt carry evidence provider
+PASS only identity verify and show were ever invoked, and no planted PAT is in any output, definition, registry or receipt
+
+20 company identity plane check groups passed

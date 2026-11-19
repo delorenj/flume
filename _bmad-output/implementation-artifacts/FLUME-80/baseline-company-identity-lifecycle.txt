@@ -1,0 +1,21 @@
+PASS every lifecycle command is a pure preview: no definition, state, ledger or provider mutation, with provider GETs only
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'unresolved'
+- 'static-usable'
+
+    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-lifecycle-regressions.mjs:242:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'unresolved',
+  expected: 'static-usable',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.5.0

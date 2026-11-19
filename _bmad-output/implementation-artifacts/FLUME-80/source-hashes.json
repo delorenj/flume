@@ -1,0 +1,5 @@
+{
+  "packages/flume-hr/src/workforce/provision.ts": "c685e2bcd126c3cf932813f5a07faac0fe302a354aad401f33acadbe72f371b6",
+  "tests/identity-provision-regressions.mjs": "120165542e2433f8c83a4f39122c88b3f90109d13a3eec83d9e8b253c8318974",
+  "docs/identity-provisioning.md": "cd03ac365d231ed5b9783548e3dbd7e95cc9c0a63d38d4b5a5a8a1e5dafbc60f"
+}

@@ -1,0 +1,23 @@
+PASS isolated cache reproduction: edit persists, ordinary read is stale, fresh read sees field
+PASS preview plans creates with remote GETs only and writes nothing
+PASS apply provisions token + rule + allowlist + vault item + binding; second apply is a no-op
+PASS a foreign rule or token name blocks provisioning instead of clobbering it
+PASS a failed vault write deletes the orphaned token at the provider
+PASS an unenrolled employee is refused before any provider call
+PASS section collision preserved; stranded metadata/provider/receipt conflict blocks minting; authorized fixture recovery converges
+PASS uncertain unreadable: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain wrong-value: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain partial: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain success-empty: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain duplicate-id: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain duplicate-field: explicit partial result, retained token, retry does not mint/delete
+PASS uncertain signal: explicit partial result, retained token, retry does not mint/delete
+PASS nonzero edit with freshly confirmed persisted pair completes binding without deletion
+PASS binding refusal after confirmed vault persistence retains the live token
+PASS provider pagination finds later-page name collision before minting
+PASS secret-only partial pair blocks without disclosing it in JSON or human output
+PASS unavailable fresh vault inventory fails closed without treating read failure as item absence
+PASS failDelete: cleanup not claimed without provider absence confirmation
+PASS lieDelete: cleanup not claimed without provider absence confirmation
+PASS all CLI JSON/stdout/stderr, receipts and definitions withhold secrets on success and every failure
+identity-provision-regressions: 22 passed
