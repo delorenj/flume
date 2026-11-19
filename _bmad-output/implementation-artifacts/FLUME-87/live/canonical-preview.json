@@ -1,0 +1,18 @@
+{
+  "source": "Verbatim stdout/stderr and exit status from the single canonical terminal preview during this closeout; no replay",
+  "cwd": "/home/delorenj/code/33GOD",
+  "argv": ["flume", "hire", "marketing-director", "--target-repo", "33GOD", "--purpose", "Work home: 33god-platform/atlas; Atlas showcase messaging and outreach strategy for 33GOD", "--skip-telegram", "--yes", "--dry-run"],
+  "exit_code": 1,
+  "resolved": {
+    "repo": "33god",
+    "role": "marketing-director",
+    "profile": "33god-marketing-director",
+    "board_scope": "advisory",
+    "reconcile_enabled": false,
+    "role_dir": "/home/delorenj/code/33GOD/agents/hermes/marketing-director",
+    "template": "/home/delorenj/code/33GOD/flume/templates/hermes-agent",
+    "charter": "/home/delorenj/code/33GOD/flume/roles/marketing-director.md"
+  },
+  "output": "✓ Config present: /home/delorenj/.config/hermes-agent-template/config.toml\n[DRY RUN] ✓ Non-interactive mode — using defaults  (repo=33god, role=marketing-director, profile=33god-marketing-director)\nConfig present: /home/delorenj/.config/hermes-agent-template/config.toml\n[DRY RUN] Would run: copier copy /home/delorenj/code/33GOD/flume/templates/hermes-agent /home/delorenj/code/33GOD/agents/hermes/marketing-director --data target_repo=33god --data role=marketing-director --data agent_purpose=Work home: 33god-platform/atlas; Atlas showcase messaging and outreach strategy for 33GOD --data model_provider= --data model_name= --data model_base_url= --data model_api_mode= --data model_key_env= --data profile_name=33god-marketing-director --data soul_tone=direct --data ticket_provider=plane --data board_scope=advisory --data reconcile_enabled=false --trust --vcs-ref=HEAD --defaults\n  then compose SOUL.md from /home/delorenj/code/33GOD/flume/roles/marketing-director.md\n✅ All Hermes agent runtimes are already untracked and gitignored.\n→ Telegram wire-up skipped\nRole declaration projected: {\"department\":\"platform\",\"reports_to\":\"33god-pm\",\"skills\":[],\"chain\":null,\"overrides\":[],\"selection\":null}\nhermes.pm-scaffold: 3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass\n✗ hermes.pm-scaffold: 3 locally-modified script(s) preserved; reconcile them into the template before this rule can pass\n",
+  "decision": "No live hire: respect the canonical scaffold refusal. Candidate absent from role, profile, project manifest and fleet registry. No duplicate hire, channel/account/spend, gateway restart or Bloodbank command."
+}

@@ -1,0 +1,50 @@
+{
+  "observed_at": "2026-11-19T08:57:41.285745+00:00",
+  "candidate_records": [],
+  "candidate_role_exists": false,
+  "candidate_profile_exists": false,
+  "candidate_project_agent_present": false,
+  "pm_board_claimants": [
+    "33god-pm"
+  ],
+  "pm_plane": {
+    "workspace": "33god",
+    "project_id": "15258893-0206-4e8f-aea6-340eb217988c",
+    "identifier": "33GOD"
+  },
+  "marketing_roster": {
+    "argv": [
+      "flume",
+      "roster",
+      "33god-marketing-director",
+      "--json"
+    ],
+    "cwd": "/home/delorenj/code/33GOD/flume",
+    "observed_at": "2026-11-19T08:57:41.659375+00:00",
+    "exit_code": 3,
+    "result": {
+      "schema_version": 1,
+      "ok": false,
+      "command": "fleet.inventory",
+      "data": null,
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No agent with that id is registered",
+        "retryable": false,
+        "details": {
+          "agent_id": "33god-marketing-director"
+        }
+      },
+      "next_actions": [
+        "Re-run without --json for the full report, or fix the reported store path"
+      ]
+    }
+  },
+  "bloodbank": {
+    "attempted": false,
+    "request": null,
+    "reply": null,
+    "worker_return": null,
+    "reason": "Canonical preview refused scaffold drift; candidate does not exist, so there is no safe employee target. No FLUME-85 receipt reused; no message sent or retried."
+  }
+}

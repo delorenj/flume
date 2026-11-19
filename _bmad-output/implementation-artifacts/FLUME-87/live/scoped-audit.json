@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "flume",
+    "audit",
+    "/home/delorenj/code/33GOD",
+    "--agent",
+    "33god-marketing-director",
+    "--rules",
+    "hermes.pm-scaffold,hermes.runtime-singleton,hermes.registry-parity,hermes.bloodbank-toolsets",
+    "--json"
+  ],
+  "cwd": "/home/delorenj/code/33GOD/flume",
+  "observed_at": "2026-11-19T08:57:35.151260+00:00",
+  "exit_code": 1,
+  "stdout": "",
+  "stderr": "file:///home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js:18322\n  if (!discoverRoles(repo).some((role) => role.agentId === id)) throw new Error(`No provisioned employee ${id} in ${repo}`);\n                                                                      ^\n\nError: No provisioned employee 33god-marketing-director in /home/delorenj/code/33GOD\n    at scopeEmployee (file:///home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js:18322:71)\n    at Command.<anonymous> (file:///home/delorenj/code/33GOD/flume/packages/flume-hr/dist/index.js:29121:22)\n    at Command.listener [as _actionHandler] (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:568:17)\n    at /home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1604:14\n    at Command._chainOrCall (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1488:12)\n    at Command._parseCommand (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1603:27)\n    at /home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1367:27\n    at Command._chainOrCall (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1488:12)\n    at Command._dispatchSubcommand (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1363:25)\n    at Command._parseCommand (/home/delorenj/code/33GOD/flume/node_modules/commander/lib/command.js:1559:19)\n\nNode.js v26.5.0\n"
+}

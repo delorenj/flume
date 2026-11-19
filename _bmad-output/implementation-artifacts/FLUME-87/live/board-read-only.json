@@ -1,0 +1,18 @@
+{
+  "ref": "FLUME-87",
+  "id": "03d2f173-c039-4435-92ef-9d19fea43615",
+  "state": "a2e54c71-5e27-48ab-9418-75414d28dd1c",
+  "state_name": "In Progress",
+  "label_names": [
+    "from:33god",
+    "lifecycle:triaged",
+    "agent:working",
+    "int:I-12"
+  ],
+  "assignees": [],
+  "updated_at": "2026-11-19T03:20:04.764490-05:00",
+  "operation": "read-only px show",
+  "writes_this_run": [],
+  "initial_read_updated_at": "2026-11-19T03:20:04.764490-05:00",
+  "unchanged_since_initial_read": true
+}
