@@ -5,7 +5,7 @@ Observed 2026-11-19 UTC against Flume base
 `19ded0acc35c8e14ddcb94dd4ebde2b4421b5384`.
 This supersedes the status claims in `verification.md`, not its historical
 receipts. This phase produced no instruction deployment or schedule cutover.
-Independent adversarial review of candidate `c0b8f8fb04496b55e0eeacb3a0c153a5c61ad6ce` found two AC5 gaps (R1/R2); narrow corrections and focused regressions are now in this branch. Independent re-review and integration remain with the parent workflow.
+Independent adversarial review of candidate `c0b8f8fb04496b55e0eeacb3a0c153a5c61ad6ce` found two AC5 gaps (R1/R2); narrow corrections and focused regressions are in reviewed candidate `3107b656b1be64c8694ecfaa918fa9cf9b4aad7d`. Independent re-review returned SPEC PASS, QUALITY PASS, zero findings; see [`final-independent-review.md`](./final-independent-review.md). Integration and live deployment remain separate from this on-disk evidence.
 
 ## Current coverage, not universal deployment
 
