@@ -1,0 +1,8 @@
+PASS public CLI dry-run absent: exit 0, manifest bytes unchanged, no role written, no blocked service calls
+{"mode":"absent","publicHireExit":1,"registrationVerified":true,"rendered":true,"lastError":"✗ Member gateway credential not verified: token=failed delta=planned-added render=not-attempted gateway-mint-or-confirm-failed"}
+PASS public CLI dry-run shadow: exit 0, manifest bytes unchanged, no role written, no blocked service calls
+{"mode":"shadow","publicHireExit":1,"registrationVerified":true,"rendered":true,"lastError":"✗ Member gateway credential not verified: token=failed delta=planned-added render=not-attempted gateway-mint-or-confirm-failed"}
+PASS public CLI dry-run managed: exit 0, manifest bytes unchanged, no role written, no blocked service calls
+{"mode":"managed","publicHireExit":1,"registrationVerified":true,"rendered":true,"lastError":"✗ Member gateway credential not verified: token=failed delta=planned-added render=not-attempted gateway-mint-or-confirm-failed"}
+{"publicPriorEmployeePreserved":true,"initialExit":1,"occupiedHireRepeatExit":1,"manifestBytesPreservedOnRepeat":true}
+{"publicWriteFailureExit":1,"writeFailureNamed":true,"manifestBytesPreserved":true,"noFalseCompletion":true}

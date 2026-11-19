@@ -1,0 +1,9 @@
+PASS edge in-repo-parent-link
+PASS edge role-ancestor-link
+PASS edge fifo
+PASS edge large
+older allowlisted helper removal status partial
+PASS edge older-allowlist
+{"probe":"replacement-between-read-and-unlink","status":"applied","race":{"triggered":true,"read":2,"localReplacementPresent":true},"replacementStillPresent":false,"oldHelperPreserved":true,"details":["demo-pm: removed obsolete template-owned .scripts/managed-execution.py"]}
+
+EXIT_CODE=0

@@ -6,7 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
-import { obsoleteScaffoldScripts, scaffoldScriptsHaveSafeParents } from "../scaffold/obsolete";
+import { obsoleteScaffoldScripts, removeObsoleteScaffoldScript, scaffoldScriptsHaveSafeParents } from "../scaffold/obsolete";
 import { readRoleDeclaration, roleDelegatesWorkers, auditRoleSkills, projectRoleDeclaration, retiredRole, withRegistryLock } from "../workforce/role";
 import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
@@ -3281,9 +3281,18 @@ return [
             continue;
           }
           const target = join(role.roleDir, obsolete.path);
+          if (ctx.dryRun) {
+            changedFiles.push(target);
+            details.push(`${prefix}: would remove obsolete template-owned ${obsolete.path}`);
+            continue;
+          }
+          const removal = removeObsoleteScaffoldScript(ctx.repoRoot, role.roleDir, obsolete);
+          if (!removal.removed) {
+            preserved.push(`${prefix}: preserved ${obsolete.path} (${removal.detail})`);
+            continue;
+          }
           changedFiles.push(target);
-          details.push(`${prefix}: ${ctx.dryRun ? "would remove" : "removed"} obsolete template-owned ${obsolete.path}`);
-          if (!ctx.dryRun) unlinkSync(target);
+          details.push(`${prefix}: removed obsolete template-owned ${obsolete.path}`);
         }
         for (const rel of managedScripts) {
           const source = join(templateRoleDir, ".scripts", rel);

@@ -49,7 +49,7 @@ function fixture(name,{authored=false,modified=false,retired=false}={}){
   };
   const remediate=(...extra)=>run('remediate','hermes.pm-scaffold',repo,...extra).results[0];
   const audit=()=>run('audit',repo,'--rules','hermes.pm-scaffold').rules[0];
-  return {repo,role,home,registry,run,remediate,audit};
+  return {repo,role,home,registry,env,run,remediate,audit};
 }
 try{
   const f=fixture('canonical');
@@ -106,5 +106,41 @@ try{
   assert.deepEqual({soul:snapshot(join(s.role,'SOUL.md')),runtime:snapshot(join(s.role,'runtime')),registry:snapshot(s.registry)},protectedBefore);
   assert.equal(s.remediate('--scripts-only').changedFiles.length,0);
   pass('supported scripts-only refresh removes obsolete helpers without touching SOUL/runtime/registry');
+
+  const raced=fixture('replacement-race'),target=join(raced.role,'.scripts/managed-execution.py'),preload=join(work,'replace-after-classify.cjs'),receipt=join(work,'replace-receipt.json');
+  assert.equal(raced.remediate().status,'applied');
+  put(target,historical('managed-execution.py'));
+  put(preload,`const fs=require('node:fs');const original=fs.readFileSync;let reads=0;
+fs.readFileSync=function(path,...args){const bytes=original.call(this,path,...args);
+if(String(path)===process.env.RACE_TARGET&&++reads===2){fs.renameSync(path,path+'.old');fs.writeFileSync(path,'# local replacement\\nDO NOT DELETE\\n');fs.writeFileSync(process.env.RACE_RECEIPT,String(reads));}
+return bytes;};`);
+  raced.env.NODE_OPTIONS=`--require=${preload}`;
+  raced.env.RACE_TARGET=target;raced.env.RACE_RECEIPT=receipt;
+  const race=raced.remediate('--scripts-only');
+  assert.equal(fs.readFileSync(receipt,'utf8'),'2','the actual CLI classified the stale historical bytes');
+  assert.equal(race.status,'partial');
+  assert.equal(fs.readFileSync(target,'utf8'),'# local replacement\nDO NOT DELETE\n');
+  assert.equal(fs.readFileSync(target+'.old','utf8'),historical('managed-execution.py'));
+  assert.match(race.details.join('\n'),/preserved .scripts\/managed-execution.py \(helper changed since classification\)/);
+  assert.ok(!race.changedFiles.includes(target));
+  pass('actual CLI preserves and reports a child-local replacement after classification');
+
+  const held=fixture('quarantine-race'),heldTarget=join(held.role,'.scripts/managed-execution.py'),heldPreload=join(work,'replace-after-quarantine.cjs'),heldReceipt=join(work,'held-receipt.json');
+  assert.equal(held.remediate().status,'applied');
+  put(heldTarget,historical('managed-execution.py'));
+  put(heldPreload,`const fs=require('node:fs');const original=fs.renameSync;
+fs.renameSync=function(src,dest){const value=original.call(this,src,dest);
+if(String(src)===process.env.RACE_TARGET&&String(dest).includes('.flume-obsolete-')){
+fs.writeFileSync(src,'# replacement after quarantine\\nDO NOT DELETE\\n');fs.writeFileSync(process.env.RACE_RECEIPT,String(dest));}
+return value;};`);
+  held.env.NODE_OPTIONS=`--require=${heldPreload}`;held.env.RACE_TARGET=heldTarget;held.env.RACE_RECEIPT=heldReceipt;
+  const afterMove=held.remediate('--scripts-only');
+  const heldPath=fs.readFileSync(heldReceipt,'utf8');
+  assert.equal(afterMove.status,'partial');
+  assert.equal(fs.readFileSync(heldTarget,'utf8'),'# replacement after quarantine\nDO NOT DELETE\n');
+  assert.equal(fs.readFileSync(heldPath,'utf8'),historical('managed-execution.py'));
+  assert.match(afterMove.details.join('\n'),/recover held file at/);
+  assert.ok(!afterMove.changedFiles.includes(heldTarget));
+  pass('quarantined old bytes remain recoverable when a public replacement arrives during removal');
 }finally{fs.rmSync(work,{recursive:true,force:true});}
 console.log(`${checks} FLUME-97 scaffold groups passed`);

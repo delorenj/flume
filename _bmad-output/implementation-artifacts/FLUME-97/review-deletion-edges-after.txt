@@ -1,0 +1,26 @@
+PASS edge in-repo-parent-link
+PASS edge role-ancestor-link
+PASS edge fifo
+PASS edge large
+older allowlisted helper removal status partial
+PASS edge older-allowlist
+{"probe":"replacement-between-read-and-unlink","status":"partial","race":{"triggered":true,"read":2,"localReplacementPresent":true},"replacementStillPresent":true,"oldHelperPreserved":true,"details":["demo-pm: preserved .scripts/managed-execution.py (helper changed since classification)"]}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: repro: replacement local content was deleted
+
+true !== false
+
+    at file:///home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume97-review-deletion-edges.mjs:49:12
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.5.0
