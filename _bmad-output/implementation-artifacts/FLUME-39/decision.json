@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "flume-pm",
+    "cli": "hermes",
+    "provider": "automaticai",
+    "type": "agent_cli"
+  },
+  "causationid": null,
+  "correlationid": "deadeef6-f504-4055-bcd3-362dc2f95af9",
+  "data": {
+    "artifacts_root": "_bmad-output/implementation-artifacts/FLUME-39",
+    "basis": [
+      "dogfood-the-platform",
+      "build-lego-not-statues"
+    ],
+    "decided_at": "2026-11-19T04:00:07Z",
+    "decided_by": "flume-pm",
+    "decision": "Hold FLUME-39 acceptance after landed hire-time credential repair; normal Hermes loader inference returns 401",
+    "issue": "FLUME-39",
+    "reasoning": "Reuse maintained gateway token and profile projection authorities. Independent regressions and real same-base 1/1 own-token audit pass, but direct-key success is not normal-loader attribution. Preserve production base and existing credentials; require bounded runtime credential-selection diagnosis and a fully passing ordinary-hire runtime receipt before closure.",
+    "repo": "flume"
+  },
+  "datacontenttype": "application/json",
+  "domain": "repo",
+  "id": "79c095e6-e5a3-4ebb-997a-37e3714248ba",
+  "kind": "event",
+  "ordering_key": "repo:flume",
+  "producer": "hermes-agent:flume-pm",
+  "service": "flume",
+  "source": "hermes://agent/flume-pm",
+  "specversion": "1.0",
+  "subject": "bloodbank.evt.repo.decision.recorded",
+  "time": "2026-11-19T04:00:07Z",
+  "type": "bloodbank.repo.decision.recorded"
+}
