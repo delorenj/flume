@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-11-19T05:12:46.024162+00:00",
+  "base_revision": "af3bf9d31ba20b6e513fd2254a4094312456cd5d",
+  "worktree": "/home/delorenj/code/33GOD/flume/.worktrees/feat-FLUME-72-base-proof",
+  "tmpdir": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch",
+  "results": [
+    {
+      "name": "specialist-placement-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/specialist-placement-regressions.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "duration_s": 1.03,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-base-proof-20261119/specialist-placement-regressions.log",
+      "log_sha256": "fe39a249e7204eb421f74b0921730971170d0313ead8a3d9925f7219ecbd13a7"
+    },
+    {
+      "name": "role-projection-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/role-projection-regressions.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "duration_s": 6.41,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-base-proof-20261119/role-projection-regressions.log",
+      "log_sha256": "763c4621e980bda55c3008b4f6be300ae62a1e3521936520408e863b889cb497"
+    },
+    {
+      "name": "fleet-status-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/fleet-status-regressions.mjs"
+      ],
+      "exit_code": -9,
+      "timed_out": true,
+      "duration_s": 150.04,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-base-proof-20261119/fleet-status-regressions.log",
+      "log_sha256": "bff46374cdfacb2e8038d76012cfb0af10a7b1f217012da548298c6a186fbf4b"
+    }
+  ],
+  "proof_scope": "test exit, log hash and location; raw stdout retained in active-profile scratch, not committed"
+}

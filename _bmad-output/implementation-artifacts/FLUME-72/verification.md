@@ -1,4 +1,10 @@
-# FLUME-72 verification and release boundary
+# FLUME-72 historical verification and release boundary
+
+This is the original 2026-10-29 observation, not current rollout status. See
+[`policy-refresh-verification.md`](./policy-refresh-verification.md) for the
+2026-11-19 read-only coverage, current checks and unresolved owners. The narrow
+refresh command and separate agents instruction publication landed after the
+observations below; their absence here is historical.
 
 - `npm run typecheck`, `npm run build`, and focused suites `scheduling-policy`, `soul-project-bank`, `named-agent`, `pjan-48` each exited 0. Detailed stdout: [`test-proof.json`](./test-proof.json). The policy suite proved 13 groups, including seven role variants × named/unnamed, a real specialist adapter projection, the public specialist hire/onboard path, and read-only drift failures.
 - `npm test` was attempted with `/usr/bin/python3` on the PATH so the specialist template could import the host PyYAML. The runner passed the policy suite (14/40), named-agent, specialist-hire, and other surrounding tests. It did **not** pass or complete: `fleet-status-regressions` failed its `policy_domains` contract assertion, `role-projection-regressions` failed on a fixture model chain (`chain.0` does not match the AutomaticAI pattern), and the overall command timed out at 600s during suite 26/40. These are not represented as a clean full-suite gate; investigate them separately.

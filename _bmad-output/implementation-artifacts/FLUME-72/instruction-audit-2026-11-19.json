@@ -1,0 +1,458 @@
+{
+  "ok": false,
+  "read_only": true,
+  "runtime_schedules_assessed": false,
+  "running_sessions_assessed": false,
+  "coverage_scope": "registered-profile-soul-policy-bytes",
+  "policy_source": "roles/_base.md",
+  "policy_sha256": "d86f8b56dabb62ce062df6a5217374d2c63c3c45522a41223f96d2a81626246c",
+  "registry": "/home/delorenj/.hermes/agents-registry.yaml",
+  "audited": 49,
+  "counts": {
+    "pass": 46,
+    "drift": 2,
+    "unproven": 1
+  },
+  "rows": [
+    {
+      "id": "dumply",
+      "role": "tutor",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/dumply/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "36c1f5a2e92cd1d018311eaf4c8f1e8886672eae78212e033c681d0e3d5d506f"
+    },
+    {
+      "id": "bloodbank-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/bloodbank-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "4cbd88cb1987c91df725b97999af18501bf57048efd24f72917f6a4d2aebd089"
+    },
+    {
+      "id": "33god-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/33god-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "b684ba214e9bac79283a1c5f5dfb4d969099ad5112cb88ba478f02cb77cedb06"
+    },
+    {
+      "id": "candystore-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/candystore-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "5a4bfee6f729299546bb2efdde968d5c9f72290e1ff98c807eebc3e852de05ba"
+    },
+    {
+      "id": "nautilus-trader-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/nautilus-trader-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "aa72360c92d0bafb4181f2006c40f6cabd547f3d20fee10e9756a909665ff834"
+    },
+    {
+      "id": "zshyzsh-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/zshyzsh-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "2b254af01e05a98dfc56a87999be2c84470ef20e3745a554fee0f7586d87342b"
+    },
+    {
+      "id": "holocene-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/holocene-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "f677548ba0fa9381836ba96e47549c18ba6681a4aeb3f49921b7c22586c075dc"
+    },
+    {
+      "id": "skillex-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/skillex-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "7f0e729c241bd0fd0b9638a4fe0f6a59da394b0d8d29bf04f63e956d1eb69390"
+    },
+    {
+      "id": "voxxy-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/voxxy-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "10bb038e1335b5220cba8c572308316ed71ea29f308cb05bffb8748cfcdc7a50"
+    },
+    {
+      "id": "gruvato-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/gruvato-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "8f1a7b8dc723549d1636ec04381517247cdd85b5f47129d197bf886cb2ad7da2"
+    },
+    {
+      "id": "keepy-money-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/keepy-money-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "674c413e19f6c0a93f4c3b2de5a55457acfa017feffb3b9bb14f8dc85638a7c6"
+    },
+    {
+      "id": "slowburns-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/slowburns-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "3a21de7bc713bad10885dbc0f78f8ef0bfc29344500af6f4bd358b024de51aed"
+    },
+    {
+      "id": "delonet-company-reporter",
+      "role": "reporter",
+      "employment": "post",
+      "status": "unproven",
+      "profile": "/home/delorenj/.hermes/profiles/delonet-company-reporter/SOUL.md",
+      "detail": "Profile SOUL.md missing"
+    },
+    {
+      "id": "james-brennan-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "drift",
+      "profile": "/home/delorenj/.hermes/profiles/james-brennan-pm/SOUL.md",
+      "detail": "expected exactly one scheduling-policy start/end pair",
+      "soul_sha256": "0b4af6d47312c35a7e08e8ed5136ae2412e133325f8c9fc04fb0989a1d02234c"
+    },
+    {
+      "id": "pjangler-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/pjangler-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "21a3ee6dd4e68bcc7ab764f7dd0453f7795ef1f1a6fad04b1094bb0348a7c5ea"
+    },
+    {
+      "id": "heyma-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/heyma-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "f149ed43ccd3b62c621174535df8065ae5ac54163a01b3b904e2a282f6e1faad"
+    },
+    {
+      "id": "delonet-director",
+      "role": "director",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/delonet-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "a05fdd14c2e95ab0901f0e866a8cd727642f15d81fee62a8bc485b1494394de2"
+    },
+    {
+      "id": "deckard-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/deckard-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "695834df8b321f83ab5515c6bb57ebc967d1f02926233ef48a07b9137a27c747"
+    },
+    {
+      "id": "infra-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/infra-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "63dd75e92de3cb2d3d7b8dca92ae41d0f0238cdee90378da4bc7febd6e612587"
+    },
+    {
+      "id": "ssbnk-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/ssbnk-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "26affe81d3a944bb6b7e638e0f925242550c1c4446942233de95a746b0e590a6"
+    },
+    {
+      "id": "tonnybox-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/tonnybox-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "1427003cd22ae8d2e9d259e7bffa1096761b60cadd1dd26737e1b6653ed5e91c"
+    },
+    {
+      "id": "sidepiece-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/sidepiece-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "5da53843503b72fe349c5fcc791627c377ce2e14f1f29e466ea63ab9859b4550"
+    },
+    {
+      "id": "client-portal-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/client-portal-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "a079130dd411fe54dacdb440228d5dde14b7d94f08410c70e54df7851af0d48f"
+    },
+    {
+      "id": "flume-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/flume-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "d2dc7bcb2643e73a75391b45a542a3df914e589692a4cc63345a62ec0ff15ad0"
+    },
+    {
+      "id": "pile-of-dumb-things-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/pile-of-dumb-things-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "af608c96ca4c0b0122dc653a50adf7ff40556c9a558b6d82908dc8b47cbdc94d"
+    },
+    {
+      "id": "green-in-between-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/green-in-between-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "f75689d934e0e963218187834ed672bc192f27ef28a72d775289a4ecd1007c2d"
+    },
+    {
+      "id": "infra-specialist",
+      "role": "infra-specialist",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/infra-specialist/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "8e7933138931675f054b7867981f22faff007eb200b627311f85708a6d59384a"
+    },
+    {
+      "id": "n8n-specialist",
+      "role": "n8n-specialist",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/n8n-specialist/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "ec60f91ed409f2e66d919586dfe534c0331a25b36c08b289ed45d030f2605093"
+    },
+    {
+      "id": "monitoring-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/monitoring-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "01d787c0d689d1bd5a8eb328487287a4229f059e7d32e4227a679a33f85fea6c"
+    },
+    {
+      "id": "idealscenario-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/idealscenario-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "2f64ee736af7e3e92485dc90c2a94cc4a10ac42ce322cc3c84b97d91d9d76bf9"
+    },
+    {
+      "id": "rererere",
+      "role": "workflows-director",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/rererere/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "d299fbbd6f66c529a8de62462125513f9caf90d97d5633443775203dd0c4ab79"
+    },
+    {
+      "id": "navi-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/navi-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "70933ed9f5c8c097e357fb9be1e3828e382eea3363316a69dbc64e5da3a2757b"
+    },
+    {
+      "id": "marge-simpson",
+      "role": "hr-director",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/marge-simpson/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "2b2ae621cb9cf146430341c4dcbd3264ad3d517b6929c2c6e3d503c876614ead"
+    },
+    {
+      "id": "peter-griffin",
+      "role": "token-ops-engineer",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/peter-griffin/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "8333c8c2970726a19b8ac89765c128799e615a295fc97866bf74c8dd5ee07d7b"
+    },
+    {
+      "id": "milkshake-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/milkshake-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "c642d7a169664f88477dbdd2ed175796f21e025182a17b9dd9b9af68a58eb69b"
+    },
+    {
+      "id": "context-director",
+      "role": "context-director",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/context-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "2bf6bf3b5b6c4a007da0bb3ffabc387451cdadb7d72d287b00acb676a402e522"
+    },
+    {
+      "id": "bennett",
+      "role": "automaticai-executive-office-manager",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/bennett/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "5494a2df6cd588d009a2311690fad11209909b6a4de295071a72f4c878872d69"
+    },
+    {
+      "id": "pilot-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/pilot-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "e784163500a6d13dc0a2766d21ac2f0ea1e4218fc8f0c7f34c4b2d41e609beda"
+    },
+    {
+      "id": "joe-pesci",
+      "role": "founder-portfolio-advisor",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/joe-pesci/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "9df7dfe0f93e0b9bd2c1201e528c40fa083c00313fbff2b5184ca91686cd7509"
+    },
+    {
+      "id": "morgan-finance",
+      "role": "automaticai-finance-director",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/morgan-finance/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "b5c7ec090e0e596f3405661798ed24a824d0765d849bd2090ff36899236d820c"
+    },
+    {
+      "id": "tolt-director",
+      "role": "director",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/tolt-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "a23a522bde82a9527f3996938b86af6b0ca8fb0950e1d8bbdfe42e468d6f799c"
+    },
+    {
+      "id": "tolt-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/tolt-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "061bd5ac98b416267c2f049145a331f23f7bb0cf3ab205f7e245473211c7acca"
+    },
+    {
+      "id": "lost-things-forge-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/lost-things-forge-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "4afc64cb0922b893339143b5f16ee610104ca22b070892763da04ef835d15bb7"
+    },
+    {
+      "id": "green-in-between-launch-director",
+      "role": "launch-director",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/green-in-between-launch-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "3df86ae8333e64078f27868ec2ec00376bccdd2572c17e8a8f58d3edc32a776d"
+    },
+    {
+      "id": "gruvato-launch-director",
+      "role": "paired-launch-director",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/gruvato-launch-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "9a33cd7d23bc56024eb36548972ba984a75b0b4fa052dca30017d698d65a9332"
+    },
+    {
+      "id": "tolt-launch-director",
+      "role": "paired-launch-director",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/tolt-launch-director/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "a264a0d530fbcb4372fe21b927650acba8362b473f7f2a556a7dc0b9da6375da"
+    },
+    {
+      "id": "jacksnaps-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/jacksnaps-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "c905fa869b9b97b3b3c5347744ea63acf99874848cf95a094233c42bcde6fe02"
+    },
+    {
+      "id": "earshot-pm",
+      "role": "pm",
+      "employment": "post",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/earshot-pm/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "8e291f0df5414519a01854d6343717f7ad4b3cb2a56e1c518e6e9b59dda52319"
+    },
+    {
+      "id": "penny",
+      "role": "engineering-career-advocate",
+      "employment": "portable-specialist",
+      "status": "pass",
+      "profile": "/home/delorenj/.hermes/profiles/penny/SOUL.md",
+      "detail": "Canonical instruction policy present; runtime scheduling not assessed",
+      "soul_sha256": "a53656e7a9eedc2206b804c09eea7b418299033833b8e482866b82237c231c9e"
+    }
+  ]
+}

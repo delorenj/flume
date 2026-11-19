@@ -1,0 +1,45 @@
+{
+  "observed_at": "2026-11-19T05:03:51.393580+00:00",
+  "command": [
+    "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+    "scripts/audit-scheduling-policy.mjs",
+    "--registry",
+    "/home/delorenj/.hermes/agents-registry.yaml",
+    "--fleet-home",
+    "/home/delorenj/.hermes"
+  ],
+  "exit_code": 1,
+  "base_revision": "af3bf9d31ba20b6e513fd2254a4094312456cd5d",
+  "policy_sha256": "d86f8b56dabb62ce062df6a5217374d2c63c3c45522a41223f96d2a81626246c",
+  "registry_sha256": "6043881c785ecab03993b6c1d01641e3bfc8a2018dec80d0959c9864abb45910",
+  "input_paths_observed": 101,
+  "bytes_modes_mtimes_links_unchanged": true,
+  "changed_inputs": [],
+  "read_only": true,
+  "live_instruction_refresh_performed": false,
+  "running_sessions_assessed": false,
+  "runtime_schedules_assessed": false,
+  "role_counts": {
+    "automaticai-executive-office-manager": 1,
+    "automaticai-finance-director": 1,
+    "context-director": 1,
+    "director": 2,
+    "engineering-career-advocate": 1,
+    "founder-portfolio-advisor": 1,
+    "hr-director": 1,
+    "infra-specialist": 1,
+    "launch-director": 1,
+    "n8n-specialist": 1,
+    "paired-launch-director": 2,
+    "pm": 32,
+    "reporter": 1,
+    "token-ops-engineer": 1,
+    "tutor": 1,
+    "workflows-director": 1
+  },
+  "portable_counts": {
+    "pass": 10,
+    "drift": 0,
+    "unproven": 0
+  }
+}

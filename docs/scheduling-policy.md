@@ -64,11 +64,17 @@ The guard reads the org chart and each actual
 `profiles/<profile_name>/SOUL.md` (including a valid runtime link), compares the
 bounded policy bytes to the authored frame, and emits JSON. It has no apply mode
 and performs no writes. Exit 0 means every registered employee has current
-instruction bytes; 1 means drift/unproven coverage; 2 means invalid input or
-command failure. Missing profiles, absent/duplicate/reversed policy markers,
-stale bytes, malformed rows, duplicate YAML keys and empty registries cannot
-produce a clean claim. This **does not scan running schedules** and cannot
-replace Candybar's runtime bypass-schedule linter.
+on-disk instruction bytes; 1 means drift/unproven coverage; 2 means invalid input
+or command failure. `coverage_scope` is `registered-profile-soul-policy-bytes`;
+`running_sessions_assessed` and `runtime_schedules_assessed` remain false.
+Missing profiles, absent/duplicate/reversed policy markers, stale bytes,
+malformed employee IDs, role/employment/profile rows, duplicate profile identities, duplicate
+YAML keys and empty registries cannot produce a clean claim. Reads use one
+nonblocking descriptor, regular-file checks, fatal UTF-8 decoding and byte caps
+(4 MiB registry; 1 MiB canonical frame or SOUL); unreadable, oversized or
+nonregular inputs fail closed. Valid SOUL runtime links remain supported. This
+**does not scan running schedules** and cannot replace Candybar's runtime
+bypass-schedule linter.
 
 ## Supported policy-only refresh
 
@@ -111,14 +117,15 @@ The original read-only audit and broad scaffold preview are historical evidence:
 `_bmad-output/implementation-artifacts/FLUME-72/`. The broad 19-file remediation
 was **not** applied. Policy-only rollout receipts live in that same directory.
 
-Current rollout results are recorded in `policy-refresh-verification.md`.
-Missing `delonet-company-reporter` remains with **FLUME-67**; this command does
-not provision a mystery employee. Refused authored SOULs require their role
-owner to reconcile the authored instruction source without deleting persona
-content. Seven portable definitions were already deleted in the agents working
-tree: their owner must restore/relocate the declared definition and ownership
-before this refresh can safely project them. Do not restore those unrelated
-deletions just to make an audit green.
+Current on-disk results and the AC handoff are recorded in
+[`policy-refresh-verification.md`](../_bmad-output/implementation-artifacts/FLUME-72/policy-refresh-verification.md).
+The 2026-11-19 read-only observation found 49 registered employees: 46 current,
+two authored-policy gaps (`dumply`, `james-brennan-pm`) and one missing profile
+(`delonet-company-reporter`, **FLUME-67**). Those authored SOULs require their
+role owner to reconcile policy without deleting persona/refusal content.
+Historical missing specialist definitions and the 27/10/1 audit are not current
+deployment findings: all ten registered portable specialists now have current
+on-disk policy. Definition ownership itself was not re-audited or repaired here.
 
 On-disk policy is not evidence that any already-running session reloaded it.
 Next-turn/startup instruction loading is runtime-owned. No gateway restart,
@@ -127,8 +134,12 @@ new clock or schedule migration is part of instruction propagation.
 Tests exercise all declared roles plus fallback named/unnamed composition,
 public portable hire/onboard and narrow refresh, receipt continuity, unchanged
 personas/config, readback and idempotence, malformed/duplicate ownership and
-unsafe paths. Run focused suites with the session scratch `TMPDIR` and a Python
-interpreter with PyYAML (`PATH=/usr/bin:$PATH` on this host).
+unsafe paths. `tests/scheduling-policy-audit-regressions.mjs` exercises the real
+read-only CLI against invalid registry/policy and unreadable input.
+Run focused suites with the session scratch `TMPDIR` and a Python interpreter
+with PyYAML, keeping the supported Node binary ahead of `/usr/bin`:
+`PATH="$(dirname "$(command -v node)"):/usr/bin:$PATH" node tests/scheduling-policy-regressions.mjs`.
+Putting `/usr/bin` first on this host selects unsupported Node 20 instead of Node 26.
 
 Candybar's runtime policy lint is callable from its checkout:
 `uv run candybar doctor --repo . --live --json`. Its machine findings are separate

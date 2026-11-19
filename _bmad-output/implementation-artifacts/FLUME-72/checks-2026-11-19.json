@@ -1,0 +1,183 @@
+{
+  "observed_at": "2026-11-19T05:09:29.575259+00:00",
+  "base_revision": "af3bf9d31ba20b6e513fd2254a4094312456cd5d",
+  "worktree": "/home/delorenj/code/33GOD/flume/.worktrees/feat-FLUME-72-policy-proof",
+  "node": "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+  "python": "/usr/bin/python3",
+  "tmpdir": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch",
+  "full_npm_test_run": false,
+  "full_npm_test_exclusion": "runner overrides TMPDIR to /tmp and unrelated suites hardcode /tmp; run applicable suites directly under session scratch instead",
+  "results": [
+    {
+      "name": "typecheck",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 3.67,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/typecheck.log",
+      "log_sha256": "c347da8e0768c9a8d267f4b3408a8bb42554e809272eaf0015600d0ef3aabce4"
+    },
+    {
+      "name": "build",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 0.26,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/build.log",
+      "log_sha256": "c34146b4c302d15998e62332634fac1506d802102f48e0a26935237594247db6"
+    },
+    {
+      "name": "scheduling-policy-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/scheduling-policy-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 4.66,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/scheduling-policy-regressions.log",
+      "log_sha256": "9943a509f221864e4669f564eb186650ac3ad83bc6e6db2db6993b62200668cc"
+    },
+    {
+      "name": "scheduling-policy-audit-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/scheduling-policy-audit-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/scheduling-policy-audit-final.log",
+      "log_sha256": "699252d526fdbd5f41bbfe896b6a4c8e57d74906cf9020f2c28efe0e8e3d9f21",
+      "rerun_note": "Six-group final run after isolated-source fixture change; direct CLI exit 0"
+    },
+    {
+      "name": "policy-refresh-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/policy-refresh-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 4.87,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/policy-refresh-regressions.log",
+      "log_sha256": "e48a9c5bafdce7aa12b4dd324b2bf95adee3aade4fc2581ae0943527c24efe3a"
+    },
+    {
+      "name": "soul-project-bank-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/soul-project-bank-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 0.42,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/soul-project-bank-regressions.log",
+      "log_sha256": "5ac2b249536ea5fc41d25d7536f697fa23eed88c7720a60e1b263236d2d7a763"
+    },
+    {
+      "name": "named-agent-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/named-agent-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 4.76,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/named-agent-regressions.log",
+      "log_sha256": "1ddb274b3da89c726856326da12841712ae0da2263a127ddca1bf250dd7c62f0"
+    },
+    {
+      "name": "pjan-48-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/pjan-48-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 27.56,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/pjan-48-regressions.log",
+      "log_sha256": "c71d8864bf11ba4f7020ebb4b3fb45f950f5e65696903de59eabd171ee6f38b7"
+    },
+    {
+      "name": "role-contract-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/role-contract-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 0.26,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/role-contract-regressions.log",
+      "log_sha256": "4968acb597518e1f0c4958be42a6756814b72bf692dba1881380d47c7a19f14d"
+    },
+    {
+      "name": "specialist-hire-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/specialist-hire-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 146.81,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/specialist-hire-regressions.log",
+      "log_sha256": "c44fd6d14691b951061b067e606668795f56bcbce027370d84bb03d6a75f3222"
+    },
+    {
+      "name": "specialist-placement-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/specialist-placement-regressions.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "duration_s": 1.95,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/specialist-placement-regressions.log",
+      "log_sha256": "373a48216f232ce3efa69dfb700d5e79afca835fac197fab04f4448b6c7a225b"
+    },
+    {
+      "name": "fleet-status-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/fleet-status-regressions.mjs"
+      ],
+      "exit_code": -9,
+      "timed_out": true,
+      "duration_s": 150.03,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/fleet-status-regressions.log",
+      "log_sha256": "bff46374cdfacb2e8038d76012cfb0af10a7b1f217012da548298c6a186fbf4b"
+    },
+    {
+      "name": "role-projection-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/role-projection-regressions.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "duration_s": 7.05,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/role-projection-regressions.log",
+      "log_sha256": "d33182318e924d7bd27f4ab99d46c83ca4ca2dca1c4fe3b3aa914570b1594842"
+    },
+    {
+      "name": "fleet-inventory-regressions",
+      "command": [
+        "/home/delorenj/.local/share/mise/installs/node/26.5.0/bin/node",
+        "tests/fleet-inventory-regressions.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "duration_s": 0.17,
+      "log": "/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume72-proof-20261119/fleet-inventory-regressions.log",
+      "log_sha256": "b0d713e290195a1d22918cc82ae9c959590e73d7e9d4e3637ed5e4e3bf42627b"
+    }
+  ],
+  "proof_scope": "test exit, log hash and location; raw stdout retained in active-profile scratch, not committed"
+}

@@ -1,6 +1,6 @@
 /** Shared extraction only: the instruction bytes are authored in roles/_base.md. */
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readAuditText } from "./read-audit-text.mjs";
 
 export const START = "<!-- flume:scheduling-policy:start -->";
 export const END = "<!-- flume:scheduling-policy:end -->";
@@ -17,5 +17,7 @@ export function policySection(text) {
 
 /** @param {string} flumeRoot */
 export function canonicalPolicy(flumeRoot) {
-  return policySection(readFileSync(join(flumeRoot, "roles/_base.md"), "utf8"));
+  const policy = policySection(readAuditText(join(flumeRoot, "roles/_base.md")));
+  if (!policy.slice(START.length, -END.length).trim()) throw new Error("Canonical scheduling policy is empty");
+  return policy;
 }

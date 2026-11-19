@@ -25,7 +25,7 @@ try {
   const { composeSoul, specialistSchedulingRequest } = await import(pathToFileURL(bundle).href);
   const isRetired = name => /^retired:/mu.test(readFileSync(join(root, "roles", name), "utf8").split(/^---$/mu)[1] ?? "");
   const declared = readdirSync(join(root, "roles")).filter(name => name.endsWith(".md") && !name.startsWith("_") && name !== "README.md" && !isRetired(name)).map(name => name.slice(0, -3));
-  const roles = [...declared, "director", "infra-specialist", "unconfigured-future-role"];
+  const roles = [...new Set([...declared, "director", "infra-specialist", "unconfigured-future-role"])];
   for (const role of roles) {
     check(`composer propagates byte-identical policy to ${role} (named and unnamed)`, () => {
       for (const named of [undefined, { name: "alice", writeBank: "agent-alice", recallBanks: ["agent-alice"] }]) {
@@ -99,6 +99,9 @@ try {
       writeFileSync(registry, text); const run = cli([]); assert.equal(run.status, 2); assert.equal(JSON.parse(run.stdout).ok, false);
     }
     save(); const restored = snapshot(); assert.equal(cli(["--apply"]).status, 2); assert.deepEqual(snapshot(), restored);
+    assert.throws(() => auditSchedulingPolicy({ registry: join(work, "missing-registry.yaml"), fleetHome }), /ENOENT/);
+    assert.equal(auditSchedulingPolicy({ registry, fleetHome, policy: "not the canonical policy" }).policy_sha256,
+      createHash("sha256").update(policy).digest("hex"), "a caller cannot replace canonical authority");
     assert.throws(() => policySection(`${END}\n${START}`), /reversed/);
     assert.throws(() => policySection(""), /exactly one/);
   });
@@ -113,7 +116,11 @@ try {
     writeFileSync(join(fleet, "agents-registry.yaml"), "agents: {}\n");
     const definition = { schema_version: 1, id: "public-specialist", display_name: "Public Specialist", role: "token-ops-engineer", charter: { purpose: "Preserve public charter", directives: ["Preserve persona"] }, skills: { set: "fixture-set" }, memory: { write_bank: "agent-public-specialist" } };
     const source = join(work, "public-agent.yaml"); writeFileSync(source, YAML.stringify(definition));
-    const env = { ...process.env, HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: join(fleet, "agents-registry.yaml"), HERMES_FLEET_REGISTRY_FILE: join(fleet, "agents-registry.yaml"), HERMES_TEMPLATE_CONFIG: join(work, "no-template"), HERMES_FLEET_ENV: join(work, "no-env"), PJ_SKILLS_REGISTRY_ROOT: catalog, XDG_STATE_HOME: options.stateHome, PYTHONDONTWRITEBYTECODE: "1", VOX_PLUGIN_DIR: join(work, "no-vox") };
+    const bin = join(work, "public-bin"), calls = join(work, "credential-fixture-calls"); mkdirSync(bin);
+    const gateway = join(bin, "gateway-tokens.py");
+    writeFileSync(gateway, `import sys\nfrom pathlib import Path\nassert sys.argv[1:] == ["mint", "hermes-public-specialist", "--preset", "owner-no-anthropic", "--group", "aai-personal", "--days", "-1"]\nwith Path(${JSON.stringify(calls)}).open("a") as log: log.write("mint\\n")\nprint("existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-public-specialist")\n`);
+    writeFileSync(join(bin, "op"), `#!${process.execPath}\nconst fs = require("node:fs");\nif (JSON.stringify(process.argv.slice(2)) !== JSON.stringify(["read", "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-public-specialist"])) process.exit(1);\nfs.appendFileSync(${JSON.stringify(calls)}, "read\\n"); console.log("fixture-member-value-long-enough-for-readback");\n`, { mode: 0o700 });
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, FLUME_GATEWAY_TOKENS_BIN: gateway, HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: join(fleet, "agents-registry.yaml"), HERMES_FLEET_REGISTRY_FILE: join(fleet, "agents-registry.yaml"), HERMES_TEMPLATE_CONFIG: join(work, "no-template"), HERMES_FLEET_ENV: join(work, "no-env"), PJ_SKILLS_REGISTRY_ROOT: catalog, XDG_STATE_HOME: options.stateHome, PYTHONDONTWRITEBYTECODE: "1", VOX_PLUGIN_DIR: join(work, "no-vox") };
     const cli = args => spawnSync(process.execPath, [join(root, "packages/flume-hr/dist/index.js"), ...args, "--json"], { env, cwd: work, encoding: "utf8", timeout: 40000 });
     check("built public hire/onboard path propagates to a portable specialist and converges", () => {
       const hired = cli(["hire", "--definition", source]); assert.equal(hired.status, 0, hired.stdout + hired.stderr);
@@ -136,6 +143,7 @@ try {
       assert.equal(readFileSync(join(portableProfile, "config.yaml"), "utf8"), configBefore);
       const repeatedNarrow = cli(["refresh-scheduling-policy", "--apply"]); assert.equal(repeatedNarrow.status, 0); assert.equal(JSON.parse(repeatedNarrow.stdout).changed_file_count, 0);
       const again = cli(["onboard", "--employee", "public-specialist"]); assert.equal(again.status, 0, again.stdout + again.stderr); assert.equal(JSON.parse(again.stdout).changed, false);
+      assert.equal(readFileSync(calls, "utf8"), "mint\nread\nmint\nread\n", "only the private credential fixture is used");
     });
   }
   console.log(`scheduling-policy: ${checks} check groups passed; ${roles.length} roles x named/unnamed rendered`);

@@ -1,35 +1,48 @@
 #!/usr/bin/env node
 /** Read-only instruction coverage guard, not Candybar's runtime schedule linter. */
-import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import YAML from "yaml";
 import { canonicalPolicy, policySection } from "./lib/scheduling-policy.mjs";
+import { readAuditText } from "./lib/read-audit-text.mjs";
 export { canonicalPolicy, policySection, START, END } from "./lib/scheduling-policy.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mapping = value => Boolean(value && typeof value === "object" && !Array.isArray(value));
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 
-export function auditSchedulingPolicy({ registry, fleetHome, policy = canonicalPolicy(root) }) {
-  const document = YAML.parseDocument(readFileSync(registry, "utf8"), { uniqueKeys: true });
-  if (document.errors.length) throw new Error(`Invalid registry: ${document.errors[0].message}`);
-  const agents = document.toJS()?.agents;
+export function auditSchedulingPolicy({ registry, fleetHome }) {
+  const policy = canonicalPolicy(root);
+  const document = YAML.parseDocument(readAuditText(registry, 4 * 1024 * 1024), { uniqueKeys: true });
+  if (document.errors.length) throw new Error("Invalid registry YAML");
+  const agents = document.toJS({ maxAliasCount: 100 })?.agents;
   if (!mapping(agents) || Object.keys(agents).length === 0) throw new Error("Registry must contain a non-empty agents mapping");
+  const profiles = new Map();
+  for (const row of Object.values(agents)) if (mapping(row) && typeof row.profile_name === "string") {
+    profiles.set(row.profile_name, (profiles.get(row.profile_name) ?? 0) + 1);
+  }
   const rows = Object.entries(agents).map(([id, row]) => {
-    const result = { id, role: mapping(row) ? row.role ?? null : null,
-      employment: mapping(row) ? row.employment ?? "post" : null,
+    const result = { id, role: mapping(row) && typeof row.role === "string" ? row.role : null,
+      employment: mapping(row) && (row.employment === undefined || typeof row.employment === "string") ? row.employment ?? "post" : null,
       status: "unproven", profile: null, detail: "" };
-    if (!mapping(row) || typeof row.profile_name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(row.profile_name)) {
-      result.detail = "Invalid or missing profile_name; no profile inferred";
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(id) || !mapping(row) || typeof row.profile_name !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]*$/u.test(row.profile_name)) {
+      result.detail = "Invalid employee id or profile_name; no profile inferred";
+      return result;
+    }
+    if (typeof row.role !== "string" || !/^[a-z][a-z0-9_-]*$/u.test(row.role) ||
+        (row.employment !== undefined && !["post", "portable-specialist"].includes(row.employment))) {
+      result.detail = "Invalid or missing role/employment; coverage unproven";
+      return result;
+    }
+    if (profiles.get(row.profile_name) !== 1) {
+      result.detail = "Duplicate profile_name; employee instruction coverage is ambiguous";
       return result;
     }
     result.profile = join(resolve(fleetHome), "profiles", row.profile_name, "SOUL.md");
     try {
-      if (!statSync(result.profile).isFile()) throw new Error("SOUL.md is not a regular file");
-      const bytes = readFileSync(result.profile, "utf8");
+      const bytes = readAuditText(result.profile);
       result.soul_sha256 = digest(bytes);
       try {
         const seen = policySection(bytes);
@@ -49,6 +62,7 @@ export function auditSchedulingPolicy({ registry, fleetHome, policy = canonicalP
   });
   const counts = Object.fromEntries(["pass", "drift", "unproven"].map(status => [status, rows.filter(row => row.status === status).length]));
   return { ok: rows.every(row => row.status === "pass"), read_only: true, runtime_schedules_assessed: false,
+    running_sessions_assessed: false, coverage_scope: "registered-profile-soul-policy-bytes",
     policy_source: "roles/_base.md", policy_sha256: digest(policy), registry: resolve(registry),
     audited: rows.length, counts, rows };
 }

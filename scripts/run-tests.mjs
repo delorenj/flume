@@ -67,6 +67,7 @@ const SUITES = [
   "tests/pm-launch-mode.mjs",
   "tests/launch-mode-regressions.mjs",
   "tests/scheduling-policy-regressions.mjs",
+  "tests/scheduling-policy-audit-regressions.mjs",
   "tests/policy-refresh-regressions.mjs",
   "tests/named-agent-regressions.mjs",
   "tests/named-agent-recency-regressions.mjs",
