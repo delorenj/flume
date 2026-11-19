@@ -37,6 +37,10 @@ This acceptance uses the explicitly permitted **isolated installed Hermes agent 
 
 The historical `live-fallback-20261005.json` remains `PASS_SEAM_ONLY` and is not reused. Its GLM/max/defaulted observations are not current defaults: GLM was absent from this member's authenticated model catalog. The new receipt reports the actual medium/non-defaulted behavior of this installed Hermes version instead of inferring effort from provider extra_body.
 
+## Validator-only revision (after the dated live run)
+
+The runner now compares a non-null outbound `reasoning_effort` with the ledger's `requested_effort` even when `effort_defaulted: true`. When the outbound field is absent, it instead requires `effort_defaulted: true`; this does not claim that configured `extra_body` reached the wire. Offline fixtures cover the formerly accepted wire `medium` / ledger requested `xhigh` tampering and genuine absent-wire defaulting. This is a validation-only revision, not a new inference or a replacement live receipt. The original snapshot remains [`ac6-role-projected-20261118.json`](ac6-role-projected-20261118.json), whose `runner_sha256` identifies the runner that produced it. The original medium/non-defaulted observations above are unchanged; no new live execution or contemporary ledger verification is claimed.
+
 ## Reproduce
 
 Prerequisites: initialized pinned `templates/hermes-agent` submodule; Flume's Node dependencies; installed Hermes Python with `httpx`, `openai`, and `PyYAML`; read access to the member's existing 1Password reference and the gateway ledger PAT. No gateway-administration skill payload is required. The gateway skill was quarantined during this task and was not read through another path.

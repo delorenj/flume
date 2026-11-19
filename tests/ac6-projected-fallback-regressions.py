@@ -70,6 +70,25 @@ class ReceiptChecks(unittest.TestCase):
                 with self.assertRaises((ac6.Blocker, KeyError)):
                     ac6.verdict_check(receipt, CHAIN, 'hermes-fixture', CATALOG)
 
+    def test_defaulted_ledger_cannot_hide_outbound_effort_mismatch(self):
+        receipt = fixture_receipt()
+        receipt['receipts'][0].update(effort_defaulted=True, requested_effort='xhigh', effective_effort='xhigh')
+        with self.assertRaisesRegex(ac6.Blocker, 'ledger effort differs from actual outbound request'):
+            ac6.verdict_check(receipt, CHAIN, 'hermes-fixture', CATALOG)
+
+    def test_defaulting_without_wire_requires_gateway_default_metadata(self):
+        receipt = fixture_receipt()
+        receipt['runtime']['requests'][0]['reasoning_effort'] = None
+        with self.assertRaises(ac6.Blocker):
+            ac6.verdict_check(receipt, CHAIN, 'hermes-fixture', CATALOG)
+        receipt['receipts'][0]['effort_defaulted'] = True
+        ac6.verdict_check(receipt, CHAIN, 'hermes-fixture', CATALOG)
+
+    def test_matching_outbound_effort_with_defaulted_metadata(self):
+        receipt = fixture_receipt()
+        receipt['receipts'][0]['effort_defaulted'] = True
+        ac6.verdict_check(receipt, CHAIN, 'hermes-fixture', CATALOG)
+
     def test_actual_gateway_defaulting_is_allowed_and_reported(self):
         receipt = fixture_receipt()
         receipt['receipts'][0].update(effort_defaulted=True,requested_effort='xhigh',effective_effort='xhigh')

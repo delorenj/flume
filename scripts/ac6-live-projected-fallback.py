@@ -144,8 +144,11 @@ def verdict_check(receipt, chain, consumer, catalog):
         require(row['token_name'].startswith('aai:' + consumer + ':'), 'ledger did not use member own consumer')
         require(row['request_id'] in runtime['request_ids'], 'ledger request ID differs from actual response')
         require(row['requested_effort'] and row['effective_effort'] and isinstance(row['effort_defaulted'], bool), 'ledger effort/defaulting incomplete')
-        if not row['effort_defaulted']:
-            require(row['requested_effort'] == fallback_requests[0].get('reasoning_effort'), 'ledger effort differs from actual outbound request')
+        wire_effort = fallback_requests[0].get('reasoning_effort')
+        if wire_effort is None:
+            require(row['effort_defaulted'], 'ledger defaulting metadata differs from absent outbound effort')
+        else:
+            require(row['requested_effort'] == wire_effort, 'ledger effort differs from actual outbound request')
 
 
 def make_bounded_send(chain, evidence, original_send):
