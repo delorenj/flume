@@ -219,9 +219,9 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
       const definitionChanged = write(join(p.desk, "agent.yaml"), p.bytes);
       const desk = await provisionDesk(p.definition, { home: p.home, resolvedSkills: p.plan.skills, quiet: true });
       const profile = projection(p, false);
-      // Initial hire has a new profile; onboard is a convergent refresh and
-      // must not rotate or touch an operator's existing gateway mapping.
-      const credential = onboard ? undefined : provisionMemberCredential(p.definition.id, { home: p.hermesRoot });
+      // A pending hire may have failed at the gateway step. Onboard must
+      // confirm the same credential before publishing the employee as complete.
+      const credential = provisionMemberCredential(p.definition.id, { home: p.hermesRoot });
       const selection = await applyRoleSelection(p.definition.id, p.plan, p.selection);
       const record = row(p);
       const recordChanged = updateRegistryDocumentUnlocked(p.registryPath, doc => {

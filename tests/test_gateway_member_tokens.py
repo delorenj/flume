@@ -20,7 +20,9 @@ REF = h.TOKENS_ITEM + "/hermes-test-person"
 @pytest.mark.parametrize("text", [
     "# operator\n{}\n", "# operator\nsettings:\n  keep: yes\n",
     "secrets:\n  onepassword:\n    env:\n      OTHER: op://vault/item/field # keep\nlogging:\n  enabled: true\n",
-    "secrets:\n  onepassword:\n    env: {} # empty\n",
+    "secrets:\n    onepassword:\n        env:\n            OTHER: op://vault/item/field # keep four spaces\n",
+    "secrets:\n    onepassword:\n        env: {} # four-space empty\n",
+    "secrets:\n    onepassword:\n        other: yes # keep sibling\n",
 ])
 def test_preserves_other_settings_and_comments(text):
     edited, state = h.candidate(text, REF)

@@ -87,7 +87,7 @@ async function fixture(label,skills) {
   executable('hermes',`import {mkdirSync,writeFileSync} from 'node:fs';import {join} from 'node:path';const a=process.argv.slice(2);if(JSON.stringify(a)!==JSON.stringify(['profile','create','demo-dev','--no-alias','--no-skills']))process.exit(93);const p=join(process.env.HOME,'.hermes/profiles',a[2]);mkdirSync(p,{recursive:true});writeFileSync(join(p,'config.yaml'),'{}\\n');writeFileSync(join(p,'.env'),'');`);
   executable('op',`if(process.argv[2]!=='read'||process.argv[3]!=='op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')process.exit(97);process.stdout.write('fixture-member-value-long-enough-for-readback');`);
   const gateway=join(bin,'gateway-tokens.py');
-  writeFileSync(gateway,`#!/usr/bin/python3\nimport sys\nassert sys.argv[1:4]==['mint','hermes-demo-dev','--preset']\nassert sys.argv[4:8]==['owner-no-anthropic','--group','aai-personal','--days']\nprint('hermes-demo-dev: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')\n`);
+  writeFileSync(gateway,`#!/usr/bin/python3\nimport os,sys\nassert sys.argv[1:4]==['mint','hermes-demo-dev','--preset']\nassert sys.argv[4:8]==['owner-no-anthropic','--group','aai-personal','--days']\nif os.environ.get('FIXTURE_MINT_FAIL') == '1': sys.exit(1)\nprint('hermes-demo-dev: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')\n`);
   symlinkSync(python,join(bin,'python3'));
   for(const name of ['curl','wget','systemctl','gh','pj','mise','bloodbank','nats','ssh']) {
     executable(name,`import {appendFileSync} from 'node:fs';appendFileSync(${JSON.stringify(blocked)},${JSON.stringify(name)}+'\\n');process.exit(97);`);
@@ -118,6 +118,7 @@ async function fixture(label,skills) {
 }
 const hire=f=>f.run('hire','dev','--yes','--skip-telegram','--skip-plane','--local');
 const onboard=f=>f.run('onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local');
+const recover=f=>spawnSync(process.execPath,[cli,'onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:f.repo,env:{...f.env},encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
 const succeeded=result=>assert.equal(result.status,0,`${result.error?.message??''}\n${result.stdout}\n${result.stderr}`);
 const writeDelta=(f,delta)=>{
   const dumped=spawnSync(python,['-I','-c','import json,sys,yaml; print(yaml.safe_dump(json.load(sys.stdin),default_flow_style=False,sort_keys=False,width=100),end="")'],
@@ -156,6 +157,8 @@ try {
       ? `HERMES_FLEET_REGISTRY_FILE=$HERMES_FLEET_HOME/agents-registry.yaml # registry\n`
       : `HERMES_FLEET_REGISTRY_FILE="${f.registry}" # registry\n`);
     const first=hire(f);succeeded(first);
+    assert.match(first.stdout,/Member gateway credential: token=confirmed delta=added render=rendered; consumer=hermes-demo-dev/);
+    assert.doesNotMatch(first.stdout+first.stderr,/fixture-member-value-long-enough-for-readback/);
     assert.match(first.stdout,/Role declaration projected/);
     assert.match(first.stdout,/Hermes lifecycle audit passed/,'the final hire audit must finish');
     assert.match(first.stdout,/verified|deferred/i);
@@ -344,5 +347,26 @@ try {
   assert.ok(arbitraryResult.rules.some(r=>r.id==='hermes.pm-scaffold'&&r.status==='fail'&&r.details.some(d=>d.includes('demo-dev')&&d.includes('soul-drift'))),'non-PM repo roles must actually be audited');
   pass('arbitrary repo role SOUL drift is detected, not a vacuous PM-only pass');
   assert.equal(git(root,['ls-tree','HEAD','templates/hermes-agent']).match(/^160000 commit ([0-9a-f]{40})\t/)[1],pin);
-  console.log(`\n${count} role-hire check groups passed`);
+  const recovery=await fixture('gateway-recovery',{set:'dev-set'});
+  recovery.env.FIXTURE_MINT_FAIL='1';
+  const failedHire=hire(recovery);
+  assert.notEqual(failedHire.status,0);
+  assert.match(failedHire.stdout+failedHire.stderr,/gateway-mint-or-confirm-failed/);
+  assert.ok(existsSync(recovery.roleDir));
+  const failedOnboard=recover(recovery);
+  assert.notEqual(failedOnboard.status,0,'onboard cannot declare success while the gateway still refuses');
+  assert.match(failedOnboard.stdout+failedOnboard.stderr,/gateway-mint-or-confirm-failed/);
+  assert.notEqual(YAML.parse(readFileSync(join(recovery.desk,'config.yaml'),'utf8')).secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY,
+    'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev');
+  delete recovery.env.FIXTURE_MINT_FAIL;
+  const recovered=recover(recovery);succeeded(recovered);
+  assert.match(recovered.stdout,/Member gateway credential: token=confirmed delta=added render=rendered/);
+  const recoveredDelta=readFileSync(join(recovery.desk,'config.delta.yaml'),'utf8');
+  const recoveredConfig=readFileSync(join(recovery.desk,'config.yaml'),'utf8');
+  const rechecked=recover(recovery);succeeded(rechecked);
+  assert.match(rechecked.stdout,/Member gateway credential: token=confirmed delta=present render=unchanged/);
+  assert.equal(readFileSync(join(recovery.desk,'config.delta.yaml'),'utf8'),recoveredDelta);
+  assert.equal(readFileSync(join(recovery.desk,'config.yaml'),'utf8'),recoveredConfig);
+  pass('failed hire and failed onboard cannot complete without gateway; successful recovery converges');
+  console.log(`\n${count} role hire check groups passed`);
 } finally {rmSync(work,{recursive:true,force:true});}

@@ -230,14 +230,15 @@ export class HireRecipe extends Recipe {
       }
     }
 
-    // The occupied/onboard path above never mints. For a new employee the
-    // resolved profile exists only after Copier/host projection and role pins.
-    if (errors.length === 0 && !ctx.dryRun && !onboardingExisting) {
+    // Onboard converges a partially provisioned employee as well as role
+    // projection. The helper refuses conflicting references before minting.
+    if (errors.length === 0 && !ctx.dryRun) {
       try {
         if (!hireCtx.profileName) throw new Error("resolved-profile-unavailable");
         const credential = provisionMemberCredential(hireCtx.profileName);
-        phases.push({ id: "hermes.member-gateway-credential", status: "changed", changedFiles: [],
-          message: `Member gateway credential: token=${credential.token} delta=${credential.delta} render=${credential.render}; consumer=${credential.consumer}` });
+        const message = `Member gateway credential: token=${credential.token} delta=${credential.delta} render=${credential.render}; consumer=${credential.consumer}`;
+        phases.push({ id: "hermes.member-gateway-credential", status: credential.delta === "added" || credential.render === "rendered" || credential.token === "minted" ? "changed" : "unchanged", changedFiles: [], message });
+        logs.push(message);
       } catch (error) {
         const message = (error as Error).message;
         phases.push({ id: "hermes.member-gateway-credential", status: "failed", changedFiles: [], message });

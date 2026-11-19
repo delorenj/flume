@@ -114,15 +114,27 @@ def candidate(text, ref):
     # Walk the syntax tree to the deepest existing parent.
     syntax = yaml.compose(text)
     depth = 0
+    parent_indent = 0
+    previous_indent = 0
     while isinstance(syntax, yaml.MappingNode) and depth < len(path):
-        child = next((v for k, v in syntax.value if k.value == path[depth]), None)
-        if child is None:
+        entry = next(((k, v) for k, v in syntax.value if k.value == path[depth]), None)
+        if entry is None:
             break
-        syntax = child
+        previous_indent, parent_indent = parent_indent, entry[0].start_mark.column
+        syntax = entry[1]
         depth += 1
+    # Use the existing parent's indentation, not an assumed two spaces.
+    if depth and isinstance(syntax, yaml.MappingNode) and syntax.value:
+        child_indent = syntax.value[0][0].start_mark.column
+        step = child_indent - parent_indent
+        if step <= 0:
+            raise ProvisionError("unsupported-delta-layout")
+    else:
+        step = parent_indent - previous_indent if depth > 1 else 2
+        child_indent = parent_indent + step if depth else 0
     block = ""
     for i, key in enumerate(path[depth:]):
-        block += "  " * (depth + i) + key + (f": {ref}\n" if depth + i == 3 else ":\n")
+        block += " " * (child_indent + i * step) + key + (f": {ref}\n" if depth + i == 3 else ":\n")
     if depth == 0:
         lines = text.splitlines(keepends=True)
         ordinary = [i for i, line in enumerate(lines) if line.strip() and not line.lstrip().startswith("#")]
