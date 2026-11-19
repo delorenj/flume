@@ -16,6 +16,7 @@ import { probeProjectContracts } from "../kernel/project-contract";
 import type { LifecycleContext, RecipeInitResult, RecipeMetadata, RecipePhaseOutcome, RecipePhaseStatus } from "../engine/types";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { provisionMemberCredential } from "./MemberGatewayCredential";
 import YAML from "yaml";
 import { changedTreePaths, snapshotTree } from "../utils/tree-diff";
 import { preflightRenderedHermes } from "../kernel/preflight";
@@ -127,6 +128,8 @@ export class HireRecipe extends Recipe {
       "UntrackHermesRuntimes",
       "WireTelegram",
       "WireEmail",
+      "ProjectRoleDeclaration",
+      "MemberGatewayCredential",
       "PrintHermesSummary (postconditions only)",
     ],
     publicRuleIds: this.checks.map((check) => check.id),
@@ -224,6 +227,21 @@ export class HireRecipe extends Recipe {
           errors.push(host.message || "Deferred Hermes host effects failed");
           break;
         }
+      }
+    }
+
+    // The occupied/onboard path above never mints. For a new employee the
+    // resolved profile exists only after Copier/host projection and role pins.
+    if (errors.length === 0 && !ctx.dryRun && !onboardingExisting) {
+      try {
+        if (!hireCtx.profileName) throw new Error("resolved-profile-unavailable");
+        const credential = provisionMemberCredential(hireCtx.profileName);
+        phases.push({ id: "hermes.member-gateway-credential", status: "changed", changedFiles: [],
+          message: `Member gateway credential: token=${credential.token} delta=${credential.delta} render=${credential.render}; consumer=${credential.consumer}` });
+      } catch (error) {
+        const message = (error as Error).message;
+        phases.push({ id: "hermes.member-gateway-credential", status: "failed", changedFiles: [], message });
+        errors.push(message);
       }
     }
 

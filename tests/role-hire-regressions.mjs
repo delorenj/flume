@@ -85,8 +85,11 @@ async function fixture(label,skills) {
   executable('flume',`await import(${JSON.stringify(cli)});`);
   // Only the external Hermes profile-create interface is simulated. No renderer/task/audit is replaced.
   executable('hermes',`import {mkdirSync,writeFileSync} from 'node:fs';import {join} from 'node:path';const a=process.argv.slice(2);if(JSON.stringify(a)!==JSON.stringify(['profile','create','demo-dev','--no-alias','--no-skills']))process.exit(93);const p=join(process.env.HOME,'.hermes/profiles',a[2]);mkdirSync(p,{recursive:true});writeFileSync(join(p,'config.yaml'),'{}\\n');writeFileSync(join(p,'.env'),'');`);
+  executable('op',`if(process.argv[2]!=='read'||process.argv[3]!=='op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')process.exit(97);process.stdout.write('fixture-member-value-long-enough-for-readback');`);
+  const gateway=join(bin,'gateway-tokens.py');
+  writeFileSync(gateway,`#!/usr/bin/python3\nimport sys\nassert sys.argv[1:4]==['mint','hermes-demo-dev','--preset']\nassert sys.argv[4:8]==['owner-no-anthropic','--group','aai-personal','--days']\nprint('hermes-demo-dev: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')\n`);
   symlinkSync(python,join(bin,'python3'));
-  for(const name of ['curl','wget','op','systemctl','gh','pj','mise','bloodbank','nats','ssh']) {
+  for(const name of ['curl','wget','systemctl','gh','pj','mise','bloodbank','nats','ssh']) {
     executable(name,`import {appendFileSync} from 'node:fs';appendFileSync(${JSON.stringify(blocked)},${JSON.stringify(name)}+'\\n');process.exit(97);`);
   }
   writeFileSync(config,`# fixture config\n[fleet]\nhermes_bin = ${JSON.stringify(join(bin,'hermes'))}\nhermes_repo = ${JSON.stringify(runtime)}\nflume_bin = ${JSON.stringify(join(bin,'flume'))}\npjangler_bin = ${JSON.stringify(join(bin,'flume'))}\nfleet_env = ${JSON.stringify(join(hermes,'fleet.env'))}\nregistry_file = ${JSON.stringify(registry)}\n[hindsight]\nagent_bank_template = ""\n`);
@@ -97,7 +100,7 @@ async function fixture(label,skills) {
     HERMES_FLEET_HOME:hermes,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,HERMES_ORG_PATH:org,
     HERMES_TEMPLATE_CONFIG:config,HERMES_FLEET_ENV:join(hermes,'fleet.env'),HERMES_BIN:join(bin,'hermes'),HERMES_AGENT_REPO:runtime,
     FLUME_BIN:join(bin,'flume'),PJANGLER_BIN:join(bin,'unavailable-pj'),PJ_SKILLS_REGISTRY_ROOT:skillex,SKILLEX_BIN:join(bin,'skillex'),
-    PROFILE_RENDERER:renderer,FLUME_ROLES_ROOT:roles,FLUME_GATEWAY_CATALOG:join(dir,'routes.json'),
+    PROFILE_RENDERER:renderer,FLUME_ROLES_ROOT:roles,FLUME_GATEWAY_CATALOG:join(dir,'routes.json'),FLUME_GATEWAY_TOKENS_BIN:gateway,
     GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_SYSTEM:'/dev/null',GIT_CEILING_DIRECTORIES:work,GIT_ALLOW_PROTOCOL:'file',PYTHONDONTWRITEBYTECODE:'1',
   };
   writeFileSync(env.FLUME_GATEWAY_CATALOG,'[]\n');
@@ -157,7 +160,7 @@ try {
     assert.match(first.stdout,/Hermes lifecycle audit passed/,'the final hire audit must finish');
     assert.match(first.stdout,/verified|deferred/i);
     assert.match(first.stdout,/automatic Skillex resync \(host service\)/,'local hire names its host automation deferral');
-    assert.equal(existsSync(f.blocked),false,'no credential, network or service tool was used');
+    assert.equal(existsSync(f.blocked),false,'no unauthorized credential, network or service tool was used');
     const records=f.records();
     const copierRuns=records.filter(r=>r.command==='copier');
     assert.equal(copierRuns.length,1);assert.deepEqual(copierRuns[0].args.slice(0,3),['copy',template,f.roleDir]);

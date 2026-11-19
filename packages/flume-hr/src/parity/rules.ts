@@ -4118,9 +4118,7 @@ return [
         id: "hermes.gateway-routing",
         title,
         status: details.length === 0 ? "pass" : "fail",
-        summary: details.length === 0
-          ? `Main, auxiliary, delegated, fallback and MoA inference route through the gateway; ${members - onFleetKey} of ${members} members carry their own token, ${onFleetKey} use the fleet token`
-          : `${details.length} gateway routing issue(s) detected`,
+        summary: `Main, auxiliary, delegated, fallback and MoA inference gateway audit: ${members - onFleetKey} of ${members} members carry their own token, ${onFleetKey} use the fleet token; ${details.length} routing issue(s)${details.length ? " (inspect details, including pre-existing base defects)" : ""}`,
         details,
         // Fleet-wide, operator-owned values (and tokens are minted, not guessed).
         fixable: false,

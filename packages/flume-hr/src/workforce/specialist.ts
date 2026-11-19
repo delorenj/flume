@@ -17,6 +17,7 @@ import { placementProblems, placementDrift, projectPlacement, resolvedSuperior }
 import { applyRoleSelection, auditRoleSelection, planRoleSelection, previewRoleSelection, type SelectionContext } from "./selection";
 import { validateNamedAgent } from "./validator";
 import { specialistSchedulingRequest } from "./scheduling";
+import { provisionMemberCredential } from "../hire/MemberGatewayCredential";
 
 const EMPLOYMENT = "portable-specialist";
 const MARKER = ".flume-specialist.json";
@@ -218,6 +219,9 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
       const definitionChanged = write(join(p.desk, "agent.yaml"), p.bytes);
       const desk = await provisionDesk(p.definition, { home: p.home, resolvedSkills: p.plan.skills, quiet: true });
       const profile = projection(p, false);
+      // Initial hire has a new profile; onboard is a convergent refresh and
+      // must not rotate or touch an operator's existing gateway mapping.
+      const credential = onboard ? undefined : provisionMemberCredential(p.definition.id, { home: p.hermesRoot });
       const selection = await applyRoleSelection(p.definition.id, p.plan, p.selection);
       const record = row(p);
       const recordChanged = updateRegistryDocumentUnlocked(p.registryPath, doc => {
@@ -257,7 +261,8 @@ async function runSpecialist(definitionPath: string, onboard = false, options: S
       const placementChanged = p.definition.department ? projectPlacement(p.definition.id, { department: p.definition.department, reports_to: p.definition.reports_to, title: p.definition.title }, p.placement) : false;
       const completionChanged = write(markerPath, JSON.stringify({ ...marker, status: "complete" }, null, 2) + "\n");
       return { ok: true, id: p.definition.id, desk: p.desk, profile: p.profile, write_bank: p.identity.writeBank, recall_banks: p.identity.recallBanks,
-        skills: p.plan.skills.map(s => s.name), changed: placementChanged || definitionChanged || contractChanged || completionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
+        skills: p.plan.skills.map(s => s.name), credential: credential ? { token: credential.token, delta: credential.delta, render: credential.render, consumer: credential.consumer } : undefined,
+        changed: placementChanged || definitionChanged || contractChanged || completionChanged || recordChanged || profile.changed.length > 0 || desk.created + desk.updated + desk.removed > 0 || selection.manifestChanged || selection.applied.length > 0, projection: profile, selection };
     } catch (error) {
       throw new Error(`${started ? "Partial specialist projection; inspect owned state and retry onboard" : "Specialist refused before projection"}: ${(error as Error).message}`);
     }
@@ -356,24 +361,18 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
       accessSync(runtime, constants.X_OK);
     } catch { throw new Error(`Deployment dependency: declared Hermes runtime unavailable: ${runtime}`); }
   }
-  let reference = `op://${hostVaultName()}/hermes-${employee}/credential`;
+  let reference: string;
   try {
-    const deltaPath = join(audited.profile, "config.delta.yaml");
     const configPath = join(audited.profile, "config.yaml");
-    if (existsSync(deltaPath)) {
-      const doc = YAML.parse(readFileSync(deltaPath, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, string> } } };
-      const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
-      if (typeof ref === "string" && ref.trim()) reference = ref.trim();
-    } else if (existsSync(configPath)) {
-      const doc = YAML.parse(readFileSync(configPath, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, string> } } };
-      const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
-      if (typeof ref === "string" && ref.trim()) reference = ref.trim();
-    }
-  } catch {
-    // fallback to reference
-  }
+    // Use the rendered desk source of truth; no fallback to a different
+    // credential, which could silently reassign runtime attribution.
+    const doc = YAML.parse(readFileSync(configPath, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, string> } } };
+    const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
+    if (typeof ref !== "string" || !/^op:\/\/DeLoSecrets\/yeurk5dpqkaarspvsn3cjtmkki\/hermes-[A-Za-z0-9_-]+$/u.test(ref)) throw new Error("missing member reference");
+    reference = ref;
+  } catch { throw new Error("Deployment dependency: generated member token reference unavailable (FLUME-39)"); }
   const gateway = spawnSync("op", ["read", reference], { encoding: "utf8", timeout: 30_000, maxBuffer: 64 * 1024 });
-  if (gateway.error || gateway.status !== 0 || !gateway.stdout.trim()) throw new Error(`Deployment dependency: employee member token unavailable at ${reference} (FLUME-39)`);
+  if (gateway.error || gateway.status !== 0 || !gateway.stdout.trim()) throw new Error("Deployment dependency: employee member token unavailable (FLUME-39)");
   // Who this run is comes from enrolled configuration; unenrolled, inactive or unbound employees are refused here.
   const access = await employeeAccessEnv(employee, "hermes");
   // The shared scrub drops the vault token, foreign Access/run secrets and explicit-provider fallback keys; only this employee's access is added back.

@@ -1,74 +1,48 @@
 #!/usr/bin/env python3
-"""Give each registered fleet member its own AutomaticAI gateway token.
+"""Provision deterministic employee gateway consumers through the gateway authority.
 
-Policy: all agent inference goes through api.automaticai.io (skills
-`automaticai-provider-gateway` and `automaticai-provider-gateway-lazy-migration-strategy`).
-The fleet base (~/.hermes/config.yaml) maps AUTOMATICAI_GATEWAY_KEY to the FLEET token
-(`hermes-fleet-workers`), so a desk with no override of its own inherits it. This script
-adds per-member tracking: for each fleet member it mints a consumer token named
-`hermes-<profile>` (shortened with a hash when the profile name is long) (scoped to the routes in --models) and overrides that one variable in
-the member's config.delta.yaml with its own `op://` reference.
-
-Only references are ever written. Token values are never read into this process's output.
-Idempotent: a member that already has a token or an override is left alone. Dry run by
-default; --apply mints tokens and edits deltas; --render also re-renders each edited desk.
-It never restarts a gateway: a running gateway holds the old key until it is restarted.
-
-The delta edit is a text-level insert (deltas carry comments), verified semantically: the
-file is parsed before and after and nothing is written unless the ONLY difference is the
-one added key.
+Dry-run by default. --apply --render confirms/mints the gateway-owned Hermes
+preset and projects only its vault reference. Conflicts refuse before minting.
+No service activation, token rotation or fleet-base changes. A running process
+is not proof it adopted a newly rendered credential.
 """
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import hashlib
+import importlib.util
+import io
+import json
+import os
+from pathlib import Path
 import re
+import signal
+import stat
 import subprocess
 import sys
-import time
-from pathlib import Path
+import tempfile
 
 import yaml
 
+sys.dont_write_bytecode = True
 HOME = Path.home()
-HERMES = HOME / ".hermes"
-NEWAPI = HOME / "docker" / "stacks" / "ai" / "newapi"
-TOKENS_CLI = NEWAPI / "ops" / "gateway-tokens.py"
-RENDERER = HOME / "code" / "33GOD" / "hermes-agent-template" / "scripts" / "hermes-profile-config.py"
+ROOT = Path(__file__).resolve().parents[1]
+HERMES = Path(os.environ.get("HERMES_FLEET_HOME", HOME / ".hermes"))
+TOKENS_CLI = Path(os.environ.get("FLUME_GATEWAY_TOKENS_BIN", HOME / "code/client-portal/gateway/ops/gateway-tokens.py"))
+RENDERER = ROOT / "templates/hermes-agent/scripts/hermes-profile-config.py"
 ENV_NAME = "AUTOMATICAI_GATEWAY_KEY"
-# One shared 1Password item ("AutomaticAI Gateway Tokens"); each consumer's token is a
-# field named after the consumer. gateway-tokens.py prints the same reference on mint.
 TOKENS_ITEM = "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki"
-DEFAULT_MODELS = [
-    "automaticai/personal/sol-6.1",
-    "automaticai/personal/sol",
-    "automaticai/personal/astra",
-    "automaticai/personal/claude-opus-5.5",
-    "automaticai/intelliforia/claude-opus-5.5",
-    "automaticai/personal/claude-sonnet-5.5",
-    "automaticai/intelliforia/claude-sonnet-5.5",
-    "automaticai/personal/kimi-k3",
-    "automaticai/personal/kimi-k3s",
-    "automaticai/personal/kimi-2.8",
-    "automaticai/personal/glm-5.3",
-    "automaticai/personal/glm-5.3-flash",
-]
-REF_RE = re.compile(r"op://\S+")
-COMMENT = (
-    "# Per-member AutomaticAI gateway token (tracking). Overrides the fleet token the base maps\n"
-    f"# to {ENV_NAME}; delete this line to fall back to the fleet key. Reference only.\n"
-)
-
-
-# The gateway names a token `aai:<consumer>:<19-digit id>` and refuses names over 50 characters
-# (POST /api/token/ answers "gateway refused operation"), so a consumer name may not exceed
-# 26 characters even though gateway-tokens.py itself allows 40.
 MAX_CONSUMER = 26
+COMMENT = "# Per-member AutomaticAI gateway credential; reference only.\n"
+
+
+class ProvisionError(RuntimeError):
+    """Only authored, secret-free diagnostic codes cross the process boundary."""
 
 
 def consumer_name(profile: str) -> str:
-    """`hermes-<profile>`, shortened deterministically (with a hash suffix) when too long."""
     name = f"hermes-{profile}"
     if len(name) <= MAX_CONSUMER:
         return name
@@ -77,159 +51,235 @@ def consumer_name(profile: str) -> str:
     return f"hermes-{profile[:keep].rstrip('-_')}-{digest}"
 
 
-def members() -> list[str]:
-    """Registered fleet members that have a desk under base+delta inheritance."""
-    agents = (yaml.safe_load((HERMES / "agents-registry.yaml").read_text()) or {}).get("agents", {})
-    out = []
-    for agent_id, row in agents.items():
-        if not isinstance(row, dict):
-            continue
-        profile = str(row.get("profile_name") or agent_id)
-        if (HERMES / "profiles" / profile / "config.delta.yaml").exists():
-            out.append(profile)
-    return sorted(set(out))
+def load_module(name, source):
+    spec = importlib.util.spec_from_file_location(name, source)
+    if spec is None or spec.loader is None:
+        raise ProvisionError("authority-unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
-def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+class UniqueLoader(yaml.SafeLoader):
+    pass
 
 
-def mint(consumer: str, models: list[str]) -> tuple[str, str]:
-    """Mint (or confirm) a consumer token; returns (op:// reference, 'minted'|'existing').
+def unique_mapping(loader, node, deep=False):
+    result = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in result:
+            raise ProvisionError("duplicate-delta-key")
+        result[key] = loader.construct_object(value_node, deep=deep)
+    return result
 
-    gateway-tokens.py is idempotent and logs in to the gateway on EVERY invocation, and the
-    gateway rate-limits that login (HTTP 429, about 20 per 20 minutes; a 409 burst can follow a success). So this is one call per
-    member, and a 429 waits for the window instead of failing the member. A contended
-    tokens-vault lock is retried briefly.
+
+UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping)
+
+
+def mapping(text):
+    value = yaml.load(text, Loader=UniqueLoader)
+    if value is None:
+        value = {}
+    if not isinstance(value, dict):
+        raise ProvisionError("delta-not-mapping")
+    return value
+
+
+def candidate(text, ref):
+    """Insert one leaf without reserializing comments or unrelated settings.
+
+    Unsupported flow/alias structures refuse, rather than rewriting operator
+    formatting or guessing. Every insert is checked against the parsed tree.
     """
-    deadline = time.time() + 45 * 60
-    contention = 0
-    while True:
-        r = run(["python3", str(TOKENS_CLI), "mint", consumer, "--models", *models])
-        out = (r.stdout + r.stderr).strip()
-        m = REF_RE.search(r.stdout)
-        if r.returncode == 0 and m:
-            return m.group(0), ("existing" if "existing token" in r.stdout else "minted")
-        # 429 = the login limiter is full; 409 = the login endpoint refusing a request that
-        # follows a success too closely (seen as a burst of 409s right after a mint). Both are
-        # transient: wait out the window rather than failing the member.
-        if ("429" in out or "409" in out) and time.time() < deadline:
-            print(f"  ... gateway login throttled ({'429' if '429' in out else '409'}); waiting 60s ({consumer})", flush=True)
-            time.sleep(60)
-            continue
-        # flock contention surfaces as "another operation owns tokens-vault" --
-        # "owns", not "lock". The holder is short-lived; retry rather than fail.
-        if ("lock" in out.lower() or "contend" in out.lower() or "owns" in out.lower()) and contention < 10:
-            contention += 1
-            time.sleep(3 * contention)
-            continue
-        raise RuntimeError(f"mint {consumer} failed: {out[:200]}")
-
-
-def readable(ref: str) -> bool:
-    r = run(["op", "read", ref])
-    return r.returncode == 0 and len(r.stdout.strip()) > 20
-
-
-def add_env_line(text: str, ref: str) -> str:
-    """Insert `ENV_NAME: ref` into secrets.onepassword.env of a delta (text-level)."""
-    lines = text.split("\n")
-    entry_comment = COMMENT
-    # An empty delta is a literal `{}` (plus comments): replace it with the block.
-    if [l for l in lines if l.strip() and not l.lstrip().startswith("#")] == ["{}"]:
-        i = next(i for i, l in enumerate(lines) if l.strip() == "{}")
-        block = entry_comment + f"secrets:\n  onepassword:\n    env:\n      {ENV_NAME}: {ref}\n"
-        return "\n".join(lines[:i] + block.rstrip("\n").split("\n") + lines[i + 1:])
-    top = next((i for i, l in enumerate(lines) if re.match(r"^secrets:\s*$", l)), None)
-    if top is None:
-        tail = text if text.endswith("\n") else text + "\n"
-        return tail + "\n" + entry_comment + f"secrets:\n  onepassword:\n    env:\n      {ENV_NAME}: {ref}\n"
-
-    def child(start: int, indent: int, key: str) -> int | None:
-        for j in range(start + 1, len(lines)):
-            l = lines[j]
-            if not l.strip() or l.lstrip().startswith("#"):
-                continue
-            ind = len(l) - len(l.lstrip())
-            if ind <= indent - 2 and ind < indent:
-                return None
-            if ind == indent and re.match(rf"^\s*{re.escape(key)}:\s*$", l):
-                return j
-            if ind < indent:
-                return None
-        return None
-
-    op = child(top, 2, "onepassword")
-    env = child(op, 4, "env") if op is not None else None
-    if env is None:
-        raise ValueError("secrets block has no onepassword.env mapping to extend; edit by hand")
-    first = next(j for j in range(env + 1, len(lines)) if lines[j].strip() and not lines[j].lstrip().startswith("#"))
-    ind = " " * (len(lines[first]) - len(lines[first].lstrip()))
-    lines[first:first] = [ind + f"{ENV_NAME}: {ref}"]
-    return "\n".join(lines)
-
-
-def edit_delta(path: Path, ref: str, apply: bool) -> str:
-    """Return 'added' | 'present' | 'skipped: why'. Verified semantically before writing."""
-    text = path.read_text()
-    before = yaml.safe_load(text) or {}
-    existing = (((before.get("secrets") or {}).get("onepassword") or {}).get("env") or {}).get(ENV_NAME)
-    if existing == ref:
-        return "present"
-    if existing:
-        return f"skipped: delta already maps {ENV_NAME} to a different reference"
-    try:
-        new_text = add_env_line(text, ref)
-    except ValueError as e:
-        return f"skipped: {e}"
+    before = mapping(text)
+    node = before
+    path = ["secrets", "onepassword", "env", ENV_NAME]
+    for key in path[:-1]:
+        if key not in node:
+            break
+        if not isinstance(node[key], dict):
+            raise ProvisionError("delta-parent-not-mapping")
+        node = node[key]
+    else:
+        if ENV_NAME in node:
+            if node[ENV_NAME] != ref:
+                raise ProvisionError("conflicting-reference")
+            return text, "present"
     expected = copy.deepcopy(before)
-    expected.setdefault("secrets", {}).setdefault("onepassword", {}).setdefault("env", {})[ENV_NAME] = ref
-    if yaml.safe_load(new_text) != expected:
-        return "skipped: edit would change more than the one key (not written)"
-    if apply:
-        path.write_text(new_text if new_text.endswith("\n") else new_text + "\n")
-    return "added"
+    cursor = expected
+    for key in path[:-1]:
+        cursor = cursor.setdefault(key, {})
+    cursor[ENV_NAME] = ref
+    # Walk the syntax tree to the deepest existing parent.
+    syntax = yaml.compose(text)
+    depth = 0
+    while isinstance(syntax, yaml.MappingNode) and depth < len(path):
+        child = next((v for k, v in syntax.value if k.value == path[depth]), None)
+        if child is None:
+            break
+        syntax = child
+        depth += 1
+    block = ""
+    for i, key in enumerate(path[depth:]):
+        block += "  " * (depth + i) + key + (f": {ref}\n" if depth + i == 3 else ":\n")
+    if depth == 0:
+        lines = text.splitlines(keepends=True)
+        ordinary = [i for i, line in enumerate(lines) if line.strip() and not line.lstrip().startswith("#")]
+        if ordinary and not before:
+            # Only the root empty mapping is replaced; comments stay verbatim.
+            if len(ordinary) != 1 or lines[ordinary[0]].strip() != "{}":
+                raise ProvisionError("unsupported-delta-layout")
+            lines[ordinary[0]] = COMMENT + block
+            result = "".join(lines)
+        else:
+            result = text + ("\n" if text and not text.endswith("\n") else "") + COMMENT + block
+    elif isinstance(syntax, yaml.MappingNode) and not syntax.flow_style:
+        lines = text.splitlines(keepends=True)
+        # A populated parent: place the new child after its first existing
+        # child, not before the mapping declaration or its comments.
+        if not syntax.value:
+            raise ProvisionError("unsupported-delta-layout")
+        at = syntax.value[0][0].start_mark.line
+        lines[at:at] = (COMMENT if depth == 3 else "").splitlines(keepends=True) + block.splitlines(keepends=True)
+        result = "".join(lines)
+    elif isinstance(syntax, yaml.MappingNode) and not syntax.value:
+        # `env: {}` (possibly with an inline comment).
+        start, end = syntax.start_mark.index, syntax.end_mark.index
+        result = text[:start] + "\n" + block.rstrip("\n") + text[end:]
+    else:
+        raise ProvisionError("unsupported-delta-layout")
+    if mapping(result) != expected:
+        raise ProvisionError("delta-semantic-check-failed")
+    return result if result.endswith("\n") else result + "\n", "added"
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--apply", action="store_true", help="mint tokens and edit deltas (default: dry run)")
-    ap.add_argument("--render", action="store_true", help="with --apply, re-render each edited desk")
-    ap.add_argument("--members", help="comma-separated profiles (default: every registered member)")
-    ap.add_argument("--models", nargs="+", default=DEFAULT_MODELS, help="routes each token may use")
+def atomic_text(path, text):
+    fd, name = tempfile.mkstemp(prefix=".member-reference-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def real_file(path):
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+        raise ProvisionError("unsafe-config-file")
+
+
+def provision(profile, renderer, batch, *, apply, render, group, gateway_bin):
+    ref = TOKENS_ITEM + "/" + consumer_name(profile)
+    result = {"profile": profile, "consumer": consumer_name(profile), "reference": ref,
+              "token": "not-attempted", "delta": "not-attempted", "render": "not-attempted", "ok": False}
+    stage = "preflight"
+    try:
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,100}", profile) or profile in {"default", ".", ".."}:
+            raise ProvisionError("invalid-profile")
+        pdir = HERMES / "profiles" / profile
+        if pdir.is_symlink() or not pdir.is_dir():
+            raise ProvisionError("unsafe-profile")
+        # The same lock as channel/voice/seed/render; no pre-lock snapshots.
+        with renderer.PROFILE_LOCK.ProfileConfigLock(pdir):
+            if pdir.is_symlink() or not pdir.is_dir():
+                raise ProvisionError("unsafe-profile")
+            delta, generated = pdir / "config.delta.yaml", pdir / "config.yaml"
+            real_file(delta)
+            real_file(generated)
+            text, delta_state = candidate(delta.read_text(), ref)
+            renderer.PROFILE_LOCK.test_snapshot_barrier("member-token")
+            result["delta"] = "planned-" + delta_state
+            if not apply:
+                result.update(token="planned", render="planned" if render else "not-requested", ok=True)
+                return result
+            stage = "token"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code, output = batch(result["consumer"], group, gateway_bin)
+                if code:
+                    raise ProvisionError("gateway-mint-or-confirm-failed")
+                if ref not in output:
+                    raise ProvisionError("gateway-reference-mismatch")
+                read = subprocess.run(["op", "read", ref], capture_output=True, text=True, timeout=20,
+                                      env={**os.environ, "OP_CACHE": "off"})
+                if read.returncode or len(read.stdout.strip()) < 20:
+                    raise ProvisionError("vault-readback-failed")
+                del read
+            result["token"] = "confirmed" if "existing token" in output else "minted"
+            stage = "delta"
+            if delta_state == "added":
+                atomic_text(delta, text)
+            result["delta"] = delta_state
+            stage = "render"
+            if render:
+                # Import the maintained renderer: do not recursively acquire its
+                # non-reentrant lock via `render --profile` in a subprocess.
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    expected = renderer.expected_config(renderer.load_yaml(renderer.BASE), mapping(text), profile)
+                    rendered = renderer.GENERATED_HEADER + renderer.dump_yaml(expected)
+                    if generated.read_text() != rendered:
+                        renderer.write_generated(generated, expected)
+                        result["render"] = "rendered"
+                    else:
+                        result["render"] = "unchanged"
+                    actual = mapping(generated.read_text())
+                    if not isinstance(actual, dict) or actual != expected or (((actual.get("secrets") or {}).get("onepassword") or {}).get("env") or {}).get(ENV_NAME) != ref:
+                        raise ProvisionError("render-readback-failed")
+            else:
+                result["render"] = "not-requested"
+            result["ok"] = True
+    except (Exception, SystemExit) as error:
+        result[stage if stage in {"token", "delta", "render"} else "delta"] = "failed"
+        result["error"] = str(error) if isinstance(error, ProvisionError) else (
+            "profile-lock-failed" if isinstance(error, renderer.PROFILE_LOCK.ProfileConfigLockError) else stage + "-failed")
+    return result
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--render", action="store_true")
+    ap.add_argument("--members", required=True, help="comma-separated resolved profiles; no implicit broad backfill")
+    ap.add_argument("--group", default="aai-personal", help="gateway owner group (explicit; default aai-personal)")
+    ap.add_argument("--gateway-bin", default=str(TOKENS_CLI), help=argparse.SUPPRESS)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--deadline", type=int, default=180, choices=range(1, 601))
     args = ap.parse_args()
-
-    todo = [m.strip() for m in args.members.split(",")] if args.members else members()
-    failures = 0
-    for profile in todo:
-        consumer = consumer_name(profile)
-        delta = HERMES / "profiles" / profile / "config.delta.yaml"
-        if not delta.exists():
-            print(f"{profile:28s} SKIP no config.delta.yaml (not under inheritance)")
-            continue
-        try:
-            ref = f"{TOKENS_ITEM}/{consumer}"
-            state = "would mint if absent"
-            if args.apply:
-                ref, state = mint(consumer, args.models)
-                state = f"token {state}"
-            if args.apply and not readable(ref):
-                print(f"{profile:28s} FAIL token reference does not read back: {ref}")
-                failures += 1
-                continue
-            result = edit_delta(delta, ref, args.apply)
-            print(f"{profile:28s} {state:16s} delta: {result}")
-            if result.startswith("skipped"):
-                failures += 1
-            if args.apply and args.render and result == "added":
-                r = run(["python3", str(RENDERER), "render", "--profile", profile])
-                print(f"{'':28s} render: {'ok' if r.returncode == 0 else 'FAILED ' + r.stderr.strip()[:120]}")
-                failures += r.returncode != 0
-        except Exception as e:  # keep going: one member must not block the rest
-            print(f"{profile:28s} FAIL {e}")
-            failures += 1
-    print(f"\n{len(todo)} member(s); {failures} problem(s); {'APPLIED' if args.apply else 'dry run (use --apply)'}")
-    return 1 if failures else 0
+    # Disable the host op wrapper's disk cache for ALL authority/readback calls.
+    os.environ["OP_CACHE"] = "off"
+    def deadline(*_):
+        raise ProvisionError("provisioning-deadline")
+    signal.signal(signal.SIGALRM, deadline)
+    signal.alarm(args.deadline)
+    results = []
+    try:
+        renderer = load_module("flume_member_renderer", RENDERER)
+        def mint(consumer, group, gateway_bin):
+            command = ["python3", str(gateway_bin), "mint", consumer, "--preset", "owner-no-anthropic",
+                       "--group", group, "--days", "-1"]
+            response = subprocess.run(command, capture_output=True, text=True, timeout=args.deadline,
+                                      env={**os.environ, "OP_CACHE": "off"})
+            return response.returncode, response.stdout
+        for profile in dict.fromkeys(args.members.split(",")):
+            results.append(provision(profile, renderer, mint, apply=args.apply, render=args.render,
+                                     group=args.group, gateway_bin=Path(args.gateway_bin)))
+        envelope = {"ok": all(r["ok"] for r in results), "members": results, "apply": args.apply}
+    except (Exception, SystemExit):
+        envelope = {"ok": False, "members": results, "error": "provisioning-authority-or-deadline-failed"}
+    finally:
+        signal.alarm(0)
+    if args.json:
+        print(json.dumps(envelope))
+    else:
+        for row in results:
+            print(f"{row['profile']}: token={row['token']} delta={row['delta']} render={row['render']}" + (f" unresolved={row['error']}" if "error" in row else ""))
+        if "error" in envelope:
+            print(envelope["error"])
+    return 0 if envelope["ok"] else 1
 
 
 if __name__ == "__main__":
