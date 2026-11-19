@@ -1,7 +1,7 @@
 import {join} from "node:path";
 import {Command,type InvokeResult} from "../engine/Command";
 import {resolveFlumeRoot} from "../kernel/paths";
-import { projectRoleDeclaration, readRoleDeclaration } from "../workforce/role";
+import { projectRoleDeclaration, readRoleDeclaration, roleDelegatesWorkers } from "../workforce/role";
 import type {HermesAgentContext} from "./types";
 import {spawnSync} from "node:child_process";
 
@@ -54,7 +54,7 @@ export class ProjectRoleDeclaration extends Command {
       // Charter-only legacy roles keep their established provisioning path.
       if(!role.skills&&!role.chain&&!role.department&&!role.reports_to) return {success:true,outcome:"unchanged",message:"Charter-only role: no deployment declaration"};
       const result=await projectRoleDeclaration(role,ctx.agentId!,ctx.profileName!,{dryRun:ctx.dryRun});
-      if (role.role !== "pm" && !ctx.dryRun) {
+      if (!roleDelegatesWorkers(role) && !ctx.dryRun) {
         const restricted = spawnSync("python3", ["-c", RESTRICT_INHERITED_BLOODBANK,
           join(resolveFlumeRoot(), "templates/hermes-agent/scripts/hermes-profile-config.py"), ctx.profileName!],
           {encoding:"utf8",timeout:35_000});
