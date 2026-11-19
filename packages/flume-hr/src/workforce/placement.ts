@@ -18,9 +18,18 @@ export function placementProblems(employee: string, placement: Partial<Placement
   if (!placement.department) return placement.reports_to || placement.title ? [`${employee}: placement requires department`] : [];
   const title = placement.title;
   if (title !== undefined && (!title.trim() || /[\u0000-\u001f\u007f]/u.test(title) || title.length > 160)) problems.push(`${employee}: title must be 1-160 printable characters`);
-  const chart = data(paths.org), agents = data(paths.registry).agents ?? {};
+  const orgDoc = document(paths.org), registryDoc = document(paths.registry);
+  const chart = orgDoc.toJS(), registry = registryDoc.toJS();
+  const departmentsNode = orgDoc.get("departments", true);
+  if (!YAML.isSeq(departmentsNode)) return [`${employee}: org departments must be a list`];
+  if (!YAML.isMap(registryDoc.get("agents", true))) return [`${employee}: registry agents must be a mapping`];
+  const agents = registry.agents;
+  for (const item of departmentsNode.items) {
+    if (!YAML.isMap(item)) return [`${employee}: org department must be a mapping`];
+    const members = item.get("members", true);
+    if (members !== undefined && !YAML.isSeq(members)) return [`${employee}: org department ${String(item.get("id"))} members must be a list`];
+  }
   const departments = chart.departments;
-  if (!Array.isArray(departments)) return [`${employee}: org departments must be a list`];
   const matches = departments.filter((d: any) => d?.id === placement.department);
   if (matches.length !== 1) return [`${employee}: department ${placement.department} ${matches.length ? "is duplicated" : "absent from org.yaml"}`];
   if (chart.personas !== undefined && (chart.personas === null || typeof chart.personas !== "object" || Array.isArray(chart.personas))) problems.push(`${employee}: org personas must be a mapping`);
@@ -51,6 +60,7 @@ export function placementDrift(employee: string, placement: Partial<Placement>, 
   const dept = chart.departments.find((d: any) => d.id === placement.department);
   const actual = chart.departments.filter((d: any) => d.manager === employee || d.members?.includes(employee));
   if (actual.length !== 1 || actual[0] !== dept) problems.push(`${employee}: org membership differs from declaration ${placement.department}`);
+  if (dept.manager === employee && dept.members?.includes(employee)) problems.push(`${employee}: both manager and member of department ${placement.department}`);
   if (!row) problems.push(`${employee}: employee absent from registry`);
   if (row?.department !== placement.department) problems.push(`${employee}: registry department differs from declaration ${placement.department}`);
   const superior = resolvedSuperior(placement as Placement, paths);
@@ -87,15 +97,13 @@ export function projectPlacement(employee: string, placement: Placement, paths: 
     for (const item of departments.items) {
       if (!YAML.isMap(item)) continue;
       const target = item.get("id") === placement.department;
-      if (item.get("manager") === employee) {
-        if (!target) throw new Error(`${employee}: manager of another department; appointment is not a placement edit`);
-        continue;
-      }
+      if (item.get("manager") === employee && !target) throw new Error(`${employee}: manager of another department; appointment is not a placement edit`);
       let members = item.get("members", true);
-      if (!YAML.isSeq(members)) { if (!target) continue; item.set("members", []); members = item.get("members", true); }
+      if (members === undefined && target) { item.set("members", []); members = item.get("members", true); }
+      if (members !== undefined && !YAML.isSeq(members)) throw new Error(`org department ${String(item.get("id"))} members must be a list`);
       if (YAML.isSeq(members)) {
-        for (let i = members.items.length - 1; i >= 0; i--) if (String(members.items[i]) === employee && !target) members.delete(i);
-        if (target && !members.items.some(x => String(x) === employee)) members.add(employee);
+        for (let i = members.items.length - 1; i >= 0; i--) if (String(members.items[i]) === employee && (!target || item.get("manager") === employee)) members.delete(i);
+        if (target && item.get("manager") !== employee && !members.items.some(x => String(x) === employee)) members.add(employee);
       }
     }
     if (placement.title !== undefined) doc.setIn(["personas", employee, "title"], placement.title);
