@@ -123,6 +123,7 @@ export interface RoleDeclaration {
   reports_to?: string;
   /** Advisory employees may read/file against the board but never claim ticket routing. */
   board_scope?: "advisory";
+  behavior?: { delegate_all_code_changes?: boolean; [key: string]: unknown };
   chain?: string[];
   [key: string]: unknown;
 }

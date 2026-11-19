@@ -676,6 +676,7 @@ export interface FleetInventoryRow {
   repo: FleetFieldValue<string>;
   repo_path: FleetFieldValue<string>;
   role: FleetFieldValue<string>;
+  purpose?: FleetFieldValue<string>;
   /** Stable person/agent identity. Unlike profile_name, this survives a change of post. */
   identity: FleetFieldValue<string>;
   /**

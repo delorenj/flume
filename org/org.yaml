@@ -50,7 +50,13 @@ personas:
     expertise: [ milkshake, client-finance, bookkeeping, mercury-reconciliation ]
   penny:
     title: "Personal Engineering Career Advocate — Jarad"
-    expertise: [ engineering-career-evidence, hiring, ai-adoption-consulting, team-training ]
+    expertise:
+      [
+        engineering-career-evidence,
+        hiring,
+        ai-adoption-consulting,
+        team-training
+      ]
   joe-pesci:
     title: "Personal Chief of Staff — Portfolio & Ventures"
     expertise: [ portfolio-strategy, business-analysis, prioritization, launch-planning ]
@@ -157,6 +163,7 @@ departments:
       - candystore-pm
       - holocene-pm
       - flume-pm
+      - 33god-art-director
 
   - id: tooling
     name: "Developer Tooling"
