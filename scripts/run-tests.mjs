@@ -62,6 +62,7 @@ const SUITES = [
   "tests/fleet-health-regressions.mjs",
   "tests/flume-14-routing-regressions.mjs",
   "tests/fleet-scaffold-regressions.mjs",
+  "tests/pjan-103-generated-consumption.mjs",
   "tests/soul-project-bank-regressions.mjs",
   "tests/pm-launch-copy-gate.mjs",
   "tests/pm-launch-mode.mjs",

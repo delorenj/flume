@@ -3146,8 +3146,9 @@ return [
       }
       const details: string[] = [...selection.blockers];
       const templateRoleDir = join(ctx.pjanglerRoot, "templates", "hermes-agent", "template");
+      // Match Copier's provider exclusion; parity must not reintroduce Linear.
       const managedScripts = templateFiles(join(templateRoleDir, ".scripts"))
-        .filter((rel) => rel !== "sentinel.prompt.md.jinja");
+        .filter((rel) => rel !== "sentinel.prompt.md.jinja" && rel !== "providers/linear.sh");
       // Lineage is decidable only for the assets the template ships verbatim.
       // `hermes`, `.gitignore` and `sentinel.prompt.md` are rendered per role,
       // so their bytes never appear in the object database at all and a blob
@@ -3218,8 +3219,9 @@ return [
       const preserved: string[] = [];
       const scriptsOnly = process.env[SCAFFOLD_SCRIPTS_ONLY_ENV] === "1";
       if (scriptsOnly) details.push("scripts-only: refreshing .scripts/ only; SOUL, wrapper, .gitignore, runtime, profile metadata and registry rows are left alone");
+      // Match Copier's provider exclusion; parity must not reintroduce Linear.
       const managedScripts = templateFiles(join(templateRoleDir, ".scripts"))
-        .filter((rel) => rel !== "sentinel.prompt.md.jinja");
+        .filter((rel) => rel !== "sentinel.prompt.md.jinja" && rel !== "providers/linear.sh");
       for (const role of selection.roles) {
         const prefix = role.agentId || role.role;
         if (!scriptsOnly) {
