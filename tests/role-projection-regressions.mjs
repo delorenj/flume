@@ -18,14 +18,16 @@ try {
   for(const name of ['build','review']) {mkdirSync(join(skillex,'all-skills',name),{recursive:true});writeFileSync(join(skillex,'all-skills',name,'SKILL.md'),`---\nname: ${name}\ndescription: fixture\n---\n`);}
   mkdirSync(join(skillex,'packs','dev'),{recursive:true});writeFileSync(join(skillex,'packs','dev','pack.toml'),'[pack]\nname="dev"\nversion="1.0.0"\n[freeform]\nskills=["build","review"]\n');
   mkdirSync(desk,{recursive:true});
-  const base=YAML.parse(readFileSync('/home/delorenj/.hermes/config.yaml','utf8'));
-  const chain=['automaticai/personal/kimi-2.8','automaticai/personal/glm-5.3'];
-  writeFileSync(join(fleet,'config.yaml'),YAML.stringify({model:base.model,fallback_providers:base.fallback_providers,providers:base.providers}));
+  const chain=['automaticai/fixture/primary','automaticai/fixture/fallback'];
+  const base={model:{provider:'automaticai',default:'automaticai/fixture/base'},fallback_providers:[{provider:'automaticai',model:'automaticai/fixture/base-fallback'}],providers:{}};
+  const catalogPath=join(work,'routes.json');
+  writeFileSync(catalogPath,JSON.stringify({routes:[...chain,base.model.default,base.fallback_providers[0].model].map(id=>({id}))}));
+  writeFileSync(join(fleet,'config.yaml'),YAML.stringify(base));
   writeFileSync(registry,'agents:\n  boss: {role: director, department: engineering}\n  unrelated: {role: reporter, department: editorial}\n');
   const original='# precious top comment\ncompany: {name: Fixture}\ndepartments:\n  - id: engineering # department comment\n    manager: boss\n    members: []\n  - id: editorial\n    members: [unrelated] # precious other employee\n';
   writeFileSync(org,original);
   const role={role:'dev',skills:{pack:'dev'},chain,department:'engineering',reports_to:'boss'};
-  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome:join(home,'.local','state'),catalogModels:chain,catalogPath:'/home/delorenj/docker/stacks/ai/newapi/ops/routes.json',renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
+  const options={home,fleetRoot:fleet,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome:join(home,'.local','state'),catalogModels:chain,catalogPath,renderer:join(process.cwd(),'templates/hermes-agent/scripts/hermes-profile-config.py')};
   await api.projectRoleDeclaration(role,'demo-dev','demo-dev',options);
   // The loadout is a Skillex selection projected into the strict desk's own skills/ -- never a
   // second skill directory or a discovery root.
@@ -69,12 +71,20 @@ try {
   const inheritedCfg=YAML.parse(readFileSync(join(secondDesk,'config.yaml'),'utf8'));
   assert.deepEqual([inheritedCfg.model.default,...inheritedCfg.fallback_providers.map(x=>x.model)],[base.model.default,...base.fallback_providers.map(x=>x.model)]);
   assert.equal(YAML.parse(readFileSync(registry,'utf8')).agents['second-dev'].reports_to,'boss');
-  writeFileSync(join(secondDesk,'config.delta.yaml'),'model: {provider: openai-codex, default: explicit-override}\n');
+  writeFileSync(join(secondDesk,'config.delta.yaml'),'model: {provider: openai-codex, default: explicit-override}\nfallback_providers:\n  - {provider: openai-codex, model: explicit-fallback}\n');
+  for(let i=0;i<2;i++) {
+    const inheritedOverride=await api.projectRoleDeclaration(inherited,'second-dev','second-dev',{...options,deskPath:secondDesk});
+    assert.deepEqual(inheritedOverride.overrides.sort(),['fallback_providers','model.default','model.provider']);
+    const configured=YAML.parse(readFileSync(join(secondDesk,'config.yaml'),'utf8'));
+    assert.deepEqual(configured.model,{provider:'openai-codex',default:'explicit-override'});
+    assert.deepEqual(configured.fallback_providers,[{provider:'openai-codex',model:'explicit-fallback'}]);
+  }
   const override=await api.projectRoleDeclaration(role,'second-dev','second-dev',{...options,deskPath:secondDesk});
   assert.ok(override.overrides.includes('model.default'));
+  assert.ok(override.overrides.includes('fallback_providers'));
   assert.equal(YAML.parse(readFileSync(join(secondDesk,'config.yaml'),'utf8')).model.default,'explicit-override');
   assert.equal(override.fallback_surface,'desk-gateway');
-  console.log('PASS AC-4 runtime fleet inheritance, manager default and reported explicit override');
+  console.log('PASS AC-4 runtime fleet inheritance, manager default and reported explicit override with and without chain');
   const rolesRoot=join(work,'declarations');
   writeFileSync(join(rolesRoot,'roles','dev.md'),'---\n'+YAML.stringify(inherited)+'---\nfixture\n');
   const repo=join(work,'repo');
@@ -88,6 +98,19 @@ try {
   assert.equal(readFileSync(join(desk,'config.yaml'),'utf8'),beforeCfg);
   assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
   console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
+  // The public onboard path must report an operator's override even when the role has no chain.
+  writeFileSync(join(desk,'config.delta.yaml'),'model: {provider: openai-codex, default: explicit-override}\nfallback_providers:\n  - {provider: openai-codex, model: explicit-fallback}\n');
+  for(let i=0;i<2;i++) {
+    const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
+    assert.equal(onboard.status,0,`${onboard.stdout}\n${onboard.stderr}`);
+    const reported=onboard.stdout.match(/Role declaration projected: (\{[^\n]+\})/);
+    assert.ok(reported,`missing public override report: ${onboard.stdout}`);
+    assert.deepEqual(JSON.parse(reported[1]).overrides.sort(),['fallback_providers','model.default','model.provider']);
+    const after=YAML.parse(readFileSync(join(desk,'config.yaml'),'utf8'));
+    assert.deepEqual(after.model,{provider:'openai-codex',default:'explicit-override'});
+    assert.deepEqual(after.fallback_providers,[{provider:'openai-codex',model:'explicit-fallback'}]);
+  }
+  console.log('PASS AC-4 caller: flume onboard reports and preserves primary/fallback overrides for chain-omitting role twice');
   // The actual fleet exposes a symlinked org file and the CEO is not a registry row.
   const chartTarget=join(fleet,'tracked-org.yaml');
   writeFileSync(chartTarget,'# link target comment\nceo: {id: ceo}\ndepartments:\n  - id: launch # placement comment\n    members: []\n');

@@ -28,6 +28,19 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
     managed = {}
     desired = {"model": {"provider": "automaticai", "default": chain[0]},
                "fallback_providers": [{"provider": "automaticai", "model": route} for route in chain[1:]]} if chain else {}
+    if not chain:
+        inherited = r.load_yaml(r.BASE)
+        model = delta.get("model")
+        if isinstance(model, dict):
+            for leaf in ("provider", "default"):
+                if (leaf in model and model[leaf] != inherited.get("model", {}).get(leaf)
+                        and model[leaf] != previous.get("model", {}).get(leaf)):
+                    overrides.append(f"model.{leaf}")
+        fallbacks = delta.get("fallback_providers")
+        if ("fallback_providers" in delta
+                and fallbacks != inherited.get("fallback_providers")
+                and fallbacks != previous.get("fallback_providers")):
+            overrides.append("fallback_providers")
     for key, value in desired.items():
         current = delta.get(key)
         if key == "model":
