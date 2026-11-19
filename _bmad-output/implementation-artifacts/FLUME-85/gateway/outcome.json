@@ -1,0 +1,19 @@
+{
+  "command_id": "7beb8253-9d0f-4913-8524-31493b3b3cc7",
+  "correlationid": "a7dea30c-61a3-4184-a5e4-ece8eafed008",
+  "envelope_id": "d90d06c3-4bb3-4db8-9dd1-24a3b5be01b3",
+  "idempotency_key": "df297c9e-da76-5fae-868c-4f96178a0101",
+  "target_agent_id": "33god-art-director",
+  "publish_exit_code": 0,
+  "observed_event_types": [
+    "bloodbank.agent.invocation.queued",
+    "bloodbank.agent.invocation.started",
+    "bloodbank.agent.invocation.failed"
+  ],
+  "gateway_state": "rejected_closed",
+  "terminal_error_code": "final_answer_capture_unavailable_before_dispatch",
+  "terminal_error_message": "Hermes final-answer capture capability is unavailable",
+  "agent_reply": null,
+  "delegate_task_result": null,
+  "dispatch_occurred": false
+}

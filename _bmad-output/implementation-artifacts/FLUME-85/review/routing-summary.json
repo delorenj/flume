@@ -1,0 +1,32 @@
+[
+  {
+    "labels": [],
+    "agentId": "33god-pm",
+    "matchedBy": "board",
+    "eligible": true
+  },
+  {
+    "labels": [
+      "art-director"
+    ],
+    "agentId": "33god-pm",
+    "matchedBy": "board",
+    "eligible": true
+  },
+  {
+    "labels": [
+      "repo:atlas"
+    ],
+    "agentId": "33god-pm",
+    "matchedBy": "board",
+    "eligible": true
+  },
+  {
+    "labels": [
+      "lifecycle:review"
+    ],
+    "agentId": "33god-pm",
+    "matchedBy": "board",
+    "eligible": true
+  }
+]

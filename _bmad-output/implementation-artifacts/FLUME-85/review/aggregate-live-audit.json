@@ -1,0 +1,293 @@
+{
+  "repo": "/home/delorenj/code/33GOD",
+  "ok": false,
+  "hostOk": false,
+  "auditedAt": "2026-11-19T07:55:49.075Z",
+  "rules": [
+    {
+      "id": "hermes.role-declaration",
+      "title": "Role deployment declaration and reporting references are valid",
+      "status": "pass",
+      "summary": "1 deployment declaration(s) checked",
+      "details": [],
+      "fixable": false,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.retired-routing",
+      "title": "No retired employee still claims a board, and no board has two defaults",
+      "fixable": false,
+      "status": "pass",
+      "summary": "50 registry row(s) checked",
+      "details": [],
+      "scope": "host"
+    },
+    {
+      "id": "hermes.launch-mode",
+      "title": "Launch passes and crank follow .launch.yaml, and no retired launch role is live",
+      "status": "pass",
+      "summary": "launch mode consistent (mode absent, 2 desk(s))",
+      "details": [],
+      "fixable": false,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.pm-scaffold",
+      "title": "Hermes orchestrator scaffold parity",
+      "status": "fail",
+      "summary": "20 orchestrator scaffold issue(s) detected",
+      "details": [
+        "33god-pm: locally-modified agents/hermes/pm/.scripts/01-config.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/10-hermes-profile.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/30-telegram.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/42-ticket-provider.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/70-systemd.sh",
+        "33god-pm: locally-modified agents/hermes/pm/.scripts/_lib.sh",
+        "33god-pm: locally-modified agents/hermes/pm/.scripts/config.example.toml",
+        "33god-pm: stale agents/hermes/pm/.scripts/heartbeat.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/launch-pass.prompt.md",
+        "33god-pm: stale agents/hermes/pm/.scripts/launch-pass.py",
+        "33god-pm: stale agents/hermes/pm/.scripts/lib/project-skills.py",
+        "33god-pm: stale agents/hermes/pm/.scripts/lib/skills-policy.py",
+        "33god-pm: stale agents/hermes/pm/.scripts/lib/ticket-provider.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/providers/plane.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/providers/trello.sh",
+        "33god-pm: stale agents/hermes/pm/.scripts/sentinel.prompt.md",
+        "33god-pm: stale agents/hermes/pm/.scripts/sentinel/docs/autonomous-delegated-review.md",
+        "33god-pm: stale agents/hermes/pm/.scripts/sentinel/docs/continuous-ticket-orchestration.md",
+        "33god-pm: soul-drift agents/hermes/pm/SOUL.md (tracked copy; composed from roles/pm.md)",
+        "33god-pm: soul-drift agents/hermes/pm/runtime/SOUL.md (the file Hermes loads; composed from roles/pm.md)"
+      ],
+      "fixable": true,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.untracked-runtimes",
+      "title": "Hermes agent runtimes untracked + gitignored",
+      "status": "pass",
+      "summary": "All Hermes agent runtimes are untracked and gitignored",
+      "details": [],
+      "fixable": true,
+      "scope": "project"
+    },
+    {
+      "id": "systemd.sentinel",
+      "title": "Hermes systemd/sentinel units enabled + active",
+      "status": "pass",
+      "summary": "Hermes user units match each role's declared service state",
+      "details": [],
+      "fixable": true,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.runtime-singleton",
+      "title": "Hermes singleton runtime (shared config/auth, per-agent memory)",
+      "status": "fail",
+      "summary": "13 singleton-runtime issue(s) detected",
+      "details": [
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/memories -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/memories",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/sessions -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/sessions",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/workspace -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/workspace",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/logs -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/logs",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/cron -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/cron",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/plans -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/plans",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/hooks -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/hooks",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/pairing -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/pairing",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/audio_cache -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/audio_cache",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/image_cache -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/image_cache",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/SOUL.md -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/SOUL.md",
+        "wrong-target: /home/delorenj/.hermes/profiles/33god-pm/kanban.db -> /home/delorenj/code/33GOD/agents/hermes/pm/runtime/kanban.db",
+        "profile skills write-receipt: /home/delorenj/.local/state/skillex/profiles/v2/46d4abeba8a5623459cb9de67f00088ea9b78b3f876d44a03609ba28de9f9ce4.json"
+      ],
+      "fixable": true,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.fleet-config",
+      "title": "Fleet base config carries the capabilities every agent inherits",
+      "status": "pass",
+      "summary": "Fleet base config invariants satisfied",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.bloodbank-toolsets",
+      "title": "Bloodbank-dispatched PM turns can delegate a worker",
+      "status": "fail",
+      "summary": "11 Bloodbank toolset issue(s) detected",
+      "details": [
+        "dumply (role tutor) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/dumply/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "delonet-director: platform_toolsets.bloodbank is missing delegation, terminal, file, skills; re-render or fix its delta: hermes-profile-config.py render --profile delonet-director",
+        "infra-specialist (role infra-specialist) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/infra-specialist/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "n8n-specialist (role n8n-specialist) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/n8n-specialist/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "rererere (role workflows-director) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/rererere/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "marge-simpson (role hr-director) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/marge-simpson/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "peter-griffin (role token-ops-engineer) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/peter-griffin/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "context-director (role context-director) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/context-director/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "joe-pesci (role founder-portfolio-advisor) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/joe-pesci/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "morgan-finance (role automaticai-finance-director) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/morgan-finance/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove",
+        "penny (role engineering-career-advocate) is not a delegating PM but its Bloodbank turns can use delegation, terminal, file; pin it in /home/delorenj/.hermes/profiles/penny/config.delta.yaml with x-pjangler-merge list_patches platform_toolsets.bloodbank remove"
+      ],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.gateway-routing",
+      "title": "All agent inference routes through the AutomaticAI gateway",
+      "status": "fail",
+      "summary": "Main, auxiliary, delegated, fallback and MoA inference gateway audit: 36 of 49 members carry their own token, 13 use the fleet token; 3 routing issue(s) (inspect details, including pre-existing base defects)",
+      "details": [
+        "fleet base: providers.automaticai.api is \"https://api-direct.automaticai.io/v1\", not the api.automaticai.io gateway: /home/delorenj/.hermes/config.yaml",
+        "fleet base: providers.automaticai.models adds uncurated route(s): automaticai/auto, automaticai/auto/orchestrator, automaticai/auto/subagent, automaticai/auto/fast: /home/delorenj/.hermes/config.yaml",
+        "49 member desk(s) inherit the fleet base problem(s) above; fix the base, then re-render each: hermes-profile-config.py render --profile <name>"
+      ],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.dotenv-no-op-refs",
+      "title": "Hermes .env files carry no literal op:// references",
+      "status": "pass",
+      "summary": "No Hermes .env carries a literal op:// value (13 file(s) scanned)",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.wake-word-session",
+      "title": "A wake word never silently rotates the session",
+      "status": "pass",
+      "summary": "No enabled wake word starts a new session",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.skillex-resync",
+      "title": "Skillex-only desks resync themselves after a catalog commit",
+      "status": "pass",
+      "summary": "47 Skillex-only desk(s) resync automatically (path unit active, candybar skillex-hermes-resync enabled, last run ok 3 min ago)",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.delta-list-override",
+      "title": "Profile deltas extend fleet base lists instead of replacing them",
+      "status": "fail",
+      "summary": "12 profile delta list override(s) detected",
+      "details": [
+        "bennett: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "context-director: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "dumply: plugins.enabled drops 3 fleet entries (bloodbank-platform, camofox, hindsight) -- delta also adds google_meet, teams-platform, teams_pipeline, +2 more -- merge the base entries back in, or confirm you meant to drop them",
+        "fleet-bloodbank-gateway: plugins.enabled drops 4 fleet entries (camofox, hindsight, orca-status, vox) -- delta also adds copilot-provider, google_meet, teams-platform, +1 more -- merge the base entries back in, or confirm you meant to drop them",
+        "infra-specialist: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "joe-pesci: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "marge-simpson: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "morgan-finance: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "n8n-specialist: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "penny: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "peter-griffin: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance",
+        "rererere: fallback_providers drops 2 fleet entries ({\"provider\":\"automaticai\",\"model\":\"automaticai/auto/subagent\"}, {\"provider\":\"automaticai\",\"model\":\"automaticai/auto/fast\"}) -- delta adds nothing new, so removing \"fallback_providers\" from the delta restores inheritance"
+      ],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.profile-wiring",
+      "title": "Launcher + systemd HERMES_HOME points at the named profile",
+      "status": "pass",
+      "summary": "HERMES_HOME wiring is in parity",
+      "details": [],
+      "fixable": true,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.registry-parity",
+      "title": "Fleet registry matches .project.json (no duplicate or stale agents)",
+      "status": "fail",
+      "summary": "3 registry parity issue(s) detected",
+      "details": [
+        "registry purpose for 33god-pm differs from role.yaml",
+        "registry company_identity for penny is absent (/home/delorenj/.agents/workforce/penny/agent.yaml projects {\"subject\":\"7e4dbd12-6e86-4767-9ba9-16a7740d02e3\",\"handle\":\"penny\",\"email\":\"penny@agents.delo.sh\",\"status\":\"active\"})",
+        "registry gateway_consumer for penny is absent (its desk runs consumer \"hermes-penny\")"
+      ],
+      "fixable": true,
+      "scope": "host"
+    },
+    {
+      "id": "org.board-projection",
+      "title": "Agent rows carry the board identity their repository's manifest declares",
+      "status": "pass",
+      "summary": "every agent row agrees with its repository's manifest",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "org.profile-path",
+      "title": "Every agent's profile directory is a real directory under the fleet profile root",
+      "status": "warn",
+      "summary": "1 profile director(ies) are not real directories under the fleet profile root",
+      "details": [
+        "delonet-company-reporter: /home/delorenj/.hermes/profiles/delonet-company-reporter is missing"
+      ],
+      "fixable": true,
+      "scope": "host"
+    },
+    {
+      "id": "org.runtime-path",
+      "title": "Every agent's role-local runtime directory exists",
+      "status": "pass",
+      "summary": "every declared role directory carries a real runtime directory",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "org.project-records",
+      "title": "Every agent's repository is a registered project",
+      "status": "warn",
+      "summary": "4 agent(s) have no project record",
+      "details": [
+        "delonet-company-reporter: /home/delorenj/code/agent-hm-delonet-company-reporter would be registered as project \"delonet-company\"",
+        "jacksnaps-pm: /home/delorenj/code/jacksnaps would be registered as project \"jacksnaps\"",
+        "monitoring-pm: /home/delorenj/code/33GOD/monitoring would be registered as project \"monitoring\"",
+        "nautilus-trader-pm: agents.nautilus-trader-pm.repo is not a usable project id (nautilus_trader)",
+        "registering a directory as a project is an operator decision -- `pj project init` writes .project.json AND renders the CommonProject scaffold into the repository -- so it needs `flume remediate org.project-records --register-projects` to authorize it"
+      ],
+      "fixable": true,
+      "scope": "host"
+    },
+    {
+      "id": "org.identity-conflict",
+      "title": "No two rows claim one identity (repo, board, identifier, unit name)",
+      "status": "fail",
+      "summary": "16 unpermitted identity conflict group(s)",
+      "details": [
+        "agents.{agent_id}.plane.identifier 33GOD is claimed by 33god-art-director, 33god-pm",
+        "agents.{agent_id}.plane.identifier TOLT is claimed by lost-things-forge-pm, tolt-pm",
+        "agents.{agent_id}.project_path ~/code/tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+        "agents.{agent_id}.project_path ~/code/33GOD is claimed by 33god-art-director, 33god-pm",
+        "agents.{agent_id}.project_path ~/code/green-in-between is claimed by green-in-between-launch-director, green-in-between-pm",
+        "agents.{agent_id}.project_path ~/code/gruvato is claimed by gruvato-launch-director, gruvato-pm",
+        "agents.{agent_id}.repo green-in-between is claimed by green-in-between-launch-director, green-in-between-pm",
+        "agents.{agent_id}.repo 33god is claimed by 33god-art-director, 33god-pm",
+        "agents.{agent_id}.repo tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+        "agents.{agent_id}.repo gruvato is claimed by gruvato-launch-director, gruvato-pm",
+        "projects.{slug}.slug 33god is claimed by 33god-art-director, 33god-pm",
+        "projects.{slug}.slug tolt is claimed by tolt-director, tolt-launch-director, tolt-pm",
+        "projects.{slug}.slug greeninbetween is claimed by green-in-between-launch-director, green-in-between-pm",
+        "projects.{slug}.slug gruvato is claimed by gruvato-launch-director, gruvato-pm",
+        "projects.{slug}.ticket_provider.board_id plane/33god/eb302959-0eac-48da-8fd5-ae1666bd500f is claimed by lost-things-forge, tolt, tower-of-lost-things",
+        "projects.{slug}.ticket_provider.identifier plane/33god/TOLT is claimed by lost-things-forge, tolt, tower-of-lost-things",
+        "resolve each group one of two ways, and only an operator can choose:",
+        "  (a) rule it intentional -- add the group to `classifications.intentionally_unmanaged.entries[]` in contracts/handbook.yaml, which makes it a permitted conflict rather than a silent one, or",
+        "  (b) change one claimant so the value is claimed once -- repoint the row/record, or retire the one that is abandoned"
+      ],
+      "fixable": false,
+      "scope": "host"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "command_id": "7beb8253-9d0f-4913-8524-31493b3b3cc7",
+  "correlationid": "a7dea30c-61a3-4184-a5e4-ece8eafed008",
+  "target_agent_id": "33god-art-director",
+  "type": "bloodbank.agent.invocation.start",
+  "source": "hermes://agent/flume-pm",
+  "prompt_scope": "one bounded fictional-color-label worker via delegate_task; wait for actual result; no production work or publication"
+}

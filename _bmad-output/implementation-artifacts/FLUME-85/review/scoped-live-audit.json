@@ -1,0 +1,44 @@
+{
+  "repo": "/home/delorenj/code/33GOD",
+  "ok": true,
+  "hostOk": false,
+  "auditedAt": "2026-11-19T07:55:46.784Z",
+  "rules": [
+    {
+      "id": "hermes.pm-scaffold",
+      "title": "Hermes orchestrator scaffold parity",
+      "status": "pass",
+      "summary": "1 orchestrator scaffold(s) verified",
+      "details": [],
+      "fixable": true,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.runtime-singleton",
+      "title": "Hermes singleton runtime (shared config/auth, per-agent memory)",
+      "status": "pass",
+      "summary": "Singleton runtime contract satisfied",
+      "details": [],
+      "fixable": true,
+      "scope": "project"
+    },
+    {
+      "id": "hermes.bloodbank-toolsets",
+      "title": "Bloodbank-dispatched PM turns can delegate a worker",
+      "status": "pass",
+      "summary": "Bloodbank-dispatched PM turns can delegate; restricted employees stay restricted",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    },
+    {
+      "id": "hermes.registry-parity",
+      "title": "Fleet registry matches .project.json (no duplicate or stale agents)",
+      "status": "pass",
+      "summary": "Fleet registry is in parity",
+      "details": [],
+      "fixable": false,
+      "scope": "host"
+    }
+  ]
+}

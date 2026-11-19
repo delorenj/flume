@@ -1,0 +1,18 @@
+# FLUME-85 — landed hire, onboarding acceptance blocked
+
+Snapshot: 2026-11-19. This is evidence closeout, **not ticket acceptance**. The Art Director role, charter, Atlas onboarding brief, and advisory employee record are landed. No showcase design, artwork, page, publication, or actual worker delegation is claimed.
+
+## Acceptance map
+
+| Gate | Finding | Evidence |
+| --- | --- | --- |
+| Role and reporting | Delivered: unique `33god-art-director`, reports to `33god-pm`; advisory board scope, no board ownership; Atlas work home and privacy gate declared. | `review/final-review-report.json`, `review/live-verification-summary.json`; landed role and Atlas brief in parent `33GOD` main. |
+| Hire/projection | Focused charter 3/3, hire static 2/2, role-hire behavioral 24/24 groups, registry lifecycle projection and typecheck passed. Read-only ingress consumer routes four label variants to PM. | `review/test-results-summary.json`, `review/routing-summary.json`. |
+| Live runtime | Canonical named Hermes profile is a real directory; role-owned links point to `/home/delorenj/code/33GOD/agents/hermes/art-director/runtime`, not FLUME-85 worktrees; `kanban.db` link target was absent. | `review/final-review-report.json`, local pre-cleanup link inspection. |
+| Actual onboarding delegation / reply (AC4) | **BLOCKED/FAILED**: one bounded Bloodbank command was published and produced queued, started, failed. Gateway rejected closed before dispatch: `final_answer_capture_unavailable_before_dispatch`. No employee reply or `delegate_task` result exists; no resend. This cannot count as a delegation or onboarding pass. | `gateway/request.json`, `gateway/outcome.json`, `gateway/events-summary.json`, `gateway/journal-summary.json`. |
+| Audit | Four explicitly supported employee-scoped rules pass (`ok=true`), but `hostOk=false`. Unscoped aggregate fails (`ok=false`, `hostOk=false`); 16 identity-conflict groups vs 12 in read-only without-target control, four introduced by shared repo/path/identifier/slug. Operator classification belongs to FLUME-78; do not silently suppress or infer PM ingress theft. | `review/scoped-live-audit.json`, `review/aggregate-live-audit.json`, `review/identity-conflict-summary.json`. |
+| Regression caveat | Profile-inheritance suite **fails** at line 648 (stale gateway summary expectation, zero fixture members). Invalid `delegate_all_code_changes` type exits nonzero but without structured JSON finding; live value is valid boolean. | `review/test-results-summary.json`, `review/final-review-report.json`. |
+
+The aggregate audit has other host findings (PM scaffold/runtime singleton, other fleet toolsets, gateway routing base, delta overrides, registry parity); the scoped pass does **not** turn the host green. Independent review's initial employee-specific acceptance wording did not include the separately owned actual live delegation attempt; its verdict is superseded for AC4 by the failed gateway receipt here. Remediation of the shared Hermes gateway capture and a new authorized actual reply/worker result are still required before acceptance. FLUME-78 owns the identity-conflict advisory; this closeout neither changes the board nor reruns the command.
+
+Only minimized, secret-screened receipt fields are included, rather than raw journal with embedded prompt and other runtime state. Source receipt: `flume85-art-director-live-53f69724a5cc`; independent review source: `flume85-independent-final`, both under the flume-pm profile scratch directory. Parent/Flume starting main revisions: `989ba0657cb01f02fdd75b451107948803f3c595` / `32f4894ac01ffd523852fc4fd8f4f90036f64df4`.

@@ -1,0 +1,25 @@
+{
+  "time_utc": "2026-11-19T07:55:49Z",
+  "checks": {
+    "exactly_one_target_declaration": true,
+    "exactly_one_registry_profile": true,
+    "exactly_one_art_director_for_project": true,
+    "advisory": true,
+    "no_board_claim": true,
+    "pm_declaration_unchanged": true,
+    "reports_to_pm": true,
+    "platform_membership_once": true,
+    "atlas_work_home_in_record": true,
+    "canonical_project_path": true,
+    "canonical_role_dir": true,
+    "canonical_terminal_cwd": true,
+    "real_named_desk": true,
+    "runtime_not_git_repo": true,
+    "no_target_worktree_links": true,
+    "required_native_toolsets": true,
+    "runtime_soul_matches_tracked": true,
+    "reconciliation_disabled": true,
+    "maintained_renderer_exact_match": true
+  },
+  "owned_state_unchanged": true
+}
