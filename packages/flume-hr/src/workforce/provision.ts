@@ -202,6 +202,14 @@ export function cfError(response: CfResponse): string {
 }
 
 export interface CfServiceToken { id: string; name: string; client_id?: string; expires_at?: string }
+/** A row missing either matching discriminator cannot establish token absence, even when pagination succeeds. */
+export function validServiceTokenRow(value: unknown): value is CfServiceToken {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Partial<CfServiceToken>;
+  return typeof row.id === "string" && row.id.trim().length > 0 &&
+    typeof row.name === "string" && row.name.trim().length > 0 &&
+    typeof row.client_id === "string" && row.client_id.trim().length > 0;
+}
 // The lifecycle adapter retains cfError; provisioning withholds free-form provider messages.
 const provisionCfError = (response: CfResponse) => `HTTP ${response.http_status || "no response"} (provider output withheld)`;
 export interface CfRoutingRule { id: string; name?: string; enabled: boolean; matchers: Array<{ type: string; field?: string; value?: string }>; actions: Array<{ type: string; value?: string[] }> }
@@ -225,7 +233,7 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
   for (let page = 1; page <= 100; page++) {
     const list = await cfRequest(cfToken, "GET", `/accounts/${account_id}/access/service_tokens?per_page=50&page=${page}`);
     const result = list.body?.result as CfServiceToken[] | undefined;
-    if (!cfOk(list) || !Array.isArray(result) || result.some(t => !t || typeof t.id !== "string" || !t.id || typeof t.name !== "string")) return stop("blocked", "cannot list service tokens completely (provider output withheld)");
+    if (!cfOk(list) || !Array.isArray(result) || result.some(t => !validServiceTokenRow(t))) return stop("blocked", "cannot list service tokens completely (provider output withheld)");
     for (const token of result) {
       if (seen.has(token.id)) return stop("blocked", "service-token inventory repeated an ID; reconcile by hand");
       seen.add(token.id); tokens.push(token);

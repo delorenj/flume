@@ -36,7 +36,7 @@ import { withRegistryLock } from "./role";
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS, planeBindingOf, planeEvidence, readPlaneReceipts, verifyBoardViaPx } from "./plane";
-import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, pendingAccessIssuance, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
+import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, pendingAccessIssuance, validServiceTokenRow, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
 import type { CompanyIdentity } from "./types";
 
 export type AdapterName = "mail" | "cloudflare_access" | "github" | "plane" | "gateway";
@@ -224,7 +224,7 @@ const PAGE_SIZE = 50, MAX_PAGES = 100;
  * listing: a declared `result_info.total_pages`, or an empty page when no total is declared. A short nonempty page
  * is not authoritative absence. Repeated IDs, inconsistent metadata, malformed pages and the page cap fail closed.
  */
-async function listAll<T extends { id: string }>(cf: { token: string }, path: string): Promise<{ ok: true; items: T[] } | { ok: false; code: string }> {
+async function listAll<T extends { id: string }>(cf: { token: string }, path: string, validItem: (item: unknown) => item is T = (item): item is T => Boolean(item) && typeof item === "object" && typeof (item as T).id === "string" && Boolean((item as T).id)): Promise<{ ok: true; items: T[] } | { ok: false; code: string }> {
   const items: T[] = [];
   const seen = new Set<string>();
   let expectedTotal: number | undefined;
@@ -232,9 +232,9 @@ async function listAll<T extends { id: string }>(cf: { token: string }, path: st
     const list = await cfRequest(cf.token, "GET", `${path}?per_page=${PAGE_SIZE}&page=${page}`);
     if (!cfOk(list)) return { ok: false, code: codeOf(list) };
     if (!Array.isArray(list.body?.result)) return { ok: false, code: "listing-incomplete" };
-    const result = list.body.result as T[];
+    const result = list.body.result as unknown[];
     for (const item of result) {
-      if (!item || typeof item.id !== "string" || !item.id || seen.has(item.id)) return { ok: false, code: "listing-incomplete" };
+      if (!validItem(item) || seen.has(item.id)) return { ok: false, code: "listing-incomplete" };
       seen.add(item.id); items.push(item);
     }
     const info = list.body?.result_info;
@@ -248,7 +248,7 @@ async function listAll<T extends { id: string }>(cf: { token: string }, path: st
   return { ok: false, code: "listing-incomplete" };
 }
 
-const listServiceTokens = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfServiceToken>(cf, `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens`);
+const listServiceTokens = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfServiceToken>(cf, `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens`, validServiceTokenRow);
 const listRules = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfRoutingRule>(cf, `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules`);
 
 /** The employee's OWN literal rule: a `to` matcher for exactly their address. Whether it is ours is decided by its action. */

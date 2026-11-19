@@ -135,7 +135,8 @@ const server = createServer((req, res) => {
     if (req.method === "GET" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
       const page = Number(url.searchParams.get("page") || "1"), size = cf.pageSize || 50;
       if (cf.onTokenList) { const hook = cf.onTokenList; cf.onTokenList = undefined; hook(); }
-      const result = cf.samePageDuplicate ? [cf.tokens[0], cf.tokens[0]] : cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
+      const full = cf.samePageDuplicate ? [cf.tokens[0], cf.tokens[0]] : cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
+      const result = cf.malformedRows ? full.map(token => token?.id === cf.malformedRows.id ? cf.malformedRows.row(token) : token) : full;
       return send(200, { success: true, result, ...(cf.samePageDuplicate ? { result_info: { total_pages: 1 } } : cf.noPageMetadata ? {} : { result_info: cf.inconsistentPages ? { total_pages: page === 1 ? 2 : 3 } : cf.clampedPageMetadata ? { per_page: size } : { total_pages: Math.max(1, Math.ceil(cf.tokens.length / size)) } }) });
     }
     if (req.method === "POST" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
@@ -774,6 +775,89 @@ const bindFixture = (name, token, extra = {}) => {
   noTokenDelete(before, token);
   cf.samePageDuplicate = false;
   pass("Q1 malformed duplicate page blocks bound-token retry even with a remembered failed DELETE ID");
+}
+for (const [variant, row] of [
+  ["id-only", token => ({ id: token.id })],
+  ["blank-name", token => ({ id: token.id, name: "  ", client_id: token.client_id })],
+  ["blank-client", token => ({ id: token.id, name: token.name, client_id: "  " })],
+  ["non-object", () => null],
+]) {
+  const name = `malformed-bound-${variant}`;
+  enrollFixture(name);
+  json(await runAsync(["identity", "provision", name, "--apply", "--json"]));
+  const token = cf.tokens.find(t => t.name === `employee-${name}`);
+  assert.ok(token);
+  const beforeHealthy = json(await runAsync(["identity", "credentials", name, "--json"]));
+  assert.equal(beforeHealthy.credentials.find(r => r.kind === "access-service-token")?.status, "static-usable");
+  const healthyProvision = json(await runAsync(["identity", "provision", name, "--json"]));
+  assert.equal(healthyProvision.capabilities["access-token"].action, "no-op");
+  cf.malformedRows = { id: token.id, row };
+  const before = calls.length;
+  const blockedProvision = json(await runAsync(["identity", "provision", name, "--apply", "--json"]), 1);
+  assert.equal(blockedProvision.capabilities["access-token"].action, "blocked");
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.includes("service_tokens")));
+  const inventory = json(await runAsync(["identity", "credentials", name, "--json"]));
+  const bound = inventory.credentials.find(r => r.kind === "access-service-token");
+  assert.equal(bound?.status, "unresolved");
+  assert.equal(bound?.provider_code, "listing-incomplete");
+  assert.equal(bound?.read_back, undefined);
+  assert.equal(inventory.complete_revocation, false);
+  const retired = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(retired.complete_revocation, false);
+  assert.ok(retired.steps.some(s => s.provider_code === "listing-incomplete" && s.outcome === "unresolved"));
+  assert.notEqual(retired.credentials.find(r => r.kind === "access-service-token")?.status, "revoked");
+  noTokenDelete(before, token);
+  cf.malformedRows = undefined;
+  const recovered = json(await runAsync(["identity", "retire", name, "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(recovered.steps.some(s => s.key === `cloudflare_access:token-delete:${token.client_id}` && s.outcome === "done"));
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  assert.equal(recovered.credentials.find(r => r.kind === "access-service-token")?.read_back, "absent");
+  pass(`R1 ${variant}: malformed bound Access row blocks false absence and DELETE; complete listing recovers`);
+}
+{
+  const token = await retained("malformed-unbound");
+  cf.malformedRows = { id: token.id, row: current => ({ id: current.id }) };
+  enrollFixture("malformed-preflight");
+  const before = calls.length;
+  for (const args of [[], ["--apply"]]) {
+    const result = json(await runAsync(["identity", "provision", "malformed-preflight", ...args, "--json"]), 1);
+    assert.equal(result.capabilities["access-token"].action, "blocked");
+  }
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.includes("service_tokens")));
+  const inventory = json(await runAsync(["identity", "credentials", "malformed-unbound", "--json"]));
+  const pending = inventory.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id);
+  assert.ok(pending && pending.status !== "revoked");
+  assert.equal(pending.read_back, undefined);
+  assert.equal(pending.provider_code, "listing-incomplete");
+  assert.equal(inventory.complete_revocation, false);
+  const retired = json(await runAsync(["identity", "retire", "malformed-unbound", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(retired.complete_revocation, false);
+  assert.ok(retired.steps.some(s => s.provider_code === "listing-incomplete"));
+  noTokenDelete(before, token);
+  cf.malformedRows = undefined;
+  const recovered = json(await runAsync(["identity", "retire", "malformed-unbound", "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(recovered.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "done"));
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  assert.equal(recovered.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id)?.read_back, "absent");
+  const mint = json(await runAsync(["identity", "provision", "malformed-preflight", "--apply", "--json"]));
+  assert.equal(mint.capabilities["access-token"].action, "created");
+  pass("R1 ID-only unbound row blocks mint and false-clean retirement; full-row recovery permits verified deletion and mint");
+}
+{
+  enrollFixture("malformed-no-binding");
+  const token = { id: "unknown-malformed-token", name: "employee-malformed-no-binding", client_id: "malformed-no-binding.access" };
+  cf.tokens.push(token);
+  cf.malformedRows = { id: token.id, row: current => ({ id: current.id }) };
+  const inventory = json(await runAsync(["identity", "credentials", "malformed-no-binding", "--json"]));
+  const access = inventory.credentials.find(r => r.provider === "cloudflare_access");
+  assert.equal(access?.status, "unverified");
+  assert.equal(access?.provider_code, "listing-incomplete");
+  assert.equal(inventory.complete_revocation, false);
+  cf.malformedRows = undefined;
+  const recovered = json(await runAsync(["identity", "credentials", "malformed-no-binding", "--json"]));
+  assert.ok(recovered.credentials.some(r => r.kind === "unattributed-access-token" && r.id === token.id));
+  cf.tokens.splice(cf.tokens.indexOf(token), 1);
+  pass("R1 malformed unbound unreceipted token never claims not-issued; full listing exposes unattributed token");
 }
 {
   const token = await retained("reserved-issuance");

@@ -75,6 +75,13 @@ Initial `npm ci --ignore-scripts` installed Skillex without dist and could not r
 - Final pre-check `git pull --no-rebase origin main` merged `3a035d3a33fe67df49016d5f0e44f7ae044f6266` as `f75ef67aa0728a2dd083f78affed977d77750161` in this worktree without conflicts. No main checkout operation or board touch.
 - **Independent reviewers must re-run their oracles against this branch**; this evidence is implementer verification, not an independent PASS.
 
+## R1 malformed Access inventory follow-up (candidate for independent review)
+
+- The independent QUALITY review of `9740fc0a` closed Q1/Q2/Q3 but held one P1: a successful page containing an ID-only Access row was mistaken for authoritative bound-token absence. This follow-up validates every service-token row's nonempty `id`, `name`, and `client_id` in both provisioning and lifecycle. Malformed rows yield blocked provisioning or `listing-incomplete` lifecycle inventory/steps; routing-rule pagination retains its separate schema.
+- Real CLI fixture coverage adds ID-only, blank name, blank client ID and non-object bound rows after successful provisioning, plus retained unbound issuance and an unreceipted unbound token. It checks no false `revoked`/`not-issued`/complete claim, no Access DELETE/POST during malformed inventory, and verified deletion/mint after complete rows return. Q1/Q2/Q3 tests remain intact.
+- Fresh checks on this follow-up: `npm run typecheck` and `npm run build` exit 0; direct provision suite exits 0 (55 groups); direct company lifecycle exits 0 (54 scenarios); direct employee-access lifecycle exits 0 (9 scenarios); `git diff --check` exits 0. Direct logs: `/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume80-r1-{provision,lifecycle,employee-access}.log`. The direct fixtures ran with PATH narrowed to `/usr/bin:/bin` plus the installed Node binary and TMPDIR in active-profile scratch. Initial attempts using ambient mise shims exited 1 before any assertions because this worktree and user mise config were untrusted; no mise trust/config was changed.
+- Earlier overlay/inherited-preload runner gateway failures remain baseline-reproducing and **not green** (company lifecycle line 243, employee-access lifecycle line 378). Direct passes do not relabel the runner or full suite as passing. No live Cloudflare/vault, board, rollout or recovery was exercised; owner approval and independent QUALITY/SPEC review remain pending.
+
 ## Remaining approval/verification gates
 
 - Independent source/spec/security review of the pushed branch.
