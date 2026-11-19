@@ -2,7 +2,7 @@
 
 [env]
 _.file = [".env"]
-_.path = [".mise/scripts", "agents/hermes/pm"]
+_.path = [".mise/scripts"]  # PM launcher NOT on PATH (it shadowed the global hermes): use `hermes-pm`
 [tools]
 node = "24"
 
