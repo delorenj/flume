@@ -75,7 +75,7 @@ async function world(label, o = {}) {
   if (o.generated) writeFileSync(join(fleet, "profiles/ada-pm/config.yaml"), YAML.stringify({ model: { provider: "automaticai" }, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf(o.generated) } } } }));
   writeFileSync(join(fleet, "profiles/bob-pm/config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: gwRefOf("bob") } } } }));
   const configPath = join(dir, "identity-provisioning.yaml");
-  writeFileSync(configPath, YAML.stringify({ version: 1, cloudflare: { api_token_ref: TOKEN_REF, account_id: ACCOUNT, zone_id: ZONE, access_issuer: ISSUER }, mailbox: { worker: "agents-facade", kv_namespace_id: KVNS }, onepassword: { vault: "DeLoSecrets" } }));
+  writeFileSync(configPath, YAML.stringify({ version: 1, cloudflare: { api_token_ref: TOKEN_REF, account_id: ACCOUNT, zone_id: ZONE, access_issuer: ISSUER, access_policy: { api_token_ref: TOKEN_REF, application_id: "app-fixture", policy_id: "policy-fixture", domain: "identity.fixture.test" } }, mailbox: { worker: "agents-facade", kv_namespace_id: KVNS }, onepassword: { vault: "DeLoSecrets" } }));
   writeFileSync(join(dir, "op.json"), JSON.stringify({ [TOKEN_REF]: CF_TOKEN, [REF.adaAccess]: CLIENT_SECRET, [REF.adaGithub]: ghKeys.ada.privateKey, [REF.adaGithub2]: ghKeys.ada2.privateKey }));
   const pxState = join(dir, "px-state.json"), pxLog = join(dir, "px-log.jsonl"), gwState = join(dir, "gw-state.json"), gwLog = join(dir, "gw-log.jsonl");
   writeFileSync(pxLog, ""); writeFileSync(gwLog, "");
@@ -193,7 +193,7 @@ try {
     const preview = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--json"]));
     assert.equal(preview.ok, true);
     assert.ok(preview.steps.every((s) => s.outcome === "planned"), JSON.stringify(preview.steps));
-    assert.deepEqual(preview.steps.map((s) => s.key), ["local-status:retired", "tombstone", "mail:allowlist-delete:ada@agents.delo.sh", "mail:routing-disable:ada@agents.delo.sh", `cloudflare_access:token-delete:${CLIENT.ada}`, "github:installation-suspend:2001", "gateway:token-revoke:ada"]);
+    assert.deepEqual(preview.steps.map((s) => s.key), ["local-status:retired", "tombstone", "mail:allowlist-delete:ada@agents.delo.sh", "mail:routing-disable:ada@agents.delo.sh", `cloudflare_access:policy-remove:${w.ada.subject}`, `cloudflare_access:token-delete:${CLIENT.ada}`, "github:installation-suspend:2001", "gateway:token-revoke:ada"]);
     assert.equal(preview.complete_revocation, false);
     pass("every lifecycle command is a pure preview: no definition, state, ledger or provider mutation, with provider GETs only");
   }
@@ -332,7 +332,7 @@ try {
     const w = await world("revoke");
     const result = w.json(await w.runAsync(["identity", "suspend", "ada-pm", "--revoke", "gateway", "--revoke", "github", "--revoke", "cloudflare_access", "--apply", "--json"]));
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.deepEqual(result.steps.map((s) => s.key), ["local-status:suspended", "mail:allowlist-delete:ada@agents.delo.sh", `cloudflare_access:token-delete:${CLIENT.ada}`, "github:installation-suspend:2001", "gateway:token-revoke:ada"], "named adapters run in the fixed order");
+    assert.deepEqual(result.steps.map((s) => s.key), ["local-status:suspended", "mail:allowlist-delete:ada@agents.delo.sh", `cloudflare_access:policy-remove:${w.ada.subject}`, `cloudflare_access:token-delete:${CLIENT.ada}`, "github:installation-suspend:2001", "gateway:token-revoke:ada"], "named adapters run in the fixed order");
     assert.equal(cf.count("DELETE", /service_tokens\/tok-ada$/u), 1);
     assert.equal(cf.tokens.some((t) => t.id === "tok-bob"), true);
     assert.equal(gh.count("PUT", /suspended$/u), 1);
@@ -443,7 +443,7 @@ try {
     assert.equal(all.ok, true, JSON.stringify(all.steps));
     assert.equal(inherits.block(inherits.adaRole).status, "retired");
     assert.ok(stateOf(inherits).tombstones[inherits.ada.subject]);
-    assert.deepEqual(all.steps.map((s) => `${s.key}:${s.outcome}`), ["local-status:retired:done", "tombstone:done", "mail:allowlist-delete:ada@agents.delo.sh:done", "mail:routing-disable:ada@agents.delo.sh:done", `cloudflare_access:token-delete:${CLIENT.ada}:done`, "github:installation-suspend:2001:done", "gateway:token-revoke:fleet:skipped"]);
+    assert.deepEqual(all.steps.map((s) => `${s.key}:${s.outcome}`), ["local-status:retired:done", "tombstone:done", "mail:allowlist-delete:ada@agents.delo.sh:done", "mail:routing-disable:ada@agents.delo.sh:done", `cloudflare_access:policy-remove:${inherits.ada.subject}:done`, `cloudflare_access:token-delete:${CLIENT.ada}:done`, "github:installation-suspend:2001:done", "gateway:token-revoke:fleet:skipped"]);
     assert.equal(stepOf(all, "gateway:token-revoke:fleet").provider_code, "shared-consumer");
     assert.deepEqual(all.skipped, [{ key: "gateway:token-revoke:fleet", adapter: "gateway", provider_code: "shared-consumer" }]);
     assert.equal(cf.tokens.some((t) => t.id === "tok-ada"), false); assert.ok(gh.installationOf("1001").suspended_at);
@@ -474,7 +474,7 @@ try {
     cf.mode.tokenDelete = mode;
     const first = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--revoke", "all", "--apply", "--json"]), 1);
     assert.equal(first.ok, false);
-    assert.deepEqual(first.succeeded.sort(), ["github:installation-suspend:2001", "gateway:token-revoke:ada", "local-status:retired", "mail:allowlist-delete:ada@agents.delo.sh", "mail:routing-disable:ada@agents.delo.sh", "tombstone"].sort());
+    assert.deepEqual(first.succeeded.sort(), [`cloudflare_access:policy-remove:${w.ada.subject}`, "github:installation-suspend:2001", "gateway:token-revoke:ada", "local-status:retired", "mail:allowlist-delete:ada@agents.delo.sh", "mail:routing-disable:ada@agents.delo.sh", "tombstone"].sort());
     assert.deepEqual(first.unresolved.map((u) => `${u.key}:${u.provider_code}`), [`cloudflare_access:token-delete:${CLIENT.ada}:http-500`]);
     assert.equal(stepOf(first, `cloudflare_access:token-delete:${CLIENT.ada}`).provider_code, "http-500");
     assert.equal(first.complete_revocation, false);

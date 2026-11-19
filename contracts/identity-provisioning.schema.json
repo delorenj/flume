@@ -20,7 +20,17 @@
         },
         "account_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
         "zone_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-        "access_issuer": { "type": "string", "pattern": "^https://[^/]+\\.cloudflareaccess\\.com$" }
+        "access_issuer": { "type": "string", "pattern": "^https://[^/]+\\.cloudflareaccess\\.com$" },
+        "access_policy": {
+          "type": "object", "additionalProperties": false,
+          "required": ["api_token_ref", "application_id", "policy_id", "domain"],
+          "properties": {
+            "api_token_ref": { "type": "string", "pattern": "^op://", "description": "Explicit scoped Access Apps and Policies Edit credential; never falls back to api_token_ref or the environment." },
+            "application_id": { "type": "string", "pattern": "^[a-zA-Z0-9-]{1,80}$" },
+            "policy_id": { "type": "string", "pattern": "^[a-zA-Z0-9-]{1,80}$" },
+            "domain": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" }
+          }
+        }
       }
     },
     "mailbox": {

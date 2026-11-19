@@ -33,7 +33,7 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
   const cf = { calls: [], mode: {}, tokens: [], rules: [], kv: new Map(), held: [], url: "", server: undefined };
   cf.reset = () => {
     cf.calls.length = 0; cf.mode = {}; cf.kv = new Map();
-    cf.tokens = [];
+    cf.tokens = []; cf.policy = undefined;
     cf.rules = [];
     cf.held.length = 0;
   };
@@ -55,6 +55,12 @@ export async function fakeCloudflare({ account, zone, kvns, token, issuer }) {
       const url = new URL(req.url, "http://cf.fixture");
       cf.calls.push({ method: req.method, path: url.pathname, query: url.search });
       if (req.headers.authorization !== `Bearer ${token}`) return send(res, 403, { success: false, errors: [{ message: "bad token" }] });
+      if (req.method === "GET" && url.pathname === `/accounts/${account}/access/apps/app-fixture`) return ok(res, { id: "app-fixture", domain: "identity.fixture.test" });
+      if (url.pathname === `/accounts/${account}/access/apps/app-fixture/policies/policy-fixture`) {
+        if (!cf.policy) cf.policy = { id: "policy-fixture", name: "Employee facade", decision: "non_identity", include: cf.tokens.map(t => ({ service_token: { token_id: t.id } })), exclude: [], require: [] };
+        if (req.method === "GET") return ok(res, cf.policy);
+        if (req.method === "PUT") { cf.policy = { id: "policy-fixture", ...JSON.parse(body) }; return ok(res, cf.policy); }
+      }
       if (req.method === "GET" && url.pathname === `/accounts/${account}/access/service_tokens`) {
         if (cf.mode.tokenList === "500") return send(res, 500, { success: false, errors: [{ message: "boom" }] });
         return paged(res, url, cf.tokens, 50);

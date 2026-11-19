@@ -37,6 +37,8 @@ import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallat
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS, planeBindingOf, planeEvidence, readPlaneReceipts, verifyBoardViaPx } from "./plane";
 import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, pendingAccessIssuance, validServiceTokenRow, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
+import { accessPolicyTokenHistory } from "./access-issuance";
+import { policyHasToken, readAccessPolicy, reconcileAccessPolicy } from "./access-policy";
 import type { CompanyIdentity } from "./types";
 
 export type AdapterName = "mail" | "cloudflare_access" | "github" | "plane" | "gateway";
@@ -413,6 +415,88 @@ function accessDeleteConflict(ctx: LifecycleContext, cf: { config: ProvisioningC
   return accessRevocationConflict(ctx.block.subject, ctx.target.path, principal, tokenId);
 }
 
+const policyCaptureKey = (config: ProvisioningConfig, ctx: LifecycleContext) => `access_policy_tokens:${config.cloudflare.account_id}:${ctx.block.bindings?.cloudflare_access?.principal ?? ctx.block.subject}`;
+
+function policyScopeDrift(ctx: LifecycleContext, config: ProvisioningConfig): boolean {
+  const history = accessPolicyTokenHistory(ctx.block.handle, ctx.block.subject, config.cloudflare.account_id);
+  const selected = config.cloudflare.access_policy;
+  const principal = ctx.block.bindings?.cloudflare_access?.principal;
+  return history.scopes.some(scope => !selected || scope.application_id !== selected.application_id || scope.policy_id !== selected.policy_id || Boolean(scope.domain && scope.domain !== selected.domain)) ||
+    Boolean(principal && Object.values(history.clients).some(client => client !== principal));
+}
+
+/** Recover IDs before/after token deletion from scoped issuance history and the lifecycle's durable pre-delete capture. */
+function policyTokenIds(ctx: LifecycleContext, config: ProvisioningConfig, tokens: CfServiceToken[]): string[] | null {
+  const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, config.cloudflare.account_id);
+  if (pending.uncertain) return null;
+  const principal = ctx.block.bindings?.cloudflare_access?.principal;
+  const history = accessPolicyTokenHistory(ctx.block.handle, ctx.block.subject, config.cloudflare.account_id, principal);
+  if (history.uncertain) return null;
+  const captured = ctx.captures[policyCaptureKey(config, ctx)] ?? (principal ? undefined : Object.entries(ctx.captures).find(([key]) => key.startsWith(`access_policy_tokens:${config.cloudflare.account_id}:`))?.[1]);
+  if (captured !== undefined && (!Array.isArray(captured) || captured.some(id => typeof id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(id)))) return null;
+  const remembered = principal ? ctx.steps[`cloudflare_access:token-delete:${principal}`]?.data?.token_id : undefined;
+  const ids = new Set<string>([
+    ...history.ids,
+    ...((captured as string[] | undefined) ?? []),
+    ...tokens.filter(token => principal ? token.client_id === principal : pending.token_ids.includes(token.id) && pending.client_ids[token.id] === token.client_id).map(token => token.id),
+    ...Object.keys(pending.client_ids).filter(id => principal ? pending.client_ids[id] === principal : pending.token_ids.includes(id)),
+    ...(typeof remembered === "string" ? [remembered] : []),
+  ]);
+  if (principal && !ids.size) return null;
+  return [...ids];
+}
+
+async function policyInventory(ctx: LifecycleContext, cf: CloudflareHandle, listed: { ok: true; items: CfServiceToken[] } | { ok: false; code: string } | undefined): Promise<CredentialRow> {
+  const base = { provider: "cloudflare_access" as const, kind: "access-policy-membership", static: false, evidence: cloudflareEvidence(ctx.env), next_action: `flume identity ${ctx.status === "active" ? "provision" : "retire"} ${ctx.employee}${ctx.status === "active" ? "" : " --revoke cloudflare_access"} --apply` };
+  if (!cf.ok) return { ...base, status: "unresolved", provider_code: cf.code };
+  if (!listed?.ok) return { ...base, status: "unresolved", provider_code: listed?.code ?? "listing-incomplete" };
+  if (policyScopeDrift(ctx, cf.config)) return { ...base, status: "unresolved", provider_code: "access-policy-config-drift", detail: "historical grant belongs to another policy/application/domain; restore its scoped configuration to reconcile before claiming complete revocation" };
+  const ids = policyTokenIds(ctx, cf.config, listed.items);
+  const policy = await readAccessPolicy(cf.config);
+  if (!policy.ok) return { ...base, status: "unresolved", provider_code: policy.code, detail: policy.detail };
+  if (!ids) return { ...base, status: "unresolved", provider_code: "access-policy-token-unresolved", detail: "token ID unknown after deletion; reconcile subject-scoped history before claiming policy cleanup" };
+  const present = ids.some(id => policyHasToken(policy.policy, id));
+  const cleanup = ctx.steps[`cloudflare_access:policy-remove:${ctx.block.subject}`];
+  if (ctx.status !== "active" && cleanup?.status === "unresolved") return { ...base, status: "unresolved", provider_code: cleanup.provider_code ?? "access-policy-cleanup-unresolved", detail: "last policy cleanup did not verify; retry the explicitly requested lifecycle cleanup before claiming complete revocation" };
+  return { ...base, status: present ? "static-usable" : "revoked", ...(present ? {} : { read_back: "absent" as const }), detail: present ? "employee token ID remains in the configured policy" : "employee token IDs absent from the configured policy" };
+}
+
+function policyCleanupStep(ctx: LifecycleContext): PlannedStep {
+  return {
+    key: `cloudflare_access:policy-remove:${ctx.block.subject}`, adapter: "cloudflare_access", action: "policy-membership-remove", resource: ctx.block.subject,
+    description: "capture employee token IDs, remove only their Service Auth include rules, verify all other policy settings unchanged",
+    async live(context) {
+      const cf = await cloudflareOf(context);
+      if (!cf.ok || policyScopeDrift(context, cf.config)) return null;
+      const listed = await listServiceTokens(cf);
+      if (!listed.ok) return null;
+      const ids = policyTokenIds(context, cf.config, listed.items), policy = await readAccessPolicy(cf.config);
+      return ids && policy.ok ? ids.filter(id => policyHasToken(policy.policy, id)) : null;
+    },
+    async run(ctx, hooks) { return accessMutation(ctx, async context => {
+      const cf = await cloudflareOf(context);
+      if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
+      if (policyScopeDrift(context, cf.config)) return { result: "unresolved", provider_code: "access-policy-config-drift", detail: "restore the historical application/policy/domain before scoped cleanup; no current-policy substitution" };
+      const listed = await listServiceTokens(cf);
+      if (!listed.ok) return { result: "unresolved", provider_code: listed.code, detail: "complete token inventory required for policy cleanup" };
+      const ids = policyTokenIds(context, cf.config, listed.items);
+      if (!ids) return { result: "unresolved", provider_code: "access-policy-token-unresolved", detail: "actual token ID unavailable; policy cleanup not verified" };
+      for (const id of ids) {
+        const principal = context.block.bindings?.cloudflare_access?.principal ?? accessPolicyTokenHistory(context.block.handle, context.block.subject, cf.config.cloudflare.account_id).clients[id] ?? pendingAccessIssuance(context.block.handle, context.block.subject, cf.config.cloudflare.account_id).client_ids[id] ?? "";
+        const live = listed.items.find(token => token.id === id);
+        if (live && (live.client_id !== principal || (!context.block.bindings?.cloudflare_access && live.name !== `employee-${context.block.handle}`))) return { result: "unresolved", provider_code: "pending-token-owner-mismatch", detail: "live token differs from scoped identity history; no policy edit authorized" };
+        const conflict = accessDeleteConflict(context, cf, principal, id);
+        if (conflict) return { result: "unresolved", provider_code: conflict.code, detail: conflict.detail };
+      }
+      // Durable even if policy edit fails and the following token DELETE commits or the process dies.
+      hooks.capture(policyCaptureKey(cf.config, context), ids);
+      if (!ids.length) return { result: "converged", detail: "no employee token IDs were issued", data: { resources: [] } };
+      const result = await reconcileAccessPolicy(cf.config, ids, false, true);
+      return { result: result.ok ? result.changed ? "done" : "converged" : "unresolved", provider_code: result.code, detail: result.ok ? "employee membership absent; unrelated policy settings read back unchanged" : result.detail, data: { resources: [] } };
+    }); },
+  };
+}
+
 export const cloudflareAccessAdapter: LifecycleAdapter = {
   name: "cloudflare_access",
   blockers: () => [],
@@ -425,9 +509,11 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
     const listed = cf.ok ? await listServiceTokens(cf) : undefined;
     const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.ok ? cf.config.cloudflare.account_id : undefined);
     const named = listed?.ok ? listed.items.filter(token => token.name === `employee-${ctx.block.handle}`) : [];
+    const history = cf.ok ? accessPolicyTokenHistory(ctx.block.handle, ctx.block.subject, cf.config.cloudflare.account_id) : { ids: [], uncertain: true };
+    const captured = cf.ok && Object.keys(ctx.captures).some(key => key.startsWith(`access_policy_tokens:${cf.config.cloudflare.account_id}:`));
     const rows: CredentialRow[] = [];
-    if (!binding && !previous.length && !pending.token_ids.length && !pending.uncertain && listed?.ok && !named.length) return [{ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` }];
-    if (!binding && !pending.token_ids.length && !pending.uncertain && listed?.ok && !named.length) rows.push({ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` });
+    if (!binding && !previous.length && !pending.token_ids.length && !pending.uncertain && !history.ids.length && !history.uncertain && !captured && listed?.ok && !named.length) return [{ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` }];
+    if (!binding && !pending.token_ids.length && !pending.uncertain && !history.ids.length && !history.uncertain && !captured && listed?.ok && !named.length) rows.push({ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` });
     if (!binding && !listed?.ok && !pending.token_ids.length && !pending.uncertain) rows.push({ ...base, status: "unverified", provider_code: cf.ok ? listed?.code : cf.code, next_action: `flume identity credentials ${ctx.employee}` });
     for (const token of named.filter(token => !pending.token_ids.includes(token.id) && (!binding || token.client_id !== binding.principal))) rows.push({ ...base, kind: "unattributed-access-token", id: token.id, status: "unverified", provider_code: "issuance-not-attributed", next_action: "reconcile provider token with subject-scoped issuance receipts; name alone never authorizes deletion" });
     for (const id of pending.token_ids) {
@@ -460,6 +546,7 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
       rows.push(previousRow("cloudflare_access", rotated, evidence, route, gone ? "absent" : undefined,
         gone ? `the service token ${rotated.principal} is absent from the provider's complete listing, so no secret of it authenticates` : listed?.ok ? `the service token ${rotated.principal} is still listed; whether the old secret still authenticates is not observable` : `the service-token listing could not be read (${listed ? listed.code : cf.ok ? "unread" : cf.code})`));
     }
+    if (binding || pending.token_ids.length || pending.uncertain || history.ids.length || history.uncertain || captured) rows.push(await policyInventory(ctx, cf, listed));
     return rows;
   },
   plan(ctx, options) {
@@ -467,6 +554,8 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
     if (!options.revoke) return [];
     const cfConfig = (() => { try { return loadProvisioningConfig(); } catch { return undefined; } })();
     const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cfConfig?.cloudflare.account_id);
+    const history = cfConfig ? accessPolicyTokenHistory(ctx.block.handle, ctx.block.subject, cfConfig.cloudflare.account_id) : { ids: [], uncertain: false };
+    const captured = cfConfig && Object.keys(ctx.captures).some(key => key.startsWith(`access_policy_tokens:${cfConfig.cloudflare.account_id}:`));
     const pendingSteps: PlannedStep[] = pending.token_ids.map(id => ({
       key: `cloudflare_access:pending-token-delete:${id}`, adapter: "cloudflare_access", action: "token-delete", resource: id,
       description: `delete retained Access token ${id} only if its provider name and account still match this employee`,
@@ -479,7 +568,7 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         if (token && (token.name !== `employee-${context.block.handle}` || pending.client_ids[id] !== token.client_id || (context.block.bindings?.cloudflare_access && context.block.bindings.cloudflare_access.principal !== token.client_id))) return null;
         return token ? [id] : [];
       },
-      async run(ctx) { return accessMutation(ctx, async context => {
+      async run(ctx, hooks) { return accessMutation(ctx, async context => {
         const cf = await cloudflareOf(context);
         if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
         if (cf.config.cloudflare.account_id !== cfConfig?.cloudflare.account_id) return { result: "unresolved", provider_code: "account-mismatch", detail: "issuance account differs from configured account" };
@@ -493,6 +582,10 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
           return { result: "converged", detail: "token is bound; the binding-scoped step owns its deletion", data: { resources: [] } };
         if (token.name !== `employee-${context.block.handle}` || pending.client_ids[id] !== token.client_id || context.block.bindings?.cloudflare_access)
           return { result: "unresolved", provider_code: "pending-token-owner-mismatch", detail: "provider identity differs from issuance receipt; no delete attempted" };
+        const captureKey = policyCaptureKey(cf.config, context);
+        const old = context.captures[captureKey];
+        if (old !== undefined && (!Array.isArray(old) || old.some(value => typeof value !== "string"))) return { result: "unresolved", provider_code: "access-policy-token-unresolved" };
+        hooks.capture(captureKey, [...new Set([...((old as string[] | undefined) ?? []), id])]);
         const removed = await cfRequest(cf.token, "DELETE", `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens/${id}`);
         if (!cfOk(removed) && removed.http_status !== 404) return { result: "unresolved", provider_code: codeOf(removed), detail: "retained token delete failed", data: { resources: [id] } };
         const verify = await listServiceTokens(cf);
@@ -504,9 +597,13 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
       pendingSteps.push(skipped({ key: "cloudflare_access:pending-issuance-uncertain", adapter: "cloudflare_access", action: "token-delete", resource: ctx.block.handle, description: "uncertain issuance history needs manual reconciliation" }, "issuance-receipt-uncertain", "cannot safely authorize any Access revocation from uncertain issuance history"));
       return pendingSteps;
     }
-    if (!binding) return pendingSteps;
+    if (history.uncertain && !pending.uncertain && cfConfig) {
+      pendingSteps.push(skipped({ key: "cloudflare_access:policy-history-uncertain", adapter: "cloudflare_access", action: "policy-membership-remove", resource: ctx.block.subject, description: "Access policy history cannot be scoped to the configured account" }, "access-policy-history-uncertain", "restore the original account/policy configuration or reconcile the scoped receipts; no policy edit authorized"));
+    }
+    const cleanup = binding || pending.token_ids.length || history.ids.length || captured ? [policyCleanupStep(ctx)] : [];
+    if (!binding) return [...cleanup, ...pendingSteps];
     const key = `cloudflare_access:token-delete:${binding.principal}`;
-    return [...pendingSteps, {
+    return [...cleanup, ...pendingSteps, {
       key, adapter: "cloudflare_access", action: "token-delete", resource: binding.principal,
       description: `delete the Access service token ${binding.principal}, verify by listing again`,
       async live(context) {
@@ -517,7 +614,7 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         const found = listed.items.find(candidate => candidate.client_id === binding.principal);
         return found ? [found.id] : [];
       },
-      async run(ctx) { return accessMutation(ctx, async context => {
+      async run(ctx, hooks) { return accessMutation(ctx, async context => {
         const cf = await cloudflareOf(context);
         if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
         const remembered = (context.steps[key]?.data as { token_id?: string } | undefined)?.token_id;
@@ -528,6 +625,11 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
         const id = found?.id ?? remembered!;
         const conflict = accessDeleteConflict(context, cf, binding.principal, id);
         if (conflict) return { result: "unresolved", provider_code: conflict.code, detail: conflict.detail };
+        const captureKey = policyCaptureKey(cf.config, context);
+        const old = context.captures[captureKey];
+        if (old !== undefined && (!Array.isArray(old) || old.some(value => typeof value !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(value)))) return { result: "unresolved", provider_code: "access-policy-token-unresolved", detail: "prior policy ID capture invalid; no delete authorized" };
+        // The first cleanup inventory may have failed. The verified token ID must survive a kill immediately after DELETE.
+        hooks.capture(captureKey, [...new Set([...((old as string[] | undefined) ?? []), id])]);
         const removed = await cfRequest(cf.token, "DELETE", `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens/${id}`);
         const committed = cfOk(removed), absent = removed.http_status === 404;
         // The id is not a secret; keeping it lets a retry send the DELETE that a 500 left unanswered.

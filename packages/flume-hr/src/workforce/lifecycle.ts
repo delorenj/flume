@@ -377,7 +377,7 @@ export async function restoreEmployee(employee: string, options: LifecycleOption
     for (const [key, record] of Object.entries(ctx.steps)) {
       if (!DONE.has(record.status) || !(key.startsWith("cloudflare_access:") || key.startsWith("gateway:"))) continue;
       const step = current.get(key);
-      if (!step) continue;
+      if (!step || step.action === "policy-membership-remove") continue;
       const acted = Array.isArray(record.data?.resources) ? (record.data!.resources as unknown[]).map(String) : [];
       let live: string[] | null = null;
       try { live = step.live ? await step.live(ctx) : null; } catch { live = null; }
