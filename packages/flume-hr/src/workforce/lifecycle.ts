@@ -265,7 +265,7 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
     ledger({ event: "lifecycle.operation", phase: "started", revoke, from: block.status, to });
 
     // 1. Local status, first. If it cannot be written nothing else is attempted: the next request would not be denied.
-    const status = await setEmployeeStatus(employee, to, { apply: true });
+    const status = await setEmployeeStatus(employee, to, { apply: true, lifecycle: true });
     const local: StepReport = { ...localStep(employee, to), outcome: status.ok ? (status.changed ? "done" : "converged") : "unresolved", ...(status.ok ? { detail: status.changed ? `${block.status} -> ${to}` : `already ${to}` } : { provider_code: status.blockers[0]?.code ?? "status-refused", detail: status.blockers[0]?.detail }) };
     reports.push(local);
     ledger({ event: "lifecycle.step", step: local.key, outcome: local.outcome, ...(local.provider_code ? { provider_code: local.provider_code } : {}) });

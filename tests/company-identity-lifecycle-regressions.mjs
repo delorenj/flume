@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import YAML from "yaml";
@@ -13,7 +14,7 @@ import { fakeCloudflare, fakeGithub, rsa, tree, writeFakeGateway, writeFakeOp, w
 
 const root = resolve(import.meta.dirname, "..");
 const cli = join(root, "packages/flume-hr/dist/index.js");
-const work = mkdtempSync("/tmp/flume53-");
+const work = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "flume53-"));
 let count = 0;
 const pass = (name) => { count++; console.log(`PASS ${name}`); };
 
@@ -604,6 +605,19 @@ try {
   // -- 10. tombstones ----------------------------------------------------------------------------------------------------
   {
     const w = await world("tombstone");
+    const beforeLegacy = { home: tree(w.home), state: tree(join(w.dir, "state")), definition: readFileSync(w.adaRole, "utf8"), calls: providerMutations(), gateway: w.gw.calls() };
+    for (const flags of [[], ["--apply"]]) {
+      const legacy = w.json(await w.runAsync(["identity", "status", "ada-pm", "retired", ...flags, "--json"]), 1);
+      blockedWith(legacy, "retirement-requires-lifecycle");
+      assert.match(legacy.blockers[0].detail, /flume identity retire ada-pm/u);
+      assert.deepEqual(legacy.writes, []);
+    }
+    assert.deepEqual(tree(w.home), beforeLegacy.home);
+    assert.deepEqual(tree(join(w.dir, "state")), beforeLegacy.state);
+    assert.equal(readFileSync(w.adaRole, "utf8"), beforeLegacy.definition);
+    assert.deepEqual(providerMutations(), beforeLegacy.calls);
+    assert.deepEqual(w.gw.calls(), beforeLegacy.gateway);
+    pass("legacy status retired is refused in preview and apply without writes or provider calls; lifecycle retirement is required");
     const retired = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
     assert.equal(retired.ok, true);
     const tomb = stateOf(w).tombstones[w.ada.subject];

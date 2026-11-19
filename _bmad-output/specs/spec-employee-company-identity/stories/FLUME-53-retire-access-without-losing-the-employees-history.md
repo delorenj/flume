@@ -33,6 +33,14 @@ deferred:
     severity: low
 ---
 
+**Current acceptance clarification (FLUME-53 follow-up).** The historical intent below is retained as an implementation record,
+but its earlier prohibition on changing the legacy `identity status` path is superseded: `identity status <e> retired`
+now refuses with `retirement-requires-lifecycle`, including `--apply`. Only `identity retire` records the permanent
+tombstone and reports residual access. For `access receipts --run`, a consumer prefix or a separately verified historical
+request is insufficient: the imported gateway usage receipt must carry an authenticated session matching a successful
+audited run and a timestamp within its bounded window. An empty FLUME-39 evidence directory is not an owner link.
+Fixture tests establish code behavior, not the live canary or provider revocation.
+
 <intent-contract>
 
 ## Intent

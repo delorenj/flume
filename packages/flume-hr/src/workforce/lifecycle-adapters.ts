@@ -24,7 +24,7 @@
 //     its own row, `unverified` while the vault item exists, because nothing proves it is the desk's consumer.
 // Nothing here ever holds, returns or logs a secret value: rows carry IDs, `op://` references and codes.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -722,7 +722,17 @@ function gatewayBin(env: NodeJS.ProcessEnv): string {
 
 export function gatewayLink(env: NodeJS.ProcessEnv = process.env) {
   const evidencePath = env.FLUME_GATEWAY_EVIDENCE || join(resolveFlumeRoot(), "_bmad-output", "implementation-artifacts", "FLUME-39");
-  return { owner_ticket: "FLUME-39", evidence_path: evidencePath, evidence_status: (existsSync(evidencePath) ? "present" : "unverified") as "present" | "unverified" };
+  const document = (path: string): boolean => {
+    const info = lstatSync(path);
+    return info.isFile() && !info.isSymbolicLink() && /\.(?:md|json|jsonl)$/u.test(path) && info.size > 0 && info.size <= 1024 * 1024 && Boolean(readFileSync(path, "utf8").trim());
+  };
+  let present = false;
+  try {
+    const info = lstatSync(evidencePath);
+    if (!info.isSymbolicLink()) present = info.isDirectory()
+      ? readdirSync(evidencePath).some(name => document(join(evidencePath, name))) : document(evidencePath);
+  } catch { /* unreadable owner evidence is not a link */ }
+  return { owner_ticket: "FLUME-39", evidence_path: evidencePath, evidence_status: (present ? "present" : "unverified") as "present" | "unverified" };
 }
 
 function fleetHome(census: IdentityCensus, env: NodeJS.ProcessEnv): string {

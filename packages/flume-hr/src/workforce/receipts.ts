@@ -3,9 +3,8 @@
 //
 // It reads secret-free logs (the facade's audit and ledgers, the lifecycle ledger, Pilot's comment receipts) and emits a
 // FIELD WHITELIST per record. It never echoes a raw line, so a field some future writer adds is not leaked by accident.
-// Gateway attribution is linked to the FLUME-39 evidence, which is `unverified` until that evidence exists; a generated
-// desk config is never offered as proof. A `--gateway-proof` file (the output of `gateway-proof.py check`) is `verified`
-// only if it says `verified: true` and every receipt's token_name belongs to the employee's own consumer.
+// Gateway attribution links owner evidence; a generated desk config is never runtime proof.
+// Imported gateway usage needs an unshared consumer, an authenticated session_id matching an audited run, and bounded time.
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { accessStateDir } from "./access";
@@ -124,7 +123,7 @@ export function accessReceipts(options: ReceiptsOptions) {
   const link = gatewayLink(env);
   const consumer = target ? gatewayConsumerOf(census, target, env) : undefined;
   const gateway: Line = { ...link, consumer: consumer?.consumer ?? null, ...(consumer?.shared ? { shared_consumer: true } : {}), attribution: link.evidence_status === "present" ? "linked" : "unverified" };
-  if (options.gatewayProof) gateway.proof = gatewayProof(options.gatewayProof, consumer?.consumer, consumer?.shared ?? false);
+  if (options.gatewayProof) gateway.proof = gatewayProof(options.gatewayProof, consumer?.consumer, consumer?.shared ?? false, audit.filter(mine).filter(inRun), audit);
 
   return {
     ok: true, blockers, employee: employee ?? null, subject: subject ?? null, handle: handle ?? null,
@@ -133,26 +132,46 @@ export function accessReceipts(options: ReceiptsOptions) {
   };
 }
 
-/**
- * `verified` only for `verified: true` AND every receipt's token_name starting `aai:<consumer>:` of a consumer that is the
- * employee's ALONE: a shared consumer's tokens (the fleet base key) say nothing about which employee spent them.
- */
-function gatewayProof(path: string, consumer: string | undefined, shared: boolean): Line {
+// Gateway usage must name the launcher-signed run in its authenticated session_id.
+// Request IDs in access requests are caller-chosen and cannot establish that link.
+function gatewayProof(path: string, consumer: string | undefined, shared: boolean, selected: Line[], audit: Line[]): Line {
   const base = { path };
+  const text = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_:.-]{1,200}$/u.test(value);
+  const timestamp = (value: unknown): number => typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value * 1000 : typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?(?:Z|[+-]\d\d:\d\d)$/u.test(value) ? Date.parse(value) : NaN;
   try {
     const info = lstatSync(path);
     if (!info.isFile() || info.isSymbolicLink() || info.size > 1024 * 1024) return { ...base, status: "unverified", reason: "not-a-regular-file" };
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as { status?: unknown; verified?: unknown; receipts?: unknown };
-    const receipts = Array.isArray(parsed.receipts) ? parsed.receipts as Line[] : [];
-    const shown = receipts.map(receipt => pick(receipt, ["token_name", "request_id", "session_id", "created_at"] as const));
-    if (!consumer) return { ...base, status: "unverified", reason: "no-consumer", receipts: shown };
-    if (shared) return { ...base, status: "unverified", reason: "shared-consumer", consumer, receipts: shown };
-    if (parsed.verified !== true) return { ...base, status: "unverified", reason: "proof-not-verified", proof_status: typeof parsed.status === "string" ? parsed.status : null, consumer, receipts: shown };
-    if (!receipts.length) return { ...base, status: "unverified", reason: "no-receipts", consumer, receipts: shown };
+    const parsed = JSON.parse(readFileSync(path, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Array.isArray(parsed.receipts)) return { ...base, status: "unverified", reason: "malformed-proof" };
+    const receipts: Line[] = parsed.receipts;
+    const shown = receipts.filter(receipt => receipt && typeof receipt === "object" && !Array.isArray(receipt)).map(receipt => Object.fromEntries(
+      ["token_name", "request_id", "session_id", "created_at"].filter(field => field === "created_at" ? Number.isFinite(timestamp(receipt[field])) : text(receipt[field])).map(field => [field, receipt[field]]),
+    ));
+    const refuse = (reason: string, status = "unverified") => ({ ...base, status, reason, consumer, receipts: shown });
+    if (!consumer) return refuse("no-consumer");
+    if (shared) return refuse("shared-consumer");
+    if (parsed.verified !== true) return refuse("proof-not-verified");
+    if (!receipts.length) return refuse("no-receipts");
+    if (receipts.length > 1000 || receipts.some(receipt => !receipt || typeof receipt !== "object" || Array.isArray(receipt))) return refuse("malformed-receipt");
     const prefix = `aai:${consumer}:`;
-    const foreign = receipts.filter(receipt => typeof receipt.token_name !== "string" || !receipt.token_name.startsWith(prefix));
-    if (foreign.length) return { ...base, status: "mismatch", reason: "foreign-token-name", consumer, foreign: foreign.length, receipts: shown };
-    return { ...base, status: "verified", consumer, receipts: shown };
+    if (receipts.some(receipt => !text(receipt.token_name) || !receipt.token_name.startsWith(prefix) || receipt.token_name.length === prefix.length)) return refuse("foreign-token-name", "mismatch");
+    if (receipts.some(receipt => !text(receipt.session_id) || !text(receipt.request_id) || !Number.isFinite(timestamp(receipt.created_at)))) return refuse("malformed-receipt");
+    for (const receipt of receipts) {
+      const own = selected.filter(line => line.run_id === receipt.session_id && Number(line.http_status) < 400 && (line.outcome === "granted" || line.outcome === "authorized"));
+      if (!own.length) return refuse("uncorrelated-session");
+      const subjects = new Set(audit.filter(line => line.run_id === receipt.session_id).map(line => line.subject));
+      if (subjects.size !== 1 || !subjects.has(own[0]!.subject)) return refuse("ambiguous-session");
+      const stamps = own.map(line => timestamp(line.at));
+      if (stamps.some(stamp => !Number.isFinite(stamp))) return refuse("invalid-run-window");
+      const from = Math.min(...stamps), to = Math.max(...stamps);
+      if (to - from > 12 * 60 * 60 * 1000) return refuse("invalid-run-window");
+      // Gateway usage is timestamped in whole Unix seconds; allow only that rounding, not an arbitrary grace period.
+      const at = timestamp(receipt.created_at);
+      if (at < Math.floor(from / 1000) * 1000 || at > Math.floor(to / 1000) * 1000 + 999) return refuse("outside-run-window");
+    }
+    if (parsed.status !== "verified" || parsed.proof_kind !== "gateway_usage") return refuse("not-gateway-usage");
+    return { ...base, status: "verified", consumer, correlation: "authenticated-session-to-audited-run", receipts: shown };
   } catch {
     return { ...base, status: "unverified", reason: "unreadable" };
   }
