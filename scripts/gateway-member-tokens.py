@@ -35,7 +35,6 @@ RENDERER = ROOT / "templates/hermes-agent/scripts/hermes-profile-config.py"
 ENV_NAME = "AUTOMATICAI_GATEWAY_KEY"
 TOKENS_ITEM = "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki"
 MAX_CONSUMER = 26
-COMMENT = "# Per-member AutomaticAI gateway credential; reference only.\n"
 
 
 class ProvisionError(RuntimeError):
@@ -131,10 +130,10 @@ def candidate(text, ref):
             # Only the root empty mapping is replaced; comments stay verbatim.
             if len(ordinary) != 1 or lines[ordinary[0]].strip() != "{}":
                 raise ProvisionError("unsupported-delta-layout")
-            lines[ordinary[0]] = COMMENT + block
+            lines[ordinary[0]] = block
             result = "".join(lines)
         else:
-            result = text + ("\n" if text and not text.endswith("\n") else "") + COMMENT + block
+            result = text + ("\n" if text and not text.endswith("\n") else "") + block
     elif isinstance(syntax, yaml.MappingNode) and not syntax.flow_style:
         lines = text.splitlines(keepends=True)
         # A populated parent: place the new child after its first existing
@@ -142,7 +141,7 @@ def candidate(text, ref):
         if not syntax.value:
             raise ProvisionError("unsupported-delta-layout")
         at = syntax.value[0][0].start_mark.line
-        lines[at:at] = (COMMENT if depth == 3 else "").splitlines(keepends=True) + block.splitlines(keepends=True)
+        lines[at:at] = block.splitlines(keepends=True)
         result = "".join(lines)
     elif isinstance(syntax, yaml.MappingNode) and not syntax.value:
         # `env: {}` (possibly with an inline comment).
