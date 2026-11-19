@@ -162,6 +162,7 @@ authorities:
       # holding `33god-pm` (agent_id/profile stay the post's routing key).
       - agents.{agent_id}.identity
       - agents.{agent_id}.display_name
+      - agents.{agent_id}.purpose
       - agents.{agent_id}.project_path
       - agents.{agent_id}.role_dir
       - agents.{agent_id}.profile_name

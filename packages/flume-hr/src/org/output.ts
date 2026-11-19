@@ -752,6 +752,7 @@ interface RosterEntry {
   repo: string;
   repoPaint: (value: string | number) => string;
   role: string;
+  purpose: string | null;
   board: string;
   tickets: string;
   state: string;
@@ -871,6 +872,7 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
       repo: bounded(row.repo.value ?? row.project_id.value ?? "-"),
       repoPaint: projectState === "resolved" ? plain : stateColor(projectState),
       role: fieldCell(row.role),
+      purpose: row.purpose?.value ? bounded(row.purpose.value, 300) : null,
       board: boardCell(row.board) ?? "-",
       tickets: optionalCell(row, "tickets") ?? PENDING_CELL,
       state: optionalCell(row, "state") ?? PENDING_CELL,
@@ -966,6 +968,7 @@ export function formatFleetInventoryReport(inventory: FleetInventory): string {
       + `${cell(entry.tickets, dim, columns.tickets)}  ${cell(entry.state, dim, columns.state)}  ${issueTally(entry.issues)}`
       + (entry.parked ? `  ${yellow(entry.parked)}` : "");
     lines.push(row.trimEnd());
+    if (entry.purpose) lines.push(`       purpose: ${entry.purpose}`);
     for (const issue of entry.issues.slice(0, entry.shown)) lines.push(issueLine(issue, codeWidth, 0, width));
     const held = entry.issues.length - entry.shown;
     if (held) lines.push(`       ${dim(`... ${held} more on this agent, not shown -- use --json`)}`);

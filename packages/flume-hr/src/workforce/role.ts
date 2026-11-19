@@ -42,6 +42,9 @@ export async function skillsProblems(role:RoleDeclaration, employee:string, opti
   try {await resolveRoleLoadout(role.skills,selectionContext(options,paths(options)));return [];}
   catch(error){return [`${employee}: skills loadout does not resolve: ${(error as Error).message}`];}
 }
+export function roleDelegatesWorkers(role: RoleDeclaration): boolean {
+  return ["pm", "em", "director"].includes(role.role) || role.behavior?.delegate_all_code_changes === true;
+}
 export function readRoleDeclaration(root:string, role:string, post="", profile=post): RoleDeclaration {
   if (!/^[a-z0-9][a-z0-9_-]*$/u.test(role)) throw new Error("Unsafe role filename");
   const path=join(root,"roles",`${role}.md`);
@@ -135,7 +138,7 @@ async function projectUnlocked(input:unknown, employee:string, profile:string, o
   // A loadout makes the desk strict: discovery is pinned to the Skillex projection before Skillex
   // writes it (a strict sync refuses a generated config that still lists external roots).
   const configured=spawnSync("python3",[join(flume,"scripts/role-profile-config.py"),options.renderer??join(flume,"templates/hermes-agent/scripts/hermes-profile-config.py"),profile],
-    {input:JSON.stringify({chain:role.chain,strict_skills:Boolean(role.skills)}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
+    {input:JSON.stringify({chain:role.chain,strict_skills:Boolean(role.skills),delegate_workers:roleDelegatesWorkers(role)}),encoding:"utf8",timeout:35_000,env:{...process.env,HERMES_FLEET_HOME:p.fleet}});
   if(configured.status!==0) throw new Error(`Role config projection failed: ${configured.stderr}`);
   const selection=plan ? await applyRoleSelection(profile,plan,selected) : null;
   projectPlacement(employee,{department:role.department!,reports_to:role.reports_to},{registry:p.registry,org:p.org});

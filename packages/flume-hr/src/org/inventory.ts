@@ -1148,6 +1148,7 @@ export function buildInventoryRow(entry: RawEntry, ctx: InventoryContext): Fleet
     repo,
     repo_path: repoPath,
     role,
+    purpose: scalar("purpose", "agents.{agent_id}.purpose"),
     identity,
     type,
     employment,

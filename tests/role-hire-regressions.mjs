@@ -293,6 +293,30 @@ try {
   assert.equal(routing.boardRouting({'demo-pm':pm,'demo-dev':advisoryRow},'board-uuid').routes.at(-1).owner,'demo-pm');
   pass('actual advisory hire preview/apply: CEO symlink, no registry claim at Copier or final projection');
 
+  const managerFixture=await fixture('delegating-manager',{set:'dev-set'});
+  writeFileSync(join(managerFixture.dir,'declarations/roles/dev.md'),
+    '---\n'+YAML.stringify({role:'dev',skills:{set:'dev-set'},department:'engineering',reports_to:'boss',board_scope:'advisory',behavior:{delegate_all_code_changes:true}})+'---\nFixture manager\n');
+  succeeded(hire(managerFixture));
+  const managerTools=()=>YAML.parse(readFileSync(join(managerFixture.desk,'config.yaml'),'utf8')).platform_toolsets.bloodbank;
+  for(const tool of ['delegation','terminal','file','skills']) assert.ok(managerTools().includes(tool),tool);
+  for(const kind of ['list-patch','direct-list']) {
+    const delta=YAML.parse(readFileSync(join(managerFixture.desk,'config.delta.yaml'),'utf8'));
+    delta['x-operator-note']={keep:['unrelated','state']};
+    if(kind==='list-patch') delta['x-pjangler-merge']={list_patches:{'platform_toolsets.bloodbank':{remove:['delegation','terminal','file','web'],add:['todo']}}};
+    else {removeBloodbankPatch(delta);delta.platform_toolsets={bloodbank:['skills','todo']};}
+    writeDelta(managerFixture,delta);
+    const broken=spawnSync(python,[renderer,'render','--profile','demo-dev'],{env:managerFixture.env,encoding:'utf8'});succeeded(broken);
+    const audit=managerFixture.run('audit','--rules','hermes.bloodbank-toolsets','--json');
+    assert.equal(JSON.parse(audit.stdout).rules[0].status,'fail','a declared manager without tools must fail audit');
+    succeeded(onboard(managerFixture));
+    for(const tool of ['delegation','terminal','file','skills','todo']) assert.ok(managerTools().includes(tool),`${kind}: ${tool}`);
+    assert.deepEqual(YAML.parse(readFileSync(join(managerFixture.desk,'config.delta.yaml'),'utf8'))['x-operator-note'],{keep:['unrelated','state']});
+    const checked=managerFixture.run('audit','--rules','hermes.bloodbank-toolsets','--json');succeeded(checked);
+    assert.equal(JSON.parse(checked.stdout).rules[0].status,'pass');
+    const stable=tree(managerFixture.desk);succeeded(onboard(managerFixture));assert.deepEqual(tree(managerFixture.desk),stable);
+  }
+  pass('declared manager hire and onboard restore existing restrictive patches/lists; real generated config and audit agree, repeat is stable');
+
   for(const [label,skills,needle] of [
     ['missing-set',{set:'no-such-set'},/no-such-set/],
     ['missing-pack',{pack:'no-such-pack'},/no-such-pack/],

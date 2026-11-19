@@ -86,6 +86,18 @@ with r.PROFILE_LOCK.ProfileConfigLock(pdir):
         if not isinstance(skills, dict):
             raise SystemExit("skills delta must be a mapping")
         delta["skills"] = {**skills, "external_dirs": []}
+    if request.get("delegate_workers"):
+        required = ["delegation", "terminal", "file", "skills"]
+        tools = delta.get("platform_toolsets") or {}
+        if "bloodbank" in tools:
+            tools["bloodbank"] = list(dict.fromkeys([*tools["bloodbank"], *required]))
+            delta["platform_toolsets"] = tools
+        directive = delta.setdefault(r.LIST_PATCH_KEY, {})
+        patches = directive.setdefault("list_patches", {})
+        patch = patches.setdefault("platform_toolsets.bloodbank", {})
+        if "remove" in patch:
+            patch["remove"] = [tool for tool in patch["remove"] if tool not in required]
+        patch["add"] = list(dict.fromkeys([*patch.get("add", []), *required]))
     # THE expected config (base + delta + every renderer pin, e.g. terminal.cwd from the registry row);
     # a bare deep_merge here rewrote the desk's config.yaml without its pin.
     merged = r.expected_config(r.load_yaml(r.BASE), delta, pdir)

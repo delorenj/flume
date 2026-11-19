@@ -21,7 +21,7 @@ import { registerOrgCli, isOrgJsonInvocation, orgParserFailureEnvelope } from ".
 import { fleetEnvelopeExitCode, renderFleetJson } from "./org/output";
 import { recipeRegistry } from "./parity/catalog";
 import { lifecycleContext, runAudit, runMigrationForRules } from "./parity/index";
-import { formatAuditReport, formatMigrationReport, SCAFFOLD_SCRIPTS_ONLY_ENV, type MigrationReport } from "./parity/rules";
+import { formatAuditReport, formatMigrationReport, scopeEmployee, SCAFFOLD_SCRIPTS_ONLY_ENV, type MigrationReport } from "./parity/rules";
 import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
@@ -973,6 +973,7 @@ program
   .argument("[repo]", "Repository to audit (default: cwd)")
   .description("Compliance audit: every employee invariant this repository is subject to")
   .option("--employee <id>", "Audit an owned portable specialist without a repository")
+  .option("--agent <id>", "Narrow supported repository checks to one provisioned employee; requires explicit --rules")
   .option("--rules <ids>", "Comma-separated rule ids; report only these")
   .option("--json", "Output machine-parseable JSON")
   // `guardBrokenPipe` BEFORE the first write, and `writeStdout` + a flushing
@@ -990,6 +991,7 @@ program
     if (options.employee) { await specialistResult(() => auditSpecialist(options.employee), options.json); return; }
     guardBrokenPipe();
     const ruleIds = String(options.rules ?? "").split(",").map((id: string) => id.trim()).filter(Boolean);
+    if (options.agent) scopeEmployee(resolve(repo ?? process.cwd()), options.agent, ruleIds);
     const report = await runAudit(repo, undefined, ruleIds);
     await writeStdout(options.json ? `${JSON.stringify(report, null, 2)}\n` : `${formatAuditReport(report)}\n`);
     await exitAfterFlush(report.ok ? 0 : 1);
@@ -1030,6 +1032,7 @@ program
   .argument("[finding]", "Rule id to correct, e.g. hermes.runtime-singleton")
   .argument("[repo]", "Repository to correct (default: cwd)")
   .description("Correct a finding, or every finding this run can correct (--all)")
+  .option("--agent <id>", "Narrow supported repository remediation to one provisioned employee")
   .option("--all", "Correct every fixable failing rule, and report each one it may not touch")
   .option("--register-projects", "Authorize org.project-records to create the project records it reports; without it that rule only says what it would register")
   .option("--scripts-only", "hermes.pm-scaffold only: refresh the role's .scripts/ and nothing else (no SOUL compose, wrapper, .gitignore, runtime seed, profile metadata or registry row)")
@@ -1055,6 +1058,7 @@ program
     // shape, shared by every recipe, and this authorization belongs to one rule.
     if (options.registerProjects) process.env[REGISTER_PROJECTS_ENV] = "1";
     if (options.scriptsOnly) process.env[SCAFFOLD_SCRIPTS_ONLY_ENV] = "1";
+    if (options.agent) scopeEmployee(resolve(repo ?? process.cwd()), options.agent, options.all ? [] : [finding!]);
     const report = options.all
       ? await runFullRemediation(repo, Boolean(options.dryRun))
       : await runMigrationForRules([finding!], repo, Boolean(options.dryRun));

@@ -6,7 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import YAML from "yaml";
 import { bold, dim, green, red, yellow, gray, glyph, statusStyle, joinDot } from "../utils/style";
 import { blobId as scaffoldBlobId, compareAssets as compareScaffoldAssets, renderTemplate as renderScaffoldTemplate, type ScaffoldDesiredAsset, type ScaffoldObservedAsset } from "../scaffold/compare";
-import { readRoleDeclaration, auditRoleSkills, projectRoleDeclaration, retiredRole, withRegistryLock } from "../workforce/role";
+import { readRoleDeclaration, roleDelegatesWorkers, auditRoleSkills, projectRoleDeclaration, retiredRole, withRegistryLock } from "../workforce/role";
 import { applyLifecycle, isHeldDrift, lifecycleDrift, rowLifecycle } from "../workforce/registry-lifecycle";
 import { updateRegistryDocumentUnlocked } from "../hire/PreserveRegistryComments";
 import { resolveFlumeRoot } from "../kernel/paths";
@@ -325,6 +325,18 @@ export { readRoleIdentity, type RoleIdentity } from "../workforce/identity";
 import { readRoleIdentity, type RoleIdentity } from "../workforce/identity";
 
 
+let scopedAgent: string | undefined;
+function agentInScope(id: string): boolean {
+  return !scopedAgent || scopedAgent === id;
+}
+export function scopeEmployee(repo: string, id: string, rules: readonly string[]): void {
+  const supported = new Set(["hermes.pm-scaffold", "hermes.runtime-singleton", "hermes.registry-parity", "hermes.bloodbank-toolsets"]);
+  if (!/^[a-z0-9][a-z0-9_-]*$/u.test(id) || !rules.length || rules.some(rule => !supported.has(rule))) {
+    throw new Error("--agent requires an employee id and explicit --rules (audit) or one of hermes.pm-scaffold, hermes.runtime-singleton, hermes.registry-parity, hermes.bloodbank-toolsets");
+  }
+  if (!discoverRoles(repo).some(role => role.agentId === id)) throw new Error(`No provisioned employee ${id} in ${repo}`);
+  scopedAgent = id;
+}
 function discoverRoles(repoRoot: string): RoleMeta[] {
   const rolesDir = join(repoRoot, "agents", "hermes");
   if (!existsSync(rolesDir)) return [];
@@ -364,7 +376,7 @@ function discoverRoles(repoRoot: string): RoleMeta[] {
         legacyScrumAutoReview: yamlGet(text, "scrum_master.auto_review"),
       } satisfies RoleMeta;
     })
-    .filter((value): value is RoleMeta => Boolean(value));
+    .filter((value): value is RoleMeta => Boolean(value) && agentInScope(value!.agentId));
 }
 
 
@@ -504,6 +516,7 @@ function registryIdentityDrift(role: RoleMeta, entry: Record<string, unknown>): 
 function registryLifecycleDrift(registry: Record<string, unknown>, fleet: string): string[] {
   const out: string[] = [];
   for (const [agentId, entry] of Object.entries(registry)) {
+    if (!agentInScope(agentId)) continue;
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const row = entry as Record<string, unknown>;
     out.push(...lifecycleDrift(row, rowLifecycle(agentId, row, fleet)));
@@ -600,7 +613,7 @@ function readDeclaredAgents(ctx: Context): DeclaredAgentEntry[] {
   const project = readProjectJson(ctx);
   const agents = project?.agents as Record<string, unknown> | undefined;
   if (!agents || typeof agents !== "object") return [];
-  return Object.entries(agents).map(([agentId, value]) => {
+  return Object.entries(agents).filter(([agentId]) => agentInScope(agentId)).map(([agentId, value]) => {
     const entry = (typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}) as Record<string, unknown>;
     return {
       agentId,
@@ -1814,8 +1827,6 @@ function fleetHome(ctx: Context): string {
 const BLOODBANK_PM_TOOLSETS = ["delegation", "terminal", "file", "skills"] as const;
 // The power a non-PM employee must NOT gain on an unattended turn.
 const BLOODBANK_POWER_TOOLSETS = ["delegation", "terminal", "file"] as const;
-// Roles whose Bloodbank turns must be able to delegate, read files and run commands.
-const BLOODBANK_DELEGATING_ROLES = new Set(["pm", "em", "director"]);
 // The gateway every agent inference path must go through -- provider, host, label and curated routes -- is a
 // fact about the HOST, not a constant of this rule: big-chungus's values are the default (DEFAULT_GATEWAY_POLICY)
 // and a host overlay (kernel/host-overlay.ts `gateway:`) replaces them for another host. Every helper below takes
@@ -2695,7 +2706,7 @@ function declaredAgentEntries(repoRoot: string): [string, Record<string, unknown
   if (raw === null) return [];
   try {
     const doc = JSON.parse(raw) as { agents?: Record<string, unknown> };
-    return Object.entries(doc.agents ?? {}).map(([agentId, entry]) => [agentId, (entry ?? {}) as Record<string, unknown>]);
+    return Object.entries(doc.agents ?? {}).filter(([agentId]) => agentInScope(agentId)).map(([agentId, entry]) => [agentId, (entry ?? {}) as Record<string, unknown>]);
   } catch {
     return [];
   }
@@ -2713,6 +2724,7 @@ function ownedRegistryEntries(
   const want = realOrSelf(repoRoot);
   const owned: [string, Record<string, unknown>][] = [];
   for (const [agentId, raw] of Object.entries(registry)) {
+    if (!agentInScope(agentId)) continue;
     const entry = (raw ?? {}) as Record<string, unknown>;
     const roleDir = String(entry.role_dir ?? "");
     if (!roleDir) continue;
@@ -3932,6 +3944,7 @@ return [
 
       const registry = readRegistry(resolveAgentRegistryPath(process.env, ctx.homeDir, fleetRoot));
       for (const [agentId, raw] of Object.entries(registry ?? {})) {
+        if (!agentInScope(agentId)) continue;
         const entry = (raw ?? {}) as Record<string, unknown>;
         const bloodbank = entry.bloodbank;
         // The gateway's own routing gate: a bloodbank block, and `enabled`
@@ -3943,7 +3956,13 @@ return [
         const profile = String(entry.profile_name || agentId);
         // Delegating roles: PMs, engineering managers and directors (Jarad 2026-11-15:
         // a director needs root tools; this is a homelab, so momentum beats least privilege).
-        const isPm = BLOODBANK_DELEGATING_ROLES.has(String(entry.role ?? ""));
+        let isPm: boolean;
+        try {
+          isPm = roleDelegatesWorkers(readRoleDeclaration(process.env.FLUME_ROLES_ROOT ?? resolveFlumeRoot(), String(entry.role ?? "unknown"), agentId, profile));
+        } catch (error) {
+          details.push(`${agentId}: unreadable role delegation declaration: ${(error as Error).message}`);
+          continue;
+        }
         const generated = safeReadText(join(fleetRoot, "profiles", profile, "config.yaml"));
         let cfg: any = null;
         if (generated !== null) {
@@ -4755,6 +4774,7 @@ return [
           details.push(`registry is missing an entry for ${role.agentId}`);
           continue;
         }
+        if (role.purpose && entry.purpose !== role.purpose) details.push(`registry purpose for ${role.agentId} differs from role.yaml`);
         const entryRoleDir = String(entry.role_dir ?? "");
         if (entryRoleDir && realOrSelf(entryRoleDir) !== realOrSelf(role.roleDir)) {
           details.push(`registry role_dir for ${role.agentId} is ${entryRoleDir} (expected ${role.roleDir})`);
@@ -4906,6 +4926,11 @@ return [
       for (const role of roles) {
         const entry = agents[role.agentId] as Record<string, unknown> | undefined;
         if (!entry) continue;
+        if (role.purpose && entry.purpose !== role.purpose) {
+          entry.purpose = role.purpose;
+          details.push(`project role purpose onto ${role.agentId}`);
+          dirty = true;
+        }
         const entryRoleDir = String(entry.role_dir ?? "");
         if (entryRoleDir && realOrSelf(entryRoleDir) !== realOrSelf(role.roleDir)) {
           details.push(`repoint ${role.agentId} role_dir -> ${role.roleDir}`);
@@ -5016,6 +5041,7 @@ return [
       // Registry projection for the ticket lifecycle: every row, as the audit reports it.
       const fleet = fleetHome(ctx);
       for (const [agentId, entry] of Object.entries(agents)) {
+        if (!agentInScope(agentId)) continue;
         if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
         const changes = applyLifecycle(entry, rowLifecycle(agentId, entry, fleet));
         if (changes.length) {

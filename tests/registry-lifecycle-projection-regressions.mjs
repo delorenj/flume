@@ -167,6 +167,19 @@ ${postRow("named-pm", roles["named-pm"])}${postRow("plain-director", roles["plai
   const lifecycleLines = (audit) => audit.details.filter((line) => /company_identity|gateway_consumer/u.test(line));
 
   seed();
+  const scopedBefore = readFileSync(registryPath, "utf8");
+  const scopedAudit = run(["audit", repo, "--agent", "named-pm", "--rules", "hermes.registry-parity", "--json"]);
+  assert.deepEqual(scopedAudit.json.rules[0].details.filter(line => !line.includes("named-pm")), []);
+  const scopedPreview = run(["remediate", "hermes.registry-parity", repo, "--agent", "named-pm", "--dry-run", "--json"]);
+  assert.equal(scopedPreview.json.results[0].status, "skipped");
+  assert.equal(readFileSync(registryPath, "utf8"), scopedBefore);
+  const scopedApply = run(["remediate", "hermes.registry-parity", repo, "--agent", "named-pm", "--json"]);
+  assert.equal(scopedApply.json.results[0].status, "applied");
+  const scopedAfter = registry();
+  assert.equal(scopedAfter.agents["named-pm"].gateway_consumer, "hermes-named-pm");
+  for (const id of ["plain-director", "ops-pm", "spec"]) assert.deepEqual(scopedAfter.agents[id], YAML.parse(scopedBefore).agents[id], `${id} was not in scope`);
+  assert.equal(run(["audit", repo, "--agent", "named-pm", "--rules", "hermes.registry-parity", "--json"]).json.rules[0].status, "pass");
+  seed();
   const seeded = readFileSync(registryPath, "utf8");
   const before = registry();
 
