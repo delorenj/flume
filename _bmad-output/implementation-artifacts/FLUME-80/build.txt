@@ -8,8 +8,8 @@
 
 
   dist/index.js             1.5mb ⚠️
-  dist/mcp-server.js      927.1kb
+  dist/mcp-server.js      928.3kb
   dist/index.js.map         3.3mb
   dist/mcp-server.js.map    2.3mb
 
-⚡ Done in 86ms
+⚡ Done in 92ms

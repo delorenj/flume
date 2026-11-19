@@ -134,7 +134,8 @@ const server = createServer((req, res) => {
     if (req.headers.authorization !== `Bearer ${CF_TOKEN}`) return send(403, { success: false, errors: [{ message: "bad token" }] });
     if (req.method === "GET" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
       const page = Number(url.searchParams.get("page") || "1"), size = cf.pageSize || 50;
-      return send(200, { success: true, result: cf.tokens.slice((page - 1) * size, page * size), result_info: { total_pages: Math.max(1, Math.ceil(cf.tokens.length / size)) } });
+      const result = cf.repeatPage && page > 1 ? cf.tokens.slice(0, size) : cf.tokens.slice((page - 1) * size, page * size);
+      return send(200, { success: true, result, ...(cf.noPageMetadata ? {} : { result_info: cf.inconsistentPages ? { total_pages: page === 1 ? 2 : 3 } : cf.clampedPageMetadata ? { per_page: size } : { total_pages: Math.max(1, Math.ceil(cf.tokens.length / size)) } }) });
     }
     if (req.method === "POST" && url.pathname === `/accounts/${ACCOUNT}/access/service_tokens`) {
       const token = { id: `token-${randomUUID().slice(0, 8)}`, name: JSON.parse(body).name, client_id: `${randomUUID().replace(/-/g, "")}.access`, client_secret: CREATED_SECRET, expires_at: "2027-10-13T00:00:00Z" };
@@ -155,7 +156,10 @@ const server = createServer((req, res) => {
       cf.tokens.splice(index, 1);
       return ok({});
     }
-    if (req.method === "GET" && url.pathname === `/zones/${ZONE}/email/routing/rules`) return ok(cf.rules);
+    if (req.method === "GET" && url.pathname === `/zones/${ZONE}/email/routing/rules`) return send(200, { success: true, result: cf.rules, result_info: { total_pages: 1 } });
+    const ruleMatch = url.pathname.match(new RegExp(`^/zones/${ZONE}/email/routing/rules/([^/]+)$`));
+    if (ruleMatch && req.method === "GET") { const rule = cf.rules.find(r => r.id === ruleMatch[1]); return rule ? ok(rule) : send(404, { success: false }); }
+    if (ruleMatch && req.method === "PUT") { const rule = cf.rules.find(r => r.id === ruleMatch[1]); if (!rule) return send(404, { success: false }); Object.assign(rule, JSON.parse(body)); return ok(rule); }
     if (req.method === "POST" && url.pathname === `/zones/${ZONE}/email/routing/rules`) {
       const rule = { id: `rule-${randomUUID().slice(0, 8)}`, enabled: true, ...JSON.parse(body) };
       cf.rules.push(rule);
@@ -166,6 +170,7 @@ const server = createServer((req, res) => {
       const key = decodeURIComponent(kvMatch[1]);
       if (req.method === "GET") return cf.kv.has(key) ? send(200, cf.kv.get(key)) : send(404, { success: false, errors: [{ code: 10009, message: "key not found" }] });
       if (req.method === "PUT") { cf.kv.set(key, JSON.parse(body)); return ok({}); }
+      if (req.method === "DELETE") { cf.kv.delete(key); return ok({}); }
     }
     return send(404, { success: false, errors: [{ message: `no fake route: ${req.method} ${url.pathname}` }] });
   });
@@ -411,6 +416,11 @@ const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"))
   assert.equal(refusedPreview.capabilities["access-token"].action, "conflict");
   assert.equal(refusedPreview.capabilities["access-token"].refs.provider_match, "absent");
   assert.match(refusedPreview.capabilities["access-token"].refs.receipt_comparison, /old-deleted-token:deleted/);
+  const jsonPreview = await runAsync(["identity", "provision", "finch", "--json"]);
+  assert.match(jsonPreview.stdout, /"client_id_fields": "finch-cid"/u);
+  assert.match(jsonPreview.stdout, /old-deleted-token:deleted/u);
+  assert.match(readFileSync(join(root, "docs/identity-provisioning.md"), "utf8"), /flume identity provision <employee> --json/u);
+  pass("documented JSON recovery preview exposes safe field IDs, provider comparison and receipt outcomes");
   assert.ok(calls.slice(beforeCalls).every(c => c.method === "GET"));
   assert.equal(readFileSync(itemsPath, "utf8"), beforeItems);
   const refused = json(await runAsync(["identity", "provision", "finch", "--apply", "--json"]), 1);
@@ -526,6 +536,180 @@ for (const failure of ["failDelete", "lieDelete"]) {
   assert.equal(row.deleted, false);
   assert.ok(!receipts.some(r => r.employee === name && r.action === "deleted-orphan"));
   pass(`${failure}: cleanup not claimed without provider absence confirmation`);
+}
+
+{
+  enrollFixture("retained-lifecycle");
+  const provisioned = json(await runAsync(["identity", "provision", "retained-lifecycle", "--apply", "--json"], { OP_MODE: "unreadable" }), 1);
+  const token = cf.tokens.find(t => t.name === "employee-retained-lifecycle");
+  assert.ok(token);
+  assert.equal(provisioned.capabilities["access-token"].action, "blocked");
+  const receiptRows = readFileSync(join(state, "receipts.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
+  assert.ok(receiptRows.some(r => r.token_id === token.id && r.subject && r.account_id === ACCOUNT && r.action === "minted"));
+  const inventory = json(await runAsync(["identity", "credentials", "retained-lifecycle", "--json"]));
+  const pending = inventory.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id);
+  assert.ok(pending, JSON.stringify(inventory.credentials));
+  assert.equal(pending.status, "static-usable");
+  assert.equal(inventory.complete_revocation, false);
+  const human = await runAsync(["identity", "credentials", "retained-lifecycle"]);
+  assert.match(human.stdout, /pending-access-issuance/u);
+  assert.match(human.stdout, /revocation INCOMPLETE/u);
+  const before = calls.length;
+  const preview = json(await runAsync(["identity", "retire", "retained-lifecycle", "--revoke", "cloudflare_access", "--json"]));
+  assert.ok(preview.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}`));
+  assert.ok(calls.slice(before).every(c => c.method === "GET"));
+  cf.failDelete = true;
+  const failed = json(await runAsync(["identity", "retire", "retained-lifecycle", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  cf.failDelete = false;
+  assert.ok(failed.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "unresolved"), JSON.stringify(failed.steps));
+  assert.equal(failed.complete_revocation, false);
+  assert.ok(cf.tokens.some(t => t.id === token.id));
+  const retired = json(await runAsync(["identity", "retire", "retained-lifecycle", "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(retired.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "done"), JSON.stringify(retired.steps));
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  assert.equal(retired.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id)?.status, "revoked");
+  const againStart = calls.length;
+  const again = json(await runAsync(["identity", "retire", "retained-lifecycle", "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(again.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "already-done"));
+  assert.ok(!calls.slice(againStart).some(c => c.method === "DELETE"));
+  pass("real CLI provision failure to credentials and permissioned retirement: retained token inventoried, failed DELETE incomplete, verified retry and no-op repeat");
+}
+{
+  enrollFixture("ownership-mismatch");
+  json(await runAsync(["identity", "provision", "ownership-mismatch", "--apply", "--json"], { OP_MODE: "unreadable" }), 1);
+  const token = cf.tokens.find(t => t.name === "employee-ownership-mismatch");
+  token.name = "employee-foreign";
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", "ownership-mismatch", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "pending-token-owner-mismatch"));
+  assert.ok(cf.tokens.some(t => t.id === token.id));
+  assert.ok(!calls.slice(before).some(c => c.method === "DELETE" && c.url.includes(token.id)));
+  pass("retained receipt with changed provider ownership cannot authorize Access deletion or complete revocation");
+}
+{
+  enrollFixture("principal-mismatch");
+  json(await runAsync(["identity", "provision", "principal-mismatch", "--apply", "--json"], { OP_MODE: "unreadable" }), 1);
+  const token = cf.tokens.find(t => t.name === "employee-principal-mismatch");
+  token.client_id = "changed-principal.access";
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", "principal-mismatch", "--revoke", "cloudflare_access", "--apply", "--json"]), 1);
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "pending-token-owner-mismatch"));
+  assert.ok(!calls.slice(before).some(c => c.method === "DELETE" && c.url.includes(token.id)));
+  pass("retained token with matching name but changed client ID cannot be deleted from issuance receipt");
+}
+{
+  enrollFixture("retained-clamped");
+  json(await runAsync(["identity", "provision", "retained-clamped", "--apply", "--json"], { OP_MODE: "unreadable" }), 1);
+  const token = cf.tokens.find(t => t.name === "employee-retained-clamped");
+  cf.pageSize = 1; cf.clampedPageMetadata = true;
+  const inventory = json(await runAsync(["identity", "credentials", "retained-clamped", "--json"]));
+  assert.equal(inventory.credentials.find(r => r.kind === "pending-access-issuance" && r.id === token.id)?.status, "static-usable");
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", "retained-clamped", "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.ok(result.steps.some(s => s.key === `cloudflare_access:pending-token-delete:${token.id}` && s.outcome === "done"));
+  assert.ok(calls.slice(before).some(c => c.url.includes("service_tokens") && c.url.includes("page=2")));
+  assert.ok(!cf.tokens.some(t => t.id === token.id));
+  cf.pageSize = undefined; cf.clampedPageMetadata = false;
+  pass("pending-token inventory and permissioned retirement read clamped provider pages through verified absence");
+}
+{
+  enrollFixture("unscoped-receipt");
+  writeFileSync(join(state, "receipts.jsonl"), readFileSync(join(state, "receipts.jsonl"), "utf8") + JSON.stringify({ employee: "unscoped-receipt", capability: "access-token", token_id: "legacy-token", action: "minted" }) + "\n");
+  const inventory = json(await runAsync(["identity", "credentials", "unscoped-receipt", "--json"]));
+  assert.equal(inventory.credentials.find(r => r.provider === "cloudflare_access")?.status, "unverified");
+  assert.equal(inventory.complete_revocation, false);
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "retire", "unscoped-receipt", "--revoke", "cloudflare_access", "--apply", "--json"]));
+  assert.equal(result.complete_revocation, false);
+  assert.ok(result.steps.some(s => s.provider_code === "issuance-receipt-uncertain" && s.outcome === "skipped"));
+  assert.ok(!calls.slice(before).some(c => c.method === "DELETE" && c.url.includes("service_tokens")));
+  pass("historical unscoped issuance receipt blocks complete revocation but never permits provider delete");
+}
+{
+  enrollFixture("tampered-receipt");
+  const token = { id: "tampered-token", name: "employee-tampered-receipt", client_id: "tampered.access" };
+  cf.tokens.push(token);
+  writeFileSync(join(state, "receipts.jsonl"), readFileSync(join(state, "receipts.jsonl"), "utf8") + JSON.stringify({ employee: "tampered-receipt", capability: "access-token", token_id: token.id, action: "deleted-orphan", deleted: true }) + "\n");
+  const inventory = json(await runAsync(["identity", "credentials", "tampered-receipt", "--json"]));
+  assert.ok(inventory.credentials.some(r => r.kind === "unattributed-access-token" && r.id === token.id && r.status === "unverified"));
+  assert.equal(inventory.complete_revocation, false);
+  pass("live named provider token defeats historical deleted receipt when issuance cannot be attributed");
+}
+{
+  enrollFixture("clamped-pages");
+  cf.tokens.push({ id: "clamped-remote", name: "employee-clamped-pages", client_id: "clamped.access" });
+  cf.pageSize = 1; cf.clampedPageMetadata = true;
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "provision", "clamped-pages", "--apply", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].action, "conflict");
+  assert.equal(cf.tokens.filter(t => t.name === "employee-clamped-pages").length, 1);
+  assert.ok(calls.slice(before).some(c => c.url.includes("page=2")));
+  cf.clampedPageMetadata = false;
+  pass("clamped served per_page without total_pages discovers later-page token before apply");
+}
+{
+  enrollFixture("metadata-less");
+  cf.tokens.push({ id: "metadata-remote", name: "employee-metadata-less", client_id: "metadata.access" });
+  cf.pageSize = 1; cf.noPageMetadata = true;
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "provision", "metadata-less", "--apply", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].action, "conflict");
+  assert.ok(calls.slice(before).some(c => c.url.includes("page=2")));
+  assert.ok(calls.slice(before).some(c => c.url.includes(`page=${cf.tokens.length + 1}`)));
+  cf.noPageMetadata = false;
+  pass("metadata-less inventory reads through empty page instead of minting duplicate");
+}
+{
+  enrollFixture("repeated-page");
+  cf.pageSize = 1; cf.clampedPageMetadata = true; cf.repeatPage = true;
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "provision", "repeated-page", "--apply", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].action, "blocked");
+  assert.ok(calls.slice(before).some(c => c.url.includes("page=2")));
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.includes("service_tokens")));
+  cf.pageSize = undefined; cf.clampedPageMetadata = false; cf.repeatPage = false;
+  pass("repeated provider page blocks token mint instead of claiming inventory complete");
+}
+{
+  enrollFixture("inconsistent-pages");
+  cf.pageSize = 1; cf.inconsistentPages = true;
+  cf.tokens.push({ id: "inconsistent-filler", name: "someone-else", client_id: "unrelated.access" });
+  const before = calls.length;
+  const result = json(await runAsync(["identity", "provision", "inconsistent-pages", "--apply", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].action, "blocked");
+  assert.ok(calls.slice(before).some(c => c.url.includes("page=2")));
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.includes("service_tokens")));
+  cf.pageSize = undefined; cf.inconsistentPages = false;
+  pass("inconsistent total_pages metadata blocks mint without claiming authoritative absence");
+}
+{
+  enrollFixture("page-cap");
+  cf.pageSize = 1; cf.repeatPage = false; cf.noPageMetadata = true;
+  const before = calls.length;
+  cf.tokens.push(...Array.from({ length: 101 }, (_, i) => ({ id: `cap-${i}`, name: `unrelated-${i}`, client_id: `cap-${i}.access` })));
+  const result = json(await runAsync(["identity", "provision", "page-cap", "--apply", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].action, "blocked");
+  assert.ok(calls.slice(before).some(c => c.url.includes("page=100")));
+  assert.ok(!calls.slice(before).some(c => c.url.includes("page=101") || c.method === "POST" && c.url.includes("service_tokens")));
+  cf.pageSize = undefined; cf.noPageMetadata = false;
+  cf.tokens.splice(cf.tokens.findIndex(t => t.id === "cap-0"), 101);
+  pass("bounded 100-page inventory fails closed without mint or unbounded provider reads");
+}
+{
+  enrollFixture("stranded-clamped");
+  const seeded = JSON.parse(readFileSync(baseEnv.OP_ITEMS, "utf8"));
+  seeded.push({ id: "item-stranded-clamped", title: "Stranded-clamped", fields: [{ id: "stranded-id", label: "Client ID", value: "stranded.access", section: { label: "Identity Service Token" } }] });
+  writeFileSync(baseEnv.OP_ITEMS, JSON.stringify(seeded));
+  cf.tokens.push({ id: "stranded-remote", name: "employee-stranded-clamped", client_id: "stranded.access" });
+  writeFileSync(join(state, "receipts.jsonl"), readFileSync(join(state, "receipts.jsonl"), "utf8") + JSON.stringify({ employee: "stranded-clamped", capability: "access-token", token_id: "stranded-remote", action: "deleted-orphan", deleted: true }) + "\n");
+  cf.pageSize = 1; cf.clampedPageMetadata = true;
+  const result = json(await runAsync(["identity", "provision", "stranded-clamped", "--json"]), 1);
+  assert.equal(result.capabilities["access-token"].refs.provider_match, "stranded-remote");
+  assert.match(result.capabilities["access-token"].refs.receipt_comparison, /stranded-remote:deleted/u);
+  cf.pageSize = undefined; cf.clampedPageMetadata = false;
+  pass("later-page stranded token overrides historical deleted receipt; JSON preview reports actual provider match");
 }
 
 // -- no secret lands in any artifact ---------------------------------------------------------

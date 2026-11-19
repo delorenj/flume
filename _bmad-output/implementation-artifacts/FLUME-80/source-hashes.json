@@ -1,5 +1,6 @@
 {
-  "packages/flume-hr/src/workforce/provision.ts": "c685e2bcd126c3cf932813f5a07faac0fe302a354aad401f33acadbe72f371b6",
-  "tests/identity-provision-regressions.mjs": "120165542e2433f8c83a4f39122c88b3f90109d13a3eec83d9e8b253c8318974",
-  "docs/identity-provisioning.md": "cd03ac365d231ed5b9783548e3dbd7e95cc9c0a63d38d4b5a5a8a1e5dafbc60f"
+  "packages/flume-hr/src/workforce/provision.ts": "1801c1afe8690d085f1331c0bed35708e2870d77e96ac429d661a59fce697ca7",
+  "packages/flume-hr/src/workforce/lifecycle-adapters.ts": "7f184b03c8ac55ae1a4656b625fe52b0d2e50a776702e1f5103667054786e847",
+  "tests/identity-provision-regressions.mjs": "853ec52fd4b553578fd734fd8b9a018e3c4ba81303136befc9417af7fa219f70",
+  "docs/identity-provisioning.md": "f13cf687e466ff18a2710b2b3a30f0762fd0de26d1224e8805497d1852bcfb47"
 }

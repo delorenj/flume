@@ -45,6 +45,21 @@ before attempting the vault write, then `created`, `deleted-orphan`,
 are withheld because they can echo secrets. Do not treat a receipt alone as
 current provider truth.
 
+Receipts for new Access issuance include the employee subject, provider account ID,
+token ID and non-secret client ID. A `minted` receipt remains pending while vault verification
+or binding is uncertain. `flume identity credentials <employee>` inventories this
+unbound token against the complete provider listing rather than claiming
+`not-issued`. `flume identity retire <employee> --revoke cloudflare_access`
+(preview first, `--apply` only with lifecycle authority) can delete a pending
+issuance by its receipt ID only when the configured account and live provider
+name and client ID still match this employee's issuance record; it verifies
+absence with a fresh complete listing.
+A failed DELETE remains incomplete and may be retried. Unscoped historical
+receipts, unreadable receipts, unknown named tokens and ownership mismatches
+stay unverified and never authorize a DELETE or complete-revocation claim.
+Neither retirement nor preview clears vault fields; any such repair still needs
+the separate owner-approved procedure below.
+
 ## Configuration
 
 `~/.config/flume/identity-provisioning.yaml` (override:
@@ -90,8 +105,11 @@ explicit owner approval; isolated fixture recovery is not live approval.
 
 Bounded operator procedure (one employee, one item, one account):
 
-1. Run preview, not `--apply`. Record the subject/handle, immutable item and
-   field IDs, section labels/presence and conflict outcome. Keep raw item JSON,
+1. Run `flume identity provision <employee> --json` (preview, **without** `--apply`). Record the subject/handle, immutable item and
+   field IDs, section labels/presence, `provider_match` and `receipt_comparison`
+   from `capabilities.access-token.refs`, and the conflict outcome. The default
+   human rendering omits these diagnostic refs; use the documented JSON preview.
+   Keep raw item JSON,
    resolved credentials and secret values out of terminals, tickets and logs.
    The provisioner compares the Client ID internally; output needs no secret.
 2. Compare fresh vault data with provider GETs in the configured account
@@ -116,9 +134,11 @@ Bounded operator procedure (one employee, one item, one account):
    mismatch rather than looping. Cleanup failures or secret-less live tokens
    require a separately approved provider action and absence verification.
 
-This procedure does not grant Access-policy membership (FLUME-57), change
-suspension/rotation/retirement semantics (FLUME-53), or authorize workforce-wide
-repair. Source/fixture verification is documented under
+This procedure does not grant Access-policy membership (FLUME-57), authorize
+live vault-field recovery, or redesign the general suspension/rotation/retirement
+contract (FLUME-53). The narrow pending-issuance lifecycle handoff above makes
+retirement inventory and explicitly requested Access revocation honest. It does
+not authorize workforce-wide repair. Source/fixture verification is documented under
 `_bmad-output/implementation-artifacts/FLUME-80/`; no installed/deployed or live
 recovery claim follows from it.
 
@@ -129,9 +149,11 @@ recovery claim follows from it.
   (FLUME-49's successor story 1.6 found the installed edition cannot), no
   sending mail, no GPG (deferred: story 1.5 proves authorship via the provider
   API, not commit signing).
-- Revocation, suspension, rotation and retirement belong to FLUME-53
+- Revocation, suspension, rotation and retirement generally belong to FLUME-53
   (`flume identity suspend|restore|retire|credentials|rotate|continuity`; see
   "Suspension, rotation and retirement (FLUME-53)" in `docs/employee-access.md`).
+  FLUME-80 adds only subject-scoped pending Access issuance inventory and
+  permissioned, verified revocation for retained tokens.
   A rebinding attempt to a *different* principal is `binding-conflict`:
   rotation is deliberate (`flume identity rotate`), not a hire side-effect.
 - The facade worker reads the allowlist from KV (`allowlist/<address>` keys),

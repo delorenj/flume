@@ -3,28 +3,30 @@ PASS apply appends one block to role.yaml; post id, registry row, memory bank an
 PASS second apply is a no-op that keeps bytes, mtimes and the subject
 PASS handle is immutable once enrolled
 PASS existing Grolf Plane candidates are listed under reconcile[] as unadopted and none is bound
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
+PASS specialist enrollment raises agent.yaml to schema_version 2, re-renders contract.yaml and stays in good standing
+PASS specialist re-apply and onboard --employee are no-ops after enrollment
+PASS onboard --definition that drops or changes the enrolled block is refused with nothing written
+PASS renamed display name keeps the same subject
+PASS specialist status change keeps schema_version 2, refreshes contract.yaml and stays in good standing
+PASS hire --definition carrying a company_identity block is refused before any write
+PASS legacy role.yaml and v1 agent.yaml read as enrolled:false with their fields
+PASS unnamed post is an explicit unnamed-post blocker; no person is invented
+PASS a retired tombstone keeps its handle: handle-taken
+PASS a subject recorded twice is subject-duplicate
+PASS one provider principal bound to two people is binding-duplicate
+PASS a person declared or enrolled at another definition is person-elsewhere
+PASS RFC 2142 role names and other registry post ids are handle-reserved
+PASS an unhired desk cannot claim a handle reserved by a definition-less registry post id
+PASS status on a deleted/missing definition reports invalid-definition, never not-enrolled
+PASS v1 agent.yaml carrying a block, a mismatched address, an unknown binding key and an unreadable census are invalid-definition
+PASS a symlinked definition is refused before any write, for enroll and status alike
+PASS a malformed handle is invalid-handle; an unknown employee or probe exits 1 with nothing written
+PASS a candidate already bound elsewhere is reported bound with its holder; a missing inventory is a warning
+PASS moving posts and rotating a binding credential keep the same subject
+PASS local suspension reports provider_revocation not_performed; retirement requires lifecycle; existing retired identities remain terminal
+PASS status on a mid-file block keeps every byte before and after it
+PASS without measurement every check is unproven, not ready and not free; no flag or no token means no request
+PASS authorized --probe cloudflare records GET-only time, path, HTTP status and exact values; an HTTP error stays unproven
+PASS a 200 with no visible zone or no JSON body stays unproven
 
-AssertionError [ERR_ASSERTION]: {
-  "ok": false,
-  "standing": "unable to assess",
-  "error": "Partial specialist projection; inspect owned state and retry onboard: Member gateway credential not verified: token=failed delta=planned-present render=not-attempted gateway-mint-or-confirm-failed"
-}
-
-
-1 !== 0
-
-    at Object.json (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:46:44)
-    at specialistFixture (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:75:5)
-    at async file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-regressions.mjs:162:15 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
-  operator: 'strictEqual',
-  diff: 'simple'
-}
-
-Node.js v26.5.0
+30 company identity check groups passed

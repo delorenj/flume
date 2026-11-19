@@ -18,6 +18,10 @@ const cases = [
 ];
 const results = [];
 for (const [name, [command, ...args], extra = {}] of cases) {
+  if (name.startsWith('baseline-') && name !== 'baseline-build' && results.find(r => r.name === 'baseline-build')?.exit !== 0) {
+    results.push({ name, command: [command, ...args].join(' '), exit: null, skipped: 'baseline-build failed', log: null });
+    continue;
+  }
   const started = Date.now();
   const run = spawnSync(command, args, { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 180000, maxBuffer: 16 * 1024 * 1024 });
   writeFileSync(join(out, `${name}.txt`), (run.stdout || '') + (run.stderr || '') + (run.error ? `\n${run.error.message}\n` : ''));
@@ -26,4 +30,4 @@ for (const [name, [command, ...args], extra = {}] of cases) {
   console.log(`${name}: exit=${run.status} (${result.duration_ms}ms)`);
 }
 writeFileSync(join(out, 'checks.json'), JSON.stringify({ at: new Date().toISOString(), base: 'f85a126835ce3f4a4b5f30198b949d865a9b54b6', evidence: 'isolated-fixture; no live provider/vault reads or mutations', results }, null, 2) + '\n');
-process.exitCode = results.some(r => !r.name.startsWith('baseline-') && r.exit !== 0) ? 1 : 0;
+process.exitCode = results.some(r => r.name === 'baseline-build' && r.exit !== 0 || !r.name.startsWith('baseline-') && r.exit !== 0) ? 1 : 0;

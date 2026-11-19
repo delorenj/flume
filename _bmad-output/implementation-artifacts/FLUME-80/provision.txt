@@ -4,6 +4,7 @@ PASS apply provisions token + rule + allowlist + vault item + binding; second ap
 PASS a foreign rule or token name blocks provisioning instead of clobbering it
 PASS a failed vault write deletes the orphaned token at the provider
 PASS an unenrolled employee is refused before any provider call
+PASS documented JSON recovery preview exposes safe field IDs, provider comparison and receipt outcomes
 PASS section collision preserved; stranded metadata/provider/receipt conflict blocks minting; authorized fixture recovery converges
 PASS uncertain unreadable: explicit partial result, retained token, retry does not mint/delete
 PASS uncertain wrong-value: explicit partial result, retained token, retry does not mint/delete
@@ -19,5 +20,17 @@ PASS secret-only partial pair blocks without disclosing it in JSON or human outp
 PASS unavailable fresh vault inventory fails closed without treating read failure as item absence
 PASS failDelete: cleanup not claimed without provider absence confirmation
 PASS lieDelete: cleanup not claimed without provider absence confirmation
+PASS real CLI provision failure to credentials and permissioned retirement: retained token inventoried, failed DELETE incomplete, verified retry and no-op repeat
+PASS retained receipt with changed provider ownership cannot authorize Access deletion or complete revocation
+PASS retained token with matching name but changed client ID cannot be deleted from issuance receipt
+PASS pending-token inventory and permissioned retirement read clamped provider pages through verified absence
+PASS historical unscoped issuance receipt blocks complete revocation but never permits provider delete
+PASS live named provider token defeats historical deleted receipt when issuance cannot be attributed
+PASS clamped served per_page without total_pages discovers later-page token before apply
+PASS metadata-less inventory reads through empty page instead of minting duplicate
+PASS repeated provider page blocks token mint instead of claiming inventory complete
+PASS inconsistent total_pages metadata blocks mint without claiming authoritative absence
+PASS bounded 100-page inventory fails closed without mint or unbounded provider reads
+PASS later-page stranded token overrides historical deleted receipt; JSON preview reports actual provider match
 PASS all CLI JSON/stdout/stderr, receipts and definitions withhold secrets on success and every failure
-identity-provision-regressions: 22 passed
+identity-provision-regressions: 35 passed

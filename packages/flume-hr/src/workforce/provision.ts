@@ -221,13 +221,24 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     plan: { action, detail, ...(refs ? { refs } : {}) }, apply: async (): Promise<CapabilityResult> => ({ action, detail }),
   });
   const tokens: CfServiceToken[] = [];
-  // Compare against the complete inventory, never interpret a truncated page as absence.
-  for (let page = 1; ; page++) {
+  const seen = new Set<string>();
+  let expectedTotal: number | undefined;
+  // A clamped full page is not absence. Without metadata, only an empty page ends the listing.
+  for (let page = 1; page <= 100; page++) {
     const list = await cfRequest(cfToken, "GET", `/accounts/${account_id}/access/service_tokens?per_page=50&page=${page}`);
-    if (!cfOk(list) || !Array.isArray(list.body?.result) || list.body.result.some((t: CfServiceToken) => !t || typeof t.id !== "string" || typeof t.name !== "string")) return stop("blocked", "cannot list service tokens (provider output withheld)");
-    tokens.push(...list.body.result);
-    const totalPages = list.body.result_info?.total_pages;
-    if (Number.isInteger(totalPages) && totalPages >= 1 ? page >= totalPages : list.body.result.length < 50) break;
+    const result = list.body?.result as CfServiceToken[] | undefined;
+    if (!cfOk(list) || !Array.isArray(result) || result.some(t => !t || typeof t.id !== "string" || !t.id || typeof t.name !== "string")) return stop("blocked", "cannot list service tokens completely (provider output withheld)");
+    if (result.some(t => seen.has(t.id))) return stop("blocked", "service-token inventory repeated an ID; reconcile by hand");
+    for (const token of result) { seen.add(token.id); tokens.push(token); }
+    const info = list.body?.result_info;
+    const total = info?.total_pages, served = info?.per_page;
+    if (total !== undefined && (!Number.isInteger(total) || total < page || total > 100 || (expectedTotal !== undefined && total !== expectedTotal) || (result.length === 0 && (page > 1 || page < total)))) return stop("blocked", "service-token pagination metadata inconsistent; reconcile by hand");
+    if (total !== undefined) expectedTotal = total;
+    if (expectedTotal !== undefined && total === undefined) return stop("blocked", "service-token pagination metadata inconsistent; reconcile by hand");
+    if (served !== undefined && (!Number.isInteger(served) || served < 1 || result.length > served)) return stop("blocked", "service-token pagination metadata inconsistent; reconcile by hand");
+    // Only a declared final page or a genuinely empty page proves completion.
+    // A short nonempty response may be a provider clamp, never absence.
+    if (total !== undefined ? page === total : result.length === 0) break;
     if (page === 100) return stop("blocked", "service-token inventory exceeded bounded pagination; reconcile by hand");
   }
   let item: OpItem | null;
@@ -236,6 +247,7 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
   const ids = item ? accessFields(item, "Client ID") : [], secrets = item ? accessFields(item, "Client Secret") : [];
   const remote = ids.length === 1 ? tokens.find(t => t.client_id === ids[0]?.value) : undefined;
   const named = tokens.find(t => t.name === tokenName(block.handle));
+  const pending = pendingAccessIssuance(block.handle, block.subject, account_id);
   const bound = block.bindings?.cloudflare_access;
   const refs: Record<string, string> = {
     ...(item ? { item_id: item.id } : {}),
@@ -254,6 +266,7 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     return stop("conflict", "binding, fresh vault fields and provider inventory disagree; owner-approved reconciliation required (see docs/identity-provisioning.md)", refs);
   }
   if (ids.length || secrets.length) return stop("conflict", "Access fields already present without a binding; refusing overwrite or token creation. Compare provider_match and receipts; owner-approved reconciliation required (see docs/identity-provisioning.md)", refs);
+  if (pending.uncertain || pending.token_ids.length) return stop("conflict", "issuance receipt may describe a retained unbound token; reconcile provider inventory before minting", refs);
   if (named) return stop("conflict", `service token ${named.id} already uses this employee's name without a binding; owner-approved reconciliation required`, refs);
 
   const plan: CapabilityResult = { action: "create", detail: `create Access service token ${tokenName(block.handle)}, vault it, bind it` };
@@ -271,13 +284,13 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
     if (!token?.id || !token.client_id || !token.client_secret) return { action: "blocked", detail: "token create response incomplete; reconcile provider inventory before retry" };
     try {
       // Record the provider ID before attempting persistence; no creation secret is receipted.
-      receipt({ capability: "access-token", employee: block.handle, action: "minted", token_id: token.id, item: home.id });
+      receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action: "minted", token_id: token.id, client_id: token.client_id, item: home.id });
       const secretField = opAccessFieldsSet(home, token.client_id, token.client_secret, vault);
       const boundResult = await bindEmployeeProvider(block.handle, "cloudflare_access", {
         principal: token.client_id, instance: access_issuer, credential_ref: `op://${vault}/${home.id}/${secretField}`,
       }, { apply: true });
       if (!boundResult.ok) throw new AccessPersistenceError("binding write refused; vaulted token retained for reconciliation");
-      receipt({ capability: "access-token", employee: block.handle, action: "created", token_id: token.id, client_id: token.client_id, expires_at: token.expires_at ?? null, item: home.id });
+      receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action: "created", token_id: token.id, client_id: token.client_id, expires_at: token.expires_at ?? null, item: home.id });
       return { action: "created", detail: `token ${token.id} vaulted and bound`, refs: { token_id: token.id, item_id: home.id } };
     } catch (error) {
       if (error instanceof AccessPersistenceError && error.cleanupSafe) {
@@ -286,15 +299,57 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
         const deleted = cfOk(removed) && check.http_status === 404;
         const action = deleted ? "deleted-orphan" : "cleanup-unconfirmed";
         let recorded = true;
-        try { receipt({ capability: "access-token", employee: block.handle, action, token_id: token.id, deleted }); } catch { recorded = false; }
+        try { receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action, token_id: token.id, deleted }); } catch { recorded = false; }
         return { action: "blocked", changed: true, detail: `vault write failed; orphan token ${token.id} ${deleted ? "deleted (provider absence verified)" : "cleanup FAILED or unconfirmed — owner reconciliation required"}${recorded ? "" : "; receipt write failed"}`, refs: { token_id: token.id, item_id: home.id } };
       }
       let recorded = true;
-      try { receipt({ capability: "access-token", employee: block.handle, action: "reconciliation-required", token_id: token.id, item: home.id, deleted: false }); } catch { recorded = false; }
+      try { receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action: "reconciliation-required", token_id: token.id, item: home.id, deleted: false }); } catch { recorded = false; }
       return { action: "blocked", changed: true, detail: `vault/binding verification uncertain; token ${token.id} retained, not deleted. Owner-approved reconciliation required${recorded ? "" : "; receipt write failed"}`, refs: { token_id: token.id, item_id: home.id } };
     }
   };
   return { plan, apply };
+}
+
+export interface PendingAccessIssuance { token_ids: string[]; client_ids: Record<string, string>; uncertain: boolean }
+/** Secret-free issuance journal. A minted ID remains pending until an authoritative deletion or a binding accounts for it. */
+export function pendingAccessIssuance(handle: string, subject: string, accountId?: string): PendingAccessIssuance {
+  const path = join(provisionStateDir(), "receipts.jsonl");
+  if (!existsSync(path)) return { token_ids: [], client_ids: {}, uncertain: false };
+  try {
+    const pending = new Set<string>();
+    const clientIds: Record<string, string> = {};
+    const accounted = new Set<string>();
+    let uncertain = false;
+    let any = false;
+    for (const text of readFileSync(path, "utf8").split("\n")) {
+      if (!text.trim()) continue;
+      const row = JSON.parse(text);
+      if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error("invalid issuance receipt");
+      if (row.employee !== handle || row.capability !== "access-token") continue;
+      any = true;
+      if (row.subject !== subject || !accountId || row.account_id !== accountId || typeof row.token_id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(row.token_id)) {
+        // Historical unscoped receipts may help diagnosis, but cannot authorize a DELETE.
+        if (row.action === "minted" || row.action === "reconciliation-required" || row.action === "cleanup-unconfirmed" || (row.subject === subject && row.account_id)) uncertain = true;
+        continue;
+      }
+      if (row.action === "created") {
+        if (pending.has(row.token_id) && (!clientIds[row.token_id] || clientIds[row.token_id] === row.client_id)) { pending.delete(row.token_id); accounted.add(row.token_id); }
+        else uncertain = true;
+      } else if (row.action === "deleted-orphan" && row.deleted === true) {
+        if (!pending.has(row.token_id)) uncertain = true;
+        pending.delete(row.token_id);
+        accounted.add(row.token_id);
+      } else if (row.action === "minted" || row.action === "reconciliation-required" || row.action === "cleanup-unconfirmed") {
+        if (row.action === "minted" && accounted.has(row.token_id)) uncertain = true;
+        if (row.action === "minted" && typeof row.client_id === "string" && row.client_id) {
+          if (clientIds[row.token_id] && clientIds[row.token_id] !== row.client_id) uncertain = true;
+          clientIds[row.token_id] = row.client_id;
+        }
+        pending.add(row.token_id);
+      }
+    }
+    return { token_ids: [...pending], client_ids: Object.fromEntries([...pending].filter(id => clientIds[id]).map(id => [id, clientIds[id]!])), uncertain: uncertain || !accountId && any };
+  } catch { return { token_ids: [], client_ids: {}, uncertain: true }; }
 }
 
 /** Whitelist outcomes/IDs from existing receipts; never echo historical free-form reasons. */

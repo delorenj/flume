@@ -9,7 +9,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 + 'unresolved'
 - 'static-usable'
 
-    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-lifecycle-regressions.mjs:242:12 {
+    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/company-identity-lifecycle-regressions.mjs:243:12 {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
   actual: 'unresolved',

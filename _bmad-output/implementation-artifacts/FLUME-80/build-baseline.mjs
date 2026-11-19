@@ -9,7 +9,7 @@ await build({
   outfile: `${root}/packages/flume-hr/dist/flume80-baseline.js`,
   plugins: [{ name: 'baseline-provision', setup(builder) {
     builder.onLoad({ filter: /\/workforce\/provision\.ts$/ }, () => ({
-      contents: execFileSync('git', ['show', `${revision}:packages/flume-hr/src/workforce/provision.ts`], { cwd: root, encoding: 'utf8' }),
+      contents: execFileSync('git', ['show', `${revision}:packages/flume-hr/src/workforce/provision.ts`], { cwd: root, encoding: 'utf8' }) + '\n// Baseline compatibility shim: current lifecycle imports the FLUME-80 receipt reader.\nexport const pendingAccessIssuance = () => ({ token_ids: [], client_ids: {}, uncertain: false });\n',
       loader: 'ts', resolveDir: `${root}/packages/flume-hr/src/workforce`,
     }));
   } }],

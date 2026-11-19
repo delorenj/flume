@@ -35,7 +35,7 @@ import { deskProfileOf, type IdentityBlocker, type IdentityCensus, type Identity
 import { githubBindingOf, githubEvidence, probeGithubAppKey, readGithubInstallation, writeGithubInstallationSuspension } from "./github";
 import { lstatIfPresent, readLifecycleLedger, type StepRecord } from "./lifecycle-state";
 import { PLANE_CREDENTIAL_SEMANTICS, planeBindingOf, planeEvidence, readPlaneReceipts, verifyBoardViaPx } from "./plane";
-import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
+import { cfOk, cfRequest, cloudflareEvidence, loadProvisioningConfig, op, opRead, pendingAccessIssuance, type CfResponse, type CfRoutingRule, type CfServiceToken, type ProvisioningConfig } from "./provision";
 import type { CompanyIdentity } from "./types";
 
 export type AdapterName = "mail" | "cloudflare_access" | "github" | "plane" | "gateway";
@@ -220,26 +220,27 @@ const PAGE_SIZE = 50, MAX_PAGES = 100;
 
 /**
  * Every item of a paged Cloudflare listing, or why it cannot be trusted. Absence is only ever concluded from a COMPLETE
- * listing: `result_info.total_pages` when the provider states it; otherwise pages are read until one is shorter than the
- * page size the provider says it SERVED (a clamped `per_page` is followed, not mistaken for the last page), or empty. A
- * listing that repeats a page or runs past the cap is `listing-incomplete`, which makes every row that relies on it unresolved.
+ * listing: a declared `result_info.total_pages`, or an empty page when no total is declared. A short nonempty page
+ * is not authoritative absence. Repeated IDs, inconsistent metadata, malformed pages and the page cap fail closed.
  */
 async function listAll<T extends { id: string }>(cf: { token: string }, path: string): Promise<{ ok: true; items: T[] } | { ok: false; code: string }> {
   const items: T[] = [];
   const seen = new Set<string>();
+  let expectedTotal: number | undefined;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const list = await cfRequest(cf.token, "GET", `${path}?per_page=${PAGE_SIZE}&page=${page}`);
     if (!cfOk(list)) return { ok: false, code: codeOf(list) };
-    const result = (Array.isArray(list.body?.result) ? list.body.result : []) as T[];
-    let fresh = 0;
-    for (const item of result) if (!seen.has(item.id)) { seen.add(item.id); items.push(item); fresh++; }
-    if (result.length > 0 && fresh === 0) return { ok: false, code: "listing-incomplete" };
-    const info = (list.body?.result_info ?? {}) as { total_pages?: unknown; per_page?: unknown };
-    const totalPages = Number(info.total_pages);
-    if (Number.isFinite(totalPages) && totalPages >= 1) { if (page >= totalPages) return { ok: true, items }; continue; }
-    if (result.length === 0) return { ok: true, items };
-    const served = Number(info.per_page);
-    if (Number.isFinite(served) && served > 0 && result.length < served) return { ok: true, items };
+    if (!Array.isArray(list.body?.result)) return { ok: false, code: "listing-incomplete" };
+    const result = list.body.result as T[];
+    if (result.some(item => !item || typeof item.id !== "string" || !item.id || seen.has(item.id))) return { ok: false, code: "listing-incomplete" };
+    for (const item of result) { seen.add(item.id); items.push(item); }
+    const info = list.body?.result_info;
+    const total = info?.total_pages, served = info?.per_page;
+    if (total !== undefined && (!Number.isInteger(total) || total < page || total > MAX_PAGES || (expectedTotal !== undefined && total !== expectedTotal) || (result.length === 0 && (page > 1 || page < total)))) return { ok: false, code: "listing-incomplete" };
+    if (total !== undefined) expectedTotal = total;
+    if (expectedTotal !== undefined && total === undefined) return { ok: false, code: "listing-incomplete" };
+    if (served !== undefined && (!Number.isInteger(served) || served < 1 || result.length > served)) return { ok: false, code: "listing-incomplete" };
+    if (total !== undefined ? page === total : result.length === 0) return { ok: true, items };
   }
   return { ok: false, code: "listing-incomplete" };
 }
@@ -396,12 +397,27 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
     const binding = ctx.block.bindings?.cloudflare_access;
     const base = { provider: "cloudflare_access" as const, kind: "access-service-token", static: true, evidence };
     const previous = rotatedAway(ctx, "cloudflare_access");
-    if (!binding && !previous.length) return [{ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` }];
     const cf = await cloudflareOf(ctx);
+    const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cf.ok ? cf.config.cloudflare.account_id : undefined);
     const listed = cf.ok ? await listServiceTokens(cf) : undefined;
+    const named = listed?.ok ? listed.items.filter(token => token.name === `employee-${ctx.block.handle}`) : [];
     const rows: CredentialRow[] = [];
-    if (!binding) rows.push({ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` });
-    else {
+    if (!binding && !previous.length && !pending.token_ids.length && !pending.uncertain && listed?.ok && !named.length) return [{ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` }];
+    if (!binding && !pending.token_ids.length && !pending.uncertain && listed?.ok && !named.length) rows.push({ ...base, status: "not-issued", next_action: `flume identity provision ${ctx.employee} --apply creates the Access service token` });
+    if (!binding && !listed?.ok && !pending.token_ids.length && !pending.uncertain) rows.push({ ...base, status: "unverified", provider_code: cf.ok ? listed?.code : cf.code, next_action: `flume identity credentials ${ctx.employee}` });
+    for (const token of named.filter(token => !pending.token_ids.includes(token.id) && (!binding || token.client_id !== binding.principal))) rows.push({ ...base, kind: "unattributed-access-token", id: token.id, status: "unverified", provider_code: "issuance-not-attributed", next_action: "reconcile provider token with subject-scoped issuance receipts; name alone never authorizes deletion" });
+    for (const id of pending.token_ids) {
+      if (listed?.ok && binding && listed.items.some(token => token.id === id && token.client_id === binding.principal && token.name === `employee-${ctx.block.handle}` && pending.client_ids[id] === token.client_id)) continue;
+      const token = listed?.ok ? listed.items.find(candidate => candidate.id === id) : undefined;
+      rows.push(staticRow({ ...base, kind: "pending-access-issuance", id, next_action: token
+        ? token.name === `employee-${ctx.block.handle}` && pending.client_ids[id] === token.client_id ? `flume identity retire ${ctx.employee} --revoke cloudflare_access --apply deletes this retained token after provider ownership verification` : "reconcile token ownership before any deletion"
+        : listed?.ok ? "none: the retained token is absent from the provider's complete listing" : `flume identity credentials ${ctx.employee}` },
+        listed?.ok && !token ? "absent" : undefined,
+        { status: cf.ok && listed?.ok ? token?.name === `employee-${ctx.block.handle}` && pending.client_ids[id] === token.client_id ? "static-usable" : "unresolved" : "unverified", provider_code: token && (token.name !== `employee-${ctx.block.handle}` || pending.client_ids[id] !== token.client_id) ? "pending-token-owner-mismatch" : !cf.ok ? cf.code : listed && !listed.ok ? listed.code : undefined }));
+    }
+    if (pending.uncertain && !pending.token_ids.length && !binding) rows.push({ ...base, status: "unverified", provider_code: "issuance-receipt-uncertain", next_action: "reconcile the provisioning receipts before claiming no Access token was issued" });
+    if (pending.uncertain && (binding || pending.token_ids.length)) rows.push({ ...base, kind: "pending-access-issuance", status: "unverified", provider_code: "issuance-receipt-uncertain", next_action: "reconcile unscoped or unreadable provisioning receipts" });
+    if (binding) {
       const row = { ...base, id: binding.principal, ref: binding.credential_ref };
       if (!cf.ok) rows.push({ ...row, status: "unverified", provider_code: cf.code, next_action: "set FLUME_PROVISION_CONFIG (docs/identity-provisioning.md); the token cannot be read or deleted without it", detail: cf.detail });
       else if (!listed!.ok) rows.push({ ...row, status: "unresolved", provider_code: listed!.code, next_action: `flume identity credentials ${ctx.employee}` });
@@ -423,9 +439,43 @@ export const cloudflareAccessAdapter: LifecycleAdapter = {
   plan(ctx, options) {
     const binding = ctx.block.bindings?.cloudflare_access;
     if (!options.revoke) return [];
-    if (!binding) return [];
+    const cfConfig = (() => { try { return loadProvisioningConfig(); } catch { return undefined; } })();
+    const pending = pendingAccessIssuance(ctx.block.handle, ctx.block.subject, cfConfig?.cloudflare.account_id);
+    const pendingSteps: PlannedStep[] = pending.token_ids.map(id => ({
+      key: `cloudflare_access:pending-token-delete:${id}`, adapter: "cloudflare_access", action: "token-delete", resource: id,
+      description: `delete retained Access token ${id} only if its provider name and account still match this employee`,
+      async live(context) {
+        const cf = await cloudflareOf(context);
+        if (!cf.ok || cf.config.cloudflare.account_id !== cfConfig?.cloudflare.account_id) return null;
+        const listed = await listServiceTokens(cf);
+        if (!listed.ok) return null;
+        const token = listed.items.find(candidate => candidate.id === id);
+        if (token && (token.name !== `employee-${context.block.handle}` || pending.client_ids[id] !== token.client_id || (context.block.bindings?.cloudflare_access && context.block.bindings.cloudflare_access.principal !== token.client_id))) return null;
+        return token ? [id] : [];
+      },
+      async run(context) {
+        const cf = await cloudflareOf(context);
+        if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
+        if (cf.config.cloudflare.account_id !== cfConfig?.cloudflare.account_id) return { result: "unresolved", provider_code: "account-mismatch", detail: "issuance account differs from configured account" };
+        const listed = await listServiceTokens(cf);
+        if (!listed.ok) return { result: "unresolved", provider_code: listed.code, detail: "could not list service tokens completely" };
+        const token = listed.items.find(candidate => candidate.id === id);
+        if (!token) return { result: "converged", detail: "retained token absent from complete provider listing", data: { resources: [] } };
+        if (context.block.bindings?.cloudflare_access?.principal === token.client_id && token.name === `employee-${context.block.handle}` && pending.client_ids[id] === token.client_id)
+          return { result: "converged", detail: "token is bound; the binding-scoped step owns its deletion", data: { resources: [] } };
+        if (token.name !== `employee-${context.block.handle}` || pending.client_ids[id] !== token.client_id || context.block.bindings?.cloudflare_access)
+          return { result: "unresolved", provider_code: "pending-token-owner-mismatch", detail: "provider identity differs from issuance receipt; no delete attempted" };
+        const removed = await cfRequest(cf.token, "DELETE", `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens/${id}`);
+        if (!cfOk(removed) && removed.http_status !== 404) return { result: "unresolved", provider_code: codeOf(removed), detail: "retained token delete failed", data: { resources: [id] } };
+        const verify = await listServiceTokens(cf);
+        if (!verify.ok || verify.items.some(candidate => candidate.id === id)) return { result: "unresolved", provider_code: verify.ok ? "delete-not-effective" : verify.code, detail: "retained token absence not verified", data: { resources: [id] } };
+        return { result: removed.http_status === 404 ? "converged" : "done", detail: "retained token absent from complete provider listing", data: { resources: [id] } };
+      },
+    }));
+    if (pending.uncertain) pendingSteps.push(skipped({ key: "cloudflare_access:pending-issuance-uncertain", adapter: "cloudflare_access", action: "token-delete", resource: ctx.block.handle, description: "unscoped or unreadable issuance receipt needs manual reconciliation" }, "issuance-receipt-uncertain", "cannot safely authorize revocation from an unscoped or unreadable receipt"));
+    if (!binding) return pendingSteps;
     const key = `cloudflare_access:token-delete:${binding.principal}`;
-    return [{
+    return [...pendingSteps, {
       key, adapter: "cloudflare_access", action: "token-delete", resource: binding.principal,
       description: `delete the Access service token ${binding.principal}, verify by listing again`,
       async live(context) {

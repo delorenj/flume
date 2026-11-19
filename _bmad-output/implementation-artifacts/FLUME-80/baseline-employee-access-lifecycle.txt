@@ -1,23 +1,40 @@
+PASS POST /v1/mail/authorize answers the Worker's contract for a valid run and writes one secret-free mail.authorize audit line per request
+PASS mail authorize refuses extra fields, list-with-id, read-without-id, non-hex ids, bad JSON, a missing or bad assertion, run or client with the access pipeline's codes
+PASS flume mail list|read reads only the launched employee's mailbox, has no identity flag and no send, and names the missing launcher environment
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: {
-  "ok": false,
-  "standing": "unable to assess",
-  "error": "Partial specialist projection; inspect owned state and retry onboard: Member gateway credential not verified: token=failed delta=planned-present render=not-attempted gateway-mint-or-confirm-failed"
-}
+AssertionError [ERR_ASSERTION]: [{"provider":"gateway","kind":"gateway-token","static":true,"evidence":"fixture","owner_ticket":"FLUME-39","evidence_path":"/home/delorenj/.hermes/profiles/flume-pm/cache/scratch/flume53b-DGnAML/fx/no-flume-39-evidence","evidence_status":"unverified","ref":"op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada","ref_source":"generated","id":"hermes-ada","consumer":"hermes-ada","status":"unresolved","provider_code":"provider-unavailable","next_action":"flume identity credentials ada"}]
++ actual - expected
 
+  [
+    [
++     'unresolved',
+-     'revoked',
+      'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada',
+      'generated'
+    ]
+  ]
 
-1 !== 0
-
-    at json (file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/employee-access-lifecycle-regressions.mjs:197:42)
-    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/employee-access-lifecycle-regressions.mjs:210:1 {
+    at file:///home/delorenj/code/33GOD/flume/.worktrees/fix-FLUME-80-fresh-vault-verification/tests/employee-access-lifecycle-regressions.mjs:378:12 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
-  operator: 'strictEqual',
+  actual: [
+    [
+      'unresolved',
+      'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada',
+      'generated'
+    ]
+  ],
+  expected: [
+    [
+      'revoked',
+      'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada',
+      'generated'
+    ]
+  ],
+  operator: 'deepStrictEqual',
   diff: 'simple'
 }
 
