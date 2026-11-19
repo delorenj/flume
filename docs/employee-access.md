@@ -427,7 +427,7 @@ it, or re-suspended by someone since) is someone else's and is never un-suspende
 | provider | what `--revoke` does | what stays usable | row status |
 |---|---|---|---|
 | mail | suspend deletes the allowlist key (reversible, record captured); retire also disables the employee's own routing rule | stored mail is kept under `mail/<handle>/` (Flume has no R2 client and deletes no mail) | `suspended-reversible`; after retire `revoked` by read-back |
-| cloudflare_access | `--revoke` DELETEs the service token and verifies by listing again | without `--revoke`: the token authenticates at Access until its `expires_at` (the facade still denies by status) | `static-usable` + `expires_at`; `revoked` only when the COMPLETE listing no longer has it |
+| cloudflare_access | `--revoke` captures actual token IDs, removes their configured Service Auth policy includes with full-policy readback, then DELETEs the service token and verifies by listing again | without `--revoke`: the token authenticates at Access until its `expires_at` (the facade still denies by status) | token `revoked` only when the COMPLETE listing no longer has it; separate `access-policy-membership` row stays unresolved/present until verified absent (see `docs/identity-provisioning.md`, FLUME-57) |
 | github | `--revoke` suspends the installation (PUT `/app/installations/{id}/suspended`, verified by `suspended_at`) | the App private key (probed by app-JWT `GET /app`); unexpired installation tokens until `expires_at` (at most 1 hour). Anyone holding the key can un-suspend | installation and tokens `suspended-reversible`; key `static-usable`, `revoked` only when GitHub answers 401 |
 | plane | nothing: Flume has no Plane client or revoke verb | the employee's PAT; its expiry is not observable. The employee deletes it (Profile > Personal Access Tokens) or an admin removes the board membership | `static-usable`; `revoked` only on Pilot's `credential_rejected` |
 | gateway | `--revoke` runs `gateway-tokens.py revoke <consumer>` and verifies `status` lists no tokens | an `expired_time` of `-1` means the token never expires; a key the desk inherits from the fleet base, a drifted desk's keys and a specialist launcher's key are usable and never revocable here | `static-usable` or `residual-expiry`; `revoked` only when `tokens: []` and the desk has not drifted; a shared consumer is `static-usable` (retire: `manual-action-required`), never `not-issued`; drift is `unverified` `gateway-ref-drift`; the launcher key is `unverified` `launcher-ref-unproven` (`not-issued` once its vault item is gone) |
@@ -440,8 +440,8 @@ Row statuses: `revoked`, `suspended-reversible`, `residual-expiry`, `static-usab
 but are status-gated, so a suspended employee's run is denied immediately. Installation tokens already minted live at most an hour.
 
 **Listings are read whole.** Cloudflare service tokens and routing rules are paged by `result_info.total_pages` when the provider
-states it, otherwise until a page shorter than the page size the provider says it SERVED (a clamped `per_page` is followed), or an
-empty page. A listing that repeats a page or exceeds 100 pages is `listing-incomplete`: absence (and so `revoked`) is never
+states it, otherwise until an empty page. A short nonempty response is not absence, even when the provider states the served
+`per_page`. A listing that repeats an ID, has malformed rows or inconsistent metadata, or exceeds 100 pages is `listing-incomplete`: absence (and so `revoked`) is never
 concluded from a partial listing.
 
 **After the GitHub App key is deleted** GitHub answers 401 to the installation read too, so that row becomes `unverified`

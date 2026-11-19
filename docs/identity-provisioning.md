@@ -16,6 +16,7 @@ that provisioning does not own is a **conflict blocker**, never a clobber.
 | --- | --- | --- |
 | `vault-item` | — | `op item create` (category identity) titled after the handle in the configured vault |
 | `access-token` | `POST /accounts/…/access/service_tokens` named `employee-<handle>` (8760h) | secret lands in the vault item as `Client Secret`; the definition gains `company_identity.bindings.cloudflare_access` with the signed `principal` (client id), the pinned `instance` (issuer) and a `credential_ref` **by field id** |
+| `access-policy` | GET the configured application + Service Auth policy; append only `{service_token: {token_id: <actual token ID>}}` if missing, PUT and GET the policy back | secret-free ID/subject/account attribution before the edit and outcome receipt; an already-bound employee gets the same reconciliation without minting |
 | `mailbox` | literal Email Routing rule `<handle>@agents.delo.sh` → worker; KV `allowlist/<address>` in the facade's projection namespace | receipt only |
 
 Order is deliberate: the vault item exists before any secret is minted. Item
@@ -81,16 +82,81 @@ the separate owner-approved procedure below.
 ```yaml
 version: 1
 cloudflare:
-  api_token_ref: op://DeLoSecrets/Cloudflare/globalAPIToken  # resolved via `op read`
+  api_token_ref: op://DeLoSecrets/Flume Identity Provisioning/credential  # scoped provisioning credential, resolved via `op read`
   account_id: <32-hex>
   zone_id: <32-hex>              # the zone that owns the mail domain
   access_issuer: https://<team>.cloudflareaccess.com
+  access_policy:
+    api_token_ref: op://DeLoSecrets/Flume Access Policy/credential
+    application_id: <application-uuid>
+    policy_id: <service-auth-policy-uuid>
+    domain: identity.delo.sh    # exact domain returned by the configured application GET
 mailbox:
   worker: agents-facade          # the agents-facade Worker
   kv_namespace_id: <32-hex>      # its MAILBOX_ALLOWLIST namespace
 onepassword:
   vault: DeLoSecrets
 ```
+
+## Access policy membership (FLUME-57)
+
+`cloudflare.access_policy` is optional in the schema so existing lifecycle/mail
+configuration still loads, but provisioning is **blocked**, not ready, without it.
+It must identify one existing Service Auth (`decision: non_identity`) policy under
+one existing application in the configured account. The application ID and exact
+`domain` must read back before any policy edit; Flume does not discover by display
+name, create policies, embed production IDs, edit another policy, or enable
+`any_valid_service_token`. Nested/ambiguous service-token include selectors are
+refused, not rewritten. Reusable/shared policies are refused because their edits
+could affect other applications. Other include rules, employees, exclusions, requirements,
+precedence, session duration and other writable settings are preserved.
+
+**Credential permissions:** the explicit `access_policy.api_token_ref` needs
+Cloudflare account **Access: Apps and Policies — Edit** (API permission group
+`Access: Apps and Policies Write`) for the selected account; it covers both the
+application/policy GETs and the policy PUT. The general provisioning credential
+needs **Access: Service Tokens — Edit**, **Workers KV Storage — Edit** for its
+account and **Email Routing Rules — Edit** for its mail zone. They can reference
+the same appropriately scoped credential only if the operator explicitly configures
+both references. Policy requests never use `cloudflare.api_token_ref`,
+`CLOUDFLARE_API_TOKEN`, or an operator-global fallback. A token that only mints
+service tokens is not sufficient. Keep account/zone resources narrowly scoped.
+
+`access-policy-permission-denied` (401/403) names the missing permission without
+copying provider errors. `access-policy-unresolved` (404), an application/domain
+mismatch, missing reference, invalid policy, provider outage or failed full-policy
+readback is blocked. A read failure before a new token is created prevents its
+mint. A PUT denial or uncertain readback after token issuance preserves the
+vaulted, bound token and completed mailbox results; `ok: false` reports partial
+provisioning. Retry the same employee after fixing the scoped credential or
+configuration: it reads the existing binding/fresh vault/provider inventory and
+repairs membership without minting or duplicating includes. A PUT that committed
+but returned an error is blocked on that invocation and converges on retry.
+Receipts distinguish `fixture` from official-endpoint `provider` observations;
+they contain IDs/outcome codes only and do not prove edge access works.
+
+`suspend|retire --revoke cloudflare_access` first durably captures the actual
+token IDs, then removes only their direct include rules and reads the policy
+back before the existing token-delete step. A failed policy edit does **not**
+prevent token deletion: local status is already closed, and authentication should
+be revoked even if membership cleanup is denied. The extra
+`access-policy-membership` inventory row keeps `complete_revocation: false`
+while membership is present, unknown or unreadable. Retry uses the durable
+capture, earlier token-delete ID or subject/account/client-scoped receipts even
+when the provider token has already disappeared. A historical bound token with
+no recoverable ID remains `access-policy-token-unresolved`; an operator must
+reconcile its ID rather than Flume guessing from a name or claiming cleanup.
+A membership reintroduced after a completed step is detected as new work.
+Restore never silently re-adds revoked membership or recreates a deleted token.
+
+Preview all operations first (`--json` exposes each capability/credential row).
+These are targeted policy edits, not transactional policy ownership: local Flume
+writers serialize through the registry lock and each edit reads the latest policy,
+but Cloudflare's full-policy PUT offers no compare-and-swap here. Coordinate
+external policy writers during an apply; full writable-policy readback detects
+observable drift but cannot eliminate an external write racing the PUT. Empty
+include lists are never replaced with a broad selector; if Cloudflare refuses
+removing the final include, cleanup stays unresolved for operator handling.
 
 State: `$FLUME_PROVISION_STATE` (default `~/.local/state/flume/provision`)
 holds `receipts.jsonl` — one secret-free line per applied action: IDs,
@@ -146,8 +212,8 @@ Bounded operator procedure (one employee, one item, one account):
    mismatch rather than looping. Cleanup failures or secret-less live tokens
    require a separately approved provider action and absence verification.
 
-This procedure does not grant Access-policy membership (FLUME-57), authorize
-live vault-field recovery, or redesign the general suspension/rotation/retirement
+This recovery procedure complements Access-policy membership (FLUME-57); it does not authorize
+live vault-field recovery or redesign the general suspension/rotation/retirement
 contract (FLUME-53). The narrow pending-issuance lifecycle handoff above makes
 retirement inventory and explicitly requested Access revocation honest. It does
 not authorize workforce-wide repair. Source/fixture verification is documented under

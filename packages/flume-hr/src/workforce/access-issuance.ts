@@ -61,6 +61,24 @@ export function pendingAccessIssuance(handle: string, subject: string, accountId
   catch { return { token_ids: [], client_ids: {}, uncertain: true }; }
 }
 
+export function accessPolicyTokenHistory(handle: string, subject: string, accountId: string, principal?: string): { ids: string[]; uncertain: boolean } {
+  try {
+    const ids = new Set<string>(), clients = new Map<string, string>(), rows = readReceipts();
+    for (const row of rows) {
+      if (row.capability !== "access-policy" || row.employee !== handle) continue;
+      if (row.subject !== subject || row.account_id !== accountId || typeof row.client_id !== "string" || !row.client_id ||
+          typeof row.token_id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/u.test(row.token_id) ||
+          (clients.has(row.token_id) && clients.get(row.token_id) !== row.client_id)) return { ids: [], uncertain: true };
+      clients.set(row.token_id, row.client_id);
+      if (!principal || row.client_id === principal) ids.add(row.token_id);
+    }
+    for (const [id, client] of clients) {
+      if (rows.some(row => row.capability === "access-policy" && row.employee !== handle && (row.token_id === id || row.client_id === client))) return { ids: [], uncertain: true };
+    }
+    return { ids: [...ids], uncertain: false };
+  } catch { return { ids: [], uncertain: true }; }
+}
+
 /** A pending issuance cannot silently become a second employee's binding, even after its definition disappears. */
 export function accessIssuanceReservation(principal: string, subject: string): "pending-issuance-reserved" | "issuance-receipt-uncertain" | undefined {
   try {

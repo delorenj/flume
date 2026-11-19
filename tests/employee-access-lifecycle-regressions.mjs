@@ -174,7 +174,7 @@ writeFileSync(join(dir, "op.json"), JSON.stringify({
   "op://DeLoSecrets/ada-access/credential": SECRET.ada, "op://DeLoSecrets/bob-access/credential": SECRET.bob,
 }));
 const provisioning = join(dir, "identity-provisioning.yaml");
-writeFileSync(provisioning, YAML.stringify({ version: 1, cloudflare: { api_token_ref: TOKEN_REF, account_id: ACCOUNT, zone_id: ZONE, access_issuer: ISSUER_CF }, mailbox: { worker: "agents-facade", kv_namespace_id: KVNS }, onepassword: { vault: "DeLoSecrets" } }));
+writeFileSync(provisioning, YAML.stringify({ version: 1, cloudflare: { api_token_ref: TOKEN_REF, account_id: ACCOUNT, zone_id: ZONE, access_issuer: ISSUER_CF, access_policy: { api_token_ref: TOKEN_REF, application_id: "app-fixture", policy_id: "policy-fixture", domain: "identity.fixture.test" } }, mailbox: { worker: "agents-facade", kv_namespace_id: KVNS }, onepassword: { vault: "DeLoSecrets" } }));
 const baseEnv = {
   ...process.env, HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry, HERMES_FLEET_REGISTRY_FILE: registry,
   HERMES_TEMPLATE_CONFIG: join(dir, "no-config"), HERMES_FLEET_ENV: join(dir, "no-env"), HERMES_FLEET_BIN: join(bin, "hermes"),
