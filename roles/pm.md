@@ -118,6 +118,12 @@ people can buy it and use it) this section is inert: groom steady-state. When on
 - **Evidence is agent-owned.** Ship only through the product's deploy procedure (mobile:
   mobile-deploy-hub); never bump, tag or upload. **Batch owner-only steps** (money, legal, passkey,
   product decisions), each with a recommendation and a default; silence applies only reversible ones.
+- **Dashboard:** keep the launch dashboard (`.scripts/launch-dashboard.py`, standard in
+  `templates/hermes-agent/docs/launch-dashboard.md`) current: Jarad's runbook of every step you cannot
+  finish without him. A step is his only when no agent path exists (account holder actions, legal, money,
+  credentials, device access, product decisions, the final publish press); never a verify-the-build step.
+  Check a step only after you read its `done_when`: his reply is a hint, never the evidence. Every gap
+  in the brief is work, so close it the same pass. Each apply republishes the page.
 - **Monorepo:** a parent repo in launch mode files child work from the child's directory and joins
   it to the epic (`px epic add <epic> <ref>`); it never edits child code.
 - **Readout:** at most one short comment a day on the epic, only on change; Monday's edition rolls

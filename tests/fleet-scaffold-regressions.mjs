@@ -868,6 +868,21 @@ try {
     gitOk(repo, ["commit", "--quiet", "-m", "remove historical helper"]);
   });
 
+  check("a repo-owned launch-pass.repo.md is never unexpected-owned (33GOD-114)", () => {
+    const repo = join(reposRoot, "droppings");
+    const path = join(repo, "agents/hermes/pm/.scripts/launch-pass.repo.md");
+    writeFileSync(path, "Repo-owned launch-pass notes.\n");
+    gitOk(repo, ["add", "--", "agents/hermes/pm/.scripts/launch-pass.repo.md"]);
+    gitOk(repo, ["commit", "--quiet", "-m", "repo-owned launch-pass notes"]);
+    const data = status(cliAt(mainRoot, [...STATUS_ARGS, "--agent", "droppings-pm"]));
+    const agent = agentNamed(data, "droppings-pm");
+    assert.equal(textOf(agent).includes("launch-pass.repo.md"), false, "the repo-owned file is never named");
+    assert.deepEqual(itemsOf(groupOf(agent, "scaffold.scripts")).map(item => item.path), [".scripts/.done-70-systemd"]);
+    assert.equal(agent.scaffold.assets.unexpected_owned, 2);
+    gitOk(repo, ["rm", "-q", "--", "agents/hermes/pm/.scripts/launch-pass.repo.md"]);
+    gitOk(repo, ["commit", "--quiet", "-m", "drop repo-owned launch-pass notes"]);
+  });
+
   check("ignored runtime, untracked notes and a foreign tracked file are counted, never named; only the WIP overlap is", () => {
     const data = status(cliAt(mainRoot, STATUS_ARGS));
     const agent = agentNamed(data, "wip-pm");

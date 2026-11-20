@@ -38,6 +38,7 @@ function fixture(name,{authored=false,modified=false,retired=false}={}){
   put(join(role,'.scripts/managed-execution.py'),historical('managed-execution.py')+(modified?'\n# Local operator change\n':''));
   put(join(role,'.scripts/heartbeat.sh'),historical('heartbeat.sh'));
   put(join(role,'.scripts/local-helper.sh'),'#!/bin/sh\nprintf local\n');
+  put(join(role,'.scripts/launch-pass.repo.md'),'Repo-owned launch-pass notes (33GOD-114).\n');
   put(join(role,'.gitignore'),'runtime/\n');
   git(repo,'add','--','.project.json','agents');git(repo,'commit','--quiet','-m','deployed scaffold');
   const env={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,
@@ -55,6 +56,7 @@ try{
   const f=fixture('canonical');
   const runtimeBefore=Object.fromEntries(['state.db','sessions/history.json','memories/MEMORY.md','local-notes.md','profile.yaml'].map(n=>[n,snapshot(join(f.role,'runtime',n))]));
   const registryBefore=snapshot(f.registry),localBefore=snapshot(join(f.role,'.scripts/local-helper.sh'));
+  const repoNotesBefore=snapshot(join(f.role,'.scripts/launch-pass.repo.md'));
   assert.match(f.audit().details.join('\n'),/obsolete template-owned helper/);
   const before={repo:snapshot(f.repo),registry:snapshot(f.registry)};
   const preview=f.remediate('--dry-run');
@@ -71,6 +73,7 @@ try{
   assert.equal(fs.readFileSync(join(f.role,'runtime/SOUL.md'),'utf8'),soul);
   assert.deepEqual(Object.fromEntries(Object.keys(runtimeBefore).map(n=>[n,snapshot(join(f.role,'runtime',n))])),runtimeBefore);
   assert.deepEqual(snapshot(f.registry),registryBefore);assert.deepEqual(snapshot(join(f.role,'.scripts/local-helper.sh')),localBefore);
+  assert.deepEqual(snapshot(join(f.role,'.scripts/launch-pass.repo.md')),repoNotesBefore,'the repo-owned launch-pass notes are never written, compared or removed');
   assert.equal(f.audit().status,'pass');
   const after=snapshot(f.repo);assert.equal(f.remediate().status,'noop');assert.deepEqual(f.remediate('--dry-run').changedFiles,[]);assert.deepEqual(snapshot(f.repo),after);
   pass('canonical preview/apply removes only shipped obsolete helpers, updates heartbeat and composes four holds; runtime/local state survives and repeats converge');

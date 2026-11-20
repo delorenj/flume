@@ -318,6 +318,15 @@ export function compareAssets(
   return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0));
 }
 
+/**
+ * Role-relative files a repo owns inside an owned group. The template never renders
+ * them and the scaffold never writes, compares, flags or removes them: they are the
+ * repository's own business, counted like any other foreign tracked file.
+ * `.scripts/launch-pass.repo.md` is the repo's addition to the shared launch-pass
+ * contract (33GOD-114); `launch-pass.py --brief` prints it after the shared prompt.
+ */
+export const REPO_OWNED_SCAFFOLD_PATHS: readonly string[] = [".scripts/launch-pass.repo.md"];
+
 export interface ScaffoldExtrasInput {
   /** Every tracked path under the role directory, role-relative. */
   trackedPaths: readonly string[];
@@ -353,6 +362,7 @@ export function classifyExtras(input: ScaffoldExtrasInput): ScaffoldExtras {
   for (const path of input.trackedPaths) {
     if (input.ownedPaths.has(path)) continue;
     if (path.startsWith(runtimePrefix)) { foreignTracked += 1; continue; }
+    if (REPO_OWNED_SCAFFOLD_PATHS.includes(path)) { foreignTracked += 1; continue; }
     const group = groupFor(path, input.groups);
     if (group === null) { foreignTracked += 1; continue; }
     const excluded = matchesExcluded(path, input.excludedPatterns);

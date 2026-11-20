@@ -19,7 +19,15 @@ let count=0;
 const pass=label=>{count++;console.log(`PASS ${label}`);};
 try {
   await build({entryPoints:[join(root,'packages/flume-hr/src/scaffold/compare.ts')],outfile:bundle,bundle:true,packages:'external',platform:'node',format:'esm',logLevel:'silent'});
-  const {renderTemplate}=await import(pathToFileURL(bundle).href);
+  const {renderTemplate,classifyExtras,REPO_OWNED_SCAFFOLD_PATHS}=await import(pathToFileURL(bundle).href);
+
+  // 33GOD-114: a repo's own launch-pass notes inside the owned .scripts/ group are never an unexpected extra.
+  const extras=classifyExtras({trackedPaths:['.scripts/launch-pass.repo.md','.scripts/.done-70-systemd','.scripts/stray.sh','README.md'],ownedPaths:new Set(),
+    groups:{'scaffold.scripts':'.scripts/'},runtimeDir:'runtime',excludedPatterns:['.done-*']});
+  assert.deepEqual(REPO_OWNED_SCAFFOLD_PATHS,['.scripts/launch-pass.repo.md']);
+  assert.deepEqual(extras.unexpected.map(e=>e.path),['.scripts/.done-70-systemd','.scripts/stray.sh']);
+  assert.equal(extras.foreignTracked,2);
+  pass('a repo-owned launch-pass.repo.md is foreign, never unexpected-owned, while a real extra still is');
 
   // Unit: the branch semantics, and what stays unsupported.
   const src='a\n{% if p == "x" %}\nX\n{% else %}\nY\n{% endif %}\nb {{ p }}\n';
