@@ -15,7 +15,7 @@
  *
  * Candybar is the only clock: the job is pinned `external`, and nothing here schedules anything.
  * `enable` is idempotent and adopts what already exists (zero changes on a wired repo); `disable`
- * only pauses the Candybar job (manifest and Hermes job stay, so going steady is reversible).
+ * only pauses the Candybar job (manifest and Hermes job stay, so going live or steady is reversible).
  * Writes only the wrappers, the Hermes job and the manifest, and asks pj to turn crank on (pj writes
  * `.project.json`); it commits nothing. `disable` leaves crank alone: crank also serves steady repos.
  */
@@ -60,8 +60,12 @@ function envPaths(env: LaunchEnv = {}) {
 export interface LaunchDeclaration {
   path: string;
   exists: boolean;
-  /** `absent` = no file (steady); `invalid` = unreadable or an unknown mode (treated as steady, reported). */
-  mode: "launch" | "steady" | "absent" | "invalid";
+  /**
+   * The lifecycle is launch (racing to a finish line) -> live (in production: people can buy it and use it);
+   * `steady` is for projects that are neither. Only `launch` runs a launch pass; `live` and `steady` run none.
+   * `absent` = no file (steady); `invalid` = unreadable or an unknown mode (treated as steady, reported).
+   */
+  mode: "launch" | "live" | "steady" | "absent" | "invalid";
   epic?: string;
   declared?: string;
   error?: string;
@@ -76,8 +80,8 @@ export function readLaunchDeclaration(repoRoot: string): LaunchDeclaration {
     const out: LaunchDeclaration = { path, exists: true, mode: "invalid" };
     if (typeof doc?.epic === "string") out.epic = doc.epic;
     if (doc?.declared !== undefined) out.declared = String(doc.declared);
-    if (mode === "launch" || mode === "steady") out.mode = mode;
-    else out.error = `${LAUNCH_DECLARATION} mode must be "launch" or "steady" (got ${JSON.stringify(mode ?? null)})`;
+    if (mode === "launch" || mode === "live" || mode === "steady") out.mode = mode;
+    else out.error = `${LAUNCH_DECLARATION} mode must be "launch", "live" or "steady" (got ${JSON.stringify(mode ?? null)})`;
     return out;
   } catch (error) {
     return { path, exists: true, mode: "invalid", error: `${LAUNCH_DECLARATION} unreadable: ${(error as Error).message}` };
@@ -437,7 +441,7 @@ export function launchProblems(input: {
       else if (crank.enabled === false) problems.push(`crank is off (${crank.source ?? "default"}), mode is launch; run: flume launch enable`);
     }
   } else if (enabled) {
-    problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is enabled but ${LAUNCH_DECLARATION} is ${declaration.mode === "absent" ? "absent" : declaration.mode} (steady); run: flume launch disable`);
+    problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is enabled but ${LAUNCH_DECLARATION} is ${declaration.mode === "absent" ? "absent" : declaration.mode} (${declaration.mode === "live" ? "live: in production, no finish line" : "steady"}); run: flume launch disable`);
   }
   return { problems, fixable };
 }

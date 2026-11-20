@@ -302,7 +302,7 @@ repo data, not a role. Role contract: `flume/roles/pm.md`, "## Launch mode".
 
 | Part | Where | Rule |
 |---|---|---|
-| Declaration | committed `<repo>/.launch.yaml` | `mode: launch\|steady`, `declared`, `source`, `finish_line`, `target_date`, `contract: [paths]`, `epic: <BOARD-n>`, optional `cut_line {launch_critical, after_launch}`. Absent file = steady. **Owner-edited only**; the PM proposes `mode: steady` in one ticket when the finish line is met on evidence. |
+| Declaration | committed `<repo>/.launch.yaml` | `mode: launch\|live\|steady`, `declared`, `source`, `finish_line`, `target_date`, `contract: [paths]`, `epic: <BOARD-n>`, optional `cut_line {launch_critical, after_launch}`. Absent file = steady. **Owner-edited only**; the PM proposes `mode: live` (in production) or `mode: steady` in one ticket when the finish line is met on evidence. A `live` file also carries `live_since` and a `live:` block read by the Holocene Live hub. |
 | Driver | `<role dir>/.scripts/launch-pass.py` (+ `launch-pass.prompt.md`), shipped by hermes-agent-template | `--monitor` (the gate snapshot), `--brief` (contract + declaration + snapshot + roadmap + plan schema), `--apply plan.json` (the only board writer: board-driver lease, `[pm]` tag, ops `comment\|create\|move\|close\|cancel\|rank\|link`, write cap, receipt under `runtime/launch-receipts/`, roadmap `runtime/launch-roadmap.md`) |
 | Wrappers | `~/.hermes/profiles/<repo>-pm/scripts/launch-{monitor,brief}.sh` | real files (Hermes refuses symlinks) that exec the repo driver |
 | Job | one Hermes job pinned `--scheduler external`, leaned with `interval-driver` `lean-job.py` | `monitor_script launch-monitor.sh`, `script launch-brief.sh` |
@@ -327,7 +327,7 @@ the first fire with `candybar history <repo>-pm-launch-pass` and the second
 **Audit.** `flume audit --rules hermes.launch-mode` (project scope): `mode: launch`
 requires the enabled Candybar `<repo>-pm-launch-pass`, an external Hermes job on
 the repo's pm desk and, in a pjangler project, crank on (`flume launch enable`
-runs `pj crank enable` for you); `mode: steady` or no file requires no enabled launch pass; any
+runs `pj crank enable` for you); `mode: live`, `mode: steady` or no file requires no enabled launch pass; any
 non-retired registry row whose role is `launch-director`, `paired-launch-director`
 or `em` is a finding that names `flume retire` (directors) or the em-to-pm
 conversion below.
@@ -452,7 +452,7 @@ monitor hash matches and the agent never starts. Recipe and measurements:
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | each role launcher (`agents/hermes/<title>/hermes`) sets `HERMES_HOME` to the named desk; no dead `HERMES_OAUTH_FILE`. The rule also reads a per-agent unit's `Environment=HERMES_HOME=` when a leftover file exists; that unit is drift whatever its env says. The one host unit runs with `HERMES_HOME=~/.hermes`, which is correct |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer`/`gateway_unit` under `systemd` |
-  | `hermes.launch-mode` | project | `.launch.yaml` `mode: launch` => enabled Candybar `<repo>-pm-launch-pass` plus an external-pinned Hermes job on the repo's pm desk; `steady`/absent => no enabled launch pass; a non-retired registry row with role `launch-director`, `paired-launch-director` or `em` is a finding (names `flume retire` or the em-to-pm conversion). See "Launch mode" |
+  | `hermes.launch-mode` | project | `.launch.yaml` `mode: launch` => enabled Candybar `<repo>-pm-launch-pass` plus an external-pinned Hermes job on the repo's pm desk; `live`/`steady`/absent => no enabled launch pass; a non-retired registry row with role `launch-director`, `paired-launch-director` or `em` is a finding (names `flume retire` or the em-to-pm conversion). See "Launch mode" |
   | `hermes.retired-routing` | host | no row with a `retired` channel still has a `plane` board claim or enabled bloodbank, and no Plane board has two `plane.scope_default: true` rows. Not auto-fixable; each finding names `flume retire <id> --apply` |
 
   `hermes.fleet-config` is deliberately **not** auto-fixable: those are fleet-wide

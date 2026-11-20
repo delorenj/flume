@@ -62,9 +62,9 @@ point. An undeclared placeholder is a hard error, never a half-rendered SOUL.
 A second role file is for a different charter. A PM in launch mode is the same
 PM reading different data, so it is a section, not a file: `pm.md` puts one
 `## Launch mode` section in every PM soul, and the repo's committed
-`.launch.yaml` decides whether it applies (`mode: launch | steady`, declared
+`.launch.yaml` decides whether it applies (`mode: launch | live | steady`, declared
 date, source, finish line, target date, contract paths, epic, optional cut-line
-hint; never status). No file means steady and the section is inert. Turning
+hint; never status). No file, `steady` or `live` leaves the section inert. Turning
 launch on or off is a commit to that repo, never a new role, a re-hire or a
 re-compose. The template ships `.scripts/launch-pass.py` to every PM desk, and
 Candybar fires it (`<repo>-pm-launch-pass`) only for a repo that launches.

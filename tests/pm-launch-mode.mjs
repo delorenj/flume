@@ -40,7 +40,7 @@ try {
     const flat = body.replace(/\s+/gu, " ");
     // Inert by default: the declaration file switches it, and absence means steady.
     assert.match(flat, /committed `\.launch\.yaml` says `mode: launch`/);
-    assert.match(flat, /With no file, or `mode: steady`,\s+this section is inert/);
+    assert.match(flat, /With no file, `mode: steady` \(not public\) or `mode: live` \(in production:\s+people can buy it and use it\) this section is inert/);
     // The rules absorbed from the retired Launch Director charters: the PM is the whole launch desk.
     assert.match(flat, /\*\*One finish line:\*\* the declaration's `finish_line`, `contract` and `epic`/);
     assert.match(flat, /Hold the cut line:\*\* rank open work launch-critical, after-launch or cut/);
@@ -63,7 +63,7 @@ try {
     assert.match(flat, /mobile-deploy-hub/);
     assert.match(flat, /money, legal, passkey,\s+product decisions\), each with a recommendation and a default/);
     assert.match(flat, /at most one short comment a day on the epic, only on change/);
-    assert.match(flat, /file one ticket proposing\s+`mode: steady`\. Never edit the declaration yourself/);
+    assert.match(flat, /file one ticket proposing `mode: live` when the\s+product is in production and sellable, or `mode: steady` when it is not\. Never edit the declaration yourself/);
     // One clock (Candybar) and one board writer (the driver's --apply).
     assert.ok(flat.includes(`Candybar fires the launch pass (\`${repo}-pm-launch-pass\`)`), "candybar manifest named per repo");
     assert.match(flat, /`\.scripts\/launch-pass\.py --brief`/);
@@ -104,11 +104,11 @@ try {
   for (const name of ["_base.md", "_tones.yaml", "pm.md"]) copyFileSync(join(root, "roles", name), join(fixtureRoles, name));
   const fixtureRole = join(fixtureRoles, "pm.md");
   const original = readFileSync(fixtureRole, "utf8");
-  const unsafe = original.replace(/file one ticket proposing `mode: steady`\.\n  Never edit the declaration yourself\./u,
+  const unsafe = original.replace(/file one ticket proposing `mode: live` when the\n  product is in production and sellable, or `mode: steady` when it is not\. Never edit the declaration yourself\./u,
     "set `mode: steady` in `.launch.yaml` yourself.");
   assert.notEqual(unsafe, original, "negative fixture must alter the role source");
   writeFileSync(fixtureRole, unsafe);
-  assert.throws(() => assertLaunchMode(composeSoul(scratch, identity("earshot", "pm")).text, "earshot"), /mode: steady/);
+  assert.throws(() => assertLaunchMode(composeSoul(scratch, identity("earshot", "pm")).text, "earshot"), /mode: steady` in `\.launch\.yaml` yourself|mode: live/);
 
   console.log("pm-launch-mode: pm section, prime directive, behavior key, per-repo manifest, non-pm exclusion and negative mutation passed");
 } finally {

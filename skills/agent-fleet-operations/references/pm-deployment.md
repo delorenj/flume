@@ -295,7 +295,7 @@ or let the deployer mark the step complete after only warning.
 `flume hire pm` deploys the one PM and never turns on a launch pass. Launch mode
 is repo data: the committed `<repo>/.launch.yaml` (`mode: launch`), then `flume
 launch enable <repo>` wires the external-pinned Hermes job and the Candybar
-`<repo>-pm-launch-pass`. A deployment with no `.launch.yaml`, or `mode: steady`,
+`<repo>-pm-launch-pass`. A deployment with no `.launch.yaml`, `mode: steady` or `mode: live`,
 must have no enabled launch pass (`flume audit --rules hermes.launch-mode`). Do
 not hire a launch-director, paired-launch-director or em desk to run a launch;
 those titles are retired (2026-11-18). Procedure, retirement and the em-to-pm

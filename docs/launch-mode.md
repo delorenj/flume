@@ -8,7 +8,7 @@ repos that use it.
 | piece | where | owner |
 | --- | --- | --- |
 | charter | `roles/pm.md`, `## Launch mode` (inert without the declaration) | flume |
-| declaration | `<repo>/.launch.yaml` (`mode: launch \| steady`, `finish_line`, `contract`, `epic`, optional `cut_line`, optional `scopes: [child dirs]` for a monorepo parent) | **Jarad only**; the PM proposes `mode: steady` in a ticket |
+| declaration | `<repo>/.launch.yaml` (`mode: launch \| live \| steady`, `finish_line`, `contract`, `epic`, optional `cut_line`, optional `scopes: [child dirs]` for a monorepo parent) | **Jarad only**; the PM proposes `mode: live` (in production, people can buy it and are using it) or `mode: steady` (not) in a ticket |
 | driver | `<desk>/.scripts/launch-pass.py` (`--monitor`, `--brief`, `--apply plan.json`) | hermes-agent template |
 | wrappers | `~/.hermes/profiles/<profile>/scripts/launch-{monitor,brief}.sh` (real files exec'ing the driver) | `flume launch enable` |
 | Hermes job | profile cron job, `scheduler: external`, lean (terminal,file,no_mcp; no skills; 10 iterations) | `flume launch enable` |
@@ -44,7 +44,7 @@ launcher) is unchanged and is the default when the first word is not `status|ena
   is given. It writes the wrappers, the job and the manifest, and commits nothing: commit the
   manifest to the repo.
 - **disable** pauses the Candybar job and keeps the manifest and the Hermes job, so going steady is
-  reversible. Use it when `.launch.yaml` goes `steady`. It leaves crank alone: crank also serves
+  reversible. Use it when `.launch.yaml` goes `live` or `steady`. It leaves crank alone: crank also serves
   steady repos (`pj crank disable` turns it off).
 
 ## Audit rule `hermes.launch-mode` (project scope)
@@ -55,7 +55,7 @@ launcher) is unchanged and is the default when the first word is not `status|ena
   job that is enabled and `scheduler: external`, the manifest, and an **enabled** Candybar
   `<repo>-pm-launch-pass`, and, in a pjangler project, crank on (`pj crank status --json`
   `policy.enabled`). An unreadable Candybar or `pj` is a `warn` (unverified), not a pass.
-- `mode: steady` or no `.launch.yaml` fails if the `<repo>-pm-launch-pass` Candybar is enabled
+- `mode: live`, `mode: steady` or no `.launch.yaml` fails if the `<repo>-pm-launch-pass` Candybar is enabled
   (`flume launch disable`).
 - Any non-retired registry row (`bloodbank.enabled` not false) for the repo with role
   `launch-director`, `paired-launch-director` or `em` fails, naming `flume retire <id> --apply` for a

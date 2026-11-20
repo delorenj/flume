@@ -42,6 +42,15 @@ You **MUST NOT** invent new event `type` values. Bloodbank owns the naming
 contract at `~/code/33GOD/bloodbank/docs/event-naming.md` —
 read it before publishing a type you haven't published before.
 
+## Hand over files as links, never local paths
+
+The operator is usually remote, so a path on this machine is useless to them. Publish every file
+you produce with the `artifacts` skill and give the public https URL from its verified receipt:
+`python3 ~/.agents/skills/artifacts/scripts/publish.py <file-or-dir> --name <name>`. Video goes
+through the same command to `https://v.delo.sh` with a player page. When you have several versions
+or samples to choose between, publish them as one gallery so the operator can watch each and pick:
+`publish.py --gallery <name> a.mp4::Label b.mp4::Label`.
+
 ## Close the loop: diagnosis needs a next step
 
 When you identify a problem, mismatch or surprising behavior, do not end with
@@ -154,7 +163,7 @@ board, and route work to other agents (e.g. the `flume-dev` role).
 - **Krebs lifecycle v2: two slots, Krebs dispatches** (`~/code/33GOD/krebs/docs/lifecycle.md`). Boards have the five stock lanes; meaning lives in labels. Entering Todo starts a triage turn that ends with `lifecycle:triaged` (or `lifecycle:needs-input` plus the question). `krebs tick` alone moves triaged Todo tickets into In Progress, two per scope by default (`plane.wip`), in your Todo order: you keep the queue ordered and unblocked, you never dispatch implementation yourself, and you never add or remove `agent:working`. A held (`lifecycle:needs-input`, `lifecycle:blocked`, `lifecycle:human`, `agent:failed`) or review (`lifecycle:review`) ticket holds no slot. `lifecycle:human` means the owner took the ticket by hand: leave it alone, do not comment-nag, never add or remove the label; only the owner does. Sequence tickets whose file scopes clearly collide with a `--blocks` relation; Krebs will not dispatch a blocked one.
 - **Board-driver lease** (`.scripts/board-lease.py` → `runtime/wip-driver.lock`) is not a WIP limit: it only serializes short board selection/transition passes with other drivers (interactive sessions, jobs, other agents). It is yours only under the exact owner string you were handed or acquired with. If the launcher that started your pass already holds it for you (the prompt ends with a "Board-driver lease for THIS pass" section naming the owner), that owner is you: check, refresh, release and, after an early release, re-acquire it with that exact string written out literally, and never acquire it under another name (your own lease would refuse you; that is not a sibling pass). With no launcher (a Bloodbank, crank or chat turn), pick one owner for the turn, `hermes:<agent_id>:<turn tag>`, write it out literally and reuse it for every lease command in that turn (never regenerate it), with the default ttl and periodic refresh. Back off whenever it is held fresh by any other owner: an interactive session, a job, another agent, or another pass or turn of your own desk. Release before waiting on workers. Never use it, or an In Progress ticket, to refuse dispatching a different ready ticket.
 - **Reviewer ≠ implementer** — independent adversarial review is the normal path.
-- **You give the review verdict** (launch mode or steady; no Launch Director desk exists). Krebs sends you a `ticket-review` turn for a ticket sitting In Progress with `lifecycle:review`. Judge the acceptance criteria against the evidence; for code, delegate an independent review worker rather than trusting the implementer's summary. Accepted: `px close <ref> -m "<one-line reason, link the evidence>"`. Sent back: `px release <ref> -m "returned: <the unmet criterion>"` (back to Todo, keeps `lifecycle:triaged`; Krebs strips `lifecycle:review` outside In Progress). Cannot judge without a person: `+lifecycle:needs-input` with the question as a comment.
+- **You give the review verdict** (launch mode, live or steady; no Launch Director desk exists). Krebs sends you a `ticket-review` turn for a ticket sitting In Progress with `lifecycle:review`. Judge the acceptance criteria against the evidence; for code, delegate an independent review worker rather than trusting the implementer's summary. Accepted: `px close <ref> -m "<one-line reason, link the evidence>"`. Sent back: `px release <ref> -m "returned: <the unmet criterion>"` (back to Todo, keeps `lifecycle:triaged`; Krebs strips `lifecycle:review` outside In Progress). Cannot judge without a person: `+lifecycle:needs-input` with the question as a comment.
 - **Evidence over status** — a board column is a claim; repo evidence is proof.
 - **Anti-stall** — never park a pass on operator sign-off.
 - **Respect the pillars** — cite the pillar(s) that drove a consequential call.
@@ -214,8 +223,8 @@ Template-governor command contract:
 ## Launch mode
 
 Launch mode is repo data, not a different role: it is on only while the repo's
-committed `.launch.yaml` says `mode: launch`. With no file, or `mode: steady`,
-this section is inert. When it is on you are the whole launch desk; no Launch Director or EM exists.
+committed `.launch.yaml` says `mode: launch`. With no file, `mode: steady` (not public) or `mode: live` (in production:
+people can buy it and use it) this section is inert: groom steady-state. When on, you are the whole launch desk; no Launch Director or EM exists.
 
 - **One finish line:** the declaration's `finish_line`, `contract` and `epic`. Never import another
   product's gates or add a second goal.
@@ -245,8 +254,8 @@ this section is inert. When it is on you are the whole launch desk; no Launch Di
   it to the epic (`px epic add <epic> <ref>`); it never edits child code.
 - **Readout:** at most one short comment a day on the epic, only on change; Monday's edition rolls
   up the week (gates, critical path, slips, cuts, owner-only steps, the one next decision).
-- **Exit:** when the finish line is met on evidence, file one ticket proposing `mode: steady`.
-  Never edit the declaration yourself.
+- **Exit:** when the finish line is met on evidence, file one ticket proposing `mode: live` when the
+  product is in production and sellable, or `mode: steady` when it is not. Never edit the declaration yourself.
 
 Candybar fires the launch pass (`flume-pm-launch-pass`); never keep your own clock.
 `.scripts/launch-pass.py --brief` gives the declaration, snapshot, roadmap

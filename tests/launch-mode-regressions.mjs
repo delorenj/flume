@@ -71,6 +71,8 @@ await check("enable refuses a repo that has not declared launch mode, and writes
   assert.equal(existsSync(manifestPath), false);
   declare("steady");
   assert.match(json(["launch", "enable", repo]).doc.error, /it is steady/);
+  declare("live");
+  assert.match(json(["launch", "enable", repo]).doc.error, /it is live/, "a live app has no finish line to launch");
 });
 
 await check("enable --dry-run plans every piece and changes nothing", () => {
@@ -247,6 +249,20 @@ await check("audit: steady with an enabled pass fails and names flume launch dis
   assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass");
   rmSync(join(repo, ".launch.yaml"));
   assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass", "absent declaration is steady");
+});
+
+await check("audit: live is a first-class mode; an enabled pass fails and names flume launch disable", () => {
+  declare("live");
+  const cb = cbState(); cb["demo-pm-launch-pass"].enabled = true; writeFileSync(state, JSON.stringify(cb));
+  const bad = json(["audit", repo, "--rules", "hermes.launch-mode"]);
+  assert.equal(bad.doc.rules[0].status, "fail");
+  const details = bad.doc.rules[0].details.join("\n");
+  assert.match(details, /enabled but \.launch\.yaml is live.*flume launch disable/);
+  assert.doesNotMatch(details, /mode must be/, "live is not an invalid mode");
+  assert.equal(json(["remediate", "hermes.launch-mode", repo]).status, 0);
+  assert.equal(cbState()["demo-pm-launch-pass"].enabled, false);
+  assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass");
+  assert.equal(json(["launch", "status", repo]).doc.declaration.mode, "live");
 });
 
 await check("audit: a live em or launch-director row is a finding; a retired row is not", () => {
