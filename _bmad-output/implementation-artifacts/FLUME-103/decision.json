@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "agent_id": "flume-pm",
+    "cli": "hermes",
+    "provider": "custom",
+    "type": "agent_cli"
+  },
+  "causationid": null,
+  "correlationid": "1e60481c-81f6-4b27-98dc-7472c384454d",
+  "data": {
+    "artifacts_root": "_bmad-output/implementation-artifacts",
+    "basis": [
+      "dogfood-the-platform",
+      "build-lego-not-statues"
+    ],
+    "decided_at": "2026-11-20T15:01:32Z",
+    "decided_by": "flume-pm",
+    "decision": "Stop employee recovery on archived DELO; ask whether to unarchive the existing board",
+    "issue": "FLUME-103",
+    "reasoning": "Pilot live enrollment preview refuses DELO as board_archived. Fallback-board verification does not satisfy native DELO readiness; no recovery mutations or implementation dispatch are authorized around that refusal.",
+    "repo": "flume"
+  },
+  "datacontenttype": "application/json",
+  "domain": "repo",
+  "id": "720e23f0-d091-4b53-9b1f-861c027988d5",
+  "kind": "event",
+  "ordering_key": "repo:flume",
+  "producer": "hermes-agent:flume-pm",
+  "service": "flume",
+  "source": "hermes://agent/flume-pm",
+  "specversion": "1.0",
+  "subject": "bloodbank.evt.repo.decision.recorded",
+  "time": "2026-11-20T15:01:32Z",
+  "type": "bloodbank.repo.decision.recorded"
+}
