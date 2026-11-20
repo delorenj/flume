@@ -90,7 +90,7 @@ function defaultHostSchema(home: string): ConfigSchema {
         ["codex_home", quote("~/.codex")],
         ["vox_plugin_name", quote("vox")],
         ["vox_plugin_dir", quote(join(home, "code", "voxxy", "plugins", "tts", "vox"))],
-        ["vox_voice", quote("carlin")],
+        // No vox_voice: the fleet base (~/.hermes/config.yaml tts.vox.voice) is THE default voice.
         ["vox_url", quote("https://vox.delo.sh")],
         ["onepassword_vault", quote(DEFAULT_VAULT_NAME)],
         ["onepassword_item_prefix", quote("hermes-agent")],

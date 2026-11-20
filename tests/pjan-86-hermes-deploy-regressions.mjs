@@ -615,7 +615,7 @@ def loads(_source):
   assert.equal((upgraded.match(/^hermes_bin\s*=/gm) ?? []).length, 1, "existing schema values must not be duplicated");
   assert.match(upgraded, /custom_key = "keep"/);
   assert.match(upgraded, /\[operator\]\nmode = "richer"/);
-  for (const key of ["flume_bin", "pjangler_bin", "hermes_git_url", "hermes_git_ref", "hermes_git_sha", "oauth_file", "codex_home", "vox_plugin_name", "vox_plugin_dir", "vox_voice", "vox_url", "onepassword_vault", "onepassword_item_prefix"]) {
+  for (const key of ["flume_bin", "pjangler_bin", "hermes_git_url", "hermes_git_ref", "hermes_git_sha", "oauth_file", "codex_home", "vox_plugin_name", "vox_plugin_dir", "vox_url", "onepassword_vault", "onepassword_item_prefix"]) {
     assert.match(upgraded, new RegExp(`^${key}\\s*=`, "m"), `config upgrade should add ${key}`);
   }
 

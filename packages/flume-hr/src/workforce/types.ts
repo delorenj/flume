@@ -31,7 +31,7 @@ export interface NamedAgentContract {
   role: string;
   charter: AgentCharter;
   skills: AgentSkillsBinding;
-  /** Optional TTS voice slug; overrides the fleet vox_voice default in the projection. */
+  /** Optional TTS voice slug; pins this desk instead of inheriting the fleet base voice (~/.hermes/config.yaml tts.vox.voice). */
   voice?: string;
   memory: AgentMemoryBinding;
   /** Optional placement in an existing org department. */

@@ -83,15 +83,17 @@ export function employeePlaneSetting(census: IdentityCensus, target: IdentityDef
 
 /** The person's name as Plane should show it: a specialist's display_name; a post's role.yaml display_name only when it names the person. */
 export function planeDisplayName(target: IdentityDefinition, block: CompanyIdentity): string {
-  const capitalized = block.handle.charAt(0).toUpperCase() + block.handle.slice(1);
+  // "ceiling-cat" -> "Ceiling Cat": a handle's words, each capitalized (a Plane name, not a slug).
+  const words = (text: string) => text.toLowerCase().split(/[\s_-]+/u).filter(Boolean);
+  const capitalized = words(block.handle).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   if (target.kind === "specialist") return typeof target.fields.display_name === "string" && target.fields.display_name.trim() ? target.fields.display_name.trim() : capitalized;
   let display: unknown;
   try { display = (parseNamedAgentYaml(target.text) as Record<string, unknown> | null)?.display_name; } catch { display = undefined; }
   if (typeof display !== "string" || !display.trim()) return capitalized;
   // A post enrolled as itself (`enroll --as-post`): the post's display_name IS its name ("Tolt PM").
   if (!target.person && target.posts.includes(block.handle)) return display.trim();
-  const person = (target.person ?? block.handle).toLowerCase();
-  return display.toLowerCase().includes(person) ? display.trim() : capitalized;
+  const person = words(target.person ?? block.handle).join(" ");
+  return words(display).join(" ").includes(person) ? display.trim() : capitalized;
 }
 
 interface EnrollAnswer {

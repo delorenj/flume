@@ -85,7 +85,6 @@ host_config:
   fleet:
     runtime_scaffold_dir: ~/code/template/runtime-scaffold
     vox_url: http://127.0.0.1:8700
-    vox_voice: default
   plane:
     base: http://plane.local
     workspace: second
@@ -142,7 +141,7 @@ lanes:
   assert.doesNotMatch(rendered, /Host overlay:/, "no provenance line without an overlay");
   assert.match(rendered, /^onepassword_vault = "DeLoSecrets"$/m);
   assert.match(rendered, /^vox_url = "https:\/\/vox\.delo\.sh"$/m);
-  assert.match(rendered, /^vox_voice = "carlin"$/m);
+  assert.doesNotMatch(rendered, /^vox_voice\s*=/m, "no stamped default voice: the fleet base tts.vox.voice is THE default");
   assert.ok(rendered.includes(`runtime_scaffold_dir = "${join(home, "code", "33GOD", "flume", "templates", "hermes-agent", "runtime-scaffold")}"`), "the scaffold default is still derived from $HOME");
   assert.match(rendered, /^base = "https:\/\/plane\.delo\.sh"$/m);
   assert.match(rendered, /^workspace = "33god"$/m);
@@ -168,7 +167,6 @@ lanes:
   assert.match(rendered, /^# Host overlay: .*host-overlay\.yaml \(host: second-host\)$/m, "a rendered config says which overlay shaped it");
   assert.match(rendered, /^onepassword_vault = "LocalVault"$/m, "vault.name feeds the config's vault");
   assert.match(rendered, /^vox_url = "http:\/\/127\.0\.0\.1:8700"$/m);
-  assert.match(rendered, /^vox_voice = "default"$/m);
   assert.ok(rendered.includes(`runtime_scaffold_dir = "${join(home, "code", "template", "runtime-scaffold")}"`), "`~/` in a path-valued key means THIS host's home");
   assert.match(rendered, /^base = "http:\/\/plane\.local"$/m);
   assert.match(rendered, /^workspace = "second"$/m);
