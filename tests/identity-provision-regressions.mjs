@@ -193,11 +193,17 @@ const server = createServer((req, res) => {
       if (cf.onDeleted) { const hook = cf.onDeleted; cf.onDeleted = undefined; hook(); }
       return ok({});
     }
-    if (req.method === "GET" && url.pathname === `/zones/${ZONE}/email/routing/rules`) return send(200, { success: true, result: cf.rules, result_info: { total_pages: 1 } });
+    if (req.method === "GET" && url.pathname === `/zones/${ZONE}/email/routing/rules`) {
+      // Like Cloudflare: paged (20 a page unless per_page says otherwise), so a grown zone's rule can sit on page 2+.
+      const size = Math.min(Number(url.searchParams.get("per_page") || "20"), cf.rulePageCap || 50), page = Number(url.searchParams.get("page") || "1");
+      return send(200, { success: true, result: cf.rules.slice((page - 1) * size, page * size), result_info: { page, per_page: size, total_pages: Math.max(1, Math.ceil(cf.rules.length / size)) } });
+    }
     const ruleMatch = url.pathname.match(new RegExp(`^/zones/${ZONE}/email/routing/rules/([^/]+)$`));
     if (ruleMatch && req.method === "GET") { const rule = cf.rules.find(r => r.id === ruleMatch[1]); return rule ? ok(rule) : send(404, { success: false }); }
     if (ruleMatch && req.method === "PUT") { const rule = cf.rules.find(r => r.id === ruleMatch[1]); if (!rule) return send(404, { success: false }); Object.assign(rule, JSON.parse(body)); return ok(rule); }
     if (req.method === "POST" && url.pathname === `/zones/${ZONE}/email/routing/rules`) {
+      const to = JSON.parse(body).matchers?.[0]?.value;
+      if (cf.rules.some(r => r.matchers?.some(m => m.value === to))) return send(409, { success: false, errors: [{ message: "duplicate matcher" }] });
       const rule = { id: `rule-${randomUUID().slice(0, 8)}`, enabled: true, ...JSON.parse(body) };
       cf.rules.push(rule);
       return ok(rule);
@@ -647,6 +653,21 @@ for (const mode of ["unreadable", "wrong-value", "partial", "success-empty", "du
   const third = json(await runAsync(["identity", "provision", "stranded", "--apply", "--json"]));
   assert.equal(third.capabilities["access-token"].action, "no-op");
   pass("stranded token: next run adopts it (no mint, no delete), binds, joins the policy; a rerun is a no-op");
+}
+{
+  // 2026-11-19 rollout: eight specialists' existing rules sat past Cloudflare's first page of 20, read as absent, and the
+  // create answered 409. Every page is read now, so an owned rule anywhere is adopted, never re-created.
+  enrollFixture("paged-mail");
+  const filler = Array.from({ length: 25 }, (_, i) => ({ id: `rule-filler-${i}`, enabled: true, matchers: [{ type: "literal", field: "to", value: `filler-${i}@agents.delo.sh` }], actions: [{ type: "worker", value: ["agents-facade"] }] }));
+  cf.rules.push(...filler, { id: "rule-paged-mail", enabled: true, matchers: [{ type: "literal", field: "to", value: "paged-mail@agents.delo.sh" }], actions: [{ type: "worker", value: ["agents-facade"] }] });
+  cf.rulePageCap = 10;
+  const result = json(await runAsync(["identity", "provision", "paged-mail", "--apply", "--json"]));
+  cf.rulePageCap = undefined;
+  assert.notEqual(result.capabilities.mailbox.action, "blocked", JSON.stringify(result.capabilities.mailbox));
+  assert.equal(result.capabilities.mailbox.refs?.rule_id, "rule-paged-mail", JSON.stringify(result.capabilities.mailbox));
+  assert.equal(cf.rules.filter(r => r.matchers.some(m => m.value === "paged-mail@agents.delo.sh")).length, 1);
+  cf.rules.splice(cf.rules.findIndex(r => r.id === "rule-filler-0"), 26);
+  pass("an owned mailbox rule past the first page of routing rules is adopted, not re-created (no 409)");
 }
 {
   enrollFixture("persist-error");

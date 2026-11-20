@@ -30,6 +30,7 @@ import { provisioningConfigProblems, COMPANY_MAIL_DOMAIN } from "./validator";
 import { withRegistryLock } from "./role";
 import { planPlaneCapability, planeProvisionSetting, type PlaneCapabilityStep } from "./plane-provision";
 import { policyHasToken, policyWritableDigest, readAccessPolicy, reconcileAccessPolicy } from "./access-policy";
+import { listRules } from "./lifecycle-adapters";
 
 export interface ProvisioningConfig {
   version: 1;
@@ -406,9 +407,11 @@ async function planMailbox(config: ProvisioningConfig, block: NonNullable<Identi
   const { zone_id } = config.cloudflare;
   const { worker, kv_namespace_id } = config.mailbox;
   const email = block.email;
-  const rules = await cfRequest(cfToken, "GET", `/zones/${zone_id}/email/routing/rules`);
-  if (!cfOk(rules)) return { plan: { action: "blocked", detail: `cannot list routing rules: ${provisionCfError(rules)}` }, apply: async () => ({ action: "blocked", detail: "plan blocked" }) };
-  const literal = (rules.body?.result ?? []) as CfRoutingRule[];
+  // Every page: Cloudflare serves 20 rules a page by default, so with a grown fleet an employee's existing rule sat on
+  // page 2+, read as absent, and the create answered 409 (eight specialists, 2026-11-19 rollout).
+  const rules = await listRules({ token: cfToken, config });
+  if (!rules.ok) return { plan: { action: "blocked", detail: `cannot list routing rules completely: ${rules.code}` }, apply: async () => ({ action: "blocked", detail: "plan blocked" }) };
+  const literal = rules.items;
   const rule = literal.find(r => r.matchers?.some(m => m.type === "literal" && m.field === "to" && m.value?.toLowerCase() === email.toLowerCase()));
   const owned = rule?.actions?.some(a => a.type === "worker" && (a.value ?? []).includes(worker)) ?? false;
   const kvKey = `allowlist/${email.toLowerCase()}`;

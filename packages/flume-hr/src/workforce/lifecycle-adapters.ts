@@ -251,7 +251,7 @@ async function listAll<T extends { id: string }>(cf: { token: string }, path: st
 }
 
 const listServiceTokens = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfServiceToken>(cf, `/accounts/${cf.config.cloudflare.account_id}/access/service_tokens`, validServiceTokenRow);
-const listRules = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfRoutingRule>(cf, `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules`);
+export const listRules = (cf: { token: string; config: ProvisioningConfig }) => listAll<CfRoutingRule>(cf, `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules`);
 
 /** The employee's OWN literal rule: a `to` matcher for exactly their address. Whether it is ours is decided by its action. */
 const pointsAtWorker = (rule: CfRoutingRule, worker: string): boolean => rule.actions?.some(action => action.type === "worker" && (action.value ?? []).includes(worker)) ?? false;
