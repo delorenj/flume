@@ -57,7 +57,7 @@ export interface IdentityDefinition {
 
 export interface IdentityCensus { home: string; registryPath: string; postIds: string[]; definitions: IdentityDefinition[] }
 
-export interface IdentityOptions { apply?: boolean; handle?: string; /** adopt-actor plane: the boards to verify; every one must pass. */ boards?: string[] }
+export interface IdentityOptions { apply?: boolean; handle?: string; /** enroll: an unnamed post enrolls as itself (handle = its post id). Operator decision 2026-11-19: "post name is the identity". */ asPost?: boolean; /** adopt-actor plane: the boards to verify; every one must pass. */ boards?: string[] }
 
 function stat(path: string) {
   try { return lstatSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined; throw error; }
@@ -190,11 +190,11 @@ export function accessRevocationConflict(subject: string, definition: string, pr
 }
 
 /** Every reason this definition may not hold this handle. Reads the census and the retirement tombstones only. */
-function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: string): IdentityBlocker[] {
+function conflicts(census: IdentityCensus, target: IdentityDefinition, handle: string, asPost = false): IdentityBlocker[] {
   const blockers: IdentityBlocker[] = [];
   if (!HANDLE.test(handle)) blockers.push({ code: "invalid-handle", detail: `handle "${handle}" must match ${HANDLE.source}` });
   if (RESERVED_HANDLES.has(handle)) blockers.push({ code: "handle-reserved", detail: `"${handle}" is an RFC 2142 role mailbox` });
-  const ownPost = target.kind === "specialist" && target.posts.includes(handle);
+  const ownPost = (target.kind === "specialist" || asPost) && target.posts.includes(handle);
   if (census.postIds.includes(handle) && !ownPost) blockers.push({ code: "handle-reserved", detail: `"${handle}" is a registry post id; a person's handle never names a post` });
   const bindings = bindingKeys(target.block);
   // FLUME-53: a retired identity's handle, subject and bindings outlive its registry row (`flume offboard`).
@@ -341,10 +341,10 @@ export async function enrollEmployee(employee: string, options: IdentityOptions 
     if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
     else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
-    else if (!target.person) blockers.push({ code: "unnamed-post", detail: `${target.path} declares no identity.name; a post is not a person, so name one before enrolling`, path: target.path });
-    const handle = target.block?.handle ?? options.handle ?? target.person ?? "";
+    else if (!target.person && !options.asPost) blockers.push({ code: "unnamed-post", detail: `${target.path} declares no identity.name; name one, or pass --as-post to enroll the post under its own id`, path: target.path });
+    const handle = target.block?.handle ?? options.handle ?? target.person ?? (options.asPost ? target.posts[0] : undefined) ?? "";
     if (target.block && options.handle && options.handle !== target.block.handle) blockers.push({ code: "handle-immutable", detail: `enrolled handle "${target.block.handle}" never changes` });
-    if (!blockers.length) blockers.push(...conflicts(census, target, handle));
+    if (!blockers.length) blockers.push(...conflicts(census, target, handle, Boolean(options.asPost && !target.person)));
     const identity: CompanyIdentity | null = target.block ?? (blockers.length ? null
       : { version: 1, subject: randomUUID(), handle, email: `${handle}@${COMPANY_MAIL_DOMAIN}`, status: "active", enrolled_at: new Date().toISOString() });
     return { target, blockers, identity, ...candidates(target, census) };

@@ -359,10 +359,11 @@ identityCmd
   .argument("<employee>", "Registry id, unhired specialist, or person name")
   .description("Give an existing employee one persistent subject and address on their own definition")
   .option("--handle <handle>", "Handle to enroll under (default: the person's name; immutable once enrolled)")
+  .option("--as-post", "An unnamed post enrolls as itself: handle and address use its post id (no-op for a named person)")
   .option("--apply", "Write the enrollment (default is a preview)")
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, options) => {
-    await identityResult(() => enrollEmployee(employee, { apply: Boolean(options.apply), handle: options.handle }), options.json);
+    await identityResult(() => enrollEmployee(employee, { apply: Boolean(options.apply), handle: options.handle, asPost: Boolean(options.asPost) }), options.json);
   });
 
 identityCmd

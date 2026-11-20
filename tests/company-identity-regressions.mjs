@@ -280,6 +280,21 @@ try {
     pass("unnamed post is an explicit unnamed-post blocker; no person is invented");
   }
   {
+    // Operator decision 2026-11-19 ("post name is the identity"): --as-post enrolls the post under its own id.
+    const f = fixture("as-post");
+    f.post("plain-pm", "role: pm\nagent_id: plain-pm\n");
+    f.post("other-pm", "role: pm\nagent_id: other-pm\n");
+    const result = f.json(f.run(["identity", "enroll", "plain-pm", "--as-post", "--apply", "--json"]));
+    assert.equal(result.ok, true);
+    assert.equal(result.identity.handle, "plain-pm");
+    assert.equal(result.identity.email, "plain-pm@agents.delo.sh");
+    const again = f.json(f.run(["identity", "enroll", "plain-pm", "--as-post", "--apply", "--json"]));
+    assert.equal(again.changed, false);
+    assert.equal(again.identity.subject, result.identity.subject);
+    blocked(f, ["enroll", "other-pm", "--as-post", "--handle", "plain-pm"], "handle-reserved");
+    pass("--as-post enrolls an unnamed post under its own id, idempotently; another post's id stays reserved");
+  }
+  {
     const f = fixture("handle-taken");
     f.named("ada-pm", "ada", f.yamlBlock({ subject: "11111111-1111-4111-8111-111111111111", handle: "ada", status: "retired" }));
     f.named("bob-pm", "bob");
