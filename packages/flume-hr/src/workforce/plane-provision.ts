@@ -65,8 +65,11 @@ export function planeDisplayName(target: IdentityDefinition, block: CompanyIdent
   if (target.kind === "specialist") return typeof target.fields.display_name === "string" && target.fields.display_name.trim() ? target.fields.display_name.trim() : capitalized;
   let display: unknown;
   try { display = (parseNamedAgentYaml(target.text) as Record<string, unknown> | null)?.display_name; } catch { display = undefined; }
+  if (typeof display !== "string" || !display.trim()) return capitalized;
+  // A post enrolled as itself (`enroll --as-post`): the post's display_name IS its name ("Tolt PM").
+  if (!target.person && target.posts.includes(block.handle)) return display.trim();
   const person = (target.person ?? block.handle).toLowerCase();
-  return typeof display === "string" && display.toLowerCase().includes(person) ? display.trim() : capitalized;
+  return display.toLowerCase().includes(person) ? display.trim() : capitalized;
 }
 
 interface EnrollAnswer {
