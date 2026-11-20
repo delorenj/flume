@@ -36,7 +36,8 @@ function fixture(label) {
   const json = (r, status = 0) => { assert.equal(r.status, status, r.stdout + r.stderr); return JSON.parse(r.stdout); };
 
   /** A PM post: role.yaml (optionally enrolled), registry row and a real desk directory. */
-  const post = (id, { identity, telegram, gatewayConsumer, voice, person } = {}) => {
+  const BASE_TTS = { provider: "vox", voice: "kurzgesagt", vox: { voice: "kurzgesagt" } };
+  const post = (id, { identity, telegram, gatewayConsumer, voice, tts, person } = {}) => {
     const roleDir = join(dir, "repos", id, "agents/hermes/pm");
     mkdirSync(roleDir, { recursive: true });
     const role = { repo: id, role: "pm", agent_id: id, profile: id, ...(person ? { identity: { name: person } } : {}), ...(telegram ? { telegram } : {}), ...(identity ? { company_identity: identity } : {}) };
@@ -47,10 +48,12 @@ function fixture(label) {
     const desk = join(fleet, "profiles", id);
     mkdirSync(desk, { recursive: true });
     const envRefs = { ...(gatewayConsumer ? { AUTOMATICAI_GATEWAY_KEY: GATEWAY(gatewayConsumer) } : {}), ...(identity?.bindings?.plane ? { PLANE_API_KEY: PLANE_REF } : {}), ...(telegram ? { TELEGRAM_BOT_TOKEN: `op://DeLoSecrets/${ITEM}/tgfield` } : {}) };
-    const delta = { ...(Object.keys(envRefs).length ? { secrets: { onepassword: { env: envRefs } } } : {}), ...(voice ? { tts: { provider: "vox", voice, vox: { voice } } } : {}), ...(telegram ? { platforms: { telegram: { enabled: true } } } : {}) };
+    const delta = { ...(Object.keys(envRefs).length ? { secrets: { onepassword: { env: envRefs } } } : {}), ...(voice ? { tts: { provider: "vox", voice, vox: { voice } } } : tts ? { tts } : {}), ...(telegram ? { platforms: { telegram: { enabled: true } } } : {}) };
     writeFileSync(join(desk, "config.delta.yaml"), YAML.stringify(delta));
     // The generated config is the fleet base merged with the delta: a desk with no own consumer runs the base's.
-    const generated = { ...delta, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: GATEWAY("hermes"), ...envRefs } } } };
+    // tts merges one provider level deep, as the renderer does.
+    const mergedTts = { ...BASE_TTS, ...(delta.tts ?? {}), vox: { ...BASE_TTS.vox, ...(delta.tts?.vox ?? {}) } };
+    const generated = { ...delta, tts: mergedTts, secrets: { onepassword: { env: { AUTOMATICAI_GATEWAY_KEY: GATEWAY("hermes"), ...envRefs } } } };
     writeFileSync(join(desk, "config.yaml"), YAML.stringify(generated));
   };
   const receipt = (row) => writeFileSync(join(state, "flume/provision/receipts.jsonl"), `${JSON.stringify(row)}\n`, { flag: "a" });
@@ -109,6 +112,7 @@ try {
     assert.equal(by.gateway.satisfied, false);
     assert.match(by.gateway.detail, /shared fleet consumer `hermes`/u);
     assert.equal(by.voice.satisfied, true);
+    assert.match(by.voice.detail, /walken \(vox\)/u);
     assert.equal(by.avatar.satisfied, true);
     assert.equal(by.telegram.satisfied, false);
     assert.equal(r.satisfied, 2);
@@ -136,10 +140,46 @@ try {
     assert.equal(by.inbox.satisfied, false);
     assert.match(by.inbox.detail, /suspended/u);
     assert.equal(by.voice.satisfied, false);
-    assert.match(by.voice.detail, /inherits the fleet default voice kurzgesagt/u);
+    assert.match(by.voice.detail, /speaks the fleet default kurzgesagt/u);
     assert.equal(by.avatar.satisfied, false);
     assert.equal(r.satisfied, 0);
     pass("look-alikes are refused: unrecorded item, shared consumer, unadopted plane, suspended inbox, inherited voice");
+  }
+
+  // The second route to each point, and the look-alikes the first review caught.
+  {
+    const f = fixture("second-routes");
+    // vault-item receipt with no Access binding; no allowlist receipt; vox-only delta voice (tts.voice still wins).
+    f.post("vox-pm", { identity: identity("voxy"), tts: { vox: { voice: "carlin" } }, gatewayConsumer: "hermes-vox-pm",
+      telegram: { provisioning_status: "verified", bot_username: "vox_pm_bot", bot_id: "42" } });
+    f.receipt({ capability: "vault-item", employee: "voxy", action: "created", item_id: ITEM });
+    f.receipt({ capability: "mailbox-rule", employee: "voxy", action: "created", address: "voxy@agents.delo.sh" });
+    f.gateway("vox-pm", "disconnected");
+    // A delta that pins the fleet default is not a personal voice.
+    f.post("pin-pm", { voice: "kurzgesagt" });
+    const r = f.json(f.run(["identity", "manifest", "vox-pm", "--json"]));
+    const by = Object.fromEntries(r.points.map((p) => [p.id, p]));
+    assert.equal(by.vault.satisfied, true, by.vault.detail);
+    assert.match(by.vault.detail, /vault-item receipt/u);
+    assert.equal(by.gateway.satisfied, true, by.gateway.detail);
+    assert.equal(by.inbox.satisfied, false);
+    assert.match(by.inbox.detail, /no mailbox allowlist receipt/u);
+    assert.equal(by.voice.satisfied, false, "tts.vox.voice alone does not change what vox speaks");
+    assert.match(by.voice.detail, /speaks the fleet default kurzgesagt \(vox\)/u);
+    assert.equal(by.telegram.satisfied, false, "wired but disconnected is not online");
+    assert.match(by.telegram.detail, /gateway state disconnected/u);
+    const pin = Object.fromEntries(f.json(f.run(["identity", "manifest", "pin-pm", "--json"])).points.map((p) => [p.id, p]));
+    assert.equal(pin.voice.satisfied, false);
+    pass("second routes: vault-item receipt counts; vox-only voice, pinned default, missing allowlist and a disconnected bot do not");
+  }
+
+  // No registry: a distinct error, never "Employee not found" (a caller would read that as unhired).
+  {
+    const f = fixture("no-registry");
+    rmSync(join(f.home, ".hermes/agents-registry.yaml"));
+    const r = f.json(f.run(["identity", "manifest", "acme-pm", "--json"]), 1);
+    assert.match(r.error, /Agent registry not readable/u);
+    pass("a missing registry is 'not readable', not 'Employee not found'");
   }
 
   // An unknown employee is a clean failure, not a crash.

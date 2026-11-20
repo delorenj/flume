@@ -333,9 +333,9 @@ versioned set of identity points every employee is expected to hold (AD-2..AD-6 
 | `gateway` AAI gateway key | yes | the desk runs its own FLUME-39 consumer: not `hermes`, no drift, no other registry row on it |
 | `plane` Plane identity | yes | `planeDeskRow` standing `own-key`: Pilot-verified native user whose key the desk runs |
 | `inbox` private inbox | yes | status active and a `mailbox-allowlist` receipt for `<handle>@agents.delo.sh` |
-| `voice` | yes | a `voice:` on the definition, or a `tts` voice in the desk delta (the inherited fleet default does not count) |
+| `voice` | yes | the voice the desk SPEAKS (generated config: vox takes `tts.voice` before `tts.vox.voice`; other providers `tts.<provider>.voice`) differs from the fleet default |
 | `avatar` | yes | Holocene's avatar index holds a file for the post (`HOLOCENE_AVATAR_DIR`) |
-| `telegram` | no | `flume channel list` standing `online` |
+| `telegram` | no | `flume channel list` standing `online` and the running gateway reports the bot `connected` |
 
 The result carries `manifest {version, latest, adopted}`, every point with `satisfied` and `detail`, `satisfied/total`
 over the required points and `optional {satisfied, total}`. It asks no provider, so "satisfied" means provisioned and

@@ -22,7 +22,7 @@ import { channelList, fleetHome } from "./channel";
 import { deskProfileOf, identityCensus, resolveEmployee, type IdentityCensus, type IdentityDefinition } from "./company";
 import { deskGatewayConsumer } from "./gateway-desk";
 import { planeDeskRow } from "./plane-desk";
-import { COMPANY_MAIL_DOMAIN, parseNamedAgentYaml } from "./validator";
+import { COMPANY_MAIL_DOMAIN } from "./validator";
 
 export interface ManifestPoint {
   id: string;
@@ -82,7 +82,11 @@ function readYamlFile(path: string): Record<string, any> | undefined {
 function provisionReceipts(): Array<Record<string, unknown>> {
   const path = join(provisionStateDir(), "receipts.jsonl");
   let text: string;
-  try { text = readFileSync(path, "utf8"); } catch { return []; }
+  try {
+    const info = lstatSync(path);
+    if (info.isSymbolicLink() || !info.isFile()) return [];
+    text = readFileSync(path, "utf8");
+  } catch { return []; }
   const rows: Array<Record<string, unknown>> = [];
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
@@ -99,12 +103,41 @@ export function holoceneAvatarDir(env: NodeJS.ProcessEnv = process.env): string 
   return env.HOLOCENE_AVATAR_DIR || join(env.HOME || homedir(), ".local", "share", "holocene", "avatars");
 }
 
-const NOT_ENROLLED = { satisfied: false, detail: "not enrolled (no company identity)" };
+/** The provider and voice a tts block actually speaks with (vox: tts.voice, then tts.vox.voice; others: tts.<provider>.voice, then tts.voice). */
+function spokenVoice(tts: unknown): { provider: string; voice: string } | undefined {
+  if (!isRecord(tts)) return undefined;
+  const provider = typeof tts.provider === "string" && tts.provider ? tts.provider : "vox";
+  const own = isRecord(tts[provider]) && typeof tts[provider].voice === "string" ? tts[provider].voice : undefined;
+  const top = typeof tts.voice === "string" && tts.voice.trim() ? tts.voice.trim() : undefined;
+  const voice = provider === "vox" ? (top ?? own) : (own ?? top);
+  return voice && VOICE_SLUG.test(voice) ? { provider, voice } : undefined;
+}
+
+/** The tts block a render would produce: the base's, with the delta's keys (one level of provider blocks) on top. */
+function mergeTts(base: unknown, delta: unknown): Record<string, any> | undefined {
+  if (!isRecord(delta)) return isRecord(base) ? base : undefined;
+  const merged: Record<string, any> = { ...(isRecord(base) ? base : {}) };
+  for (const [key, value] of Object.entries(delta)) merged[key] = isRecord(value) && isRecord(merged[key]) ? { ...merged[key], ...value } : value;
+  return merged;
+}
+
+function isRealFile(path: string): boolean {
+  try { return lstatSync(path).isFile(); } catch { return false; }
+}
+
+function isRealDir(path: string): boolean {
+  try { const info = lstatSync(path); return info.isDirectory() && !info.isSymbolicLink(); } catch { return false; }
+}
+
+/** An account point on a definition that holds no identity block: say why (unreadable beats unenrolled). */
+function notEnrolled(target: IdentityDefinition) {
+  return { satisfied: false, detail: target.problem ? `definition unreadable: ${target.problem}` : target.missing ? "definition missing" : "not enrolled (no company identity)" };
+}
 
 const EVALUATORS: Record<string, Evaluator> = {
   vault({ target, receipts }) {
     const block = target.block;
-    if (!block) return NOT_ENROLLED;
+    if (!block) return notEnrolled(target);
     const mine = receipts.filter(r => r.employee === block.handle);
     const created = mine.find(r => r.capability === "vault-item" && typeof r.item_id === "string" && (r.action === "created" || r.action === "no-op"));
     if (created) return { satisfied: true, detail: `vault item ${created.item_id} (vault-item receipt)`, evidence: { item: created.item_id } };
@@ -117,7 +150,7 @@ const EVALUATORS: Record<string, Evaluator> = {
   },
 
   gateway({ target, profile, registry }) {
-    if (!profile) return { satisfied: false, detail: "no desk" };
+    if (!profile || !isRealDir(join(fleetHome(), "profiles", profile))) return { satisfied: false, detail: `no desk${profile ? ` (${profile})` : ""}` };
     const desk = deskGatewayConsumer(fleetHome(), profile);
     if (desk.unreadable) return { satisfied: false, detail: `${profile}: generated config.yaml unreadable` };
     if (!desk.consumer) return { satisfied: false, detail: `${profile}: runs no FLUME-39 gateway consumer` };
@@ -129,14 +162,14 @@ const EVALUATORS: Record<string, Evaluator> = {
   },
 
   plane({ census, target }) {
-    if (!target.block) return NOT_ENROLLED;
+    if (!target.block) return notEnrolled(target);
     const row = planeDeskRow(census, target);
     return { satisfied: row.standing === "own-key", detail: `${row.standing}: ${row.detail}`, ...(row.want ? { evidence: { credential_ref: row.want } } : {}) };
   },
 
   inbox({ target, receipts }) {
     const block = target.block;
-    if (!block) return NOT_ENROLLED;
+    if (!block) return notEnrolled(target);
     // Suspension deletes the allowlist key; the append-only receipts would otherwise keep reading satisfied.
     if (block.status !== "active") return { satisfied: false, detail: `${block.email}: ${block.status} (allowlist closed)` };
     const key = `allowlist/${block.email.toLowerCase()}`;
@@ -145,19 +178,23 @@ const EVALUATORS: Record<string, Evaluator> = {
     return { satisfied: true, detail: `${block.email} allowlisted`, evidence: { address: block.email } };
   },
 
-  voice({ target, profile }) {
-    const declared = (parseNamedAgentYaml(target.text) ?? {}) as Record<string, unknown>;
-    if (typeof declared.voice === "string" && VOICE_SLUG.test(declared.voice)) return { satisfied: true, detail: `${declared.voice} (definition)`, evidence: { voice: declared.voice, source: "definition" } };
-    const delta = profile ? readYamlFile(join(fleetHome(), "profiles", profile, "config.delta.yaml")) : undefined;
-    const tts = isRecord(delta?.tts) ? delta!.tts : {};
-    const plugin = isRecord(tts.vox) && typeof tts.vox.voice === "string" ? tts.vox.voice : undefined;
-    const top = typeof tts.voice === "string" ? tts.voice : undefined;
-    if (plugin && top && plugin !== top) return { satisfied: false, detail: `conflicting voice overrides in ${profile}'s delta (tts.voice ${top}, tts.vox.voice ${plugin})` };
-    const slug = plugin ?? top;
-    if (slug && VOICE_SLUG.test(slug)) return { satisfied: true, detail: `${slug} (desk delta)`, evidence: { voice: slug, source: "desk-delta" } };
-    const base = readYamlFile(join(fleetHome(), "config.yaml"))?.tts;
-    const inherited = isRecord(base) ? (isRecord(base.vox) && typeof base.vox.voice === "string" ? base.vox.voice : base.voice) : undefined;
-    return { satisfied: false, detail: inherited ? `inherits the fleet default voice ${inherited}` : "no voice configured" };
+  voice({ profile }) {
+    // Judge the voice the desk SPEAKS, not the keys its delta sets: Hermes runs the generated config.yaml (the fleet
+    // base merged with the delta), and for vox the top-level tts.voice wins over tts.vox.voice (plugins/vox
+    // _resolve_voice). A delta that sets only tts.vox.voice still speaks the base's tts.voice.
+    const fleet = fleetHome();
+    const base = readYamlFile(join(fleet, "config.yaml"));
+    const fleetDefault = spokenVoice(base?.tts);
+    if (!profile) return { satisfied: false, detail: "no desk" };
+    const desk = join(fleet, "profiles", profile);
+    const generated = readYamlFile(join(desk, "config.yaml"));
+    const tts = generated ? generated.tts : mergeTts(base?.tts, readYamlFile(join(desk, "config.delta.yaml"))?.tts);
+    const spoken = spokenVoice(tts);
+    if (!spoken) return { satisfied: false, detail: "no voice configured" };
+    if (fleetDefault && spoken.provider === fleetDefault.provider && spoken.voice === fleetDefault.voice) {
+      return { satisfied: false, detail: `speaks the fleet default ${spoken.voice} (${spoken.provider})` };
+    }
+    return { satisfied: true, detail: `${spoken.voice} (${spoken.provider})`, evidence: { voice: spoken.voice, provider: spoken.provider, source: generated ? "generated" : "delta" } };
   },
 
   avatar({ target, profile }) {
@@ -179,12 +216,18 @@ const EVALUATORS: Record<string, Evaluator> = {
   telegram({ target }) {
     const post = target.posts[0];
     if (!post) return { satisfied: false, detail: "no registry post" };
-    let row;
-    try { row = channelList(post).rows.find(r => r.platform === "telegram"); }
+    let list;
+    try { list = channelList(post); }
     catch (error) { return { satisfied: false, detail: (error as Error).message }; }
+    const row = list.rows.find(r => r.platform === "telegram");
     if (!row || row.standing === "deferred" || row.standing === "unwired") return { satisfied: false, detail: "not linked" };
     const bot = row.bot_username ? `@${row.bot_username}` : "bot";
-    if (row.standing === "online") return { satisfied: true, detail: `${bot} online`, evidence: { bot_username: row.bot_username, gateway: row.gateway?.state ?? null } };
+    // channelList calls a wired channel `online` unless the gateway says fatal; the point wants it actually running.
+    if (row.standing === "online") {
+      if (!list.gateway_running) return { satisfied: false, detail: `${bot} linked, but the gateway is not running` };
+      if (row.gateway?.state !== "connected") return { satisfied: false, detail: `${bot} linked, gateway state ${row.gateway?.state ?? "unknown"}` };
+      return { satisfied: true, detail: `${bot} connected`, evidence: { bot_username: row.bot_username, gateway: row.gateway.state } };
+    }
     return { satisfied: false, detail: `${bot} ${row.standing}${row.notes.length ? `: ${row.notes.join("; ")}` : ""}` };
   },
 };
@@ -195,7 +238,9 @@ function registryOf(census: IdentityCensus): Record<string, Record<string, unkno
 }
 
 export function evaluateManifest(census: IdentityCensus, target: IdentityDefinition, manifest: IdentityManifest = LATEST_IDENTITY_MANIFEST) {
-  const ctx: PointContext = { census, target, profile: deskProfileOf(census, target), receipts: provisionReceipts(), registry: registryOf(census) };
+  let profile: string | null = null;
+  try { profile = deskProfileOf(census, target); } catch { /* the points that need a desk say "no desk" */ }
+  const ctx: PointContext = { census, target, profile, receipts: provisionReceipts(), registry: registryOf(census) };
   const points: PointResult[] = manifest.points.map(point => {
     const evaluate = EVALUATORS[point.id];
     let judged: Omit<PointResult, "id" | "title" | "required">;
@@ -216,6 +261,8 @@ export function evaluateManifest(census: IdentityCensus, target: IdentityDefinit
 /** `flume identity manifest <employee>`: which identity points this employee holds, from local evidence only. */
 export function employeeManifest(employee: string) {
   const census = identityCensus();
+  // Without a registry every employee is "not found"; say what is actually wrong so a caller never reads it as unhired.
+  if (!isRealFile(census.registryPath)) throw new Error(`Agent registry not readable: ${census.registryPath}`);
   const target = resolveEmployee(census, employee);
   const block = target.block;
   return {
