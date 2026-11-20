@@ -39,6 +39,9 @@ ceo:
 
 # Reusable title/expertise per agent_id (optional; fills node title + badges).
 personas:
+  peggy-olson:
+    title: "Director of Marketing — 33GOD"
+    expertise: [ platform-positioning, product-marketing, editorial-direction, launch-narratives ]
   gruvato-pm:
     title: "Project Manager — Gruvato (launch mode)"
     expertise: [ orchestration, delivery, launch-mode, cut-line, mobile-deploy-hub ]
@@ -261,6 +264,12 @@ departments:
     members:
       - james-brennan-pm
       - navi-pm
+
+  - id: marketing
+    name: "Marketing & Public Experience"
+    order: 12
+    manager: peggy-olson
+    members: []
 
 # Reporting lines INSIDE a department: agent_id -> the agent_id it reports to. The
 # agent stays a member of its department (Holocene, which renders departments flat,
