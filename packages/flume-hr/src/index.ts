@@ -33,6 +33,7 @@ import { HOST_OVERLAY_ENV, LANE_BANDS, LANE_BANDS_NOTE, loadHostOverlay, type La
 import { defaultRoleYamls, formatLaneResolution, resolveRoleLanesAt } from "./workforce/lanes";
 import { hireSpecialist, auditSpecialist, launchSpecialist } from "./workforce/specialist";
 import { adoptNativeActor, bindProvider, enrollEmployee, rotateEmployeeCredential, setEmployeeStatus, showEmployeeIdentity } from "./workforce/company";
+import { employeeVoice, formatVoiceResult } from "./workforce/voice";
 import { refreshSchedulingPolicy } from "./workforce/policy-refresh";
 import { updateEmployeePersona } from "./workforce/persona";
 import { employeeContinuity, employeeCredentials, formatLifecycleResult, restoreEmployee, retireEmployee, suspendEmployee } from "./workforce/lifecycle";
@@ -384,6 +385,22 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, options) => {
     await identityResult(async () => employeeManifest(employee), options.json, formatManifestResult);
+  });
+
+identityCmd
+  .command("voice")
+  .argument("[employee]", "Registry id, unhired specialist, or person name (default: the desk this runs inside)")
+  .description("The voice the employee speaks; --assign <voice> pins an existing Vox voice, --assign <new> --clone \"<who>\" clones one first (voxxy voice clone), --clear inherits the fleet default again (preview unless --apply)")
+  .option("--assign <voice>", "Vox voice slug to pin on the employee's desk")
+  .option("--clone <who>", "Clone a new Vox voice from a description first (\"Meg from Family Guy\"), saved as the --assign slug")
+  .option("--pick <n>", "--clone only: take the Nth ranked clip (needed unattended for fictional characters)", (v: string) => Number.parseInt(v, 10))
+  .option("--force", "--clone only: re-clone over an existing Vox voice of that name")
+  .option("--clear", "Drop the desk's pin: speak the fleet default (~/.hermes/config.yaml tts.vox.voice)")
+  .option("--apply", "Write (and clone); without it, preview only")
+  .option("--no-reload", "Write but do not cycle the desk through the gateway")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string | undefined, options) => {
+    await identityResult(async () => employeeVoice(employee, { assign: options.assign, clone: options.clone, pick: options.pick, force: Boolean(options.force), clear: Boolean(options.clear), apply: Boolean(options.apply), noReload: options.reload === false }), options.json, formatVoiceResult);
   });
 
 identityCmd
