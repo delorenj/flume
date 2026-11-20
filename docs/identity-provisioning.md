@@ -106,6 +106,24 @@ operator's, so an adopted identity still comments as the operator until its desk
   `shared_key_fallback: false`, an unusable `key_ref`). After a partial failure, rerun: px converges on the same user,
   memberships and labelled token.
 - A person without a name cannot be enrolled (`unnamed-post`): give the post an `identity.name` first.
+- **Adopted means Pilot verified this key.** `native_actor_id` survives `identity rotate`, so the desk is projected (and a
+  converged employee judged a no-op) only when a `plane.adopt` receipt names the binding's current `credential_ref`,
+  principal and instance. A key rotated to a ref Pilot never verified reads `not-adopted` and is re-verified, never projected.
+- **Pending includes the user, not only memberships and the key**: a deactivated user, a changed display name or a profile
+  update that px reports in its preview makes the run apply, and the result says what changed.
+- **Gates fire before the Plane write.** A refused candidate (`stale-candidate`), a conflicting adopted actor and an actor
+  another employee already holds are `conflict` on the preview and on `--apply`, before any user, membership or key exists.
+- **px's environment.** Every px call runs with `PLANE_API_KEY` pinned to the fleet base's reference (the operator's), never
+  the caller's value: run from inside an employee's own desk the variable holds that employee's projected key, and Pilot
+  refuses an employee key that resolves to the shared identity (`shared_identity` / `operator_identity`). `--workspace` and
+  `--base` come from `plane.instance`, never from whatever px resolves from its cwd.
+- **A command run inside the profile it projects** (`HERMES_HOME` is that desk, or `HERMES_PROFILE` names it) never cycles
+  that profile through the socket: that would cut its own turn and could leave it unserved. The write stands and the result
+  says `NOT picked up`; cycle it from outside, or run `hermes-gateway-restart` once after the last projection. The same
+  holds for `flume channel offline|online`.
+- `--only plane` reads only the config's `plane:` block and `onepassword.vault`; an invalid access or mailbox half does not stop it.
+- The desk delta is edited as text: only the one line changes (or is inserted); comments, unicode, `off`/`on` scalars and key
+  order stay, and `secrets.onepassword.enabled` is never invented.
 
 ### Host rule: `org.plane-credential`
 

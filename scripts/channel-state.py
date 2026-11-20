@@ -129,13 +129,144 @@ def file_mode(path: Path, default: int) -> int:
 
 
 def render_delta(delta: dict, original: bytes | None) -> bytes:
-    """Keep the original's comment lines, then the mapping; same shape the channel transaction writes."""
+    """The full-dump FALLBACK: keep the original's comment lines, then the mapping.
+
+    Lossy on purpose only as a last resort (comments hoisted to the top, inline comments dropped, `off` re-spelled
+    `false`): `edit_delta` is the path every write takes, and this runs only when that targeted edit cannot be proven.
+    """
     comments: list[str] = []
     for line in (original or b"").decode("utf-8").splitlines():
         if line.lstrip().startswith("#") and line not in comments:
             comments.append(line)
     head = ("\n".join(comments) + "\n") if comments else ""
-    return (head + yaml.safe_dump(delta, sort_keys=False)).encode("utf-8")
+    return (head + yaml.safe_dump(delta, sort_keys=False, allow_unicode=True)).encode("utf-8")
+
+
+PLAIN_SCALAR = re.compile(r"[A-Za-z0-9_./:@+%=-]+")
+KEY_LINE = re.compile(r"^( *)([A-Za-z0-9_][A-Za-z0-9_.-]*)[ \t]*:(?=[ \t]|$)(.*)$")
+
+
+def scalar_text(value) -> str:
+    """One YAML scalar as it would be typed: true/false, a plain op:// reference, else a JSON (double-quoted) string."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    text = str(value)
+    if PLAIN_SCALAR.fullmatch(text):
+        try:
+            if yaml.safe_load(text) == text:
+                return text
+        except yaml.YAMLError:
+            pass
+    return json.dumps(text, ensure_ascii=False)
+
+
+def split_value(rest: str) -> tuple[str, str]:
+    """`rest` is what follows `key:` on a line: (the value text, the inline comment with its leading space, or "")."""
+    stripped = rest.lstrip()
+    lead = rest[: len(rest) - len(stripped)]
+    if stripped[:1] in ('"', "'"):
+        quote, i = stripped[0], 1
+        while i < len(stripped):
+            if quote == '"' and stripped[i] == "\\":
+                i += 2
+                continue
+            if stripped[i] == quote:
+                if quote == "'" and stripped[i + 1 : i + 2] == "'":
+                    i += 2
+                    continue
+                break
+            i += 1
+        value, tail = stripped[: i + 1], stripped[i + 1 :]
+        comment = re.search(r"[ \t]+#.*$", tail)
+        return value, comment.group(0) if comment else ""
+    if stripped.startswith("#"):
+        return "", lead + stripped if lead else " " + stripped
+    comment = re.search(r"[ \t]+#.*$", stripped)
+    return (stripped[: comment.start()] if comment else stripped).strip(), comment.group(0) if comment else ""
+
+
+def set_scalar(text: str, path: list[str], value) -> str | None:
+    """Set ONE nested block-style mapping key to a scalar and touch no other byte: comments (full-line and inline),
+    ordering, quoting and non-ASCII text all survive. A missing key (or missing parent mappings) is inserted at the end
+    of its parent block. Returns None when the layout is not plain block style (a flow mapping, a quoted or complex key
+    that could hide a duplicate, a key that holds a mapping, tab indentation), so the caller falls back and verifies."""
+    lines = text.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+
+    def indent(line: str) -> int:
+        return len(line) - len(line.lstrip(" "))
+
+    def blank(line: str) -> bool:
+        return not line.strip() or line.lstrip().startswith("#")
+
+    def list_item(line: str) -> bool:
+        body = line.strip()
+        return body == "-" or body.startswith("- ")
+
+    if any(line[indent(line) : indent(line) + 1] == "\t" for line in lines if line.strip()):
+        return None
+    start, end, parent = 0, len(lines), -1
+    for depth, key in enumerate(path):
+        last = depth == len(path) - 1
+        child = None
+        found = None
+        for i in range(start, end):
+            line = lines[i]
+            if blank(line):
+                continue
+            if child is None:
+                child = indent(line)
+            if indent(line) != child or list_item(line):
+                continue  # deeper content, or a sequence written at its key's own indent
+            match = KEY_LINE.match(line.rstrip("\n"))
+            if not match:
+                return None  # a quoted, complex or flow key: a miss here could write a duplicate
+            if match.group(2) == key and found is None:
+                found = i
+        if found is None:
+            pad = child if child is not None else parent + 2 if parent >= 0 else 0
+            at = end
+            while at > start and blank(lines[at - 1]):
+                at -= 1
+            fresh = []
+            for offset, name in enumerate(path[depth:]):
+                prefix = " " * (pad + 2 * offset)
+                fresh.append(f"{prefix}{name}: {scalar_text(value)}\n" if depth + offset == len(path) - 1 else f"{prefix}{name}:\n")
+            lines[at:at] = fresh
+            return "".join(lines)
+        match = KEY_LINE.match(lines[found].rstrip("\n"))
+        value_text, comment = split_value(match.group(3))
+        block_end = end
+        for i in range(found + 1, end):
+            if not blank(lines[i]) and indent(lines[i]) <= indent(lines[found]) and not list_item(lines[i]):
+                block_end = i
+                break
+        has_children = any(not blank(lines[i]) for i in range(found + 1, block_end))
+        if last:
+            if has_children or value_text[:1] in ("{", "[", "|", ">", "&", "*", "!"):
+                return None
+            lines[found] = f"{match.group(1)}{key}: {scalar_text(value)}{comment}\n"
+            return "".join(lines)
+        if value_text:
+            return None  # `key: {}` / `key: [..]` / a scalar where a mapping is needed: not a plain block
+        start, end, parent = found + 1, block_end, indent(lines[found])
+    return None
+
+
+def edit_delta(original: bytes | None, edits: list[tuple[list[str], object]], target: dict) -> bytes:
+    """Apply `edits` to the delta TEXT in place; proven by re-parsing to exactly `target`, else the full-dump fallback."""
+    text = (original or b"").decode("utf-8")
+    for path, value in edits:
+        edited = set_scalar(text, path, value)
+        if edited is None:
+            return render_delta(target, original)
+        text = edited
+    try:
+        same = (yaml.safe_load(text) or {}) == target
+    except yaml.YAMLError:
+        same = False
+    return text.encode("utf-8") if same else render_delta(target, original)
 
 
 def other_claims(agents: dict, agent_id: str, platform: str, fields: dict[str, str]):
@@ -273,12 +404,14 @@ def apply(req: dict) -> dict:
                 onepassword = delta.setdefault("secrets", {}).setdefault("onepassword", {})
                 if not isinstance(onepassword, dict):
                     raise Refusal("delta-shape", "secrets.onepassword in the delta is not a mapping")
-                onepassword.setdefault("enabled", True)
+                # Only the env keys: `enabled` is the fleet base's to declare, not a desk delta's.
                 env = onepassword.setdefault("env", {})
                 if not isinstance(env, dict):
                     raise Refusal("delta-shape", "secrets.onepassword.env in the delta is not a mapping")
                 env.update(refs)
-            delta_after = render_delta(delta, delta_before)
+            edits = [(["platforms", platform, "enabled"], bool(req["delta_enabled"]))]
+            edits += [(["secrets", "onepassword", "env", key], ref) for key, ref in refs.items()]
+            delta_after = edit_delta(delta_before, edits, delta)
 
             base = r.load_yaml(r.BASE)
             # THE expected config (merge + renderer pins) from the delta as it will be written.
@@ -366,12 +499,13 @@ def apply_desk_refs(req: dict) -> dict:
             onepassword = onepassword.setdefault("onepassword", {})
             if not isinstance(onepassword, dict):
                 raise Refusal("delta-shape", "secrets.onepassword in the delta is not a mapping")
-            onepassword.setdefault("enabled", True)
+            # Only the env keys: `enabled` is the fleet base's to declare (the handbook owns no delta path for it).
             env = onepassword.setdefault("env", {})
             if not isinstance(env, dict):
                 raise Refusal("delta-shape", "secrets.onepassword.env in the delta is not a mapping")
             env.update(refs)
-            delta_after = render_delta(delta, delta_before)
+            # A targeted textual edit: every other byte of the delta (comments, quoting, non-ASCII, `off`) is kept.
+            delta_after = edit_delta(delta_before, [(["secrets", "onepassword", "env", key], ref) for key, ref in refs.items()], delta)
 
             base = r.load_yaml(r.BASE)
             expected = r.expected_config(base, delta, pdir)

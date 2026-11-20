@@ -451,6 +451,65 @@ await check("--no-reload writes the change and says honestly that the gateway wa
   assert.equal(registry().agents["bob-pm"].telegram.provisioning_status, "verified");
 });
 
+await check("run from inside the profile's own turn: written, but the profile is NOT cycled from under itself", async () => {
+  verbs.length = 0;
+  for (const env of [{ HERMES_HOME: join(FLEET, "profiles", "bob-pm") }, { HERMES_PROFILE: "bob-pm" }]) {
+    const off = await json(["channel", "offline", "bob-pm", "--apply"], env);
+    assert.equal(off.status, 0, JSON.stringify(off.body));
+    assert.equal(registry().agents["bob-pm"].telegram.provisioning_status, "offline", "the change is written");
+    assert.equal(off.body.gateway.action, "skipped", JSON.stringify(off.body.gateway));
+    assert.equal(off.body.gateway.confirmed, false);
+    assert.match(off.body.gateway.detail, /NOT picked up/u);
+    assert.deepEqual(verbs, [], "no unserve/serve of the profile this command runs inside");
+    const back = await json(["channel", "online", "bob-pm", "--apply"], env);
+    assert.equal(back.status, 0, JSON.stringify(back.body));
+    assert.equal(registry().agents["bob-pm"].telegram.provisioning_status, "verified");
+    assert.deepEqual(verbs, []);
+  }
+  // Another profile's desk as HERMES_HOME is not "inside": it is cycled as usual.
+  const other = await json(["channel", "offline", "bob-pm", "--apply"], { HERMES_HOME: join(FLEET, "profiles", "ada-pm") });
+  assert.equal(other.body.gateway.action, "profile-cycle", JSON.stringify(other.body.gateway));
+  assert.deepEqual(verbs.map((v) => v.name), ["bob-pm", "bob-pm"]);
+  assert.equal((await json(["channel", "online", "bob-pm", "--no-reload", "--apply"])).status, 0);
+});
+
+await check("the delta edit is textual: unicode, `off`, inline and indented comments survive, and no onepassword.enabled is invented", async () => {
+  const path = join(FLEET, "profiles", "bob-pm", "config.delta.yaml");
+  const original = [
+    "# keep me: ünïcode — café ☕",
+    "skills:",
+    "  project_discovery: true   # inline comment",
+    "memory:",
+    "  enabled: off",
+    "platforms:",
+    "  telegram:",
+    "    enabled: true   # parked by hand before",
+    "secrets:",
+    "  onepassword:",
+    "    env:",
+    "      # indented comment: stays",
+    `      TELEGRAM_BOT_TOKEN: ${REF.bob}`,
+    "label: \"naïve ☕\"",
+    "",
+  ].join("\n");
+  writeFileSync(path, original, { mode: 0o600 });
+  const off = await json(["channel", "offline", "bob-pm", "--no-reload", "--apply"]);
+  assert.equal(off.status, 0, JSON.stringify(off.body));
+  const after = readFileSync(path, "utf8");
+  const lines = after.split("\n");
+  const lost = original.split("\n").filter((line) => !lines.includes(line));
+  assert.deepEqual(lost, ["    enabled: true   # parked by hand before"], "only the one changed line differs");
+  assert.ok(lines.includes("    enabled: false   # parked by hand before"), "the inline comment stays on the changed line");
+  assert.match(after, /^memory:\n  enabled: off$/mu);
+  assert.ok(!/onepassword:\n {4}enabled:/u.test(after), "secrets.onepassword.enabled was not added");
+  assert.equal(after.split("\n").length, original.split("\n").length, "no line added or dropped");
+  const back = await json(["channel", "online", "bob-pm", "--no-reload", "--apply"]);
+  assert.equal(back.status, 0, JSON.stringify(back.body));
+  const restored = readFileSync(path, "utf8");
+  assert.ok(restored.split("\n").includes("    enabled: true   # parked by hand before"));
+  assert.match(restored, /^label: "naïve ☕"$/mu);
+});
+
 await check("without a control socket the host gateway is restarted through hermes-gateway-restart, never raw systemctl", async () => {
   socketServer.close();
   rmSync(SOCK, { force: true });

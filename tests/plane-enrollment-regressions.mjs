@@ -65,39 +65,49 @@ const flag = (name) => flags(name)[0];
 const sha1 = (t) => crypto.createHash("sha1").update(t).digest("hex");
 const uuidOf = (t) => { const h = crypto.createHash("md5").update(t).digest("hex"); return h.slice(0, 8) + "-" + h.slice(8, 12) + "-4" + h.slice(13, 16) + "-8" + h.slice(17, 20) + "-" + h.slice(20, 32); };
 if (state.refuse) refuse(state.refuse, "forced " + state.refuse);
+// Pilot's guard: a key that resolves to the same user as a shared key is refused (shared_identity / operator_identity).
+// An employee's own PAT in PLANE_API_KEY (a command run from the employee's desk) is exactly that case.
+if (Object.values(state.pats).includes(process.env.PLANE_API_KEY || "")) refuse("shared_identity", "PLANE_API_KEY resolves to an employee's own user, not the operator's");
+fs.appendFileSync(process.env.PX_FAKE_LOG, JSON.stringify({ env_plane_api_key: process.env.PLANE_API_KEY ? (process.env.PLANE_API_KEY.startsWith("op://") ? process.env.PLANE_API_KEY : "(a value)") : null }) + "\\n");
 
 if (args[0] === "identity" && args[1] === "enroll") {
   const email = flag("email"), name = flag("display-name"), apply = args.includes("--apply");
   const handle = email.split("@")[0];
   if (!email.endsWith("@agents.delo.sh")) refuse("not_employee_email", email + " is not a company address");
+  if (flag("workspace") !== "33god") refuse("workspace_mismatch", "enroll needs --workspace 33god, got " + flag("workspace"));
+  if (flag("base") !== "https://plane.delo.sh") refuse("base_mismatch", "enroll needs --base https://plane.delo.sh, got " + flag("base"));
   const admin = flags("admin-board");
   for (const b of admin) if (!state.boards[b]) refuse("unknown_board", "board " + b + " is not a project");
   let user = state.users[email];
   const created = !user;
   if (!user) user = { id: uuidOf(email), email, name };
+  const reactivated = Boolean(user.inactive);
+  const updatedFields = !created && user.name !== name ? ["display_name"] : [];
   const boards = Object.entries(state.boards).map(([identifier, board]) => {
     const wanted = admin.includes(identifier) ? 20 : 15;
     const have = board.members[user.id];
-    return { identifier, project_id: board.id, role: wanted, action: have === undefined ? "add" : have === wanted ? "unchanged" : "update" };
+    return { identifier, project_id: board.id, role: wanted, action: have === undefined ? "would-create" : have === wanted ? "unchanged" : "would-update" };
   });
   const passed = flag("key-ref");
   const existing = state.keys[passed || ""] && state.keys[passed].user === user.id ? passed : null;
   const keyRef = existing || "op://DeLoSecrets/" + sha1("item-" + handle).slice(0, 26) + "/" + sha1("field-" + handle).slice(0, 26);
   const have = Object.entries(state.keys).find(([, k]) => k.user === user.id);
   const reuse = existing || (have ? have[0] : null);
-  const credential = { key_ref: reuse || keyRef, item_id: (reuse || keyRef).split("/")[3], field_id: (reuse || keyRef).split("/")[4], action: reuse ? "unchanged" : "create", type: "plane_personal_access_token", static: true };
+  const credential = { key_ref: reuse || keyRef, item_id: (reuse || keyRef).split("/")[3], field_id: (reuse || keyRef).split("/")[4], action: existing ? "unchanged" : reuse ? "would-reuse" : "would-create", type: "plane_personal_access_token", static: true };
   if (apply) {
     if (created) state.users[email] = user;
+    else { state.users[email].name = name; delete state.users[email].inactive; }
     for (const b of boards) state.boards[b.identifier].members[user.id] = b.role;
     if (!reuse) state.keys[keyRef] = { user: user.id, pat: state.pats[handle] };
-    credential.action = reuse ? "unchanged" : "created";
+    credential.action = existing ? "unchanged" : reuse ? "reused" : "created";
     save();
   }
   out(0, {
     ok: true, evidence: "fixture", applied: apply, plane: { version: "1.3.1", workspace: "33god" },
-    user: { id: user.id, email, display_name: name, created },
-    workspace_member: { role: 15, created, reactivated: false },
-    boards: boards.map((b) => apply ? Object.assign({}, b, { action: b.action === "unchanged" ? "unchanged" : b.action === "add" ? "added" : "updated" }) : b),
+    user: { id: user.id, email, display_name: name, created, reactivated, updated: updatedFields, is_bot: false },
+    profile: { created: created, updated: [] },
+    workspace_member: { role: 15, created, reactivated, updated: false },
+    boards: boards.map((b) => apply ? Object.assign({}, b, { action: b.action === "unchanged" ? "unchanged" : b.action === "would-create" ? "created" : "updated" }) : b),
     credential: apply ? credential : Object.assign({}, credential, { key_ref: reuse || undefined }),
     verified: apply ? { users_me: user.id, boards: boards.map((b) => b.identifier) } : null,
     shared_key_fallback: false,
@@ -142,7 +152,10 @@ writeFileSync(join(BIN, "px"), FAKE_PX, { mode: 0o755 });
 writeFileSync(join(BIN, "op"), "#!/bin/sh\nexit 2\n", { mode: 0o755 });
 writeFileSync(join(BIN, "hermes-gateway-restart"), `#!/bin/sh\necho "$@" >> "${join(work, "gateway-restart.log")}"\nexit 0\n`, { mode: 0o755 });
 writeFileSync(join(work, "gateway-restart.log"), "");
-const pxCalls = () => readFileSync(PXLOG, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).argv);
+const pxLines = () => readFileSync(PXLOG, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+const pxCalls = () => pxLines().filter((l) => l.argv).map((l) => l.argv);
+/** What PLANE_API_KEY held in each px call's environment: a reference, "(a value)" or null. */
+const pxEnvKeys = () => pxLines().filter((l) => "env_plane_api_key" in l).map((l) => l.env_plane_api_key);
 const enrollCalls = () => pxCalls().filter((a) => a[0] === "identity" && a[1] === "enroll");
 const applyCalls = () => enrollCalls().filter((a) => a.includes("--apply"));
 
@@ -465,6 +478,167 @@ await check("without a plane: block and without --only plane the capability is d
   const bad = await flume(["identity", "provision", "rhea-pm", "--only", "nonsense", "--json"]);
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /--only takes access or plane/u);
+});
+
+await check("preview passes --workspace and --base: the instance the binding names, never whatever px would resolve itself", async () => {
+  const enroll = enrollCalls()[0];
+  assert.equal(enroll[enroll.indexOf("--workspace") + 1], "33god", enroll.join(" "));
+  assert.equal(enroll[enroll.indexOf("--base") + 1], "https://plane.delo.sh", enroll.join(" "));
+  assert.ok(enrollCalls().every((a) => a.includes("--workspace") && a.includes("--base")), "every enroll call carries both");
+});
+
+await check("a key rotated to a ref Pilot never verified is NOT projected, and the audit does not call the desk own-key", async () => {
+  // ivy runs its own adopted key. Rotating the binding keeps native_actor_id, so only the missing plane.adopt receipt for the
+  // new ref stands between a rogue/unverified key and the desk.
+  const ownRef = keyRefOf("ivy");
+  const rotated = await flume(["identity", "rotate", "ivy-pm", "plane", "--credential-ref", keyRefOf("rogue"), "--apply", "--json"]);
+  assert.equal(rotated.status, 0, rotated.stdout + rotated.stderr);
+  assert.equal(block("ivy-pm").bindings.plane.credential_ref, keyRefOf("rogue"));
+  assert.equal(block("ivy-pm").bindings.plane.native_actor_id, block("ivy-pm").bindings.plane.principal, "rotate keeps native_actor_id");
+  const calls = pxCalls().length;
+  const verbsBefore = verbs.length;
+  const deskBefore = tree(join(FLEET, "profiles", "ivy-pm"));
+  const found = JSON.parse((await flume(["audit", REPO, "--rules", "org.plane-credential", "--json"])).stdout).rules.find((r) => r.id === "org.plane-credential");
+  const details = found.details.join("\n");
+  assert.ok(!/own-key: .*ivy-pm/u.test(details), details);
+  assert.match(details, /shared-key .*ivy-pm/u, details);
+  const fixed = JSON.parse((await flume(["remediate", "org.plane-credential", REPO, "--json"])).stdout).results.find((r) => r.id === "org.plane-credential");
+  assert.notEqual(fixed.status, "applied", JSON.stringify(fixed));
+  assert.deepEqual(tree(join(FLEET, "profiles", "ivy-pm")), deskBefore, "the unverified key is never projected");
+  assert.equal(planeKey(delta("ivy-pm")), ownRef);
+  assert.equal(verbs.length, verbsBefore);
+  assert.equal(pxCalls().length, calls, "judging adoption never calls px");
+  // Rotating back to the key Pilot verified restores it.
+  assert.equal((await flume(["identity", "rotate", "ivy-pm", "plane", "--credential-ref", ownRef, "--apply", "--json"])).status, 0);
+  const again = JSON.parse((await flume(["audit", REPO, "--rules", "org.plane-credential", "--json"])).stdout).rules.find((r) => r.id === "org.plane-credential");
+  assert.match(again.details.join("\n"), /own-key: .*ivy-pm/u);
+});
+
+await check("stale candidate: refused by bind and by provision BEFORE any Plane write", async () => {
+  const run = await flume(["identity", "enroll", "zed-pm", "--apply", "--json"]);
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  // zed already has a Plane user (enrolled by hand); the candidate inventory refuses exactly that principal.
+  const zed = uuidOf("zed@agents.delo.sh");
+  const px = pxState();
+  px.users["zed@agents.delo.sh"] = { id: zed, email: "zed@agents.delo.sh", name: "Zed" };
+  writeFileSync(PXSTATE, JSON.stringify(px));
+  const inventory = join(work, "candidates.yaml");
+  writeFileSync(inventory, YAML.stringify({ candidates: [{ provider: "plane", principal: zed, adoptable: false, disposition: "an alias on the operator's own account", source: "fixture" }] }));
+  const env = { FLUME_IDENTITY_CANDIDATES: inventory };
+  const bound = await flume(["identity", "bind", "zed-pm", "plane", "--principal", zed, "--instance", INSTANCE, "--credential-ref", keyRefOf("zed"), "--apply", "--json"], env);
+  assert.notEqual(bound.status, 0);
+  assert.ok(JSON.parse(bound.stdout).blockers.some((b) => b.code === "stale-candidate"), bound.stdout);
+  assert.equal(block("zed-pm").bindings?.plane, undefined, "nothing bound");
+  const before = world();
+  const stateBefore = pxState();
+  const applies = applyCalls().length;
+  for (const extra of [[], ["--apply"]]) {
+    const result = await flume(["identity", "provision", "zed-pm", "--only", "plane", ...extra, "--json"], env);
+    assert.notEqual(result.status, 0, result.stdout);
+    const body = JSON.parse(result.stdout);
+    assert.equal(body.capabilities.plane.action, "conflict", JSON.stringify(body.capabilities.plane));
+    assert.match(body.capabilities.plane.detail, /stale-candidate/u);
+    assert.match(body.capabilities.plane.detail, /refused before any Plane write/u);
+  }
+  assert.deepEqual(world(), before);
+  assert.deepEqual(pxState(), stateBefore, "no membership, no key");
+  assert.equal(applyCalls().length, applies, "px --apply was never called");
+});
+
+await check("run from the employee's own desk: px never sees the employee's key, the profile is not cycled from inside itself, the delta keeps its bytes", async () => {
+  // A comment-rich, unicode, `off`-valued delta with no onepassword.enabled of its own.
+  const original = [
+    "# keep me: ünïcode — café ☕",
+    "skills:",
+    "  project_discovery: true   # inline comment",
+    "memory:",
+    "  enabled: off",
+    "secrets:",
+    "  onepassword:",
+    "    env:",
+    "      # indented comment: stays",
+    "      AUTOMATICAI_GATEWAY_KEY: op://DeLoSecrets/gwkey00000000000000000000/zed",
+    "label: \"naïve ☕\"",
+    "",
+  ].join("\n");
+  const deltaPath = join(FLEET, "profiles", "zed-pm", "config.delta.yaml");
+  writeFileSync(deltaPath, original, { mode: 0o600 });
+  const verbsBefore = verbs.length;
+  const envKeysBefore = pxEnvKeys().length;
+  // What a Hermes tool subprocess of zed-pm sees: its own desk as HERMES_HOME and its OWN key as PLANE_API_KEY.
+  const inside = { HERMES_HOME: join(FLEET, "profiles", "zed-pm"), PLANE_API_KEY: patOf("zed") };
+  const body = await provision("zed-pm", ["--apply"], inside);
+  assert.equal(body.ok, true, JSON.stringify(body));
+  assert.equal(body.capabilities.plane.action, "adopted", JSON.stringify(body.capabilities.plane));
+  const ref = keyRefOf("zed");
+  assert.equal(block("zed-pm").bindings.plane.native_actor_id, uuidOf("zed@agents.delo.sh"));
+  // px was refused nothing: every call ran with the fleet base reference, not the employee's own key.
+  const seen = pxEnvKeys().slice(envKeysBefore);
+  assert.ok(seen.length >= 3, "preview, enroll, verify");
+  assert.ok(seen.every((key) => key === OPERATOR_REF), JSON.stringify(seen));
+  // The desk was written and rendered, but not cycled from inside itself.
+  assert.equal(planeKey(delta("zed-pm")), ref);
+  assert.equal(planeKey(generated("zed-pm")), ref);
+  assert.equal(body.capabilities["plane-desk"].refs.gateway, "unpicked", JSON.stringify(body.capabilities["plane-desk"]));
+  assert.match(body.capabilities["plane-desk"].detail, /NOT picked up/u);
+  assert.deepEqual(verbs.slice(verbsBefore), [], "no unserve/serve against the profile this very command runs inside");
+  // Every file written is named.
+  assert.ok(body.writes.some((w) => w.endsWith("zed-pm/agents/hermes/pm/role.yaml") || w.endsWith("/role.yaml")), JSON.stringify(body.writes));
+  assert.ok(body.writes.some((w) => w.endsWith("zed-pm/config.delta.yaml")), JSON.stringify(body.writes));
+  assert.ok(body.writes.some((w) => w.endsWith("/plane-verifications.jsonl")), JSON.stringify(body.writes));
+  // The delta: exactly one line added, nothing else touched, nothing mangled, no onepassword.enabled invented.
+  const after = deltaText("zed-pm");
+  const gone = original.split("\n").filter((line) => !after.split("\n").includes(line));
+  assert.deepEqual(gone, [], `lines lost or rewritten:\n${gone.join("\n")}`);
+  const added = after.split("\n").filter((line) => !original.split("\n").includes(line));
+  assert.equal(added.length, 1, `added: ${JSON.stringify(added)}`);
+  assert.match(added[0], new RegExp(`^ +PLANE_API_KEY: ${ref.replace(/[/.]/gu, "\\$&")}$`, "u"));
+  assert.equal(delta("zed-pm").secrets.onepassword.enabled, undefined, "the delta did not gain secrets.onepassword.enabled");
+  assert.equal(delta("zed-pm").memory.enabled, "off", "`off` is untouched (kept as the operator wrote it)");
+  assert.match(after, /^memory:\n  enabled: off$/mu);
+});
+
+await check("a deactivated user or a changed display name is a pending change: enroll --apply reruns, then it converges", async () => {
+  const px = pxState();
+  px.users["rhea@agents.delo.sh"].inactive = true;
+  px.users["rhea@agents.delo.sh"].name = "Old Name";
+  writeFileSync(PXSTATE, JSON.stringify(px));
+  const applies = applyCalls().length;
+  const preview = await provision("rhea-pm");
+  assert.equal(preview.changed, true, JSON.stringify(preview.capabilities));
+  assert.equal(preview.capabilities.plane.action, "adopt");
+  assert.match(preview.capabilities.plane.detail, /reactivate user/u);
+  assert.match(preview.capabilities.plane.detail, /update user display_name/u);
+  assert.equal(applyCalls().length, applies, "a preview never applies");
+  const body = await provision("rhea-pm", ["--apply"]);
+  assert.equal(body.ok, true, JSON.stringify(body));
+  assert.equal(applyCalls().length, applies + 1, "the Plane write ran");
+  const user = pxState().users["rhea@agents.delo.sh"];
+  assert.equal(user.inactive, undefined, "reactivated");
+  assert.notEqual(user.name, "Old Name", "the display name was updated");
+  const again = await provision("rhea-pm", ["--apply"]);
+  assert.equal(again.changed, false, JSON.stringify(again.capabilities));
+  assert.equal(again.capabilities.plane.action, "no-op");
+  assert.equal(applyCalls().length, applies + 1);
+});
+
+await check("--only plane runs with a provisioning config whose access half is invalid", async () => {
+  const config = join(work, "invalid-access.yaml");
+  writeFileSync(config, YAML.stringify({ version: 1, cloudflare: { api_token_ref: "not-a-ref" }, plane: { instance: INSTANCE } }));
+  const calls = pxCalls().length;
+  const run = await flume(["identity", "provision", "rhea-pm", "--only", "plane", "--json"], { FLUME_PROVISION_CONFIG: config });
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.ok(pxCalls().length > calls, "the plane group ran");
+  assert.equal(JSON.parse(run.stdout).capabilities.plane.action, "no-op");
+  // The default run (access included) still validates the whole file.
+  const both = await flume(["identity", "provision", "rhea-pm", "--json"], { FLUME_PROVISION_CONFIG: config });
+  assert.notEqual(both.status, 0);
+  assert.equal(JSON.parse(both.stdout).blockers[0].code, "invalid-config");
+});
+
+await check("every px call ran with the fleet base reference in PLANE_API_KEY, never a value", async () => {
+  assert.ok(pxEnvKeys().length > 10);
+  assert.ok(pxEnvKeys().every((key) => key === OPERATOR_REF), JSON.stringify([...new Set(pxEnvKeys())]));
 });
 
 await check("no planted token value appears in any output or any file", async () => {
