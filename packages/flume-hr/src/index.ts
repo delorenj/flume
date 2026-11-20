@@ -11,6 +11,7 @@
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError } from "commander";
+import { convertRoot, renderKDL } from "@usage-spec/commander";
 
 import { guardBrokenPipe, writeStdout, exitAfterFlush } from "./utils/stdout";
 
@@ -1097,6 +1098,10 @@ const isCliEntry = Boolean(
 );
 
 if (isCliEntry) {
+  if (commandArgs.includes("--usage-spec") && !commandArgs.slice(0, commandArgs.indexOf("--usage-spec")).includes("--")) {
+    process.stdout.write(renderKDL(convertRoot(program)));
+    process.exit(0);
+  }
   try {
     await program.parseAsync(process.argv);
   } catch (error) {
