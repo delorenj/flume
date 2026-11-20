@@ -169,6 +169,20 @@ function bindingKeys(block: CompanyIdentity | null): string[] {
 
 const tombstoneBindingKeys = (tombstone: Tombstone): string[] => tombstone.bindings.map(b => `${b.provider}\u0000${b.instance ?? ""}\u0000${b.principal}`);
 
+/**
+ * Whether `other` keeps the census from proving who owns an Access identity. A definition with a problem always does.
+ * A definition file that does not exist holds no identity block; it can claim one only through its registry projection,
+ * so a missing definition whose rows carry no company_identity cannot own anything (2026-11-19: three posts with deleted
+ * or never-written role.yaml — a retired launch director among them — blocked every employee's Access binding).
+ */
+function unverifiableForAccess(census: IdentityCensus, other: IdentityDefinition): boolean {
+  if (other.problem) return true;
+  if (!other.missing) return false;
+  let rows: Record<string, Record<string, unknown>>;
+  try { rows = registryRows(census.registryPath); } catch { return true; }
+  return other.posts.some(post => rows[post]?.company_identity !== undefined);
+}
+
 /** Re-read the whole census and permanent reservations before an irreversible Access mutation. Caller holds registry lock. */
 export function accessRevocationConflict(subject: string, definition: string, principal: string, tokenId?: string): IdentityBlocker | undefined {
   try {
@@ -177,7 +191,8 @@ export function accessRevocationConflict(subject: string, definition: string, pr
     if (!target?.block || target.problem || target.block.subject !== subject) return { code: "access-owner-unverified", detail: "current employee definition cannot verify issuance ownership" };
     const matches = (value: string) => Boolean(value && (value === principal || tokenId && value === tokenId));
     for (const other of census.definitions) {
-      if (other.missing || other.problem) return { code: "access-owner-unverified", detail: "the whole identity census cannot be read; no Access delete authorized" };
+      if (other.missing && !unverifiableForAccess(census, other)) continue;
+      if (other.missing || other.problem) return { code: "access-owner-unverified", detail: `the whole identity census cannot be read (${other.path}); no Access mutation authorized` };
       if (other.path === definition) continue;
       if (other.block?.subject === subject || matches(other.block?.bindings?.cloudflare_access?.principal ?? "")) return { code: "access-owner-conflict", detail: "another employee definition holds this Access identity; no delete authorized" };
     }
@@ -421,8 +436,10 @@ export async function bindEmployeeProvider(employee: string, provider: string, b
     if (provider === "cloudflare_access" && target.block) {
       const reservation = accessIssuanceReservation(binding.principal, target.block.subject);
       if (reservation) blockers.push({ code: reservation, detail: "another subject's pending or uncertain Access issuance reserves this principal; owner-approved reconciliation required" });
-      for (const other of census.definitions) if (other.path !== target.path && (other.missing || other.problem)) blockers.push({ code: "invalid-definition", detail: "cannot verify Access ownership across the whole census", path: other.path });
+      for (const other of census.definitions) if (other.path !== target.path && unverifiableForAccess(census, other)) blockers.push({ code: "invalid-definition", detail: `cannot verify Access ownership across the whole census (${other.path})`, path: other.path });
     }
+    // A principal the candidate inventory refuses is a machine-blocker for any provider binding, plane included.
+    if (provider === "plane" && target.block) { const stale = staleCandidate("plane", binding.principal); if (stale) blockers.push(stale); }
     const base = { employee, ...summary(target), apply: Boolean(options.apply), provider };
     if (blockers.length || !target.block) return { ok: false, changed: false, binding: null, blockers, writes: [] as string[], ...base };
     const block = target.block;
@@ -553,6 +570,30 @@ function legacyRegistryWarnings(target: IdentityDefinition, census: IdentityCens
 }
 
 /**
+ * Every gate `adopt-actor plane` applies before it calls px, as one function. `identity provision --only plane` calls it
+ * BEFORE the Plane write too: a refused candidate, a conflicting adopted actor, or an actor another employee holds must
+ * never get a Plane user, memberships and a vaulted key first. `principal` is the native user the employee is (or is about
+ * to be) bound to. Pure: no write, no px call.
+ */
+export function planeAdoptionBlockers(census: IdentityCensus, target: IdentityDefinition, principal: string): IdentityBlocker[] {
+  const blockers: IdentityBlocker[] = [];
+  const own = target.block?.bindings?.plane;
+  const employee = target.posts[0] ?? target.block?.handle ?? "employee";
+  const stale = staleCandidate("plane", principal);
+  if (stale) blockers.push(stale);
+  if (own?.native_actor_id !== undefined && own.native_actor_id !== principal) {
+    blockers.push({ code: "native-actor-conflict", detail: `${employee} already adopted actor ${own.native_actor_id} but is bound to ${principal}. Rotation is deliberate — remove native_actor_id by hand first` });
+  }
+  for (const other of census.definitions) {
+    if (other.path === target.path || other.missing || other.problem) continue;
+    if (other.block?.bindings?.plane?.native_actor_id === principal) {
+      blockers.push({ code: "native-actor-duplicate", detail: `actor ${principal} is already adopted at ${other.path}; two employees are never one native actor`, path: other.path });
+    }
+  }
+  return blockers;
+}
+
+/**
  * `flume identity adopt-actor <employee> plane --board <b...>` (FLUME-52): have PILOT verify the employee's plane binding
  * (`px identity verify`, as the employee's own key, once per board) and stamp `native_actor_id` = the verified native user
  * ID. Every board must pass or nothing is written. Only an enrolled, active employee is adopted, and every gate fires before
@@ -583,17 +624,7 @@ async function adoptPlaneActor(employee: string, options: IdentityOptions) {
       return { ...none, blockers, ...(code === "no-provider-binding" ? { enrollment: { prerequisites: planeEnrollmentPrerequisites(block.handle) } } : {}) };
     }
     const facts = bound.facts;
-    const stale = staleCandidate("plane", existing.principal);
-    if (stale) blockers.push(stale);
-    if (existing.native_actor_id !== undefined && existing.native_actor_id !== existing.principal) {
-      blockers.push({ code: "native-actor-conflict", detail: `${employee} already adopted actor ${existing.native_actor_id} but is bound to ${existing.principal}. Rotation is deliberate — remove native_actor_id by hand first` });
-    }
-    for (const other of census.definitions) {
-      if (other.path === target.path || other.missing || other.problem) continue;
-      if (other.block?.bindings?.plane?.native_actor_id === existing.principal) {
-        blockers.push({ code: "native-actor-duplicate", detail: `actor ${existing.principal} is already adopted at ${other.path}; two employees are never one native actor`, path: other.path });
-      }
-    }
+    blockers.push(...planeAdoptionBlockers(census, target, existing.principal));
     if (blockers.length) return { ...none, binding: existing, blockers };
 
     // Every gate above fired without a px call. From here Pilot decides, board by board.

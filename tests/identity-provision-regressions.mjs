@@ -67,7 +67,11 @@ if (args[0] === "item" && args[1] === "list") {
 if (args[0] === "item" && args[1] === "get") {
   const edited = read(editedPath, []);
   if (mode === "unreadable" && edited.includes(args[2])) { process.stderr.write(${JSON.stringify(CREATED_SECRET)}); process.exit(1); }
-  const source = mode === "stale" && !args.includes("--cache=false") ? read(cachePath, items()) : items();
+  // lag: a 1Password Connect server serves its pre-edit copy for OP_LAG_READS reads after an edit, fresh or not.
+  const lagPath = process.env.OP_ITEMS + ".lag";
+  const lagging = mode === "lag" && fs.existsSync(lagPath) && Number(fs.readFileSync(lagPath, "utf8")) > 0;
+  if (lagging) fs.writeFileSync(lagPath, String(Number(fs.readFileSync(lagPath, "utf8")) - 1));
+  const source = lagging || (mode === "stale" && !args.includes("--cache=false")) ? read(cachePath, items()) : items();
   const item = source.find((i) => i.title === args[2] || i.id === args[2]);
   if (!item) process.exit(1);
   process.stdout.write(JSON.stringify(item));
@@ -106,6 +110,7 @@ if (args[0] === "item" && args[1] === "edit") {
     else item.fields.push({ id: fid(m[1]), label: lbl, type: m[2], value: m[3], section: sec ? { label: sec } : undefined });
   }
   fs.writeFileSync(editedPath, JSON.stringify([...read(editedPath, []), item.id]));
+  if (mode === "lag") fs.writeFileSync(process.env.OP_ITEMS + ".lag", process.env.OP_LAG_READS || "2");
   if (mode === "wrong-value") item.fields.filter(f => f.section?.label === "Identity Service Token").forEach(f => f.value = "wrong");
   if (mode === "partial") item.fields = item.fields.filter(f => f.label !== "Client Secret");
   if (mode === "duplicate-id") item.fields.forEach(f => f.id = "duplicate");
@@ -227,6 +232,8 @@ const baseEnv = {
   OP_SERVICE_ACCOUNT_TOKEN: "vault-session-token", OP_ITEMS: join(dir, "op-items.json"), OP_CALLS: join(dir, "op-calls.jsonl"), OP_CACHE: "on",
   FLUME_HOST_OVERLAY: "none", HERMES_FLEET_ENV: join(dir, "no-fleet.env"),
   PLANE_API_KEY: "", PLANE_DEFAULT_API_KEY: "", PLANE_33GOD_API_KEY: "", TRELLO_TOKEN: "",
+  // One readback, no Connect-lag polling, unless a test opts in (the lag tests below).
+  FLUME_VAULT_READBACK_TIMEOUT_MS: "0",
 };
 const cliArtifacts = [];
 /** The child talks to the in-process fake Cloudflare: a sync spawn would deadlock it. */
@@ -251,7 +258,7 @@ writeFileSync(join(deskDir, "agent.yaml"), YAML.stringify({
   const enrolled = json(spawnSync(process.execPath, [cli, "identity", "enroll", "rhea", "--apply", "--json"], { env: baseEnv, cwd: dir, encoding: "utf8" }));
   assert.equal(enrolled.identity.email, "rhea@agents.delo.sh");
 }
-const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"));
+const desk = (name) => YAML.parse(readFileSync(name ? join(home, ".agents/workforce", name, "agent.yaml") : join(deskDir, "agent.yaml"), "utf8"));
 
 // -- FLUME-80: the double deliberately models the incident's cache sequence ------------------
 {
@@ -599,9 +606,47 @@ for (const mode of ["unreadable", "wrong-value", "partial", "success-empty", "du
   assert.ok(!calls.slice(before).some(c => c.method === "DELETE"));
   assert.equal(cf.tokens.filter(t => t.name === `employee-${name}`).length, 1);
   const retryStart = calls.length;
-  json(await runAsync(["identity", "provision", name, "--apply", "--json"]), 1);
-  assert.ok(calls.slice(retryStart).every(c => c.method === "GET"));
+  if (mode === "unreadable") {
+    // The pair DID persist; only its readback failed. A fresh read now confirms it, the provider token and the issuance
+    // receipt agree, so the retry adopts the retained token: bind + policy membership, never a mint or a delete.
+    const retry = json(await runAsync(["identity", "provision", name, "--apply", "--json"]));
+    assert.equal(retry.capabilities["access-token"].action, "adopted");
+    assert.ok(!calls.slice(retryStart).some(c => c.method === "DELETE" || (c.method === "POST" && c.url.endsWith("/access/service_tokens"))));
+  } else {
+    json(await runAsync(["identity", "provision", name, "--apply", "--json"]), 1);
+    assert.ok(calls.slice(retryStart).every(c => c.method === "GET"));
+  }
   pass(`uncertain ${mode}: explicit partial result, retained token, retry does not mint/delete`);
+}
+{
+  // 1Password Connect lag (2026-11-19, tolt-pm): the pair landed but the first fresh reads still showed the old item.
+  // With a readback budget the write is confirmed once Connect syncs; nothing is stranded.
+  enrollFixture("connect-lag");
+  const result = json(await runAsync(["identity", "provision", "connect-lag", "--apply", "--json"], { OP_MODE: "lag", OP_LAG_READS: "2", FLUME_VAULT_READBACK_TIMEOUT_MS: "8000" }));
+  assert.equal(result.capabilities["access-token"].action, "created", JSON.stringify(result.capabilities["access-token"]));
+  assert.ok(desk("connect-lag").company_identity.bindings.cloudflare_access, "lagged write was not bound");
+  pass("Connect read-after-write lag: readback polls until the pair confirms, then binds");
+}
+{
+  // Without the budget the same lag strands the token (retained, reconciliation required). The next run adopts it,
+  // because vault pair, provider token name/client ID and issuance receipt all agree; it never mints a second token.
+  enrollFixture("stranded");
+  const first = json(await runAsync(["identity", "provision", "stranded", "--apply", "--json"], { OP_MODE: "lag", OP_LAG_READS: "1" }), 1);
+  assert.equal(first.capabilities["access-token"].action, "blocked");
+  assert.match(first.capabilities["access-token"].detail, /retained, not deleted/);
+  const minted = cf.tokens.filter(t => t.name === "employee-stranded");
+  assert.equal(minted.length, 1);
+  const before = calls.length;
+  const second = json(await runAsync(["identity", "provision", "stranded", "--apply", "--json"]));
+  assert.equal(second.capabilities["access-token"].action, "adopted", JSON.stringify(second.capabilities["access-token"]));
+  assert.ok(!calls.slice(before).some(c => c.method === "POST" && c.url.endsWith("/access/service_tokens")), "adopt minted a token");
+  assert.ok(!calls.slice(before).some(c => c.method === "DELETE"), "adopt deleted a token");
+  assert.equal(cf.tokens.filter(t => t.name === "employee-stranded").length, 1);
+  assert.equal(desk("stranded").company_identity.bindings.cloudflare_access.principal, minted[0].client_id);
+  assert.ok(cf.policy.include.some(rule => rule.service_token?.token_id === minted[0].id), "adopted token missing from the Access policy");
+  const third = json(await runAsync(["identity", "provision", "stranded", "--apply", "--json"]));
+  assert.equal(third.capabilities["access-token"].action, "no-op");
+  pass("stranded token: next run adopts it (no mint, no delete), binds, joins the policy; a rerun is a no-op");
 }
 {
   enrollFixture("persist-error");

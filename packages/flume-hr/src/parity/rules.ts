@@ -3881,6 +3881,17 @@ return [
           details.push(`agent.disabled_toolsets contains "memory" — memory tools are suppressed fleet-wide even though memory.provider is set (auto recall/retain still runs, which masks it)`);
         }
 
+        // Native Plane identity (FLUME-93): every adopted employee's desk injects its OWN
+        // PLANE_API_KEY, but the terminal tool scrubs every secret from child env unless the
+        // name is in terminal.env_passthrough. Without it `px comment` in a PM's shell falls back
+        // to the operator's key and the comment posts as Jarad, with no error anywhere
+        // (tolt-pm on TOLT-151, 2026-11-19). The gateway caches this list per home for its whole
+        // life, so a change here needs one hermes-gateway-restart to reach running sessions.
+        const passthrough: unknown = cfg?.terminal?.env_passthrough;
+        if (!Array.isArray(passthrough) || !passthrough.includes("PLANE_API_KEY")) {
+          details.push(`terminal.env_passthrough lacks PLANE_API_KEY — every employee's terminal drops its own Plane key and px posts as the operator. Add it to ${base}, re-render, then hermes-gateway-restart once`);
+        }
+
         // Named profiles load their real skills/ overlay. Skill reachability
         // is checked by hermes.runtime-singleton through the public core;
         // external_dirs may intentionally be empty.

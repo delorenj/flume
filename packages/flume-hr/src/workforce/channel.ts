@@ -1,8 +1,8 @@
 import { execFile, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createConnection } from "node:net";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { CHANNEL_PARKED_STATUS } from "../org/types";
@@ -244,12 +244,28 @@ async function confirmState(key: string, want: "offline" | "online", since: numb
 }
 
 /**
+ * Whether THIS process runs inside `profile`'s own turn. Hermes hands every tool subprocess of a routed turn
+ * HERMES_HOME = that profile's desk (and a pinned dispatcher HERMES_PROFILE). Cycling the profile from there unserves
+ * the very turn running this process, which can be cut between unserve-profile and serve-profile and leave the profile
+ * unserved: the caller skips the cycle and reports the change as written but NOT picked up.
+ */
+export function callerRunsProfile(profile: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (plain(env.HERMES_PROFILE) === profile) return true;
+  const hermesHome = plain(env.HERMES_HOME);
+  if (!hermesHome) return false;
+  const real = (path: string): string => { try { return realpathSync(path); } catch { return resolve(path); } };
+  return real(hermesHome) === real(join(fleetHome(), "profiles", profile));
+}
+
+/**
  * unserve then serve ONE profile through the gateway control socket: its adapters are stopped and rebuilt from the file
  * just rendered, and the gateway drops the profile's secret snapshot on unserve, so the next serve re-pulls every
  * `secrets.onepassword.env` reference (gateway/run_profile_reconcile.py). Other profiles are untouched. Never falls back to
  * a restart: the caller decides that (a channel does; a desk key batches one `hermes-gateway-restart` for the operator).
+ * Never cycles the profile this process runs inside (`self: true`): see callerRunsProfile.
  */
-export async function cycleProfileViaSocket(profile: string): Promise<{ ok: boolean; detail: string }> {
+export async function cycleProfileViaSocket(profile: string): Promise<{ ok: boolean; self?: true; detail: string }> {
+  if (callerRunsProfile(profile)) return { ok: false, self: true, detail: `not cycled: this command runs inside ${profile}'s own turn, and unserving it could cut this process before serve-profile and leave ${profile} unserved; cycle it from outside the profile` };
   const socket = join(fleetHome(), "gateway.sock");
   if (!existsSync(socket)) return { ok: false, detail: "no gateway control socket" };
   const down = await controlRequest(socket, "unserve-profile", { name: profile }, 10_000);
@@ -275,6 +291,8 @@ async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offl
     const seen = await confirmState(key, want, since, waitMs);
     return { action: "profile-cycle", confirmed: seen.confirmed, state: seen.state, detail: cycled.detail };
   }
+  // Inside the profile's own turn: no cycle and no restart from here (either would cut this turn). Written, not picked up.
+  if (cycled.self) return { action: "skipped", confirmed: false, state: gateway.platforms[key]?.state ?? null, detail: `${cycled.detail}; written, NOT picked up` };
   detail = cycled.detail;
   if (isLaunchdHost(hostPlatform())) {
     // A launchd host has no `hermes-gateway` unit. Hermes restarts its own LaunchAgent;

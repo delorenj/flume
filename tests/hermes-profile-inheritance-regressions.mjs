@@ -93,6 +93,7 @@ const AUX_TASKS = [
 const GATEWAY_AUX = Object.fromEntries(AUX_TASKS.map((task) => [task, { provider: "automaticai", model: "automaticai/personal/glm-5.3-flash", timeout: 30 }]));
 
 const BASE_CONFIG = {
+  terminal: { env_passthrough: ["PLANE_API_KEY"] },
   // The main agent calls the gateway (`hermes.gateway-routing`: all inference).
   model: { provider: "automaticai", default: "automaticai/personal/kimi-2.8", base_url: "", api_mode: "chat_completions" },
   auxiliary: { free_only: true, discovery: false, ...GATEWAY_AUX },
@@ -639,6 +640,14 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
   const hooks = { ...BASE_CONFIG.hooks, post_tool_call: [{ command: hookCommand("pre_tool_call"), timeout: 5 }] };
   const f = auditRule(repo, makeFleet({ overrides: { hooks } }), "hermes.fleet-config");
   assert.match(f.text, /canonical publisher .* for: post_tool_call$/m, "only the miswired event is named");
+}
+
+// 20b. Each employee's own Plane key must survive the terminal's secret scrub, or px in its
+//      shell posts as the operator with no error (tolt-pm on TOLT-151, 2026-11-19).
+{
+  const f = auditRule(repo, makeFleet({ overrides: { terminal: { env_passthrough: [] } } }), "hermes.fleet-config");
+  assert.equal(f.status, "fail");
+  assert.match(f.text, /terminal\.env_passthrough lacks PLANE_API_KEY/, "a base that scrubs the employee's Plane key must be reported");
 }
 
 // 21. ALL inference routes through the gateway, not just delegated workers.

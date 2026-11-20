@@ -67,6 +67,18 @@ export function loadProvisioningConfig(path = provisioningConfigPath()): Provisi
   return parsed as ProvisioningConfig;
 }
 
+/** Only what the plane capability reads (`plane:` and `onepassword.vault`), shape-checked on its own; every other key is ignored. */
+function planeOnlyConfig(path: string): ProvisioningConfig | null {
+  let parsed: any;
+  try { parsed = YAML.parse(readFileSync(path, "utf8")); } catch { return null; }
+  if (!parsed || typeof parsed !== "object") return null;
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+  const plane = parsed.plane && typeof parsed.plane === "object" && !Array.isArray(parsed.plane)
+    ? { ...(text(parsed.plane.instance) ? { instance: parsed.plane.instance } : {}), ...(text(parsed.plane.verification_board) ? { verification_board: parsed.plane.verification_board } : {}) } : undefined;
+  const vault = text(parsed.onepassword?.vault) ? parsed.onepassword.vault : undefined;
+  return { ...(plane ? { plane } : {}), ...(vault ? { onepassword: { vault } } : {}) } as unknown as ProvisioningConfig;
+}
+
 /** Secret-free receipt lines: IDs, references and outcomes. */
 function receipt(line: Record<string, unknown>): void {
   const dir = provisionStateDir();
@@ -150,6 +162,13 @@ function hasAccessFields(item: OpItem): boolean {
   return accessFields(item, "Client ID").length + accessFields(item, "Client Secret").length > 0;
 }
 
+/** FLUME_VAULT_READBACK_TIMEOUT_MS bounds how long a write waits to read back through Connect (default 90s; 0 = one read). */
+function vaultReadbackBudgetMs(): number {
+  const parsed = Number.parseInt(process.env.FLUME_VAULT_READBACK_TIMEOUT_MS ?? "90000", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+const sleepMs = (ms: number): void => { if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
+
 class AccessPersistenceError extends Error {
   constructor(message: string, readonly cleanupSafe = false) { super(message); }
 }
@@ -161,13 +180,25 @@ function opAccessFieldsSet(item: OpItem, clientId: string, secret: string, vault
   const edit = op(["item", "edit", item.id, "--vault", vault,
     `${ACCESS_SECTION}.Client ID[text]=${clientId}`, `${ACCESS_SECTION}.Client Secret[concealed]=${secret}`]);
   let after: OpItem;
-  try { after = opItemGet(item.id, vault); }
-  catch { throw new AccessPersistenceError("vault verification uncertain; fresh read unavailable"); }
-  const ids = accessFields(after, "Client ID"), secrets = accessFields(after, "Client Secret");
-  const id = ids[0], secretField = secrets[0];
-  if (after.id === item.id && ids.length === 1 && secrets.length === 1 && id?.value === clientId && secretField?.value === secret &&
-      id.id && secretField.id && id.id !== secretField.id && after.fields.filter(f => f.id === secretField.id).length === 1 &&
-      after.fields.filter(f => f.id === id.id).length === 1) return secretField.id;
+  // 1Password Connect (OP_CONNECT_HOST) serves a synced copy, so a fresh read right after the edit can still show the
+  // old item; that is lag, not a failed write (2026-11-19: tolt-pm's pair landed but read back unconfirmed, stranding
+  // its token). Poll until the pair confirms or the readback budget runs out; only then is it uncertain.
+  const confirmed = (candidate: OpItem): string | undefined => {
+    const ids = accessFields(candidate, "Client ID"), secrets = accessFields(candidate, "Client Secret");
+    const id = ids[0], secretField = secrets[0];
+    return candidate.id === item.id && ids.length === 1 && secrets.length === 1 && id?.value === clientId && secretField?.value === secret &&
+      id.id && secretField.id && id.id !== secretField.id && candidate.fields.filter(f => f.id === secretField.id).length === 1 &&
+      candidate.fields.filter(f => f.id === id.id).length === 1 ? secretField.id : undefined;
+  };
+  const deadline = Date.now() + vaultReadbackBudgetMs();
+  for (let delay = 1000; ; delay = Math.min(delay * 2, 10_000)) {
+    try { after = opItemGet(item.id, vault); }
+    catch { if (Date.now() >= deadline) throw new AccessPersistenceError("vault verification uncertain; fresh read unavailable"); sleepMs(Math.min(delay, Math.max(0, deadline - Date.now()))); continue; }
+    const field = confirmed(after);
+    if (field) return field;
+    if (Date.now() >= deadline || (!edit.ok && !edit.uncertain)) break;
+    sleepMs(Math.min(delay, Math.max(0, deadline - Date.now())));
+  }
   // Even a nonzero edit can have committed remotely. Never delete on its status alone.
   if (!edit.ok && !edit.uncertain && after.id === item.id && !hasAccessFields(after)) {
     throw new AccessPersistenceError("vault write failed; fresh read confirms no Access fields persisted", true);
@@ -285,6 +316,27 @@ async function planAccessToken(config: ProvisioningConfig, block: NonNullable<Id
       return { plan: { action: "no-op", detail: "binding, fresh vault fields and provider token agree", refs: { token_id: remote.id, client_id: remote.client_id!, item_id: item.id } }, apply: async () => ({ action: "no-op", detail: "already bound and live" }) };
     }
     return stop("conflict", "binding, fresh vault fields and provider inventory disagree; owner-approved reconciliation required (see docs/identity-provisioning.md)", refs);
+  }
+  // A token stranded by an unconfirmed readback (receipt `reconciliation-required`) is adopted when every source agrees:
+  // exactly one vaulted pair, the provider token with this employee's name and that client ID, and issuance history
+  // naming exactly that token. Anything less stays a conflict for the owner.
+  if (ids.length === 1 && secrets.length === 1 && item && remote && remote.name === tokenName(block.handle) && !pending.uncertain &&
+      pending.token_ids.length === 1 && pending.token_ids[0] === remote.id && pending.client_ids[remote.id] === remote.client_id &&
+      ids[0]?.id && secrets[0]?.id && ids[0].id !== secrets[0].id && secrets[0].value) {
+    const home = item, secretField = secrets[0].id, clientId = remote.client_id!;
+    const adoptPlan: CapabilityResult = { action: "adopt", detail: `bind stranded token ${remote.id}: vault pair, provider token and issuance receipt agree`, refs: { token_id: remote.id, client_id: clientId, item_id: home.id } };
+    return { plan: adoptPlan, apply: async (): Promise<CapabilityResult> => {
+      const fresh = opItemGet(home.id, vault);
+      const freshIds = accessFields(fresh, "Client ID"), freshSecrets = accessFields(fresh, "Client Secret");
+      if (freshIds.length !== 1 || freshSecrets.length !== 1 || freshIds[0]?.value !== clientId || freshSecrets[0]?.id !== secretField) return { action: "conflict", detail: "vault pair changed since preview; reconcile before retry" };
+      const census = identityCensus(), target = resolveEmployee(census, block.handle);
+      const owner = accessRevocationConflict(block.subject, target.path, clientId, remote.id);
+      if (owner) return { action: "conflict", detail: `${owner.code}: ${owner.detail}; owner reconciliation required` };
+      const boundResult = await bindEmployeeProvider(block.handle, "cloudflare_access", { principal: clientId, instance: access_issuer, credential_ref: `op://${vault}/${home.id}/${secretField}` }, { apply: true });
+      if (!boundResult.ok) return { action: "blocked", detail: "binding write refused; token retained for reconciliation" };
+      receipt({ capability: "access-token", employee: block.handle, subject: block.subject, account_id, action: "created", token_id: remote.id, client_id: clientId, expires_at: remote.expires_at ?? null, item: home.id, reconciled: true });
+      return { action: "adopted", detail: `stranded token ${remote.id} bound`, refs: { token_id: remote.id, client_id: clientId, item_id: home.id } };
+    } };
   }
   if (ids.length || secrets.length) return stop("conflict", "Access fields already present without a binding; refusing overwrite or token creation. Compare provider_match and receipts; owner-approved reconciliation required (see docs/identity-provisioning.md)", refs);
   if (pending.uncertain || pending.token_ids.length) return stop("conflict", "issuance receipt may describe a retained unbound token; reconcile provider inventory before minting", refs);
@@ -452,7 +504,7 @@ async function provisionAccessGroup(employee: string, census: ReturnType<typeof 
     ? { action: "blocked", detail: "vault home unavailable; no token minted" }
     : !policy.ok && access.plan.action === "create"
       ? { action: "blocked", detail: "Access policy preflight blocked; no token minted" }
-      : access.plan.action === "create" ? await applySafely(access) : access.plan;
+      : ["create", "adopt"].includes(access.plan.action) ? await applySafely(access) : access.plan;
   capabilities["access-policy"] = await applySafely({ apply: async () => {
     const accessResult = capabilities["access-token"]!;
     const id = accessResult.refs?.token_id, clientId = accessResult.refs?.client_id;
@@ -519,8 +571,11 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
   const explicitPlane = Boolean(only?.includes("plane"));
   const configPath = provisioningConfigPath();
   let config: ProvisioningConfig | null = null;
-  if (wantAccess || existsSync(configPath)) {
+  if (wantAccess) {
     try { config = loadProvisioningConfig(configPath); } catch (error) { blockers.push({ code: "invalid-config", detail: (error as Error).message }); }
+  } else if (existsSync(configPath)) {
+    // `--only plane` promises no Cloudflare configuration: a file whose access/mailbox half is incomplete or invalid must not stop it.
+    config = planeOnlyConfig(configPath);
   }
 
   const base = { employee, kind: target.kind, definition: target.path, person: target.person, apply: Boolean(options.apply) };
@@ -543,8 +598,10 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
   if (access.blocker) return { ok: false, changed: false, capabilities: {}, blockers: [...blockers, access.blocker], writes: [] as string[], ...base };
   const capabilities: Record<string, CapabilityResult> = { ...access.capabilities };
   const planeDeferredResult = (detail: string): CapabilityResult => ({ action: "deferred", detail });
+  let planeWrites: string[] = [];
   if (planeStep) {
-    const done = options.apply ? await planeStep.apply().catch((): { plane: CapabilityResult; desk: CapabilityResult } => ({ plane: { action: "blocked", detail: "plane capability failed or is uncertain; inspect state and rerun to converge (provider output withheld)" }, desk: planeDeferredResult("not projected") })) : planeStep.plan;
+    const done = options.apply ? await planeStep.apply().catch((): { plane: CapabilityResult; desk: CapabilityResult; writes: string[] } => ({ plane: { action: "blocked", detail: "plane capability failed or is uncertain; inspect state and rerun to converge (provider output withheld)" }, desk: planeDeferredResult("not projected"), writes: [] })) : { ...planeStep.plan, writes: [] as string[] };
+    planeWrites = done.writes;
     capabilities.plane = done.plane;
     capabilities["plane-desk"] = done.desk;
   } else if (planeDeferred) capabilities.plane = planeDeferredResult(planeDeferred);
@@ -557,7 +614,7 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
   const failed = Object.values(capabilities).some(c => c.action === "blocked" || c.action === "conflict");
   const changed = Object.values(capabilities).some(c => c.changed || c.action === "created" || c.action === "adopted");
   return {
-    ok: !failed, changed, capabilities, blockers, writes: changed ? [join(provisionStateDir(), "receipts.jsonl")] : [],
+    ok: !failed, changed, capabilities, blockers, writes: [...new Set([...(changed ? [join(provisionStateDir(), "receipts.jsonl")] : []), ...planeWrites])],
     note: "Receipts carry IDs and references only; secrets live in the vault item.",
     ...base,
   };

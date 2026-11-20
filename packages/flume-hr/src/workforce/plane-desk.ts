@@ -6,7 +6,8 @@
 // reference. This module projects exactly that one key:
 //
 //   want     = company_identity.bindings.plane.credential_ref, for an ACTIVE employee whose binding is ADOPTED
-//              (native_actor_id == principal, i.e. Pilot verified the key is that user);
+//              (native_actor_id == principal) AND whose current key Pilot verified (a `plane.adopt` receipt naming this
+//              credential_ref, principal and instance: a rotate keeps native_actor_id, so the actor alone is not proof);
 //   delta    : secrets.onepassword.env.PLANE_API_KEY = want, every other key and comment of config.delta.yaml kept;
 //   render   : config.yaml re-rendered by the canonical renderer (scripts/channel-state.py `mode: desk-refs`);
 //   pick-up  : that ONE profile cycled through the gateway control socket (unserve drops its secret snapshot, serve
@@ -19,7 +20,7 @@
 import { existsSync, lstatSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { deskProfileOf, identityCensus, resolveEmployee, type IdentityCensus, type IdentityDefinition } from "./company";
-import { appendPlaneReceipt, planeBindingOf } from "./plane";
+import { appendPlaneReceipt, planeAdoptionVerified, planeBindingOf } from "./plane";
 import { readRef, type RefRead } from "./gateway-desk";
 import { cycleProfileViaSocket, deskDirOf, desksUsingRef, fleetBaseConfigPath, readGateway, writeDeskRefs } from "./channel";
 import type { LifecycleAuditFinding, LifecycleContext, LifecycleMigrationResult, RecipeCheck } from "../engine/types";
@@ -91,6 +92,8 @@ export function planeDeskRow(census: IdentityCensus, definition: IdentityDefinit
   const bound = planeBindingOf(binding);
   if ("code" in bound) return row("binding-invalid", `shared-key: plane binding unusable (${bound.code}: ${bound.detail})`);
   if (binding.native_actor_id !== binding.principal) return row("not-adopted", `shared-key: plane binding not yet adopted (run flume identity adopt-actor ${employeeName(definition)} plane --board <board> --apply, or flume identity provision ${employeeName(definition)} --only plane --apply)`, own);
+  // native_actor_id survives a rotate; only Pilot's verification of THIS key, principal and instance makes it projectable.
+  if (!planeAdoptionVerified(block.subject, binding)) return row("not-adopted", `shared-key: Pilot has not verified ${binding.credential_ref} as native user ${binding.principal} (no plane.adopt receipt for the current key, principal and instance; a rotated key is re-verified before it is projected): run flume identity adopt-actor ${employeeName(definition)} plane --board <board> --apply, or flume identity provision ${employeeName(definition)} --only plane --apply`, own);
   const want = bound.facts.keyRef;
   if (!profile || !desk || !realDir(desk)) return row("no-desk", `adopted, but ${desk ?? "no desk"} is not a real profile directory; nothing to project into`, want);
   if (delta === want && running === want) return row("own-key", "runs its own adopted Plane key", want);
@@ -144,6 +147,8 @@ async function pickUpDesk(profile: string, noReload: boolean): Promise<PlaneDesk
   if (noReload) return { action: "skipped", confirmed: false, detail: `--no-reload: written, NOT picked up. Cycle ${profile} or, once after the last projection, run hermes-gateway-restart --reason "plane keys projected"` };
   const cycled = await cycleProfileViaSocket(profile);
   if (cycled.ok) return { action: "profile-cycle", confirmed: true, detail: cycled.detail };
+  // Run from inside the employee's own desk: cycling it would cut this very turn (cycleProfileViaSocket refuses).
+  if (cycled.self) return { action: "unpicked", confirmed: false, detail: `${cycled.detail}; written, NOT picked up. From outside ${profile}: cycle it, or once after the last projection run hermes-gateway-restart --reason "plane keys projected"` };
   // Never a restart from here: one per desk would drain every profile N times. Batch it.
   return { action: "unpicked", confirmed: false, detail: `${cycled.detail}; written, NOT picked up. Once after the last projection: hermes-gateway-restart --reason "plane keys projected"` };
 }

@@ -18,9 +18,9 @@
 // preview, nothing written). The token value never reaches Flume: px prints references only.
 import { readFileSync } from "node:fs";
 import YAML from "yaml";
-import { adoptNativeActor, bindEmployeeProvider, rotateEmployeeCredential, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
+import { adoptNativeActor, bindEmployeeProvider, planeAdoptionBlockers, rotateEmployeeCredential, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import { githubCredentialRefProblem } from "./github";
-import { isBoardArgument, isPlaneUuid, parsePlaneInstance, planeEvidence, runPx, PLANE_CREDENTIAL_SEMANTICS } from "./plane";
+import { isBoardArgument, isPlaneUuid, parsePlaneInstance, planeAdoptionVerified, planeEvidence, runPx, PLANE_CREDENTIAL_SEMANTICS } from "./plane";
 import { planeDeskRow, projectPlaneKey } from "./plane-desk";
 import { parseNamedAgentYaml } from "./validator";
 import type { CompanyIdentity } from "./types";
@@ -75,11 +75,25 @@ export function planeDisplayName(target: IdentityDefinition, block: CompanyIdent
 interface EnrollAnswer {
   userId: string | null;
   userCreated: boolean;
-  workspaceMember: { role?: unknown; created?: boolean; reactivated?: boolean };
+  /** What px would change (preview) or changed (apply) on an EXISTING user and profile: reactivation, fields, onboarding. */
+  userChanges: string[];
+  workspaceMember: { role?: unknown; created?: boolean; reactivated?: boolean; updated?: boolean };
   boards: Array<{ identifier: string; action: string; role?: unknown }>;
   credential: { key_ref: string | null; action: string | null };
   verifiedUser: string | null;
   plane: Record<string, unknown>;
+  /** px's own evidence: "fixture" when its Plane admin channel is a stand-in (PX_PLANE_ADMIN_EXEC). */
+  evidence: "fixture" | "provider" | null;
+}
+
+/** The changes px reports for an existing user and its profile; a created user's own fields are not "changes". */
+function userChangesOf(user: Record<string, any>, profile: Record<string, any>): string[] {
+  const changes: string[] = [];
+  if (user.reactivated === true) changes.push("reactivate user");
+  if (Array.isArray(user.updated) && user.updated.length) changes.push(`update user ${user.updated.map(String).join(", ")}`);
+  if (profile.created === true && user.created !== true) changes.push("create profile");
+  if (Array.isArray(profile.updated) && profile.updated.length) changes.push(`update profile ${profile.updated.map(String).join(", ")}`);
+  return changes;
 }
 
 /** Read px's answer and refuse anything that disagrees with what was asked. The answer carries references only. */
@@ -104,23 +118,28 @@ function readEnrollAnswer(data: Record<string, any>, block: CompanyIdentity, set
     if (data.verified?.users_me !== userId) return { problem: "px did not verify users/me with the new key as the enrolled user" };
   }
   const boards = Array.isArray(data.boards) ? data.boards.filter((b: any) => b && typeof b.identifier === "string").map((b: any) => ({ identifier: String(b.identifier), action: String(b.action ?? "unknown"), ...(b.role !== undefined ? { role: b.role } : {}) })) : [];
+  const profile = data.profile && typeof data.profile === "object" ? data.profile : {};
   return {
     answer: {
-      userId, userCreated: user.created === true || !userId,
+      userId, userCreated: user.created === true || !userId, userChanges: userChangesOf(user, profile),
       workspaceMember: data.workspace_member && typeof data.workspace_member === "object" ? data.workspace_member : {},
       boards, credential: { key_ref: keyRef, action: typeof credential.action === "string" ? credential.action : null },
       verifiedUser: typeof data.verified?.users_me === "string" ? data.verified.users_me : null,
       plane: data.plane && typeof data.plane === "object" ? data.plane : {},
+      evidence: data.evidence === "fixture" || data.evidence === "provider" ? data.evidence : null,
     },
   };
 }
 
 function enrollArgs(block: CompanyIdentity, displayName: string, ownBoards: string[], keyRef: string | undefined, setting: PlaneProvisionSetting, apply: boolean): string[] {
   const [first, ...rest] = displayName.split(/\s+/u).filter(Boolean);
+  const origin = parsePlaneInstance(setting.instance)?.origin;
   return [
     "identity", "enroll", "--email", block.email, "--display-name", displayName,
     ...(first ? ["--first-name", first] : []), ...(rest.length ? ["--last-name", rest.join(" ")] : []),
     ...ownBoards.flatMap(board => ["--admin-board", board]), "--all-boards",
+    // The workspace and API base the binding will name, never whatever px would resolve from its cwd or config.
+    "--workspace", setting.workspace, ...(origin ? ["--base", origin] : []),
     ...(keyRef ? ["--key-ref", keyRef] : []), ...(setting.vault ? ["--vault", setting.vault] : []),
     ...(apply ? ["--apply"] : []), "--json",
   ];
@@ -132,12 +151,14 @@ const SETTLED = new Set(["unchanged", "reused", "existing", "exists", "present",
 const blockerText = (blockers: IdentityBlocker[]): string => blockers.map(b => `${b.code}: ${b.detail}${b.provider_code ? ` [px ${b.provider_code}${b.board ? ` on ${b.board}` : ""}]` : ""}`).join("; ");
 const boardSummary = (boards: EnrollAnswer["boards"]): string => boards.map(b => `${b.identifier}:${b.action}`).join(",") || "none";
 
+export interface PlaneCapabilityOutcome { plane: CapabilityResult; desk: CapabilityResult; /** Every local file the apply wrote (definition, ledgers, receipts, desk). */ writes: string[] }
+
 export interface PlaneCapabilityStep {
   plan: { plane: CapabilityResult; desk: CapabilityResult };
-  apply: () => Promise<{ plane: CapabilityResult; desk: CapabilityResult }>;
+  apply: () => Promise<PlaneCapabilityOutcome>;
 }
 
-const fixed = (plane: CapabilityResult, desk: CapabilityResult): PlaneCapabilityStep => ({ plan: { plane, desk }, apply: async () => ({ plane, desk }) });
+const fixed = (plane: CapabilityResult, desk: CapabilityResult): PlaneCapabilityStep => ({ plan: { plane, desk }, apply: async () => ({ plane, desk, writes: [] }) });
 
 function deskCapability(result: Awaited<ReturnType<typeof projectPlaneKey>>): CapabilityResult {
   const refs: Record<string, string> = { ...(result.profile ? { profile: result.profile } : {}), standing: result.standing, ...(result.to ? { credential_ref: result.to } : {}), ...(result.gateway ? { gateway: result.gateway.action } : {}) };
@@ -147,13 +168,18 @@ function deskCapability(result: Awaited<ReturnType<typeof projectPlaneKey>>): Ca
   return { action: "created", changed: true, detail: `${result.detail}${result.gateway ? `; gateway ${result.gateway.action}: ${result.gateway.detail}` : ""}`, refs };
 }
 
+async function projectDesk(employee: string, noReload: boolean | undefined): Promise<{ desk: CapabilityResult; writes: string[] }> {
+  const projected = await projectPlaneKey(employee, { apply: true, noReload });
+  return { desk: deskCapability(projected), writes: [...projected.writes, ...(projected.receipt ? [projected.receipt] : [])] };
+}
+
 /**
  * Plan (read-only: one px preview) and, on apply, run the plane capability for one enrolled, ACTIVE employee. The caller
  * has already refused a non-active or unenrolled employee.
  */
 export async function planPlaneCapability(employee: string, census: IdentityCensus, target: IdentityDefinition, setting: PlaneProvisionSetting, options: { noReload?: boolean; receipt: (line: Record<string, unknown>) => void }): Promise<PlaneCapabilityStep> {
   const block = target.block!;
-  const evidence = planeEvidence();
+  const ownEvidence = planeEvidence();
   const existing = block.bindings?.plane;
   const ownBoards = ownPlaneBoards(census, target);
   const verification = ownBoards.length ? ownBoards : [setting.verificationBoard];
@@ -167,18 +193,22 @@ export async function planPlaneCapability(employee: string, census: IdentityCens
   const preview = runPx(enrollArgs(block, displayName, ownBoards, existing?.credential_ref, setting, false));
   if (!preview.ok) {
     const detail = preview.kind === "unavailable" ? `provider-unavailable: ${preview.detail}` : `provider-refused [px ${preview.code}]: ${preview.detail}`;
-    return fixed({ action: "blocked", detail, refs: { evidence, ...(preview.kind === "refused" ? { provider_code: preview.code } : {}) } }, deferredDesk);
+    return fixed({ action: "blocked", detail, refs: { evidence: ownEvidence, ...(preview.kind === "refused" ? { provider_code: preview.code } : {}) } }, deferredDesk);
   }
   const read = readEnrollAnswer(preview.data, block, setting, false);
-  if ("problem" in read) return fixed({ action: "blocked", detail: `provider-result-mismatch: ${read.problem}`, refs: { evidence } }, deferredDesk);
+  if ("problem" in read) return fixed({ action: "blocked", detail: `provider-result-mismatch: ${read.problem}`, refs: { evidence: ownEvidence } }, deferredDesk);
   const plan = read.answer;
+  // A stand-in on EITHER side (FLUME_PX_BIN here, PX_PLANE_ADMIN_EXEC in px) makes the whole answer fixture evidence.
+  const evidence = ownEvidence === "fixture" || plan.evidence === "fixture" ? "fixture" : "provider";
   if (existing && plan.userId !== existing.principal) {
     return fixed({ action: "conflict", detail: `binding-conflict: plane is bound to principal ${existing.principal}, but ${block.email} ${plan.userId ? `is native user ${plan.userId}` : "has no Plane user yet"}; rotation is deliberate (unbind by hand first), never a side effect of provisioning`, refs: { evidence, principal: existing.principal } }, deferredDesk);
   }
-  const adopted = Boolean(existing && existing.native_actor_id === existing.principal);
+  // Adopted means Pilot verified THIS key: native_actor_id survives a rotate, so the actor alone would skip re-verification.
+  const adopted = Boolean(existing && existing.native_actor_id === existing.principal && planeAdoptionVerified(block.subject, existing));
   const pending = plan.userCreated || !existing || !adopted
+    || plan.userChanges.length > 0
     || plan.boards.some(b => !SETTLED.has(b.action))
-    || Boolean(plan.workspaceMember.created || plan.workspaceMember.reactivated)
+    || Boolean(plan.workspaceMember.created || plan.workspaceMember.reactivated || plan.workspaceMember.updated)
     || !SETTLED.has(plan.credential.action ?? "")
     || Boolean(plan.credential.key_ref && existing?.credential_ref && plan.credential.key_ref !== existing.credential_ref);
   const refs = { evidence, email: block.email, display_name: displayName, boards: boardSummary(plan.boards), admin_boards: ownBoards.join(",") || "none", verification_boards: verification.join(","), verification_basis: basis, ...(plan.userId ? { user_id: plan.userId } : {}) };
@@ -195,18 +225,25 @@ export async function planPlaneCapability(employee: string, census: IdentityCens
     const planePlan: CapabilityResult = { action: "no-op", detail: `native user ${existing!.principal} enrolled, bound and adopted; memberships and key unchanged`, refs };
     return {
       plan: { plane: planePlan, desk: deskPlan },
-      apply: async () => ({ plane: planePlan, desk: deskPlan.action === "create" ? deskCapability(await projectPlaneKey(employee, { apply: true, noReload: options.noReload })) : deskPlan }),
+      apply: async () => deskPlan.action === "create" ? { plane: planePlan, ...(await projectDesk(employee, options.noReload)) } : { plane: planePlan, desk: deskPlan, writes: [] },
     };
   }
+  // Every gate adopt-actor would apply after the Plane write fires HERE, before it: a refused candidate, an actor another
+  // employee holds, or a conflicting adopted actor must never get a Plane user, memberships and a vaulted key first.
+  const principal = plan.userId ?? existing?.principal;
+  const gate = principal ? planeAdoptionBlockers(census, target, principal) : [];
+  if (gate.length) return fixed({ action: "conflict", detail: `${blockerText(gate)}; refused before any Plane write`, refs: { ...refs, principal: principal! } }, deferredDesk);
   const steps = [plan.userCreated ? `create native user ${block.email} ("${displayName}")` : `adopt existing native user ${plan.userId}`,
+    ...(plan.userChanges.length ? [plan.userChanges.join(", ")] : []),
     `memberships ${boardSummary(plan.boards)} (admin on ${ownBoards.join(", ") || "none"}; member everywhere else)`,
     `key ${plan.credential.action ?? "?"}`,
     existing ? (adopted ? "binding kept" : "adopt the existing binding") : "bind plane (native)",
     `verify on ${verification.join(", ")} (${basis})`];
   const planePlan: CapabilityResult = { action: plan.userCreated ? "create" : "adopt", detail: steps.join("; "), refs };
 
-  const apply = async (): Promise<{ plane: CapabilityResult; desk: CapabilityResult }> => {
-    const blocked = (detail: string, extra: Record<string, string> = {}, changed = false): { plane: CapabilityResult; desk: CapabilityResult } => ({ plane: { action: "blocked", detail, refs: { ...refs, ...extra }, ...(changed ? { changed } : {}) }, desk: deferredDesk });
+  const apply = async (): Promise<PlaneCapabilityOutcome> => {
+    const writes: string[] = [];
+    const blocked = (detail: string, extra: Record<string, string> = {}, changed = false): PlaneCapabilityOutcome => ({ plane: { action: "blocked", detail, refs: { ...refs, ...extra }, ...(changed ? { changed } : {}) }, desk: deferredDesk, writes });
     const ran = runPx(enrollArgs(block, displayName, ownBoards, existing?.credential_ref, setting, true));
     if (!ran.ok) {
       // A refusal after some ORM steps is safe to retry: px converges on the same user, memberships and labelled token.
@@ -215,29 +252,34 @@ export async function planPlaneCapability(employee: string, census: IdentityCens
     const got = readEnrollAnswer(ran.data, block, setting, true);
     if ("problem" in got) return blocked(`provider-result-mismatch: ${got.problem}; nothing bound`, {}, true);
     const answer = got.answer;
+    const appliedEvidence = evidence === "fixture" || answer.evidence === "fixture" ? "fixture" : "provider";
     const userId = answer.userId!, keyRef = answer.credential.key_ref!;
     if (existing && userId !== existing.principal) return blocked(`binding-conflict: px enrolled native user ${userId}, but plane is bound to ${existing.principal}; nothing rebound`, { user_id: userId }, true);
-    const done = { ...refs, user_id: userId, credential_ref: keyRef, credential_action: answer.credential.action ?? "unknown", boards: boardSummary(answer.boards) };
+    const done = { ...refs, evidence: appliedEvidence, user_id: userId, credential_ref: keyRef, credential_action: answer.credential.action ?? "unknown", boards: boardSummary(answer.boards) };
     try {
-      options.receipt({ capability: "plane", employee, handle: block.handle, subject: block.subject, action: answer.userCreated ? "created" : "enrolled", user_id: userId, instance: setting.instance, credential_ref: keyRef, credential_action: answer.credential.action, boards: answer.boards, evidence });
+      options.receipt({ capability: "plane", employee, handle: block.handle, subject: block.subject, action: answer.userCreated ? "created" : "enrolled", user_id: userId, instance: setting.instance, credential_ref: keyRef, credential_action: answer.credential.action, boards: answer.boards, ...(answer.userChanges.length ? { user_changes: answer.userChanges } : {}), evidence: appliedEvidence });
     } catch { /* the Plane write already happened; the binding below is the durable record */ }
 
     let bindNote: string;
     if (!existing) {
       const bound = await bindEmployeeProvider(employee, "plane", { principal: userId, instance: setting.instance, credential_ref: keyRef, attribution_mode: "native" }, { apply: true });
       if (!bound.ok) return blocked(`enrolled at Plane, but the binding was refused: ${blockerText(bound.blockers)}`, done, true);
+      writes.push(...bound.writes);
       bindNote = "bound";
     } else if (existing.credential_ref !== keyRef) {
       const rotated = await rotateEmployeeCredential(employee, "plane", { credentialRef: keyRef, principal: existing.principal }, { apply: true });
       if (!rotated.ok) return blocked(`enrolled at Plane, but the key rotation was refused: ${blockerText(rotated.blockers)}`, done, true);
+      writes.push(...rotated.writes);
       bindNote = `key rotated from ${existing.credential_ref ?? "(none)"} (revoke the old token at Plane by hand)`;
     } else bindNote = "binding unchanged";
 
     const adoption = await adoptNativeActor(employee, "plane", { apply: true, boards: verification });
     if (!adoption.ok) return blocked(`enrolled and ${bindNote}, but adoption failed on ${verification.join(", ")}: ${blockerText(adoption.blockers as IdentityBlocker[])}; rerun to converge`, done, true);
-    const plane: CapabilityResult = { action: answer.userCreated ? "created" : "adopted", changed: true, detail: `native user ${userId} (${block.email}); memberships ${boardSummary(answer.boards)}; key ${answer.credential.action ?? "?"}; ${bindNote}; verified by Pilot on ${verification.join(", ")} (${basis})`, refs: done };
-    const desk = deskCapability(await projectPlaneKey(employee, { apply: true, noReload: options.noReload }));
-    return { plane, desk };
+    writes.push(...adoption.writes, ...("receipt" in adoption && typeof adoption.receipt === "string" ? [adoption.receipt] : []));
+    const plane: CapabilityResult = { action: answer.userCreated ? "created" : "adopted", changed: true, detail: `native user ${userId} (${block.email}); ${answer.userChanges.length ? `${answer.userChanges.join(", ")}; ` : ""}memberships ${boardSummary(answer.boards)}; key ${answer.credential.action ?? "?"}; ${bindNote}; verified by Pilot on ${verification.join(", ")} (${basis})`, refs: done };
+    const projected = await projectDesk(employee, options.noReload);
+    writes.push(...projected.writes);
+    return { plane, desk: projected.desk, writes: [...new Set(writes)] };
   };
   return { plan: { plane: planePlan, desk: deskPlan }, apply };
 }

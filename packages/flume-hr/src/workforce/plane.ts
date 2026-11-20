@@ -19,7 +19,9 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fleetBaseConfigPath } from "./channel";
 import { identityCensus, resolveEmployee } from "./company";
+import { readRef } from "./gateway-desk";
 import { firstLine, githubCredentialRefProblem } from "./github";
 import type { CompanyIdentityBinding } from "./types";
 
@@ -130,13 +132,30 @@ export type PxOutcome =
 const clip = (text: string): string => firstLine(text).slice(0, 300);
 
 /**
- * Run px once. No shell, no retry, and the parent environment passes through unchanged because px needs its own
- * op/shared-key environment to detect a fallback. A missing binary, a timeout or non-JSON stdout is `unavailable`;
- * an exit-1 `{ok:false, code}` is a `refused` carrying px's own code.
+ * The environment every px call Flume makes runs under: the parent's, except `PLANE_API_KEY`, which is pinned to the fleet
+ * base's reference (`<fleet home>/config.yaml` secrets.onepassword.env.PLANE_API_KEY: the shared/operator key) or unset
+ * when the base names none. Pilot counts PLANE_API_KEY as "the shared key px would otherwise fall back to" and refuses an
+ * employee key that resolves to the same user. Inside an employee's own desk PLANE_API_KEY IS that employee's projected
+ * key, so passing it through made every re-provision or adopt-actor run from the desk refuse itself (`shared_identity`,
+ * `operator_identity`). Only the reference text is read here, never a value.
+ */
+export function pxEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const child: NodeJS.ProcessEnv = { ...env };
+  const base = readRef(fleetBaseConfigPath(), "PLANE_API_KEY");
+  if (base.exists && !base.unreadable && base.ref) child.PLANE_API_KEY = base.ref;
+  else delete child.PLANE_API_KEY;
+  return child;
+}
+
+/**
+ * Run px once. No shell, no retry. The parent environment passes through (px needs its own op environment) except
+ * PLANE_API_KEY, which `pxEnv` pins to the fleet base's shared reference so px can still detect a fallback to it. A
+ * missing binary, a timeout or non-JSON stdout is `unavailable`; an exit-1 `{ok:false, code}` is a `refused` carrying
+ * px's own code.
  */
 export function runPx(args: string[], env: NodeJS.ProcessEnv = process.env): PxOutcome {
   const bin = env.FLUME_PX_BIN || "px", timeout = pxTimeoutMs(env);
-  const result = spawnSync(bin, args, { encoding: "utf8", timeout, shell: false, maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"], env });
+  const result = spawnSync(bin, args, { encoding: "utf8", timeout, shell: false, maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"], env: pxEnv(env) });
   if (result.error) {
     const code = (result.error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return { ok: false, kind: "unavailable", detail: "the px binary was not found (set FLUME_PX_BIN, or install Pilot)" };
@@ -260,6 +279,15 @@ export function planeCredentialReport(subject: string, binding: CompanyIdentityB
   if (!latest) return { type: PLANE_CREDENTIAL_SEMANTICS.type, static: true, ...(keyRef ? { ref: keyRef } : {}), verified: false, expiry: { observable: false } };
   const { credential } = latest as { credential: Record<string, unknown> };
   return { ...(withoutLifetime(credential) as Record<string, unknown>), static: true, verified: true, verified_at: latest.at, evidence: latest.evidence, boards: (latest.boards ?? []).map((b: { identifier?: string }) => b.identifier) };
+}
+
+/**
+ * Whether Pilot verified EXACTLY this binding: a `plane.adopt` receipt for the subject naming the current credential_ref,
+ * principal and instance. `native_actor_id == principal` alone is not proof: `flume identity rotate` keeps the adopted
+ * actor while it swaps the key reference, so a rotated (or hand-edited) key reads as adopted until Pilot re-verifies it.
+ */
+export function planeAdoptionVerified(subject: string, binding: CompanyIdentityBinding, env: NodeJS.ProcessEnv = process.env): boolean {
+  return planeCredentialReport(subject, binding, env).verified === true;
 }
 
 // ---------------------------------------------------------------------------

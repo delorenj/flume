@@ -32,6 +32,8 @@ import YAML from "yaml";
  *     false) and
  *     every enabled MoA slot on the gateway (`hermes.gateway-routing`), or some
  *     inference path calls a provider directly;
+ *   - terminal.env_passthrough must name PLANE_API_KEY, or every employee's
+ *     px posts with the operator's key;
  *   - an enabled wake word must not start a new session
  *     (`hermes.wake-word-session`), or a wake silently resets the model.
  */
@@ -76,6 +78,8 @@ export function fleetBaseConfig(homeDir) {
     },
     memory: { provider: "hindsight" },
     agent: { disabled_toolsets: [] },
+    // Each employee's own Plane key reaches its terminal (FLUME-93).
+    terminal: { env_passthrough: ["PLANE_API_KEY"] },
     skills: { external_dirs: [join(homeDir, ".agents", "skills")] },
     platform_toolsets: {
       bloodbank: ["delegation", "skills", "todo", "session_search", "terminal", "file", "web"],
