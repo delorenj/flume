@@ -40,6 +40,7 @@ import { accessReceipts } from "./workforce/receipts";
 import { NO_GATEWAY_RELOAD_ENV } from "./workforce/plane-desk";
 import { PROVISION_GROUPS, provisionEmployee, type ProvisionGroup } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
+import { employeeManifest, formatManifestResult } from "./workforce/manifest";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { channelList, channelOffline, channelOnline, formatChannelList, formatChannelResult } from "./workforce/channel";
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, requestMail, startAccessServer } from "./workforce/access";
@@ -302,12 +303,12 @@ const identityCmd = program
   .command("identity")
   .description("Company identity: one subject and address per employee, on the definition they already own");
 
-async function identityResult(action: () => Promise<{ ok: boolean }>, json: boolean): Promise<void> {
+async function identityResult(action: () => Promise<{ ok: boolean }>, json: boolean, format: (result: Record<string, any>) => string = formatIdentityResult): Promise<void> {
   guardBrokenPipe();
   let result: { ok: boolean };
   try { result = await action(); }
   catch (error) { result = { ok: false, error: (error as Error).message } as { ok: boolean }; }
-  await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : formatIdentityResult(result as Record<string, any>));
+  await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n` : format(result as Record<string, any>));
   await exitAfterFlush(result.ok ? 0 : 1);
 }
 
@@ -374,6 +375,15 @@ identityCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, options) => {
     await identityResult(async () => showEmployeeIdentity(employee), options.json);
+  });
+
+identityCmd
+  .command("manifest")
+  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .description("FLUME-93: which identity-manifest points the employee holds (vault item, gateway key, Plane, inbox, voice, avatar; Telegram optional), from local evidence only — no provider is asked")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    await identityResult(async () => employeeManifest(employee), options.json, formatManifestResult);
   });
 
 identityCmd

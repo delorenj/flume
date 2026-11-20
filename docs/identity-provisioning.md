@@ -320,3 +320,27 @@ recovery claim follows from it.
   project for the employee. `flume remediate hermes.registry-parity` re-projects
   `company_identity` (and each desk's `gateway_consumer`) onto every registry
   row; see "Registry projection for the lifecycle" in `docs/employee-access.md`.
+
+## Identity manifest: which points an employee holds (FLUME-93)
+
+`flume identity manifest <employee> [--json]` evaluates the employee against the latest **identity manifest**, the
+versioned set of identity points every employee is expected to hold (AD-2..AD-6 in
+`_bmad-output/specs/spec-one-command-employee-provisioning/.memlog.md`). Manifest v1 (AD-4):
+
+| point | required | satisfied when (local evidence only) |
+| --- | --- | --- |
+| `vault` 1Password Identity | yes | a `vault-item` receipt for the handle, or the Access binding's item named by an issuance receipt for the handle |
+| `gateway` AAI gateway key | yes | the desk runs its own FLUME-39 consumer: not `hermes`, no drift, no other registry row on it |
+| `plane` Plane identity | yes | `planeDeskRow` standing `own-key`: Pilot-verified native user whose key the desk runs |
+| `inbox` private inbox | yes | status active and a `mailbox-allowlist` receipt for `<handle>@agents.delo.sh` |
+| `voice` | yes | a `voice:` on the definition, or a `tts` voice in the desk delta (the inherited fleet default does not count) |
+| `avatar` | yes | Holocene's avatar index holds a file for the post (`HOLOCENE_AVATAR_DIR`) |
+| `telegram` | no | `flume channel list` standing `online` |
+
+The result carries `manifest {version, latest, adopted}`, every point with `satisfied` and `detail`, `satisfied/total`
+over the required points and `optional {satisfied, total}`. It asks no provider, so "satisfied" means provisioned and
+recorded, not that the provider answers right now (`flume identity credentials` asks). There is no adoption record
+yet, so `adopted` is `null` and every employee is evaluated against the latest manifest. A published manifest is never
+edited: a new point is a new version in `IDENTITY_MANIFESTS` (`workforce/manifest.ts`) plus its evaluator.
+
+The pjangler shell prompt shows the project PM's result (`id v1 5/6`) from this command, refreshed in the background.
