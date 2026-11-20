@@ -104,6 +104,7 @@ const SUITES = [
   "tests/company-identity-lifecycle-regressions.mjs",
   "tests/employee-access-lifecycle-regressions.mjs",
   "tests/channel-offline-regressions.mjs",
+  "tests/plane-enrollment-regressions.mjs",
   "tests/retire-regressions.mjs",
   "tests/macos-portability-regressions.mjs",
   "tests/host-overlay-regressions.mjs",

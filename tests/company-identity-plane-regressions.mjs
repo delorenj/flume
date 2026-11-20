@@ -234,12 +234,12 @@ try {
     const f = fixture("enrollment");
     f.employee("33god-pm", "grolf");
     const noRef = f.json(f.run(["identity", "bind", "33god-pm", "plane", "--principal", GROLF, "--instance", INSTANCE, "--json"]), 1);
-    assert.ok(codes(noRef).includes("manual-enrollment-required"));
+    assert.ok(codes(noRef).includes("plane-enrollment-required"));
     const noBinding = f.json(f.adopt("33god-pm", ["TEST"]), 1);
     assert.deepEqual(codes(noBinding), ["no-provider-binding"]);
     for (const result of [noRef, noBinding]) {
       const text = result.enrollment.prerequisites.join("\n");
-      for (const needle of ["grolf@agents.delo.sh", "sign in once", "personal access token", "expiry", "26-char item uuid", "board", "identity bind", "adopt-actor"]) assert.ok(text.includes(needle), `${needle} in ${text}`);
+      for (const needle of ["identity provision grolf --only plane --apply", "grolf@agents.delo.sh", "sign in once", "personal access token", "expiry", "26-char item uuid", "board", "identity bind", "adopt-actor"]) assert.ok(text.includes(needle), `${needle} in ${text}`);
     }
     assert.equal(f.px.calls().length, 0);
     pass("bind without a credential and adopt without a binding list the manual enrollment prerequisites and call px zero times");

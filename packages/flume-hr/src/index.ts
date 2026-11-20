@@ -36,7 +36,8 @@ import { refreshSchedulingPolicy } from "./workforce/policy-refresh";
 import { updateEmployeePersona } from "./workforce/persona";
 import { employeeContinuity, employeeCredentials, formatLifecycleResult, restoreEmployee, retireEmployee, suspendEmployee } from "./workforce/lifecycle";
 import { accessReceipts } from "./workforce/receipts";
-import { provisionEmployee } from "./workforce/provision";
+import { NO_GATEWAY_RELOAD_ENV } from "./workforce/plane-desk";
+import { PROVISION_GROUPS, provisionEmployee, type ProvisionGroup } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { channelList, channelOffline, channelOnline, formatChannelList, formatChannelResult } from "./workforce/channel";
@@ -400,18 +401,23 @@ identityCmd
 identityCmd
   .command("provision")
   .argument("<employee>", "Registry id, unhired specialist, or person name")
-  .description("FLUME-56: live provider accounts for an enrolled employee — Access service token, mailbox rule + allowlist, vault item (preview unless --apply)")
+  .description("FLUME-56/62: live accounts for an enrolled employee — Access service token, mailbox rule + allowlist, vault item, and the employee's own native Plane user (Pilot enrolls it; Flume binds, adopts and projects the key into the desk) (preview unless --apply)")
   .option("--apply", "Perform the provider mutations (default is a preview)")
+  .option("--only <capability>", "Run only this capability group: access (Cloudflare, mailbox, vault) or plane (native Plane user, binding, adoption, desk key). Repeatable. Without it, plane runs only when the provisioning config has a plane: block", (value: string, previous: string[] = []) => [...previous, value], [] as string[])
+  .option("--no-reload", "Plane desk projection: write and render the desk, do not cycle the running gateway profile")
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, options) => {
-    await identityResult(() => provisionEmployee(employee, { apply: Boolean(options.apply) }), options.json);
+    const only = (options.only ?? []) as string[];
+    const unknown = only.filter(group => !(PROVISION_GROUPS as readonly string[]).includes(group));
+    if (unknown.length) { console.error(`error: --only takes ${PROVISION_GROUPS.join(" or ")}, not ${unknown.join(", ")}`); process.exitCode = 2; return; }
+    await identityResult(() => provisionEmployee(employee, { apply: Boolean(options.apply), only: only as ProvisionGroup[], noReload: options.reload === false }), options.json);
   });
 
 identityCmd
   .command("bind")
   .argument("<employee>", "Registry id, unhired specialist, or person name")
   .argument("<provider>", "Provider key, e.g. github or plane")
-  .description("FLUME-50/52: bind one provider principal to an enrolled employee, by reference only (preview unless --apply). github: principal = App ID, instance = installation ID, credential-ref = op://<vault>/<item-uuid>/<field-id> of the App private key. plane: principal = the native Plane user UUID, instance = https://<host>/<workspace>, credential-ref = the employee's own PAT by item UUID and field ID (Flume never creates a Plane user or token)")
+  .description("FLUME-50/52: bind one provider principal to an enrolled employee, by reference only (preview unless --apply). github: principal = App ID, instance = installation ID, credential-ref = op://<vault>/<item-uuid>/<field-id> of the App private key. plane: principal = the native Plane user UUID, instance = https://<host>/<workspace>, credential-ref = the employee's own PAT by item UUID and field ID (to have the user and key created for you, use `identity provision --only plane`)")
   .option("--principal <id>", "Provider principal (github: the numeric App ID; plane: the native user UUID)")
   .option("--instance <id>", "Provider instance (github: the numeric installation ID; plane: https://<host>/<workspace-slug>)")
   .option("--credential-ref <ref>", "op:// reference to the credential; never a value")
@@ -1037,6 +1043,7 @@ program
   .option("--all", "Correct every fixable failing rule, and report each one it may not touch")
   .option("--register-projects", "Authorize org.project-records to create the project records it reports; without it that rule only says what it would register")
   .option("--scripts-only", "hermes.pm-scaffold only: refresh the role's .scripts/ and nothing else (no SOUL compose, wrapper, .gitignore, runtime seed, profile metadata or registry row)")
+  .option("--no-reload", "org.plane-credential only: write and render the desks, do not cycle the running gateway profiles (then run hermes-gateway-restart --reason ... once)")
   .option("--dry-run", "Report what would change without changing it")
   .option("--json", "Output machine-parseable JSON")
   .action(async (finding: string | undefined, repo: string | undefined, options) => {
@@ -1059,6 +1066,7 @@ program
     // shape, shared by every recipe, and this authorization belongs to one rule.
     if (options.registerProjects) process.env[REGISTER_PROJECTS_ENV] = "1";
     if (options.scriptsOnly) process.env[SCAFFOLD_SCRIPTS_ONLY_ENV] = "1";
+    if (options.reload === false) process.env[NO_GATEWAY_RELOAD_ENV] = "1";
     if (options.agent) scopeEmployee(resolve(repo ?? process.cwd()), options.agent, options.all ? [] : [finding!]);
     const report = options.all
       ? await runFullRemediation(repo, Boolean(options.dryRun))

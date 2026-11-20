@@ -243,6 +243,23 @@ async function confirmState(key: string, want: "offline" | "online", since: numb
   }
 }
 
+/**
+ * unserve then serve ONE profile through the gateway control socket: its adapters are stopped and rebuilt from the file
+ * just rendered, and the gateway drops the profile's secret snapshot on unserve, so the next serve re-pulls every
+ * `secrets.onepassword.env` reference (gateway/run_profile_reconcile.py). Other profiles are untouched. Never falls back to
+ * a restart: the caller decides that (a channel does; a desk key batches one `hermes-gateway-restart` for the operator).
+ */
+export async function cycleProfileViaSocket(profile: string): Promise<{ ok: boolean; detail: string }> {
+  const socket = join(fleetHome(), "gateway.sock");
+  if (!existsSync(socket)) return { ok: false, detail: "no gateway control socket" };
+  const down = await controlRequest(socket, "unserve-profile", { name: profile }, 10_000);
+  // "not served" is fine: nothing to stop, and serve below starts it from the new config.
+  if (!down.ok && !/not served/u.test(down.error ?? "")) return { ok: false, detail: `unserve-profile: ${down.error}` };
+  const up = await controlRequest(socket, "serve-profile", { name: profile }, 20_000);
+  if (!up.ok) return { ok: false, detail: `serve-profile: ${up.error}` };
+  return { ok: true, detail: `cycled profile ${profile} through the gateway control socket (other profiles untouched)${up.result?.pending ? "; the gateway reported the start as still pending" : ""}` };
+}
+
 async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offline" | "online", options: ChannelOptions): Promise<GatewayPickup> {
   const gateway = readGateway();
   const key = `${employee.profile}:${platform}`;
@@ -252,22 +269,13 @@ async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offl
   }
   const since = Date.now();
   const waitMs = options.confirmMs ?? (Number(process.env.FLUME_CHANNEL_CONFIRM_MS) || 20_000);
-  const socket = join(fleetHome(), "gateway.sock");
   let detail = "";
-  if (existsSync(socket)) {
-    // unserve then serve: one profile's adapters are stopped and rebuilt from the file just rendered.
-    const down = await controlRequest(socket, "unserve-profile", { name: employee.profile }, 10_000);
-    // "not served" is fine: nothing to stop, and serve below starts it from the new config.
-    if (!down.ok && !/not served/u.test(down.error ?? "")) detail = `unserve-profile: ${down.error}`;
-    else {
-      const up = await controlRequest(socket, "serve-profile", { name: employee.profile }, 20_000);
-      if (up.ok) {
-        const seen = await confirmState(key, want, since, waitMs);
-        return { action: "profile-cycle", confirmed: seen.confirmed, state: seen.state, detail: `cycled profile ${employee.profile} through the gateway control socket (other profiles untouched)${up.result?.pending ? "; the gateway reported the start as still pending" : ""}` };
-      }
-      detail = `serve-profile: ${up.error}`;
-    }
-  } else detail = "no gateway control socket";
+  const cycled = await cycleProfileViaSocket(employee.profile);
+  if (cycled.ok) {
+    const seen = await confirmState(key, want, since, waitMs);
+    return { action: "profile-cycle", confirmed: seen.confirmed, state: seen.state, detail: cycled.detail };
+  }
+  detail = cycled.detail;
   if (isLaunchdHost(hostPlatform())) {
     // A launchd host has no `hermes-gateway` unit. Hermes restarts its own LaunchAgent;
     // a bare kickstart of the label is the fallback when the CLI is not on PATH or refuses.
@@ -377,6 +385,24 @@ function transact(request: Record<string, unknown>): { ok: boolean; error?: stri
   if (run.status === 0 && parsed.ok === true) return { ok: true, writes: [parsed.delta, parsed.generated, parsed.registry].filter((p): p is string => typeof p === "string") };
   return { ok: false, code: parsed.code, error: parsed.error ?? (run.stderr || run.error?.message || `channel-state exited ${run.status}`).trim(), writes: [] };
 }
+
+/**
+ * Set `secrets.onepassword.env` references on ONE desk's delta and re-render its generated config through the canonical
+ * renderer, under the registry and profile locks, with rollback (scripts/channel-state.py `mode: desk-refs`). References
+ * only: no value passes through. `expect` maps each key to the reference the plan saw (null = absent) and refuses a stale plan.
+ */
+export function writeDeskRefs(profile: string, refs: Record<string, string>, expect: Record<string, string | null>): { ok: boolean; error?: string; code?: string; writes: string[] } {
+  return transact({ mode: "desk-refs", profile_name: profile, delta_refs: refs, expect_refs: expect });
+}
+
+/** `<fleet home>/profiles/<profile>`, the employee's desk. */
+export function deskDirOf(profile: string): string { return join(fleetHome(), "profiles", profile); }
+
+/** The fleet base config (`<fleet home>/config.yaml`). */
+export function fleetBaseConfigPath(): string { return join(fleetHome(), "config.yaml"); }
+
+/** Every desk whose delta maps some env key to `ref`, except `exceptProfile`. */
+export function desksUsingRef(ref: string, exceptProfile: string): string[] { return profilesUsingRef(ref, exceptProfile); }
 
 function blocked(base: Omit<ChannelResult, "ok" | "blockers" | "writes" | "warnings" | "changed">, blockers: ChannelBlocker[], warnings: string[] = []): ChannelResult {
   return { ...base, ok: false, changed: false, writes: [], blockers, warnings };

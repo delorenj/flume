@@ -52,9 +52,16 @@ export const PLANE_CREDENTIAL_SEMANTICS = Object.freeze({
   },
 });
 
-/** Everything an operator does by hand before `bind`; Flume never mints a Plane user or token. */
+/**
+ * How an employee gets its OWN native Plane identity. The one command is `flume identity provision <e> --only plane
+ * --apply`: Pilot (`px identity enroll`, which owns every Plane write) creates the user, memberships and vaulted
+ * personal access token, then Flume binds, adopts and projects the key into the employee's desk. The manual steps remain
+ * the fallback when Pilot's enrollment is not installed; either way Flume itself opens no Plane connection.
+ */
 export function planeEnrollmentPrerequisites(handle = "<handle>"): string[] {
   return [
+    `run: flume identity provision ${handle} --only plane --apply (Pilot enrolls the user, board memberships and vaulted key; Flume then binds, adopts and projects the key into the desk)`,
+    "or by hand, when Pilot's enrollment is unavailable:",
     `invite ${handle}@agents.delo.sh to the Plane workspace, or let it self-sign-up`,
     "sign in once as that user",
     "the employee creates its OWN personal access token in the browser (Profile > Personal Access Tokens) and records the expiry it chose",

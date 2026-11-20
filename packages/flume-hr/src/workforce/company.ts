@@ -472,7 +472,7 @@ export async function bindProvider(employee: string, provider: string, input: Bi
       problem("invalid-binding", detail);
     }
     if (!input.credentialRef) {
-      problem("manual-enrollment-required", "no --credential-ref: Flume cannot create a Plane user or mint its token. The employee enrolls by hand (see enrollment.prerequisites), then binds by reference");
+      problem("plane-enrollment-required", "no --credential-ref: bind records a key that already exists. `flume identity provision <employee> --only plane --apply` has Pilot enroll the Plane user and vault its key, then binds and adopts in one step (see enrollment.prerequisites for the manual fallback)");
       let handle: string | undefined;
       try { handle = resolveEmployee(identityCensus(), employee).block?.handle; } catch { /* the bind itself reports an unknown employee */ }
       enrollment = { prerequisites: planeEnrollmentPrerequisites(handle) };

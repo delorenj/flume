@@ -73,6 +73,48 @@ stay unverified and never authorize a DELETE or complete-revocation claim.
 Neither retirement nor preview clears vault fields; any such repair still needs
 the separate owner-approved procedure below.
 
+## The plane capability: a native Plane user that comments as itself (FLUME-62)
+
+`flume identity provision <employee> --only plane [--apply] [--no-reload]` takes an enrolled, **active** employee
+the rest of the way: a native Plane user, board memberships and a vaulted key, bound, adopted and running at its desk.
+Pilot owns every Plane write; Flume opens no Plane connection and shells out to `px` (`FLUME_PX_BIN` is the test seam).
+
+| step | who | what |
+| --- | --- | --- |
+| preview | `px identity enroll --email <company email> --display-name <name> [--first-name --last-name] --admin-board <own board> ... --all-boards [--key-ref <bound credential_ref>] [--vault <vault>] --json` | read-only plan: user, memberships, key. A binding to a **different principal or instance** is `binding-conflict` here, before anything is written |
+| enroll | same with `--apply` | user and workspace membership, admin on the employee's own board(s) (its registry rows' `plane.identifier`) and member on every other, a personal access token vaulted by Pilot (`op://<vault>/<26-char item uuid>/<field id>`, never a value in argv or output), verified with users/me |
+| bind | `flume identity bind` path | `principal` = the user id, `instance` = `plane.instance` (default `https://plane.delo.sh/33god`), `credential_ref` = px's `key_ref`, `attribution_mode: native`. The same principal with a **new** key goes through `identity rotate` instead (the old token is reported manual-action-required) |
+| adopt | `flume identity adopt-actor plane` path | Pilot verifies the key on the employee's own board(s); an employee with none (a portable specialist) is verified on `plane.verification_board` (default `33GOD`). The result names which (`verification_basis: own-board` or `default-board`) |
+| desk | `plane-desk` capability | `secrets.onepassword.env.PLANE_API_KEY` in the desk's `config.delta.yaml` becomes the binding's `credential_ref`; the generated `config.yaml` is re-rendered by the canonical renderer; **only that profile** is cycled through the gateway control socket (`unserve-profile`, `serve-profile`) |
+
+Every step converges: a rerun on an enrolled, adopted employee whose desk runs its own key is a pure no-op (one px
+preview, nothing written). Why the desk step exists: a desk inherits the fleet base's `PLANE_API_KEY`, which is the
+operator's, so an adopted identity still comments as the operator until its desk carries its own reference.
+
+- **Opt-in.** The capability runs when the provisioning config carries a `plane:` block
+  (`plane: { instance: https://plane.delo.sh/33god, verification_board: 33GOD }`) or when asked for with
+  `--only plane` (which needs no Cloudflare config). Otherwise it reports `plane: deferred`; that is neither a change nor a failure.
+- **No restart, ever.** Projection never restarts the gateway. With no running gateway the desk runs its key when it
+  next starts; with `--no-reload` (or a socket that refuses) the result says `NOT picked up` and to run
+  `hermes-gateway-restart --reason "plane keys projected"` once, after the last projection.
+- **Out of scope for the desk step:** suspended and retired employees are never projected (and reported, with a
+  warning when their desk still runs their own key); an employee without an adopted binding stays on the shared key
+  (`shared-key: not yet enrolled`, a fact not a failure); a key reference already mapped in another desk is refused.
+- **Failure modes** keep px's own code: `provider-refused [px not_employee_email | operator_identity | admin_exec_unavailable |
+  unknown_board | vault_write_failed | verification_failed]`, `provider-unavailable` (no binary, timeout, non-JSON),
+  `provider-result-mismatch` (px answered something other than what was asked: another email, workspace, no
+  `shared_key_fallback: false`, an unusable `key_ref`). After a partial failure, rerun: px converges on the same user,
+  memberships and labelled token.
+- A person without a name cannot be enrolled (`unnamed-post`): give the post an `identity.name` first.
+
+### Host rule: `org.plane-credential`
+
+`flume audit` fails this host-scoped rule when an adopted, active employee's desk runs another key, and
+`flume remediate org.plane-credential [--dry-run] [--no-reload]` projects each own key (the same write the provision
+step does, one profile cycled per desk). The audit also lists own-key desks, desk-less employees and shared-key
+employees, and fails on a collision or on a suspended/retired employee whose desk still runs its own key
+(`needs an operator`: park the desk or rotate the key).
+
 ## Configuration
 
 `~/.config/flume/identity-provisioning.yaml` (override:
@@ -96,6 +138,9 @@ mailbox:
   kv_namespace_id: <32-hex>      # its MAILBOX_ALLOWLIST namespace
 onepassword:
   vault: DeLoSecrets
+plane:                           # optional: opts the plane capability in (see above)
+  instance: https://plane.delo.sh/33god
+  verification_board: 33GOD      # optional; for an employee with no board of its own
 ```
 
 ## Access policy membership (FLUME-57)
@@ -240,8 +285,8 @@ recovery claim follows from it.
 ## Boundaries
 
 - No GitHub App creation (the manifest flow needs an authenticated browser
-  session — the ego-browser skill owns that leg), no Plane member provisioning
-  (FLUME-49's successor story 1.6 found the installed edition cannot), no
+  session — the ego-browser skill owns that leg), no Plane write of its own (the
+  `plane` capability above has Pilot's `px identity enroll` do it), no
   sending mail, no GPG (deferred: story 1.5 proves authorship via the provider
   API, not commit signing).
 - Revocation, suspension, rotation and retirement generally belong to FLUME-53

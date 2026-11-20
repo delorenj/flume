@@ -331,7 +331,9 @@ const desk = () => YAML.parse(readFileSync(join(deskDir, "agent.yaml"), "utf8"))
   assert.equal(cf.deleted.length, 0, "stale cached state deleted a live token");
   assert.equal(again.ok, true);
   assert.equal(again.changed, false);
-  for (const cap of Object.values(again.capabilities)) assert.equal(cap.action, "no-op", JSON.stringify(cap));
+  // The plane capability is opt-in (no plane: block in this config): reported deferred, never run, never a change.
+  assert.equal(again.capabilities.plane.action, "deferred", JSON.stringify(again.capabilities.plane));
+  for (const [name, cap] of Object.entries(again.capabilities)) if (name !== "plane") assert.equal(cap.action, "no-op", JSON.stringify(cap));
   assert.equal(cf.tokens.length, 1, "second apply minted another token");
   assert.equal(cf.rules.length, 1, "second apply created another rule");
   pass("apply provisions token + rule + allowlist + vault item + binding; second apply is a no-op");

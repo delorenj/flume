@@ -33,6 +33,10 @@
  *   org.identity-conflict  never automatic. No tool can decide which of two
  *                          agents owns a repository. It reports the two real
  *                          resolutions and stops.
+ *   org.plane-credential   an employee whose native Plane identity is adopted
+ *                          runs its OWN key: config.delta PLANE_API_KEY =
+ *                          the binding's credential_ref, re-rendered, that
+ *                          one profile cycled (workforce/plane-desk.ts).
  *
  * RESTRAINT IS INHERITED, not re-argued. `hermes.registry-parity` refuses to
  * prune unprovisioned rows ("report, never delete"); nothing here deletes a
@@ -60,6 +64,7 @@ import { loadFleetContract, resolveFleetContractPath, validateFleetContract } fr
 import { collectFleetInventory, resolveInventoryStores, resolveProfileLayout } from "../org/inventory";
 import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import type { FleetInventory, FleetInventoryFinding } from "../org/types";
+import { PLANE_CREDENTIAL_CHECK, PLANE_CREDENTIAL_RULE } from "../workforce/plane-desk";
 
 /**
  * The rules an operator may ask this recipe to RUN.
@@ -75,6 +80,7 @@ export const ORG_REMEDIABLE_RULES: ReadonlySet<string> = new Set([
   "org.profile-path",
   "org.runtime-path",
   "org.project-records",
+  PLANE_CREDENTIAL_RULE,
 ]);
 
 /**
@@ -899,7 +905,9 @@ const IDENTITY_CONFLICT: RecipeCheck = {
 // ---------------------------------------------------------------------------
 
 export function createOrgReconcileChecks(): RecipeCheck[] {
-  return [BOARD_PROJECTION, PROFILE_PATH, RUNTIME_PATH, PROJECT_RECORDS, IDENTITY_CONFLICT];
+  // org.plane-credential (workforce/plane-desk.ts): an employee with an adopted native Plane identity must RUN its own
+  // key at its desk. It reads the identity census and the desks, not the inventory, so it lives beside its writer.
+  return [BOARD_PROJECTION, PROFILE_PATH, RUNTIME_PATH, PROJECT_RECORDS, IDENTITY_CONFLICT, PLANE_CREDENTIAL_CHECK];
 }
 
 /**

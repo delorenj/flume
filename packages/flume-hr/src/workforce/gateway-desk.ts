@@ -39,14 +39,14 @@ export function gatewayRefShape(): string {
 /** What one desk config file says about the gateway key. A symlink, a non-file or bad YAML is `unreadable`, never "no key". */
 export type RefRead = { exists: false } | { exists: true; ref?: string; unreadable?: true };
 
-export function readRef(path: string): RefRead {
+export function readRef(path: string, envKey = "AUTOMATICAI_GATEWAY_KEY"): RefRead {
   let info;
   try { info = lstatSync(path); }
   catch (error) { return (error as NodeJS.ErrnoException).code === "ENOENT" ? { exists: false } : { exists: true, unreadable: true }; }
   if (info.isSymbolicLink() || !info.isFile()) return { exists: true, unreadable: true };
   try {
     const doc = YAML.parse(readFileSync(path, "utf8")) as { secrets?: { onepassword?: { env?: Record<string, unknown> } } } | null;
-    const ref = doc?.secrets?.onepassword?.env?.AUTOMATICAI_GATEWAY_KEY;
+    const ref = doc?.secrets?.onepassword?.env?.[envKey];
     return { exists: true, ...(typeof ref === "string" ? { ref } : {}) };
   } catch { return { exists: true, unreadable: true }; }
 }

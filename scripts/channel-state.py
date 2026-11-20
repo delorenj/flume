@@ -8,7 +8,11 @@ writes the profile DELTA, renders that ONE profile through the canonical rendere
 (`hermes-profile-config.py`, never an absorb), and writes the registry row last. A failure at
 any step puts every file back byte for byte.
 
-stdin  : one JSON request (see `apply`)
+A second mode, ``"mode": "desk-refs"`` (see `apply_desk_refs`), sets only
+``secrets.onepassword.env`` references on one desk (the employee's own Plane key) under the same
+locks and render, without reading or writing the registry.
+
+stdin  : one JSON request (see `apply` / `apply_desk_refs`)
 stdout : one JSON result. `ok: false` carries `code` and `error`; exit 1.
 
 It never reads, resolves, or prints a credential: references are `op://` strings and are
@@ -308,10 +312,99 @@ def apply(req: dict) -> dict:
     }
 
 
+def apply_desk_refs(req: dict) -> dict:
+    """``mode: desk-refs``: set ``secrets.onepassword.env`` references on ONE desk and nothing else.
+
+    The employee's own Plane key (``flume`` org.plane-credential / ``identity provision``) is a desk fact,
+    not a channel: no registry row is read or written and no platform is toggled, so a portable specialist
+    with no registry row is served the same way. Same locks (registry, then the renderer's profile lock),
+    same canonical render of the one profile, same byte-for-byte rollback as ``apply``.
+
+    ``expect_refs`` maps an env key to the reference the plan saw in the delta (``None`` = absent); any
+    difference is a ``stale-plan`` refusal, so a concurrent edit is never overwritten.
+    """
+    fleet = Path(req["fleet_home"])
+    registry = Path(req["registry"])
+    profile_name = req["profile_name"]
+    if not PROFILE_NAME.fullmatch(profile_name or ""):
+        raise Refusal("invalid-profile", f"invalid profile name: {profile_name!r}")
+    refs = req.get("delta_refs") or {}
+    if not isinstance(refs, dict) or not refs:
+        raise Refusal("invalid-request", "desk-refs needs at least one delta_refs entry")
+    for key, ref in refs.items():
+        if not isinstance(key, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", key):
+            raise Refusal("invalid-request", f"invalid env key: {key!r}")
+        if not isinstance(ref, str) or not OP_REF.fullmatch(ref):
+            raise Refusal("invalid-reference", "a credential reference must be op://<vault>/<item>/<field>")
+    r = load_renderer(Path(req["renderer"]), fleet, registry)
+    pdir = r.PROFILES / profile_name
+    if pdir.is_symlink() or not pdir.is_dir():
+        raise Refusal("desk", f"profile must be a real directory: {pdir}")
+    delta_path = pdir / "config.delta.yaml"
+    generated_path = pdir / "config.yaml"
+
+    with RegistryLock(registry):
+        with r.PROFILE_LOCK.ProfileConfigLock(pdir):
+            delta_before = read_bytes(delta_path)
+            gen_before = read_bytes(generated_path)
+            try:
+                delta = r.load_yaml(delta_path)
+            except SystemExit as exc:
+                raise Refusal("delta-unreadable", str(exc))
+            if not isinstance(delta, dict):
+                raise Refusal("delta-shape", "config.delta.yaml is not a mapping")
+            secrets = delta.get("secrets")
+            current_env = {}
+            if isinstance(secrets, dict) and isinstance(secrets.get("onepassword"), dict) and isinstance(secrets["onepassword"].get("env"), dict):
+                current_env = secrets["onepassword"]["env"]
+            for key, want in (req.get("expect_refs") or {}).items():
+                if current_env.get(key) != want:
+                    raise Refusal("stale-plan", f"{profile_name}: delta {key} changed since the plan")
+            onepassword = delta.setdefault("secrets", {})
+            if not isinstance(onepassword, dict):
+                raise Refusal("delta-shape", "secrets in the delta is not a mapping")
+            onepassword = onepassword.setdefault("onepassword", {})
+            if not isinstance(onepassword, dict):
+                raise Refusal("delta-shape", "secrets.onepassword in the delta is not a mapping")
+            onepassword.setdefault("enabled", True)
+            env = onepassword.setdefault("env", {})
+            if not isinstance(env, dict):
+                raise Refusal("delta-shape", "secrets.onepassword.env in the delta is not a mapping")
+            env.update(refs)
+            delta_after = render_delta(delta, delta_before)
+
+            base = r.load_yaml(r.BASE)
+            expected = r.expected_config(base, delta, pdir)
+            written: list[tuple[Path, bytes | None, int]] = []
+            try:
+                backup = r.backup([generated_path, delta_path], "desk-refs")
+                write_atomic(delta_path, delta_after, 0o600)
+                written.append((delta_path, delta_before, file_mode(delta_path, 0o600)))
+                r.write_generated(generated_path, expected)
+                written.append((generated_path, gen_before, file_mode(generated_path, 0o600)))
+            except BaseException:
+                for path, content, mode in reversed(written):
+                    try:
+                        if content is None:
+                            path.unlink(missing_ok=True)
+                        else:
+                            write_atomic(path, content, mode)
+                    except OSError:
+                        pass
+                raise
+    return {
+        "ok": True,
+        "profile": profile_name,
+        "delta": str(delta_path),
+        "generated": str(generated_path),
+        "backup": str(backup) if backup else None,
+    }
+
+
 def main() -> int:
     try:
         request = json.load(sys.stdin)
-        result = apply(request)
+        result = apply_desk_refs(request) if request.get("mode") == "desk-refs" else apply(request)
     except Refusal as exc:
         print(json.dumps({"ok": False, "code": exc.code, "error": str(exc)}))
         return 1

@@ -28,6 +28,7 @@ export { pendingAccessIssuance, provisionStateDir } from "./access-issuance";
 import { accessRevocationConflict, bindEmployeeProvider, identityCensus, resolveEmployee, type IdentityBlocker, type IdentityDefinition } from "./company";
 import { provisioningConfigProblems, COMPANY_MAIL_DOMAIN } from "./validator";
 import { withRegistryLock } from "./role";
+import { planPlaneCapability, planeProvisionSetting, type PlaneCapabilityStep } from "./plane-provision";
 import { policyHasToken, policyWritableDigest, readAccessPolicy, reconcileAccessPolicy } from "./access-policy";
 
 export interface ProvisioningConfig {
@@ -38,11 +39,19 @@ export interface ProvisioningConfig {
   };
   mailbox: { worker: string; kv_namespace_id: string };
   onepassword: { vault: string };
+  /** FLUME-62: opts the plane capability in; the workspace employees are enrolled into. */
+  plane?: { instance: string; verification_board?: string };
 }
 
-export interface ProvisionOptions { apply?: boolean }
+export interface ProvisionOptions {
+  apply?: boolean;
+  /** Run only these capability groups (default: all; the plane group only when the config has a `plane:` block). */
+  only?: ProvisionGroup[];
+  /** Plane desk projection: write and render, leave the running gateway alone. */
+  noReload?: boolean;
+}
 
-type CapabilityAction = "no-op" | "create" | "adopt" | "created" | "adopted" | "deleted-orphan" | "conflict" | "blocked";
+export type CapabilityAction = "no-op" | "create" | "adopt" | "created" | "adopted" | "deleted-orphan" | "conflict" | "blocked" | "deferred";
 export interface CapabilityResult { action: CapabilityAction; detail: string; refs?: Record<string, string>; changed?: boolean }
 
 export function provisioningConfigPath(): string {
@@ -402,25 +411,11 @@ function planVaultItem(config: ProvisioningConfig, block: NonNullable<IdentityDe
 // The command
 // ---------------------------------------------------------------------------
 
-export async function provisionEmployee(employee: string, options: ProvisionOptions = {}) {
-  const blockers: IdentityBlocker[] = [];
-  const census = identityCensus();
-  const target = resolveEmployee(census, employee);
-  if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
-  else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
-  else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; run flume identity enroll ${employee} --apply first` });
-  else if (target.block.status !== "active") blockers.push({ code: `employee-${target.block.status}`, detail: `the employee is ${target.block.status}; provisioning is for active employees` });
-
-  let config: ProvisioningConfig | null = null;
-  try { config = loadProvisioningConfig(); } catch (error) { blockers.push({ code: "invalid-config", detail: (error as Error).message }); }
-
-  const base = { employee, kind: target.kind, definition: target.path, person: target.person, apply: Boolean(options.apply) };
-  if (blockers.length || !target.block || !config) return { ok: false, changed: false, capabilities: {}, blockers, writes: [] as string[], ...base };
-  const block = target.block;
-
+/** The Cloudflare/1Password half: vault item, Access token, Access policy membership and mailbox. Plans (GETs only) unless `apply`. */
+async function provisionAccessGroup(employee: string, census: ReturnType<typeof identityCensus>, block: NonNullable<IdentityDefinition["block"]>, config: ProvisioningConfig, apply: boolean): Promise<{ blocker?: IdentityBlocker; capabilities: Record<string, CapabilityResult> }> {
   let cfToken: string | null = null;
   try { cfToken = opRead(config.cloudflare.api_token_ref); }
-  catch (error) { return { ok: false, changed: false, capabilities: {}, blockers: [...blockers, { code: "credential-unavailable", detail: (error as Error).message }], writes: [] as string[], ...base }; }
+  catch (error) { return { blocker: { code: "credential-unavailable", detail: (error as Error).message }, capabilities: {} }; }
 
   // Plan against live remote state (GETs only), then apply in an order that
   // never leaves a secret-bearing resource without its vault home.
@@ -445,12 +440,7 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
           ? { action: "no-op", detail: "actual token ID is included in the configured policy", refs: { token_id: tokenId } }
           : { action: "adopt", detail: "include the actual employee token ID in the configured Service Auth policy and read back" };
 
-  if (!options.apply) {
-    const capabilities = { "vault-item": vaultItem.plan, "access-token": access.plan, "access-policy": policyPlan, mailbox: mailbox.plan };
-    const planned = Object.values(capabilities).some(c => c.action === "create" || c.action === "adopt");
-    const conflicted = Object.values(capabilities).some(c => c.action === "conflict" || c.action === "blocked");
-    return { ok: !conflicted, changed: planned, capabilities, blockers, writes: [] as string[], note: "Preview only — provider reads, no writes. Pass --apply to provision.", ...base };
-  }
+  if (!apply) return { capabilities: { "vault-item": vaultItem.plan, "access-token": access.plan, "access-policy": policyPlan, mailbox: mailbox.plan } };
 
   const capabilities: Record<string, CapabilityResult> = {};
   const applySafely = async (step: { apply: () => Promise<CapabilityResult> }): Promise<CapabilityResult> => {
@@ -507,6 +497,63 @@ export async function provisionEmployee(employee: string, options: ProvisionOpti
     });
   } });
   capabilities["mailbox"] = ["create", "adopt"].includes(mailbox.plan.action) ? await applySafely(mailbox) : mailbox.plan;
+  return { capabilities };
+}
+
+export type ProvisionGroup = "access" | "plane";
+export const PROVISION_GROUPS: readonly ProvisionGroup[] = ["access", "plane"];
+
+export async function provisionEmployee(employee: string, options: ProvisionOptions = {}) {
+  const blockers: IdentityBlocker[] = [];
+  const census = identityCensus();
+  const target = resolveEmployee(census, employee);
+  if (target.missing) blockers.push({ code: "invalid-definition", detail: `definition not found: ${target.path}`, path: target.path });
+  else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
+  else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; run flume identity enroll ${employee} --apply first` });
+  else if (target.block.status !== "active") blockers.push({ code: `employee-${target.block.status}`, detail: `the employee is ${target.block.status}; provisioning is for active employees` });
+
+  // `--only plane` needs no Cloudflare configuration; the default runs both groups, the plane one only when configured.
+  const only = options.only?.length ? options.only : undefined;
+  const wantAccess = !only || only.includes("access");
+  const wantPlane = !only || only.includes("plane");
+  const explicitPlane = Boolean(only?.includes("plane"));
+  const configPath = provisioningConfigPath();
+  let config: ProvisioningConfig | null = null;
+  if (wantAccess || existsSync(configPath)) {
+    try { config = loadProvisioningConfig(configPath); } catch (error) { blockers.push({ code: "invalid-config", detail: (error as Error).message }); }
+  }
+
+  const base = { employee, kind: target.kind, definition: target.path, person: target.person, apply: Boolean(options.apply) };
+  if (blockers.length || !target.block || (wantAccess && !config)) return { ok: false, changed: false, capabilities: {}, blockers, writes: [] as string[], ...base };
+  const block = target.block;
+
+  let planeStep: PlaneCapabilityStep | null = null;
+  let planeDeferred: string | null = null;
+  if (wantPlane) {
+    const setting = planeProvisionSetting(config, explicitPlane, configPath);
+    if ("deferred" in setting) {
+      if (explicitPlane) return { ok: false, changed: false, capabilities: {}, blockers: [{ code: "invalid-config", detail: setting.deferred }], writes: [] as string[], ...base };
+      planeDeferred = setting.deferred;
+    } else planeStep = await planPlaneCapability(employee, census, target, setting, { noReload: options.noReload, receipt });
+  }
+
+  // Plan against live remote state (GETs only), then apply in an order that
+  // never leaves a secret-bearing resource without its vault home.
+  const access = wantAccess ? await provisionAccessGroup(employee, census, block, config!, Boolean(options.apply)) : { capabilities: {} as Record<string, CapabilityResult> };
+  if (access.blocker) return { ok: false, changed: false, capabilities: {}, blockers: [...blockers, access.blocker], writes: [] as string[], ...base };
+  const capabilities: Record<string, CapabilityResult> = { ...access.capabilities };
+  const planeDeferredResult = (detail: string): CapabilityResult => ({ action: "deferred", detail });
+  if (planeStep) {
+    const done = options.apply ? await planeStep.apply().catch((): { plane: CapabilityResult; desk: CapabilityResult } => ({ plane: { action: "blocked", detail: "plane capability failed or is uncertain; inspect state and rerun to converge (provider output withheld)" }, desk: planeDeferredResult("not projected") })) : planeStep.plan;
+    capabilities.plane = done.plane;
+    capabilities["plane-desk"] = done.desk;
+  } else if (planeDeferred) capabilities.plane = planeDeferredResult(planeDeferred);
+
+  if (!options.apply) {
+    const planned = Object.values(capabilities).some(c => c.action === "create" || c.action === "adopt");
+    const conflicted = Object.values(capabilities).some(c => c.action === "conflict" || c.action === "blocked");
+    return { ok: !conflicted, changed: planned, capabilities, blockers, writes: [] as string[], note: "Preview only — provider reads, no writes. Pass --apply to provision.", ...base };
+  }
   const failed = Object.values(capabilities).some(c => c.action === "blocked" || c.action === "conflict");
   const changed = Object.values(capabilities).some(c => c.changed || c.action === "created" || c.action === "adopted");
   return {

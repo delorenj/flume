@@ -49,6 +49,16 @@
       "properties": {
         "vault": { "type": "string", "minLength": 1 }
       }
+    },
+    "plane": {
+      "type": "object",
+      "description": "FLUME-62: opts the `plane` capability of `flume identity provision` in (without it the capability reports `deferred`; `--only plane` runs it regardless). Pilot (`px identity enroll`) does every Plane write; Flume records what it proved.",
+      "additionalProperties": false,
+      "required": ["instance"],
+      "properties": {
+        "instance": { "type": "string", "pattern": "^https://[^/]+/[a-z0-9][a-z0-9_-]*$", "description": "https://<host>/<workspace-slug>, the same shape as a plane binding's instance." },
+        "verification_board": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", "description": "The board Pilot verifies a new identity on when the employee has no board of its own (default 33GOD)." }
+      }
     }
   }
 }

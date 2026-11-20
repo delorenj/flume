@@ -38,7 +38,7 @@ flume offboard <employee>     # retire an employee
 flume retire <employee> [--reason ".."] [--apply]  # out of service, record kept: bloodbank off, plane board claim removed, live channels parked; reports who gets each ticket afterwards. Never hand-edit a status to "retire" a PM: a still-claiming row keeps winning the shared board
 
 flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
-flume identity provision <employee>        # live accounts: Access token, mailbox rule + allowlist, vault item (preview unless --apply)
+flume identity provision <employee> [--only access|plane] [--no-reload]   # live accounts: Access token, mailbox rule + allowlist, vault item, and (plane) the employee's own native Plane user: Pilot enrolls it, Flume binds, adopts and projects its key into the desk (preview unless --apply). `--only plane` needs no Cloudflare config
 flume identity show <employee>             # read an employee's company identity
 flume identity status <employee> <status>  # local active|suspended|retired; never revokes provider access (use suspend|retire below)
 flume identity suspend|retire <employee> [--revoke cloudflare_access|github|gateway ...]  # FLUME-53: status first, then the mailbox allowlist (captured, deleted, verified), then only the adapters named; retire adds the routing rule, a tombstone and --revoke all. Preview unless --apply; reports every credential honestly (complete_revocation, `revocation INCOMPLETE`)
@@ -78,7 +78,7 @@ flume handbook validate       # check the handbook is well-formed
 flume handbook bootstrap      # seed host configuration
 
 flume audit                   # compliance audit
-flume remediate <finding>     # correct a finding
+flume remediate <finding>     # correct a finding; `org.plane-credential [--dry-run] [--no-reload]` makes every adopted employee's desk run its own Plane key
 ```
 
 `flume review` returns one of three verdicts, and the third one matters most:

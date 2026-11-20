@@ -1644,6 +1644,8 @@ try {
       "profiles.{profile_name}.config.delta.memory.user_profile_enabled",
       // Skillex-only PM desks (2026-10-01): step 10 pins external_dirs: [].
       "profiles.{profile_name}.config.delta.skills.external_dirs",
+      // FLUME-62: the employee's own Plane key reference.
+      "profiles.{profile_name}.config.delta.secrets.onepassword.env.PLANE_API_KEY",
       "profiles.{profile_name}.profile.yaml",
       "profiles.{profile_name}.hindsight.config.json",
       "profiles.{profile_name}.skills",

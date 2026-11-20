@@ -334,11 +334,21 @@ flume comment verify-plane TEST-14 --comment grolf:<comment-id> --comment rerere
   `agent_operational_records`). An unbound or merely requested binding projects nothing. A portable specialist
   has no board binding in its registry row: `plane.workspace|project_id|identifier` belong to project-registry.
 
-**Manual enrollment prerequisites** (Flume cannot create a Plane user or token; `bind` without a
-`--credential-ref`, or `adopt-actor` without a binding, answers `manual-enrollment-required` /
-`no-provider-binding` with this list): invite `<handle>@agents.delo.sh` (or let it self-sign-up); sign in
-once; the employee creates **its own** PAT in the browser and records the expiry it chose; vault it and
-reference it by item UUID and field ID; a workspace admin adds board membership; then bind and adopt.
+**Enrollment.** One command creates the identity and records it: `flume identity provision <employee> --only plane
+--apply` has Pilot (`px identity enroll`, which owns every Plane write) create the native user, board memberships
+and the vaulted personal access token, then binds, adopts (verified on the employee's own board, or the default
+verification board) and projects the key into the desk (`docs/identity-provisioning.md`, "The plane capability").
+`bind` without a `--credential-ref`, or `adopt-actor` without a binding, answers `plane-enrollment-required` /
+`no-provider-binding` and points at that command; the old manual list stays as the fallback in
+`enrollment.prerequisites` (invite `<handle>@agents.delo.sh`, sign in once, the employee creates **its own** PAT
+and records the expiry it chose, vault it by item UUID and field ID, a workspace admin adds board membership,
+then bind and adopt).
+
+**The desk runs the employee's key.** An adopted binding is not enough on its own: a desk inherits the fleet
+base's operator `PLANE_API_KEY`. The provision step (and `flume remediate org.plane-credential`, audited as the
+host rule of the same name) writes `secrets.onepassword.env.PLANE_API_KEY` = the binding's `credential_ref` into
+the desk's `config.delta.yaml` (nothing else changes), re-renders `config.yaml` and cycles only that profile
+through the gateway socket; never a gateway restart. Suspended and retired employees are never projected.
 
 **A Plane PAT is static.** Plane shows its expiry and revocation only to the owner's browser session, never to
 the key. Every result reports `type: plane_personal_access_token`, `static: true`, px's `expiry`
