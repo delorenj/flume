@@ -19,6 +19,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/auth-app": "^8.3.1",
     "@octokit/request": "^10.0.16",
+    "@usage-spec/commander": "^1.1.0",
     "ajv": "^8.20.0",
     "commander": "^14.0.2",
     "jose": "^6.2.12",
