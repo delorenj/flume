@@ -194,6 +194,7 @@ try {
     assert.equal(r.pm, "proj-pm");
     assert.deepEqual(r.agents.map((a) => a.employee), ["proj-pm", "proj-helper", "ghost"]);
     assert.equal(r.agents[2].ok, false);
+    assert.deepEqual(r.agents.map((a) => a.prompt), ["id none", "id none", "id none"]);
     const md = f.run(["identity", "manifest", "--project", sub, "--markdown"]);
     assert.equal(md.status, 0, md.stderr);
     assert.match(md.stdout, /^\*\*proj\*\* · bound PM/u);

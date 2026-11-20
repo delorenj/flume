@@ -313,8 +313,11 @@ export function projectManifest(dir: string = process.cwd()) {
   const census = identityCensus();
   if (!isRealFile(census.registryPath)) throw new Error(`Agent registry not readable: ${census.registryPath}`);
   const agents = project.agents.map(agent => {
-    try { return { role: agent.role, ...employeeManifest(agent.id) }; }
-    catch (error) { return { ok: false, role: agent.role, employee: agent.id, error: (error as Error).message }; }
+    let result: Record<string, any>;
+    try { result = { role: agent.role, ...employeeManifest(agent.id) }; }
+    catch (error) { result = { ok: false, role: agent.role, employee: agent.id, error: (error as Error).message }; }
+    // The prompt's own words for the row (`id v1 5/6`), so a picker can label it without re-deriving them.
+    return { ...result, prompt: manifestPromptForm(result) };
   });
   return {
     ok: true,

@@ -349,4 +349,4 @@ With no employee, `flume identity manifest [--project <dir>]` reads the nearest 
 directory (cwd by default) and evaluates every agent it declares, the PM first (pjangler's rule: role `pm`,
 `<slug>-pm` first). `--markdown` renders either form as the `/identity` view every agent CLI shows (Claude Code
 mod, Codex, OpenCode): those adapters run `flume identity manifest $ARGUMENTS --markdown` and draw what it prints,
-so the view is written once, here (33god-hub `cli-extensions` sub-skill).
+so the view is written once, here (33god-hub `agent-cli-extensions` sub-skill).
