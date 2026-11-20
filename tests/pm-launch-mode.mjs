@@ -61,6 +61,7 @@ try {
     assert.match(flat, /\*\*His play is the gate; silence is approval\.\*\* Never ask Jarad to verify or\s+sign off/);
     assert.match(flat, /reviewed ticket shipped in a published\s+build is accepted: close it, citing that build/);
     assert.match(flat, /mobile-deploy-hub/);
+    assert.match(flat, /\*\*Dashboard:\*\* keep Jarad's launch dashboard current[\s\S]*never verify-the-build[\s\S]*every gap is work/);
     assert.match(flat, /money, legal, passkey,\s+product decisions\), each with a recommendation and a default/);
     assert.match(flat, /at most one short comment a day on the epic, only on change/);
     assert.match(flat, /file one ticket proposing `mode: live` when the\s+product is in production and sellable, or `mode: steady` when it is not\. Never edit the declaration yourself/);
@@ -71,7 +72,7 @@ try {
     assert.match(flat, /`--apply <plan\.json>`, the pass's only board\s+writer/);
     assert.doesNotMatch(body, /\{\{|\}\}/, "no unrendered placeholder");
     const lines = body.trim().split("\n").length;
-    assert.ok(lines <= 40, `launch mode section stays short (${lines} lines)`);
+    assert.ok(lines <= 44, `launch mode section stays short (${lines} lines)`);
   };
 
   const pm = composeSoul(root, identity("earshot", "pm")).text;
