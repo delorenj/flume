@@ -344,3 +344,9 @@ yet, so `adopted` is `null` and every employee is evaluated against the latest m
 edited: a new point is a new version in `IDENTITY_MANIFESTS` (`workforce/manifest.ts`) plus its evaluator.
 
 The pjangler shell prompt shows the project PM's result (`id v1 5/6`) from this command, refreshed in the background.
+
+With no employee, `flume identity manifest [--project <dir>]` reads the nearest `.project.json` at or above the
+directory (cwd by default) and evaluates every agent it declares, the PM first (pjangler's rule: role `pm`,
+`<slug>-pm` first). `--markdown` renders either form as the `/identity` view every agent CLI shows (Claude Code
+mod, Codex, OpenCode): those adapters run `flume identity manifest $ARGUMENTS --markdown` and draw what it prints,
+so the view is written once, here (33god-hub `cli-extensions` sub-skill).

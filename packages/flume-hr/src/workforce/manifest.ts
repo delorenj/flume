@@ -15,7 +15,7 @@
 // evaluated against the latest manifest and `adopted` is null until the adoption record exists.
 import { lstatSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import YAML from "yaml";
 import { provisionStateDir } from "./access-issuance";
 import { channelList, fleetHome } from "./channel";
@@ -278,8 +278,116 @@ export function employeeManifest(employee: string) {
   };
 }
 
+const MANIFEST_NOTE_SHORT = "Local evidence only: ✓ means provisioned and recorded, not that the provider answers right now (`flume identity credentials <employee>` asks the providers).";
+
+/** The nearest `.project.json` at or above `dir`, as pjangler reads it (src/prompt-pm.ts): slug and declared agents. */
+function findProject(dir: string): { root: string; file: string; slug: string; agents: Array<{ id: string; role: string }> } | undefined {
+  let at = resolve(dir);
+  for (;;) {
+    const file = join(at, ".project.json");
+    if (isRealFile(file)) {
+      let manifest: Record<string, any> = {};
+      try { const parsed = JSON.parse(readFileSync(file, "utf8")); if (isRecord(parsed)) manifest = parsed; } catch { /* the directory name stands */ }
+      const id = manifest.project_id ?? manifest.project_slug;
+      const slug = typeof id === "string" && id.trim() ? id.trim().toLowerCase() : basename(at);
+      const agents = Object.entries(isRecord(manifest.agents) ? manifest.agents : {})
+        .map(([agentId, entry]) => ({ id: agentId, role: isRecord(entry) && typeof entry.role === "string" ? entry.role : "?" }));
+      // pjangler's PM rule: role pm, `<slug>-pm` first when a project declares more than one.
+      const rank = (a: { id: string; role: string }) => (a.role === "pm" ? (a.id === `${slug}-pm` ? 0 : 1) : 2);
+      agents.sort((a, b) => rank(a) - rank(b));
+      return { root: at, file, slug, agents };
+    }
+    const up = dirname(at);
+    if (up === at) return undefined;
+    at = up;
+  }
+}
+
+/**
+ * `flume identity manifest` with no employee: every agent the project at `dir` declares in `.project.json`, its PM
+ * first. The prompt's PM segment (`@bot(PM) id v1 5/6`) is the first row of this, expanded.
+ */
+export function projectManifest(dir: string = process.cwd()) {
+  const project = findProject(dir);
+  if (!project) throw new Error(`No .project.json at or above ${resolve(dir)}: name an employee (flume identity manifest <employee>)`);
+  const census = identityCensus();
+  if (!isRealFile(census.registryPath)) throw new Error(`Agent registry not readable: ${census.registryPath}`);
+  const agents = project.agents.map(agent => {
+    try { return { role: agent.role, ...employeeManifest(agent.id) }; }
+    catch (error) { return { ok: false, role: agent.role, employee: agent.id, error: (error as Error).message }; }
+  });
+  return {
+    ok: true,
+    project: { slug: project.slug, root: project.root, file: project.file },
+    pm: project.agents[0]?.role === "pm" ? project.agents[0].id : null,
+    agents,
+    note: MANIFEST_NOTE_SHORT,
+  };
+}
+
+/** The prompt's own words for one employee: `id v1 5/6`, `id none`, `id ?`, plus a non-active status. */
+export function manifestPromptForm(result: Record<string, any>): string {
+  if (!result.ok) return /Employee not found/u.test(result.error ?? "") ? "id none" : "id ?";
+  if (!result.enrolled) return "id none";
+  return `id v${result.manifest.version} ${result.satisfied}/${result.total}${result.status && result.status !== "active" ? ` ${result.status}` : ""}`;
+}
+
+const mdCell = (text: string) => String(text).replace(/\|/gu, "\\|").replace(/\n/gu, " ");
+
+function manifestMarkdownBlock(result: Record<string, any>, role?: string): string[] {
+  const label = `**${result.employee}**${role ? ` (${role})` : ""}`;
+  if (!result.ok) return [`${label} · prompt shows \`${manifestPromptForm(result)}\``, "", `✗ ${result.error ?? "manifest evaluation failed"}`];
+  const who = result.enrolled ? `${result.handle} · ${result.status}` : "not enrolled (no company identity)";
+  const adopted = result.manifest.adopted === null ? "no adoption record, judged against latest" : `adopted v${result.manifest.adopted}`;
+  const lines = [
+    `${label} · ${who} · prompt shows \`${manifestPromptForm(result)}\``,
+    "",
+    `Identity manifest **v${result.manifest.version}** (latest v${result.manifest.latest}; ${adopted}) · required **${result.satisfied}/${result.total}**${result.optional.total ? ` · optional ${result.optional.satisfied}/${result.optional.total}` : ""}`,
+    "",
+    "|  | Point | Evidence |",
+    "|---|---|---|",
+    ...result.points.map((p: PointResult) => `| ${p.satisfied ? "✓" : "✗"} | ${mdCell(p.title)}${p.required ? "" : " *(optional)*"} | ${mdCell(p.detail)} |`),
+  ];
+  const missing = result.points.filter((p: PointResult) => p.required && !p.satisfied).map((p: PointResult) => p.title);
+  if (missing.length) lines.push("", `Missing: ${missing.join(", ")}`);
+  if (result.definition) lines.push("", `Definition: \`${result.definition}\``);
+  return lines;
+}
+
+/**
+ * Markdown for an agent CLI's `/identity` (Claude Code mod, Codex, OpenCode): one renderer, so every CLI shows the
+ * same view. Takes either `employeeManifest` or `projectManifest` output.
+ */
+export function formatManifestMarkdown(result: Record<string, any>): string {
+  if (!result.ok) return `✗ ${result.error ?? "manifest evaluation failed"}\n`;
+  if (!Array.isArray(result.agents)) return `${[...manifestMarkdownBlock(result), "", `_${MANIFEST_NOTE_SHORT}_`].join("\n")}\n`;
+  const { project, agents } = result;
+  if (!agents.length) return `\`${project.file}\` (${project.slug}) declares no agents. Name one: \`/identity <employee>\`.\n`;
+  const [lead, ...rest] = agents;
+  const lines = [
+    result.pm ? `**${project.slug}** · bound PM` : `**${project.slug}** · no PM declared; first agent shown`,
+    "",
+    ...manifestMarkdownBlock(lead, lead.role),
+  ];
+  if (rest.length) {
+    lines.push("", "Other agents on this project:");
+    for (const agent of rest) {
+      const missing = agent.ok ? agent.points.filter((p: PointResult) => p.required && !p.satisfied).map((p: PointResult) => p.title) : [];
+      const tail = !agent.ok ? ` · ${agent.error ?? "unreadable"}` : missing.length ? ` · missing ${missing.join(", ")}` : "";
+      lines.push(`- **${agent.employee}** (${agent.role}) · \`${manifestPromptForm(agent)}\`${tail}`);
+    }
+  }
+  lines.push("", `_${MANIFEST_NOTE_SHORT}_`);
+  return `${lines.join("\n")}\n`;
+}
+
 export function formatManifestResult(result: Record<string, any>): string {
   if (!result.ok) return `✗ ${result.error ?? "manifest evaluation failed"}\n`;
+  if (Array.isArray(result.agents)) {
+    const head = `${result.project.slug} (${result.project.file})${result.pm ? ` · PM ${result.pm}` : " · no PM declared"}`;
+    const blocks = result.agents.map((agent: Record<string, any>) => agent.ok ? formatManifestResult(agent).trimEnd() : `${agent.employee}: ✗ ${agent.error}`);
+    return `${[head, ...blocks].join("\n")}\n`;
+  }
   const who = result.enrolled ? `${result.handle} (${result.status})` : "not enrolled";
   const lines = [`${result.employee}: ${who} · identity manifest v${result.manifest.version} · ${result.satisfied}/${result.total} required${result.optional.total ? ` · ${result.optional.satisfied}/${result.optional.total} optional` : ""}`];
   for (const point of result.points) lines.push(`  ${point.satisfied ? "✓" : "✗"} ${point.title}${point.required ? "" : " (optional)"}: ${point.detail}`);

@@ -182,6 +182,29 @@ try {
     pass("a missing registry is 'not readable', not 'Employee not found'");
   }
 
+  // No employee: the project at cwd (or --project), its PM first, as an agent CLI's /identity shows it.
+  {
+    const f = fixture("project");
+    f.post("proj-pm", { voice: "walken" });
+    f.post("proj-helper", {});
+    const repo = join(f.dir, "repo"), sub = join(repo, "deep/er");
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(repo, ".project.json"), JSON.stringify({ project_id: "proj", agents: { "proj-helper": { role: "helper" }, "proj-pm": { role: "pm" }, ghost: { role: "dev" } } }));
+    const r = f.json(f.run(["identity", "manifest", "--project", sub, "--json"]));
+    assert.equal(r.pm, "proj-pm");
+    assert.deepEqual(r.agents.map((a) => a.employee), ["proj-pm", "proj-helper", "ghost"]);
+    assert.equal(r.agents[2].ok, false);
+    const md = f.run(["identity", "manifest", "--project", sub, "--markdown"]);
+    assert.equal(md.status, 0, md.stderr);
+    assert.match(md.stdout, /^\*\*proj\*\* · bound PM/u);
+    assert.match(md.stdout, /\| ✓ \| voice \| walken \(vox\) \|/u);
+    assert.match(md.stdout, /- \*\*ghost\*\* \(dev\) · `id none` · Employee not found/u);
+    const none = f.run(["identity", "manifest", "--project", f.home, "--json"]);
+    assert.equal(none.status, 1);
+    assert.match(JSON.parse(none.stdout).error, /No \.project\.json/u);
+    pass("no employee: the project's agents, PM first; markdown is the /identity view; no project is a clean error");
+  }
+
   // An unknown employee is a clean failure, not a crash.
   {
     const f = fixture("unknown");

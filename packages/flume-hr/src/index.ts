@@ -41,7 +41,7 @@ import { accessReceipts } from "./workforce/receipts";
 import { NO_GATEWAY_RELOAD_ENV } from "./workforce/plane-desk";
 import { PROVISION_GROUPS, provisionEmployee, type ProvisionGroup } from "./workforce/provision";
 import { identityReadiness } from "./workforce/readiness";
-import { employeeManifest, formatManifestResult } from "./workforce/manifest";
+import { employeeManifest, formatManifestMarkdown, formatManifestResult, projectManifest } from "./workforce/manifest";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
 import { channelList, channelOffline, channelOnline, formatChannelList, formatChannelResult } from "./workforce/channel";
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, requestMail, startAccessServer } from "./workforce/access";
@@ -380,11 +380,14 @@ identityCmd
 
 identityCmd
   .command("manifest")
-  .argument("<employee>", "Registry id, unhired specialist, or person name")
+  .argument("[employee]", "Registry id, unhired specialist, or person name; omitted, every agent the project at --project (default: cwd) declares, its PM first")
   .description("FLUME-93: which identity-manifest points the employee holds (vault item, gateway key, Plane, inbox, voice, avatar; Telegram optional), from local evidence only — no provider is asked")
+  .option("--project <dir>", "With no employee: the project directory to read .project.json from (default: cwd, searching upward)")
+  .option("--markdown", "Markdown, as an agent CLI's /identity shows it")
   .option("--json", "Output machine-parseable JSON")
-  .action(async (employee: string, options) => {
-    await identityResult(async () => employeeManifest(employee), options.json, formatManifestResult);
+  .action(async (employee: string | undefined, options) => {
+    const name = employee?.trim();
+    await identityResult(async () => name ? employeeManifest(name) : projectManifest(options.project ?? process.cwd()), options.json, options.markdown ? formatManifestMarkdown : formatManifestResult);
   });
 
 identityCmd
