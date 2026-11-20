@@ -324,8 +324,10 @@ export function compareAssets(
  * repository's own business, counted like any other foreign tracked file.
  * `.scripts/launch-pass.repo.md` is the repo's addition to the shared launch-pass
  * contract (33GOD-114); `launch-pass.py --brief` prints it after the shared prompt.
+ * `.scripts/launch-pass.repo-monitor` is the repo's off-board snapshot (gate receipts,
+ * store review states); `launch-pass.py --monitor` appends its lines as `repo|...`.
  */
-export const REPO_OWNED_SCAFFOLD_PATHS: readonly string[] = [".scripts/launch-pass.repo.md"];
+export const REPO_OWNED_SCAFFOLD_PATHS: readonly string[] = [".scripts/launch-pass.repo.md", ".scripts/launch-pass.repo-monitor"];
 
 export interface ScaffoldExtrasInput {
   /** Every tracked path under the role directory, role-relative. */

@@ -22,11 +22,11 @@ try {
   const {renderTemplate,classifyExtras,REPO_OWNED_SCAFFOLD_PATHS}=await import(pathToFileURL(bundle).href);
 
   // 33GOD-114: a repo's own launch-pass notes inside the owned .scripts/ group are never an unexpected extra.
-  const extras=classifyExtras({trackedPaths:['.scripts/launch-pass.repo.md','.scripts/.done-70-systemd','.scripts/stray.sh','README.md'],ownedPaths:new Set(),
+  const extras=classifyExtras({trackedPaths:['.scripts/launch-pass.repo.md','.scripts/launch-pass.repo-monitor','.scripts/.done-70-systemd','.scripts/stray.sh','README.md'],ownedPaths:new Set(),
     groups:{'scaffold.scripts':'.scripts/'},runtimeDir:'runtime',excludedPatterns:['.done-*']});
-  assert.deepEqual(REPO_OWNED_SCAFFOLD_PATHS,['.scripts/launch-pass.repo.md']);
+  assert.deepEqual(REPO_OWNED_SCAFFOLD_PATHS,['.scripts/launch-pass.repo.md','.scripts/launch-pass.repo-monitor']);
   assert.deepEqual(extras.unexpected.map(e=>e.path),['.scripts/.done-70-systemd','.scripts/stray.sh']);
-  assert.equal(extras.foreignTracked,2);
+  assert.equal(extras.foreignTracked,3);
   pass('a repo-owned launch-pass.repo.md is foreign, never unexpected-owned, while a real extra still is');
 
   // Unit: the branch semantics, and what stays unsupported.
