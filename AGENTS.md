@@ -49,6 +49,7 @@ flume identity continuity <employee> [--record] [--comment e:<id>]  # FLUME-53: 
 flume identity bind <employee> <provider> --principal --instance --credential-ref  # bind a provider by reference only (preview unless --apply); github: App ID, installation ID, op://<vault>/<item-uuid>/<field-id>; plane: native user UUID, https://<host>/<workspace>, op:// ref to the employee's own PAT
 flume identity adopt-actor <employee> github  # record the bot user ID GitHub reports for the employee's own App as native_actor_id (preview unless --apply; never mints)
 flume identity adopt-actor <employee> plane --board <b...>  # plane: Pilot (`px identity verify`) verifies the bound native user on every board, then native_actor_id = that UUID (preview unless --apply; Flume has no Plane client)
+flume identity voice [employee] [--assign <voice>] [--clone "<who>" [--pick n] [--force]] [--clear] [--apply]   # the voice the employee SPEAKS (desk pin, else the fleet base tts.vox.voice). --assign pins an existing Vox voice; --clone makes it first with `voxxy voice clone` then pins it; --clear inherits the fleet default again. Run inside a desk, the employee defaults to that desk. The agent is the voice SSOT: Holocene/Telegram only render it
 flume identity readiness                   # unproven account facts; --probe cloudflare is GET-only
 flume identity recent <employee> [--touch p] # the recall compass: last 5 projects, MRU-first (preview unless --apply)
 flume identity recall <employee> [--narrow]  # write bank + declared banks most-recently-interacted first
