@@ -48,15 +48,37 @@ export function planeProvisionSetting(config: { plane?: { instance?: string; ver
 }
 
 /** The board(s) this employee works on: its registry rows' `plane.identifier`. A portable specialist has none. */
-export function ownPlaneBoards(census: IdentityCensus, target: IdentityDefinition): string[] {
-  let agents: Record<string, any> = {};
-  try { agents = (YAML.parse(readFileSync(census.registryPath, "utf8")) as { agents?: Record<string, any> } | null)?.agents ?? {}; } catch { return []; }
+export function ownPlaneBoards(census: IdentityCensus, target: IdentityDefinition, workspace?: string): string[] {
   const boards: string[] = [];
-  for (const post of target.posts) {
-    const identifier = agents[post]?.plane?.identifier;
-    if (typeof identifier === "string" && isBoardArgument(identifier) && !boards.includes(identifier)) boards.push(identifier);
+  for (const row of planeRows(census, target)) {
+    if (workspace && row.workspace && row.workspace !== workspace) continue;
+    if (!boards.includes(row.identifier)) boards.push(row.identifier);
   }
   return boards;
+}
+
+function planeRows(census: IdentityCensus, target: IdentityDefinition): Array<{ identifier: string; workspace?: string }> {
+  let agents: Record<string, any> = {};
+  try { agents = (YAML.parse(readFileSync(census.registryPath, "utf8")) as { agents?: Record<string, any> } | null)?.agents ?? {}; } catch { return []; }
+  const rows: Array<{ identifier: string; workspace?: string }> = [];
+  for (const post of target.posts) {
+    const plane = agents[post]?.plane;
+    if (typeof plane?.identifier !== "string" || !isBoardArgument(plane.identifier)) continue;
+    rows.push({ identifier: plane.identifier, ...(typeof plane.workspace === "string" && /^[a-z0-9][a-z0-9-]*$/u.test(plane.workspace) ? { workspace: plane.workspace } : {}) });
+  }
+  return rows;
+}
+
+/**
+ * The workspace this employee lives in. A client PM's board sits in its client's workspace (james-brennan-pm: JIMB in
+ * `automaticai`), and its identity must be enrolled and bound THERE, on the same host; every other employee keeps the
+ * configured workspace. Posts that span workspaces keep the configured one (their boards elsewhere are left out).
+ */
+export function employeePlaneSetting(census: IdentityCensus, target: IdentityDefinition, setting: PlaneProvisionSetting): PlaneProvisionSetting {
+  const workspaces = [...new Set(planeRows(census, target).map(row => row.workspace).filter((w): w is string => Boolean(w)))];
+  if (workspaces.length !== 1 || workspaces[0] === setting.workspace) return setting;
+  const origin = parsePlaneInstance(setting.instance)?.origin;
+  return origin ? { ...setting, workspace: workspaces[0]!, instance: `${origin}/${workspaces[0]}` } : setting;
 }
 
 /** The person's name as Plane should show it: a specialist's display_name; a post's role.yaml display_name only when it names the person. */
@@ -177,20 +199,33 @@ async function projectDesk(employee: string, noReload: boolean | undefined): Pro
  * Plan (read-only: one px preview) and, on apply, run the plane capability for one enrolled, ACTIVE employee. The caller
  * has already refused a non-active or unenrolled employee.
  */
-export async function planPlaneCapability(employee: string, census: IdentityCensus, target: IdentityDefinition, setting: PlaneProvisionSetting, options: { noReload?: boolean; receipt: (line: Record<string, unknown>) => void }): Promise<PlaneCapabilityStep> {
+export async function planPlaneCapability(employee: string, census: IdentityCensus, target: IdentityDefinition, configured: PlaneProvisionSetting, options: { noReload?: boolean; receipt: (line: Record<string, unknown>) => void }): Promise<PlaneCapabilityStep> {
   const block = target.block!;
   const ownEvidence = planeEvidence();
   const existing = block.bindings?.plane;
-  const ownBoards = ownPlaneBoards(census, target);
-  const verification = ownBoards.length ? ownBoards : [setting.verificationBoard];
-  const basis = ownBoards.length ? "own-board" : "default-board";
+  const setting = employeePlaneSetting(census, target, configured);
+  let ownBoards = ownPlaneBoards(census, target, setting.workspace);
+  let verification = ownBoards.length ? ownBoards : [setting.verificationBoard];
+  let basis = ownBoards.length ? "own-board" : "default-board";
   const displayName = planeDisplayName(target, block);
   const deferredDesk: CapabilityResult = { action: "deferred", detail: "the desk is projected once the plane identity is adopted" };
 
   if (existing?.instance && existing.instance !== setting.instance) {
     return fixed({ action: "conflict", detail: `binding-conflict: plane is bound to ${existing.instance}, not ${setting.instance}; a different instance is a different identity (never silently rebound)` }, deferredDesk);
   }
-  const preview = runPx(enrollArgs(block, displayName, ownBoards, existing?.credential_ref, setting, false));
+  let preview = runPx(enrollArgs(block, displayName, ownBoards, existing?.credential_ref, setting, false));
+  // An archived own board (a parked project: DNET, MKTJNG) is not a reason to leave its employee without an identity.
+  // Drop exactly the boards px names as archived and enroll on the rest, or on the default board when none remain.
+  if (!preview.ok && preview.kind === "refused" && preview.code === "board_archived" && preview.boards?.length) {
+    const archived = new Set(preview.boards);
+    const remaining = ownBoards.filter(board => !archived.has(board));
+    if (remaining.length < ownBoards.length) {
+      ownBoards = remaining;
+      verification = ownBoards.length ? ownBoards : [setting.verificationBoard];
+      basis = ownBoards.length ? "own-board" : "default-board (own board archived)";
+      preview = runPx(enrollArgs(block, displayName, ownBoards, existing?.credential_ref, setting, false));
+    }
+  }
   if (!preview.ok) {
     const detail = preview.kind === "unavailable" ? `provider-unavailable: ${preview.detail}` : `provider-refused [px ${preview.code}]: ${preview.detail}`;
     return fixed({ action: "blocked", detail, refs: { evidence: ownEvidence, ...(preview.kind === "refused" ? { provider_code: preview.code } : {}) } }, deferredDesk);

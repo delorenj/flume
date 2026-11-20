@@ -127,7 +127,7 @@ function pxTimeoutMs(env: NodeJS.ProcessEnv): number {
 export type PxOutcome =
   | { ok: true; data: Record<string, any> }
   | { ok: false; kind: "unavailable"; detail: string }
-  | { ok: false; kind: "refused"; code: string; detail: string };
+  | { ok: false; kind: "refused"; code: string; detail: string; /** the boards a board-level refusal names (unknown_board, board_archived) */ boards?: string[] };
 
 const clip = (text: string): string => firstLine(text).slice(0, 300);
 
@@ -168,7 +168,10 @@ export function runPx(args: string[], env: NodeJS.ProcessEnv = process.env): PxO
   if (!data || typeof data !== "object" || Array.isArray(data)) return { ok: false, kind: "unavailable", detail: `px exited ${result.status} with a JSON answer that is not an object` };
   const body = data as Record<string, any>;
   if (result.status === 0) return { ok: true, data: body };
-  if (body.ok === false && typeof body.code === "string") return { ok: false, kind: "refused", code: body.code, detail: clip(String(body.error ?? body.code)) };
+  if (body.ok === false && typeof body.code === "string") {
+    const boards = Array.isArray(body.boards) ? body.boards.filter((b: unknown): b is string => typeof b === "string") : [];
+    return { ok: false, kind: "refused", code: body.code, detail: clip(String(body.error ?? body.code)), ...(boards.length ? { boards } : {}) };
+  }
   // Real px fails some reads (a missing ticket) with {ok:false, error} and no code.
   if (body.ok === false && typeof body.error === "string") return { ok: false, kind: "refused", code: "unspecified", detail: clip(body.error) };
   return { ok: false, kind: "unavailable", detail: `px exited ${result.status} without a refusal` };

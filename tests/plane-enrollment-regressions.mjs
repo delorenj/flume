@@ -74,16 +74,19 @@ if (args[0] === "identity" && args[1] === "enroll") {
   const email = flag("email"), name = flag("display-name"), apply = args.includes("--apply");
   const handle = email.split("@")[0];
   if (!email.endsWith("@agents.delo.sh")) refuse("not_employee_email", email + " is not a company address");
-  if (flag("workspace") !== "33god") refuse("workspace_mismatch", "enroll needs --workspace 33god, got " + flag("workspace"));
+  const workspaces = state.workspaces || ["33god"];
+  if (!workspaces.includes(flag("workspace"))) refuse("workspace_mismatch", "enroll needs --workspace " + workspaces.join("|") + ", got " + flag("workspace"));
   if (flag("base") !== "https://plane.delo.sh") refuse("base_mismatch", "enroll needs --base https://plane.delo.sh, got " + flag("base"));
   const admin = flags("admin-board");
   for (const b of admin) if (!state.boards[b]) refuse("unknown_board", "board " + b + " is not a project");
+  const archived = admin.filter((b) => state.boards[b].archived);
+  if (archived.length) out(1, { ok: false, code: "board_archived", error: "archived, so an employee there would read an empty board: " + archived.join(", "), boards: archived });
   let user = state.users[email];
   const created = !user;
   if (!user) user = { id: uuidOf(email), email, name };
   const reactivated = Boolean(user.inactive);
   const updatedFields = !created && user.name !== name ? ["display_name"] : [];
-  const boards = Object.entries(state.boards).map(([identifier, board]) => {
+  const boards = Object.entries(state.boards).filter(([, board]) => !board.archived).map(([identifier, board]) => {
     const wanted = admin.includes(identifier) ? 20 : 15;
     const have = board.members[user.id];
     return { identifier, project_id: board.id, role: wanted, action: have === undefined ? "would-create" : have === wanted ? "unchanged" : "would-update" };
@@ -103,7 +106,7 @@ if (args[0] === "identity" && args[1] === "enroll") {
     save();
   }
   out(0, {
-    ok: true, evidence: "fixture", applied: apply, plane: { version: "1.3.1", workspace: "33god" },
+    ok: true, evidence: "fixture", applied: apply, plane: { version: "1.3.1", workspace: flag("workspace") },
     user: { id: user.id, email, display_name: name, created, reactivated, updated: updatedFields, is_bot: false },
     profile: { created: created, updated: [] },
     workspace_member: { role: 15, created, reactivated, updated: false },
@@ -636,13 +639,63 @@ await check("--only plane runs with a provisioning config whose access half is i
   assert.equal(JSON.parse(both.stdout).blockers[0].code, "invalid-config");
 });
 
+// Two neighbours of the common case, found in the live rollout (2026-11-19): an employee whose only board is archived
+// (delonet-director on DNET, nautilus-trader-pm on MKTJNG), and a client PM whose board lives in its client's workspace
+// (james-brennan-pm on JIMB in automaticai).
+async function hireExtra(id, person, board, workspace) {
+  const registry = YAML.parse(readFileSync(REG, "utf8"));
+  registry.agents[id] = { ...row(id, board), plane: { workspace, project_id: BOARDS[board] ?? `00000000-0000-4000-8000-${board.padEnd(12, "0").slice(0, 12).toLowerCase().replace(/[^0-9a-f]/gu, "0")}`, identifier: board } };
+  writeFileSync(REG, YAML.stringify(registry), { mode: 0o600 });
+  const roleDir = join(REPOS, id, "agents/hermes/pm");
+  mkdirSync(roleDir, { recursive: true });
+  writeFileSync(join(roleDir, "role.yaml"), `repo: ${id}\nrole: pm\nagent_id: ${id}\nprofile: ${id}\nidentity:\n  name: ${person}\n  recall_banks:\n    - agent-${id}\n`);
+  const desk = join(FLEET, "profiles", id);
+  mkdirSync(desk, { recursive: true });
+  writeFileSync(join(desk, "config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { enabled: true, env: {} } } }), { mode: 0o600 });
+  writeFileSync(join(desk, "config.yaml"), `# GENERATED FILE\n${YAML.stringify(BASE_CONFIG)}`, { mode: 0o600 });
+  const px = pxState();
+  px.pats[person] = patOf(person);
+  writeFileSync(PXSTATE, JSON.stringify(px));
+  const run = await flume(["identity", "enroll", id, "--apply", "--json"]);
+  assert.equal(run.status, 0, `enroll ${id}\n${run.stdout}${run.stderr}`);
+}
+
+await check("an archived own board: enrolled on the default board instead, never left without an identity", async () => {
+  const px = pxState();
+  px.boards.ARCH = { id: "a1a1a1a1-0000-4000-8000-000000000001", members: {}, archived: true };
+  writeFileSync(PXSTATE, JSON.stringify(px));
+  await hireExtra("arch-pm", "ada", "ARCH", "33god");
+  const body = await provision("arch-pm", ["--apply"], { FLUME_NO_GATEWAY_RELOAD: "1" });
+  assert.equal(body.ok, true, JSON.stringify(body.capabilities.plane));
+  assert.equal(body.capabilities.plane.action, "created");
+  assert.equal(body.capabilities.plane.refs.admin_boards, "none");
+  assert.equal(body.capabilities.plane.refs.verification_boards, "33GOD");
+  assert.match(body.capabilities.plane.refs.verification_basis, /default-board \(own board archived\)/u);
+  assert.ok(!pxState().boards.ARCH.members[uuidOf("ada@agents.delo.sh")], "never made a member of the archived board");
+  assert.equal(block("arch-pm").bindings.plane.instance, "https://plane.delo.sh/33god");
+});
+
+await check("a client PM: enrolled and bound in its board's own workspace on the same host", async () => {
+  const px = pxState();
+  px.workspaces = ["33god", "clientco"];
+  px.boards.CLNT = { id: "c1c1c1c1-0000-4000-8000-000000000001", members: {} };
+  writeFileSync(PXSTATE, JSON.stringify(px));
+  await hireExtra("clnt-pm", "cleo", "CLNT", "clientco");
+  const body = await provision("clnt-pm", ["--apply"], { FLUME_NO_GATEWAY_RELOAD: "1" });
+  assert.equal(body.ok, true, JSON.stringify(body.capabilities.plane));
+  const enroll = enrollCalls().filter((a) => a.includes("cleo@agents.delo.sh")).at(-1);
+  assert.equal(enroll[enroll.indexOf("--workspace") + 1], "clientco", enroll.join(" "));
+  assert.equal(block("clnt-pm").bindings.plane.instance, "https://plane.delo.sh/clientco");
+  assert.equal(body.capabilities.plane.refs.verification_boards, "CLNT");
+});
+
 await check("every px call ran with the fleet base reference in PLANE_API_KEY, never a value", async () => {
   assert.ok(pxEnvKeys().length > 10);
   assert.ok(pxEnvKeys().every((key) => key === OPERATOR_REF), JSON.stringify([...new Set(pxEnvKeys())]));
 });
 
 await check("no planted token value appears in any output or any file", async () => {
-  const secrets = [OPERATOR_KEY, ...HANDLES.map(patOf)];
+  const secrets = [OPERATOR_KEY, ...HANDLES.map(patOf), patOf("ada"), patOf("cleo")];
   const hits = [];
   for (const text of outputs) for (const secret of secrets) if (text.includes(secret)) hits.push(`output contains ${secret}`);
   const walk = (dir) => {

@@ -126,3 +126,21 @@ provisioned_by: hermes-agent-template
 deployment:
   local_only: false
   systemd: required
+company_identity:
+  version: 1
+  subject: "27163b4f-ae2a-4839-924d-9913da6d1366"
+  handle: "flume-pm"
+  email: "flume-pm@agents.delo.sh"
+  status: "active"
+  enrolled_at: "2026-11-20T02:23:42.428Z"
+  bindings:
+    cloudflare_access:
+      principal: "078ea51eb9d9ee0b4dfd0c30408f2bb7.access"
+      instance: "https://delonet.cloudflareaccess.com"
+      credential_ref: "op://DeLoSecrets/i5ivs73kapan3rktjaoz3addpu/5rqfz47i3x64syphxzshkhl4ku"
+    plane:
+      principal: "3a52b2a4-b7da-4be4-bd70-cd1024caf43a"
+      instance: "https://plane.delo.sh/33god"
+      credential_ref: "op://DeLoSecrets/kp2k3jbl4hjjboyidvkygmhgva/credential"
+      attribution_mode: "native"
+      native_actor_id: "3a52b2a4-b7da-4be4-bd70-cd1024caf43a"
