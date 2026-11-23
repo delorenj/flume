@@ -82,7 +82,49 @@ Awaiting specification approval. Shared dirty files untouched. g33 passed (legac
 
 ## Review Triage Log
 
+SAFE CHECKPOINT ONLY — independent SPEC and SAFETY are HOLD, full AC remains
+unimplemented. The rejected writer raced an external `lifecycle:human` edit
+after its last read. Pilot/Plane must own provider-conditional expected-version
+and human-absence mutation predicates; another local read/lease is not a fix.
+Parent owns filing the dependency. No source/install/runtime acceptance claimed.
+
+The checkpoint removes all automatic board mutation and receipt-writing code;
+`--apply` unconditionally refuses before any source access. Read-only monitor,
+brief and explicitly proposal-only evaluation remain. The isolated Krebs test
+uses deliberately modeled Todo, NOT output from an operative PM applier.
+
+Local repairs: POSIX driver-path quoting tested by executing wrappers containing
+apostrophes, spaces, substitutions and backticks; Krebs inactive lifecycle forms;
+digit-leading 33GOD identifiers and lowercase manifest slugs for uppercase repos;
+canonical digest without derived pipeline metadata; no prefix-spoof comment
+suppression. Cost arithmetic now estimates three provider mutations per intake,
+two per hold, maximum six. No-write notes print locally, without durable receipts.
+
+Deferred: supported reject/disposition, paging starvation/fairness, global deadline
+and read-cost bound (review observed 477 GETs for four tickets), exact launcher
+lease handoff, confined atomic receipt reservation/replay, actor/receipt-proven
+own-comment filtering, independent re-review and all authorized live acceptance.
+Do not install/register/resume or mark the ticket complete.
+
 ## Verification
+
+Checkpoint checks executed in active-profile scratch `flume111-safe-checkpoint`
+with provider credentials stripped:
+- Copied Flume source: `npm run typecheck` exit 0; `npm run build` exit 0.
+- Individual `node tests/pm-reconcile-regressions.mjs`: eight isolated built-CLI
+  checks PASS, including actual POSIX malicious-path wrapper execution.
+- Canonical `uv run --no-project --with pytest python -m pytest -q
+  -p no:cacheprovider tests/test_pm_reconcile.py --basetemp <scratch>`:
+  30 PASS (containment/proposal/model checks only, not mutation acceptance).
+- Individual `node tests/pm-launch-mode.mjs`: role composition and negative
+  mutation checks PASS; launch/scaffold broad suites not run because retained
+  harnesses hard-code system temp or need broader history fixtures.
+- Initial interpreter lacked pytest; scratch-local `uv --with pytest` supplied it.
+  Initial isolated collaborator lookup used fixture HOME; explicit Krebs root
+  corrected that harness issue before the final 30-PASS run.
+- Both isolated lanes pass `git diff --check`.
+
+Historical planned checks (not a statement of execution):
 
 - Run canonical Python driver tests using scratch-local fixtures; prohibit real provider/network side effects.
 - Run Flume typecheck/build and the new built-CLI regressions, plus launch/scaffold/role regressions relevant to changed seams.

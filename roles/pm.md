@@ -102,27 +102,27 @@ Todo in place: Krebs alone starts at most the scope WIP cap and owns
 other tickets are reasons to stop accepting eligible independent work. If no
 Backlog item qualifies, state the exact reason per excluded candidate, not
 "waiting" or "nothing to do". Human holds, live workers, opt-outs and reserved
-product decisions still outrank replenishment. The interval pass supports
-bounded intake+triage; the PM never sends a dispatch itself.
+product decisions still outrank replenishment. The retained interval prototype is
+read-only; automatic intake+triage is disabled pending a provider conditional
+mutation boundary. The PM never sends a dispatch itself.
 
 ## Owning-PM reconciliation
 
-When installed, Candybar alone wakes the externally pinned PM reconciliation job. Its
-`pm-reconcile.py --monitor` reports stable owned intake and hold facts; `--brief` gives
-only bounded candidates and a plan shape. The PM decides with explicit authority,
-restriction and original-hold evidence, then applies a six-write-cap plan. The
-applier takes the exact launcher owner on `runtime/wip-driver.lock`, refreshes the
-lease, verifies fresh registry routing and Krebs/Candystore liveness, re-reads each
-ticket, and records receipts. It never dispatches or touches `agent:working` or
-`lifecycle:human` (even to comment). Krebs alone takes accepted Todo work.
+FLUME-111 is a source-only **HOLD**, not install-ready. The retained
+`pm-reconcile.py --monitor` reports scoped facts; `--brief` and `--evaluate`
+support read-only proposals. `--apply` always refuses before any source call or
+mutation, with no environment/config bypass. Do not use direct Pilot commands to
+bypass that gate. Pilot/Plane must supply provider-enforced expected-version and
+human-absence predicates: a local lease or another read cannot protect against
+an outside writer adding `lifecycle:human` after the final read.
 
-`reconcile.enabled: false` or `explicit_opt_out: true` is a binding opt-out.
-Unavailable board, registry, scope, liveness or authority means no writes. On a
-shared board, unlabeled intake requires separate ownership routing: a fallback is
-not approval. No age or untagged agent comment clears a hold. `agent:failed`
-requires a diagnosed turn and a named recovery. PMs never treat this pass as
-permission for product publication, spending, legal action or credential changes.
-See `docs/pm-reconciliation.md` for the install and rollback protocol.
+`reconcile.enabled: false` or `explicit_opt_out: true` remains binding, as do
+inactive registry lifecycle forms. Unknown sources stay unknown, not empty.
+Krebs alone dispatches and owns `agent:working`. No age, marker-prefixed comment
+or untagged agent prose clears a hold. Proposal success is not applied authority,
+installation readiness or runtime acceptance. Reserved product publication,
+spending, legal and credential decisions remain reserved.
+See `docs/pm-reconciliation.md` for the external dependency and deferred gates.
 
 ## Launch mode
 

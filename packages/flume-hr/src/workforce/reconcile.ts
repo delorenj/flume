@@ -10,13 +10,23 @@ import { resolveFleetHomeDir } from "../kernel/fleet-paths";
 import { resolveFlumeRoot } from "../kernel/paths";
 
 const mapping = (v: unknown): Record<string, unknown> | undefined => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : undefined;
-const name = "pm-reconcile";
 const SCRIPT = "pm-reconcile.py";
 const BRIEF = "pm-reconcile-brief.sh";
 const MONITOR = "pm-reconcile-monitor.sh";
-const PROMPT = "Follow the pass contract in the brief above.";
+const PROMPT = "Follow the read-only proposal contract in the brief above. Automatic board writes are disabled.";
 const toolsets = ["terminal", "file", "no_mcp"];
 const real = (p: string) => { try { return realpathSync(p); } catch { return resolve(p); } };
+const shellQuote = (s: string) => "'" + s.replaceAll("'", "'\"'\"'") + "'";
+const manifestSlug = (repo: string) => basename(repo).toLowerCase();
+
+function inactive(row: Record<string, unknown> | undefined): boolean {
+  if (!row) return true;
+  // Match Krebs tick/registry.mjs retiredWhy without changing its owner contract.
+  const retired = new Set(["retired", "suspended", "offboarded"]);
+  return [row.status, row.employment].some((v) => typeof v === "string" && retired.has(v.trim().toLowerCase()))
+    || row.retired === true || (typeof row.retired_at === "string" && row.retired_at.trim().length > 0)
+    || (typeof row.retired_at === "number" && Number.isFinite(row.retired_at));
+}
 
 export interface ReconcileScope { board: string; label: string; owner: string; eligible: boolean; reason: string }
 export interface ReconcileCoverage {
@@ -40,7 +50,8 @@ export function reconcileCoverage(repoArg: string | undefined, env: LaunchEnv = 
   const row = mapping(raw);
   const roleDir = typeof row?.role_dir === "string" ? row.role_dir : join(repo, "agents", "hermes", "pm");
   if (!real(roleDir).startsWith(repo + "/")) problems.push("PM role directory is outside owning repository");
-  if (row?.role !== "pm" || mapping(row?.bloodbank)?.enabled === false) problems.push("PM retired or inactive");
+  const active = row?.role === "pm" && !inactive(row) && mapping(row?.bloodbank)?.enabled !== false;
+  if (!active) problems.push("PM retired or inactive");
   if (!/^[a-z0-9][a-z0-9_-]*$/u.test(employee ?? "")) problems.push("unsafe PM identifier");
   const roleFile = join(roleDir, "role.yaml");
   let enabled = false;
@@ -49,7 +60,7 @@ export function reconcileCoverage(repoArg: string | undefined, env: LaunchEnv = 
     const policy = mapping(role?.reconcile);
     if (policy?.explicit_opt_out === true || policy?.enabled === false) problems.push(`${roleFile}: explicit reconciliation opt-out`);
     else if (policy?.explicit_opt_out !== false || policy?.enabled !== true) problems.push(`${roleFile}: reconciliation policy not explicitly enabled`);
-    else enabled = true;
+    else enabled = active;
   } catch (e) { problems.push(`${roleFile}: policy unreadable (${(e as Error).message})`); }
   const boards = row ? claimedBoards(row) : [];
   // Registry board_id and project_id may be two aliases for the same Plane project.
@@ -61,7 +72,7 @@ export function reconcileCoverage(repoArg: string | undefined, env: LaunchEnv = 
     const plane = mapping(role?.plane);
     const provider = mapping(role?.ticket_provider);
     const identifier = plane?.identifier ?? provider?.identifier;
-    if (typeof identifier === "string" && /^[A-Z][A-Z0-9]*$/u.test(identifier)) board = identifier;
+    if (typeof identifier === "string" && /^[A-Z0-9]+$/u.test(identifier)) board = identifier;
   } catch { /* policy read reports the error above */ }
   if (!board) problems.push("board identifier missing from PM role");
   let rolePolicy: Record<string, unknown> | undefined;
@@ -79,8 +90,8 @@ export function reconcileCoverage(repoArg: string | undefined, env: LaunchEnv = 
       const label = route.label ?? "(unlabeled)";
       if (route.owner === employee) {
         const scoped = (!allowedScope || allowedScope.includes(label)) && (label !== "(unlabeled)" || (rolePolicy?.unlabeled_intake !== false && routing.claimants.length === 1));
-        const eligible = scoped && route.eligible && (route.declared || route.label === null || routing.claimants.length === 1) && !routing.flags.some((f) => f.code === "multiple-defaults");
-        scopes.push({ board, label, owner: employee, eligible, reason: eligible ? "owned" : route.why });
+        const eligible = enabled && scoped && route.eligible && (route.declared || route.label === null || routing.claimants.length === 1) && !routing.flags.some((f) => f.code === "multiple-defaults");
+        scopes.push({ board, label, owner: employee, eligible, reason: eligible ? "owned" : !active ? "PM retired or inactive" : route.why });
         if (!eligible && label !== "(unlabeled)") problems.push(`${board}/${label}: ambiguous or ineligible ownership`);
       }
     }
@@ -89,25 +100,24 @@ export function reconcileCoverage(repoArg: string | undefined, env: LaunchEnv = 
   const profile = typeof row?.profile_name === "string" ? row.profile_name : "";
   if (!profile) problems.push("PM has no profile");
   if (!/^[a-z0-9][a-z0-9_-]*$/u.test(profile)) problems.push("unsafe PM profile");
-  if (!/^[a-z0-9][a-z0-9_-]*$/u.test(basename(repo))) problems.push("unsafe repository slug for manifest");
+  if (!/^[a-z0-9][a-z0-9_-]*$/u.test(manifestSlug(repo))) problems.push("unsafe repository slug for manifest");
   const driver = existsSync(join(roleDir, ".scripts", SCRIPT)) && existsSync(join(roleDir, ".scripts", "pm-reconcile-liveness.mjs")) && existsSync(join(roleDir, ".scripts", "launch-pass.py"));
   if (!driver) problems.push(`${roleDir}/.scripts/PM reconcile, launch declaration reader or liveness adapter missing; refresh only the owned scripts first`);
   const scripts = join(fleet, "profiles", profile, "scripts");
   const wrapperOk = (p: string, mode: string) => {
-    try { const st = lstatSync(p); return st.isFile() && !st.isSymbolicLink() && Boolean(st.mode & 0o111) && readFileSync(p, "utf8").includes(`exec python3 '${join(roleDir, ".scripts", SCRIPT)}' --${mode}`); }
+    try { const st = lstatSync(p); return st.isFile() && !st.isSymbolicLink() && Boolean(st.mode & 0o111) && readFileSync(p, "utf8").includes(`exec python3 ${shellQuote(join(roleDir, ".scripts", SCRIPT))} --${mode}`); }
     catch { return false; }
   };
   const wrappers = wrapperOk(join(scripts, MONITOR), "monitor") && wrapperOk(join(scripts, BRIEF), "brief");
   const jobs = profile ? readProfileJobs(profile, env).filter((j) => j.script === BRIEF || j.monitor_script === MONITOR || j.name === `${employee} PM reconcile`) : [];
   if (jobs.length > 1) problems.push(`duplicate PM reconcile jobs in ${profile}`);
-  const manifest = join(repo, ".candybars", `${basename(repo)}-pm-reconcile.candybar.toml`);
+  const manifest = join(repo, ".candybars", `${manifestSlug(repo)}-pm-reconcile.candybar.toml`);
   return { ok: problems.length === 0, repo, employee, enabled, board, scopes, problems, driver, wrappers,
     job: jobs.length === 1 ? String(jobs[0]!.id) : null, manifest: existsSync(manifest) ? manifest : null };
 }
 
 export function reconcileAuthority(repo: string | undefined, env: LaunchEnv = {}) {
   const c = reconcileCoverage(repo, env);
-  // The driver never trusts a fallback route on a shared board, nor an inactive PM.
   const owned = c.scopes.filter((s) => s.eligible).map((s) => s.label);
   return { ok: c.ok && owned.length > 0, employee: c.employee, enabled: c.enabled, board: c.board, scopes: owned, problems: c.problems };
 }
@@ -121,6 +131,7 @@ export function reconcileTicketAuthority(repo: string | undefined, labels: strin
   if (registry.error) return { ok: false, employee: c.employee, board: c.board, scope: null, reason: registry.error };
   const agents = agentsOf({ agents: registry.agents });
   const row = mapping(agents[c.employee]);
+  if (inactive(row)) return { ok: false, employee: c.employee, board: c.board, scope: null, reason: "PM retired or inactive" };
   const ids = row ? claimedBoards(row) : [];
   if (ids.length !== 1) return { ok: false, employee: c.employee, board: c.board, scope: null, reason: "board claim changed" };
   const scopeLabels = labels.filter((l) => l.startsWith("repo:"));
@@ -160,10 +171,10 @@ export function installReconcile(repoArg: string | undefined, apply = false, env
       }
     } catch { return { ...result, ok: false, error: "runtime policy malformed" }; }
   }
-  result.actions.push({ target: policyPath, action: existingPolicy === null ? "create" : "unchanged", detail: "local owning-PM policy; no credential" });
+  result.actions.push({ target: policyPath, action: existingPolicy === null ? "create" : "unchanged", detail: "read-only owning-PM policy; automatic board writes disabled" });
   if (!existsSync(join(fleet, "profiles", profile))) return { ...result, ok: false, error: `profile ${profile} missing` };
   if (isSymlink(scripts)) return { ...result, ok: false, error: "profile scripts directory is a symlink" };
-  const wrap = (mode: string) => `#!/usr/bin/env bash\nexec python3 '${driver}' --${mode}\n`;
+  const wrap = (mode: string) => `#!/usr/bin/env sh\nexec python3 ${shellQuote(driver)} --${mode}\n`;
   const targets = [[MONITOR, "monitor"], [BRIEF, "brief"]] as const;
   for (const [file, mode] of targets) {
     const path = join(scripts, file);
@@ -182,7 +193,8 @@ export function installReconcile(repoArg: string | undefined, apply = false, env
     || !Array.isArray(existing.skills) || existing.skills.length !== 0 || mapping(existing.economics)?.max_iterations !== 10)) {
     return { ...result, ok: false, error: "existing reconcile job conflicts; never auto-resume or adopt a drifted job" };
   }
-  const schedule = defaultSchedule(basename(c.repo));
+  const slug = manifestSlug(c.repo);
+  const schedule = defaultSchedule(slug);
   const timezone = DEFAULT_TIMEZONE;
   const jobId = existing ? String(existing.id) : "";
   result.actions.push({ target: `Hermes job ${profile}`, action: existing ? "unchanged" : "create", detail: "external scheduler; lean; no continuity" });
@@ -190,7 +202,7 @@ export function installReconcile(repoArg: string | undefined, apply = false, env
     const stored = String(mapping(existing?.schedule)?.expr ?? "");
     if (!stored || !/^(\S+\s+){4}\S+$/u.test(stored)) return { ...result, ok: false, error: "existing job schedule unavailable" };
   }
-  const manifest = join(c.repo, ".candybars", `${basename(c.repo)}-pm-reconcile.candybar.toml`);
+  const manifest = join(c.repo, ".candybars", `${slug}-pm-reconcile.candybar.toml`);
   let current: Record<string, unknown> | undefined;
   if (existsSync(manifest)) {
     if (isSymlink(manifest)) return { ...result, ok: false, error: "manifest is a symlink" };
@@ -199,14 +211,14 @@ export function installReconcile(repoArg: string | undefined, apply = false, env
   }
   const candy = mapping(current?.candybar);
   const runner = mapping(candy?.runner);
-  if (current && (candy?.name !== `${basename(c.repo)}-pm-reconcile` || candy?.enabled !== false || runner?.kind !== "hermes" || runner?.profile !== profile || (jobId && runner?.job_id !== jobId)
+  if (current && (candy?.name !== `${slug}-pm-reconcile` || candy?.enabled !== false || runner?.kind !== "hermes" || runner?.profile !== profile || (jobId && runner?.job_id !== jobId)
     || candy?.schedule !== mapping(existing?.schedule)?.expr || candy?.timezone !== existing?.timezone)) {
     return { ...result, ok: false, error: "manifest conflicts with owner/job" };
   }
   if (current && !jobId) return { ...result, ok: false, error: "manifest exists without matching Hermes job" };
-  result.actions.push({ target: manifest, action: current ? "unchanged" : "create", detail: "disabled manifest; manual registration after review" });
+  result.actions.push({ target: manifest, action: current ? "unchanged" : "create", detail: "disabled manifest; NOT install-ready: external conditional mutation dependency" });
   if (!apply) return result;
-  // Apply only inert installation files. No Candybar register/resume, no gateway restart.
+  // Retained inert installer prototype, exercised only in isolated fixtures.
   if (existingPolicy === null) { mkdirSync(join(roleDir, "runtime"), { recursive: true }); writeFileSync(policyPath, policyText, { mode: 0o600 }); }
   for (const [file, mode] of targets) {
     const path = join(scripts, file), text = wrap(mode);
@@ -227,7 +239,7 @@ export function installReconcile(repoArg: string | undefined, apply = false, env
   }
   if (!current) {
     mkdirSync(join(c.repo, ".candybars"), { recursive: true });
-    writeFileSync(manifest, `[candybar]\nname = "${basename(c.repo)}-pm-reconcile"\nschedule = "${schedule}"\ntimezone = "${timezone}"\nenabled = false\ntags = ["hermes-agent", "pm", "reconcile"]\n\n[candybar.runner]\nkind = "hermes"\nprofile = "${profile}"\njob_id = "${id}"\ntimeout_s = 1500\n`);
+    writeFileSync(manifest, `[candybar]\nname = "${slug}-pm-reconcile"\nschedule = "${schedule}"\ntimezone = "${timezone}"\nenabled = false\ntags = ["hermes-agent", "pm", "reconcile"]\n\n[candybar.runner]\nkind = "hermes"\nprofile = "${profile}"\njob_id = "${id}"\ntimeout_s = 1500\n`);
   }
   return { ...result, applied: true };
 }
