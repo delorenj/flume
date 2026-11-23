@@ -16,7 +16,7 @@ import { withRegistryLock } from "./role";
 import { placementProblems, placementDrift, projectPlacement, resolvedSuperior } from "./placement";
 import { applyRoleSelection, auditRoleSelection, planRoleSelection, previewRoleSelection, type SelectionContext } from "./selection";
 import { validateNamedAgent } from "./validator";
-import { specialistSchedulingRequest } from "./scheduling";
+import { specialistPolicyRequest, specialistSchedulingRequest } from "./scheduling";
 import { provisionMemberCredential } from "../hire/MemberGatewayCredential";
 
 const EMPLOYMENT = "portable-specialist";
@@ -101,7 +101,7 @@ type Prepared = Awaited<ReturnType<typeof prepare>>;
 function projection(p: Prepared, check: boolean) {
   const adapter = join(resolveFlumeRoot(), "templates/hermes-agent/scripts/hermes-specialist-profile.py");
   const run = spawnSync("python3", [adapter, ...(check ? ["--check"] : [])], {
-    input: JSON.stringify({ ...specialistSchedulingRequest(p.definition, resolveFlumeRoot()), definition: join(p.desk, "agent.yaml") }), encoding: "utf8", timeout: 35_000,
+    input: JSON.stringify({ ...specialistPolicyRequest(p.definition, resolveFlumeRoot()), definition: join(p.desk, "agent.yaml") }), encoding: "utf8", timeout: 35_000,
     env: { ...process.env, HERMES_FLEET_HOME: p.hermesRoot, PYTHONDONTWRITEBYTECODE: "1" },
   });
   if (run.error || run.status !== 0) throw new Error(run.error?.message || run.stderr.trim() || "Specialist profile projection failed");

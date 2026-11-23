@@ -1,6 +1,7 @@
 # `roles/` — what a role IS, as a file you can branch
 
-Every Hermes agent loads one file: `<repo>/agents/hermes/<role>/runtime/SOUL.md`.
+Repo-scoped Hermes agents load `<repo>/agents/hermes/<role>/runtime/SOUL.md`;
+portable specialists load their profile's SOUL (see below).
 Until now nothing owned that file's *role* half. It was an
 `{% if role == "pm" %}` branch inside a copier template, stamped once at hire
 and never re-read — so "where is the PM role codified?" had no answer, and three
@@ -89,8 +90,8 @@ notice for a body. Three titles are retired (2026-11-18), replaced by launch mod
 
 ## The one composer
 
-`composeSoul()` in `packages/flume-hr/src/parity/rules.ts` is the only thing that
-turns these files into a SOUL, and every path goes through it:
+`composeSoul()` in `packages/flume-hr/src/parity/rules.ts` turns these files into
+repo-scoped SOULs. Named agents holding a repo post use the same composer:
 
 - **hire / onboard** — `RunCopierTemplate` composes and writes the SOUL after
   copier returns. `templates/hermes-agent/template/SOUL.md.jinja` no longer
@@ -102,9 +103,43 @@ turns these files into a SOUL, and every path goes through it:
   against what these files compose, so a two-generation-stale SOUL is a finding
   instead of a pass.
 
+- **portable specialists** — these do not hold a repo post and do not use the
+  composer. `specialistPolicyRequest()` in `workforce/scheduling.ts` appends
+  the canonical bounded scheduling and handback sections to an adapter request;
+  `templates/hermes-agent/scripts/hermes-specialist-profile.py` renders that
+  request during public hire/onboard. The owning `agent.yaml`, authored charter,
+  directives and tone stay intact. Generated section markers in an authored
+  charter are refused. Repeat onboarding updates an owned projection and
+  converges; handwritten profile changes remain protected by its ownership receipt.
+
 `templates/hermes-agent/scripts/momo-unify-agent.py` was the third renderer. It
 had no caller and it has been deleted; `~/code/33GOD/momo/spec/momo-agent.spec.yaml`
 is the ancestor of the file format here.
+
+## Shared clean-or-checkpoint handback
+
+`_base.md` owns the single `flume:handback-policy` section. Repo posts receive it
+in the composed frame; portable specialists receive the exact section through the
+shared bounded-section extractor in `scripts/lib/`. There is no handback policy
+copy in role charters, specialist definitions or PM execution templates. Every
+supported non-retired role and the `_default.md` fallback receive it, for named
+and unnamed posts and headless work.
+Retired role composition still refuses rather than overwriting a desk.
+
+This is an instruction contract, not a new cleanup command or scheduler. Owned
+paths alone define cleanliness in a shared checkout. Unfinished or unverified
+work needs a permitted durable checkpoint with changed paths, remaining work,
+actual checks, blocker/owner and an executable next step. No-commit can use a
+permitted durable note; local-only and no-publication restrictions outrank general
+artifact-sharing instructions. Nothing grants authority over another agent's work.
+
+Verify privately after `npm run typecheck` and `npm run build` with
+`node tests/handback-policy-regressions.mjs`. It enumerates roles, exercises the
+real Python adapter and public specialist hire/repeated onboard in disposable
+fixtures, and checks the safety scenarios. Fixture evidence is not a live rollout:
+use the existing owner-approved projection path for deployed desks, preview first;
+never hand-edit a deployed SOUL. PM template writer/retention changes remain with
+their own owners, and no new clock is required.
 
 ## Deployment declaration
 
@@ -185,6 +220,7 @@ ledger's actual effort rather than the configured one.
 | Runtime policy boundary | Source / verification |
 | --- | --- |
 | Recurring schedules, every role | `_base.md` bounded `flume:scheduling-policy` section: Candybar owns the single clock, runners only execute. Portable specialist projection receives the same section through `workforce/scheduling.ts`; no policy copy in a specialist definition or template. |
+| Clean-or-checkpoint handback, every role | `_base.md` bounded `flume:handback-policy` section; repo composer and portable `specialistPolicyRequest()` share exact source bytes. `node tests/handback-policy-regressions.mjs` proves generated coverage, private projection and restrictions, not live compliance. |
 | Instruction drift, current employees | `node scripts/audit-scheduling-policy.mjs` reads the registry and actual profile SOULs, exits nonzero for missing/stale coverage, and never changes employee state. This is not Candybar's runtime bypass-schedule linter. See `docs/scheduling-policy.md`. |
 
 ## Named agents

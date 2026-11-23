@@ -121,7 +121,7 @@ process.on("exit", () => fs.writeFileSync(process.env.RACE_RECEIPT, JSON.stringi
     try {
       mkdirSync(source);
       symlinkSync(join(root, "node_modules"), join(source, "node_modules"), "dir");
-      for (const file of ["scripts/audit-scheduling-policy.mjs", "scripts/lib/scheduling-policy.mjs", "scripts/lib/read-audit-text.mjs", "contracts/role.schema.json"]) {
+      for (const file of ["scripts/audit-scheduling-policy.mjs", "scripts/lib/scheduling-policy.mjs", "scripts/lib/bounded-policy.mjs", "scripts/lib/read-audit-text.mjs", "contracts/role.schema.json"]) {
         mkdirSync(dirname(join(source, file)), { recursive: true }); copyFileSync(join(root, file), join(source, file));
       }
       const script = join(source, "scripts/audit-scheduling-policy.mjs"), base = join(source, "roles/_base.md");

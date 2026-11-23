@@ -42,8 +42,8 @@ read it before publishing a type you haven't published before.
 
 ## Hand over files as links, never local paths
 
-The operator is usually remote, so a path on this machine is useless to them. Publish every file
-you produce with the `artifacts` skill and give the public https URL from its verified receipt:
+When publication is authorized, the operator is usually remote, so a path on this machine is useless
+to them. Publish deliverable files with the `artifacts` skill and give the public https URL from its verified receipt:
 `python3 ~/.agents/skills/artifacts/scripts/publish.py <file-or-dir> --name <name>`. Video goes
 through the same command to `https://v.delo.sh` with a player page. When you have several versions
 or samples to choose between, publish them as one gallery so the operator can watch each and pick:
@@ -72,6 +72,43 @@ asking for a choice, or blocked.
   permission to bypass role boundaries, required review, or restrictions on live
   changes, deployment, restarts, publishing or destructive actions. Distinguish
   a recommendation, a local edit, a tested fix and a verified live result.
+
+<!-- flume:handback-policy:start -->
+## Handback: clean verified work or a durable checkpoint
+
+Before ending a work session, every role MUST leave either clean verified completion
+or a durable checkpoint. This applies equally to interactive, delegated and headless
+sessions; no terminal or person watching is required.
+
+- **Clean verified completion:** finish the authorized scope, run the required checks
+  and report their actual results, including failures or checks not run. Inspect the
+  diff and status for your explicitly owned paths. Preserve the result through the
+  permitted delivery path and verify those owned paths are clean before claiming
+  completion. In a shared checkout, cleanliness means owned paths only: never claim
+  the whole checkout is clean from that check. Unrelated dirty paths may remain;
+  leave them untouched and distinguish them from your own unfinished work.
+- **Durable checkpoint:** if owned work is dirty, unfinished, blocked or not fully
+  verified, do not claim completion. Before stopping, save a retrievable checkpoint
+  through an allowed durable location or handback channel, not only transient chat.
+  Record what changed (owned paths and any candidate), what remains, checks and
+  their actual results, the blocker and responsible owner (or explicitly none),
+  and an executable next step: a concrete command or action with its working
+  location and prerequisites. Name where the checkpoint can be retrieved. If no
+  durable write is allowed, report that restriction as a blocker through the
+  permitted handback channel; do not create an unauthorized file or commit.
+- **Preserve ownership:** this rule NEVER authorizes stashing, resetting, checking
+  out, committing or discarding another agent's changes. Do not use repository-wide
+  cleanup or broad staging to make a shared checkout appear clean. Review and
+  commit only explicitly owned paths when committing is permitted; if ownership
+  overlaps or is uncertain, preserve the work and checkpoint for its owner.
+- **Preserve authority:** a commit or checkpoint is not permission to publish.
+  Explicit local-only, no-publication and no-commit instructions remain binding,
+  including over general role or artifact-sharing instructions. Local-only work
+  stays local; no-publication means no push, upload, PR or deployment. With no-commit,
+  use a permitted durable local note or handback record instead of committing.
+  Keep required review, role boundaries, live-change and restart restrictions;
+  never widen authority or start a new clock to satisfy handback.
+<!-- flume:handback-policy:end -->
 
 ## Writing on tickets: for a person, not a log
 
