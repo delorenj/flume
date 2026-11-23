@@ -18,7 +18,7 @@ try {
   for(const name of ['build','review']) {mkdirSync(join(skillex,'all-skills',name),{recursive:true});writeFileSync(join(skillex,'all-skills',name,'SKILL.md'),`---\nname: ${name}\ndescription: fixture\n---\n`);}
   mkdirSync(join(skillex,'packs','dev'),{recursive:true});writeFileSync(join(skillex,'packs','dev','pack.toml'),'[pack]\nname="dev"\nversion="1.0.0"\n[freeform]\nskills=["build","review"]\n');
   mkdirSync(desk,{recursive:true});
-  const chain=['automaticai/fixture/primary','automaticai/fixture/fallback'];
+  const chain=['automaticai/auto','automaticai/auto/subagent','automaticai/auto/fast'];
   const base={model:{provider:'automaticai',default:'automaticai/fixture/base'},fallback_providers:[{provider:'automaticai',model:'automaticai/fixture/base-fallback'}],providers:{}};
   const catalogPath=join(work,'routes.json');
   writeFileSync(catalogPath,JSON.stringify({routes:[...chain,base.model.default,base.fallback_providers[0].model].map(id=>({id}))}));
@@ -37,6 +37,11 @@ try {
   const cfg=YAML.parse(readFileSync(join(desk,'config.yaml'),'utf8'));
   assert.deepEqual(cfg.skills.external_dirs,[],'a role loadout must never add skills.external_dirs');
   assert.deepEqual([cfg.model.default,...cfg.fallback_providers.map(x=>x.model)],chain);
+  assert.equal(cfg.model.provider,'automaticai');
+  assert.deepEqual(cfg.fallback_providers.map(x=>x.provider),['automaticai','automaticai']);
+  assert.deepEqual(api.declarationProblems(role,'demo-dev',options),[],'catalog fixture accepts every auto-router tier');
+  const absent={...options,catalogModels:chain.slice(1)};
+  assert.ok(api.declarationProblems(role,'demo-dev',absent).some(x=>x.includes('automaticai/auto absent from gateway catalog')),'schema acceptance does not bypass catalog validation');
   const chart=api.buildOrgChart({home,registryPath:registry,orgPath:org});
   const find=n=>n.id==='demo-dev'?n:n.children.map(find).find(Boolean);
   const employee=find(chart.root);
@@ -88,14 +93,22 @@ try {
   const rolesRoot=join(work,'declarations');
   writeFileSync(join(rolesRoot,'roles','dev.md'),'---\n'+YAML.stringify(inherited)+'---\nfixture\n');
   const repo=join(work,'repo');
-  const cliEnv={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath,PJ_SKILLS_REGISTRY_ROOT:skillex};
-  const beforeOrg=readFileSync(org,'utf8'), beforeCfg=readFileSync(join(desk,'config.yaml'),'utf8');
+  const bin=join(work,'bin');mkdirSync(bin,{recursive:true});
+  const gatewayStub=join(bin,'gateway-tokens.py');
+  writeFileSync(gatewayStub,'#!/usr/bin/env python3\nimport sys\nassert sys.argv[1:8] == ["mint", "hermes-demo-dev", "--preset", "owner-no-anthropic", "--group", "aai-personal", "--days"]\nprint("hermes-demo-dev: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev")\n',{mode:0o755});
+  writeFileSync(join(bin,'op'),`#!${process.execPath}\nif(process.argv[2]!=='read'||process.argv[3]!=='op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')process.exit(1);process.stdout.write('private-fixture-readback-value-long-enough');\n`,{mode:0o755});
+  const cliEnv={...process.env,HOME:home,PATH:`${bin}:${process.env.PATH}`,OP_SERVICE_ACCOUNT_TOKEN:'',FLUME_GATEWAY_TOKENS_BIN:gatewayStub,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath,PJ_SKILLS_REGISTRY_ROOT:skillex};
+  const beforeOrg=readFileSync(org,'utf8');
+  let firstOnboardCfg;
   for(let i=0;i<2;i++) {
     const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
     assert.equal(onboard.status,0,`${onboard.stdout}\n${onboard.stderr}`);
+    const configured=readFileSync(join(desk,'config.yaml'),'utf8');
+    if(i===0) firstOnboardCfg=configured;
+    else assert.equal(configured,firstOnboardCfg,'repeat onboard must preserve the credential projection');
   }
   assert.equal(readFileSync(org,'utf8'),beforeOrg);
-  assert.equal(readFileSync(join(desk,'config.yaml'),'utf8'),beforeCfg);
+  assert.equal(YAML.parse(firstOnboardCfg).secrets.onepassword.env.AUTOMATICAI_GATEWAY_KEY,'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev');
   assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
   console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
   // The public onboard path must report an operator's override even when the role has no chain.
