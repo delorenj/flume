@@ -23,11 +23,11 @@ for (const bank of ['agent-bob', 'agent-alice']) {
 const schema = JSON.parse(readFileSync(new URL('../contracts/named-agent.schema.json', import.meta.url)));
 const roleSchema = JSON.parse(readFileSync(new URL('../contracts/role.schema.json', import.meta.url)));
 const baseRole = {role:'dev',department:'engineering'};
-for (const route of ['automaticai/auto','automaticai/auto/orchestrator','automaticai/auto/subagent','automaticai/auto/fast','automaticai/personal/sol-5.5']) {
+for (const route of ['automaticai/auto','automaticai/auto/orchestrator','automaticai/auto/subagent','automaticai/auto/fast','automaticai/personal/sol-5.5','automaticai/auto/legacy-model','automaticai/auto/slow']) {
   assert.deepEqual(api.validateRoleDeclaration({...baseRole,chain:[route]},'demo-dev','demo-dev').chain,[route],`${route} must validate`);
 }
 assert.deepEqual(api.validateRoleDeclaration({...baseRole,chain:['automaticai/auto','automaticai/auto/subagent','automaticai/personal/sol-5.5']},'demo-dev','demo-dev').chain,['automaticai/auto','automaticai/auto/subagent','automaticai/personal/sol-5.5']);
-for (const chain of [[],['automaticai/auto','automaticai/auto'],['automaticai/'],['automaticai/auto/'],['automaticai/auto/slow'],['automaticai/auto/subagent/extra'],['automaticai//model'],['automaticai/personal/'],['other/auto'],['automaticai/auto ']]) {
+for (const chain of [[],['automaticai/auto','automaticai/auto'],['automaticai/'],['automaticai/auto/'],['automaticai/auto/subagent/extra'],['automaticai//model'],['automaticai/personal/'],['other/auto'],['automaticai/auto ']]) {
   assert.throws(() => api.validateRoleDeclaration({...baseRole,chain},'demo-dev','demo-dev'),error => error.diagnostics?.some(d => d.field.startsWith('chain')),`invalid role chain ${JSON.stringify(chain)} must fail schema validation`);
 }
 console.log('PASS FLUME-64 role-chain shapes, nonempty unique chains and malformed routes');

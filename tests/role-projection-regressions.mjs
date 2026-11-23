@@ -42,6 +42,10 @@ try {
   assert.deepEqual(api.declarationProblems(role,'demo-dev',options),[],'catalog fixture accepts every auto-router tier');
   const absent={...options,catalogModels:chain.slice(1)};
   assert.ok(api.declarationProblems(role,'demo-dev',absent).some(x=>x.includes('automaticai/auto absent from gateway catalog')),'schema acceptance does not bypass catalog validation');
+  for(const route of ['automaticai/auto/legacy-model','automaticai/auto/slow']) {
+    assert.deepEqual(api.validateRoleDeclaration({...role,chain:[route]},'demo-dev','demo-dev').chain,[route],`${route} retains legacy account/model syntax`);
+    assert.ok(api.declarationProblems({...role,chain:[route]},'demo-dev',options).some(x=>x.includes(`${route} absent from gateway catalog`)),`${route} is rejected by catalog, not syntax`);
+  }
   const chart=api.buildOrgChart({home,registryPath:registry,orgPath:org});
   const find=n=>n.id==='demo-dev'?n:n.children.map(find).find(Boolean);
   const employee=find(chart.root);
@@ -99,18 +103,30 @@ try {
   writeFileSync(join(bin,'op'),`#!${process.execPath}\nif(process.argv[2]!=='read'||process.argv[3]!=='op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev')process.exit(1);process.stdout.write('private-fixture-readback-value-long-enough');\n`,{mode:0o755});
   const cliEnv={...process.env,HOME:home,PATH:`${bin}:${process.env.PATH}`,OP_SERVICE_ACCOUNT_TOKEN:'',FLUME_GATEWAY_TOKENS_BIN:gatewayStub,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,FLUME_ROLES_ROOT:rolesRoot,FLUME_GATEWAY_CATALOG:options.catalogPath,PJ_SKILLS_REGISTRY_ROOT:skillex};
   const beforeOrg=readFileSync(org,'utf8');
+  // Start the public no-chain path from fleet inheritance, not the earlier explicit auto-chain fixture.
+  const deltaPath=join(desk,'config.delta.yaml');
+  const inheritedDelta=YAML.parse(readFileSync(deltaPath,'utf8'));
+  delete inheritedDelta.model;
+  delete inheritedDelta.fallback_providers;
+  delete inheritedDelta['x-flume-fallback-override'];
+  writeFileSync(deltaPath,YAML.stringify(inheritedDelta));
+  rmSync(join(desk,'role-projection.json'),{force:true});
   let firstOnboardCfg;
   for(let i=0;i<2;i++) {
     const onboard=spawnSync(process.execPath,[join(process.cwd(),'packages/flume-hr/dist/index.js'),'onboard','dev','--target-repo','demo','--skip-telegram','--skip-plane','--local'],{cwd:repo,env:cliEnv,encoding:'utf8',timeout:20000});
     assert.equal(onboard.status,0,`${onboard.stdout}\n${onboard.stderr}`);
     const configured=readFileSync(join(desk,'config.yaml'),'utf8');
+    const projected=YAML.parse(configured);
+    assert.deepEqual(projected.model,{provider:base.model.provider,default:base.model.default},'onboard must restore the declared inherited fleet primary');
+    assert.deepEqual(projected.fallback_providers,base.fallback_providers,'onboard must restore inherited fleet fallbacks in order with providers');
+    assert.equal(projected.secrets.onepassword.env.AUTOMATICAI_GATEWAY_KEY,'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev');
+    assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
+    assert.equal(readFileSync(org,'utf8'),beforeOrg,'onboard must retain org comments and unrelated members');
     if(i===0) firstOnboardCfg=configured;
     else assert.equal(configured,firstOnboardCfg,'repeat onboard must preserve the credential projection');
   }
   assert.equal(readFileSync(org,'utf8'),beforeOrg);
-  assert.equal(YAML.parse(firstOnboardCfg).secrets.onepassword.env.AUTOMATICAI_GATEWAY_KEY,'op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-demo-dev');
-  assert.deepEqual(readdirSync(join(desk,'skills')).filter(n=>!n.startsWith('.')).sort(),['build','review']);
-  console.log('PASS AC-2 caller: flume onboard twice leaves projections and comments unchanged');
+  console.log('PASS AC-2 caller: flume onboard twice restores inherited routing, preserves projections and comments');
   // The public onboard path must report an operator's override even when the role has no chain.
   writeFileSync(join(desk,'config.delta.yaml'),'model: {provider: openai-codex, default: explicit-override}\nfallback_providers:\n  - {provider: openai-codex, model: explicit-fallback}\n');
   for(let i=0;i<2;i++) {
