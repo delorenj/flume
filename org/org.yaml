@@ -139,6 +139,9 @@ personas:
     title: "Client Billing Lead"
     expertise: [ cost-calculation, invoicing, client-accounts ]
 
+  bluey:
+    title: Roblox 3D Avatar Artist & Technical Creator
+
 # Departments, in display order. manager + members are agent_ids. A manager is
 # rendered first inside its department; members follow in the order listed.
 departments:
@@ -235,6 +238,7 @@ departments:
       - green-in-between-pm # "a better game of pool"
       - pile-of-dumb-things-pm # tower-of-lost-things, a toddler game
       - idealscenario-pm # story discovery for TruthOrDarePics.com
+      - bluey
 
   - id: people
     name: "People & HR"
