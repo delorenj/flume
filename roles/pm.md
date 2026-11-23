@@ -88,6 +88,42 @@ Template-governor command contract:
   diff is what you meant. Never hand-edit a deployed `SOUL.md`: the next
   compose overwrites it and the audit will have called it drift in the meantime.
 
+## Continuous replenishment
+
+A held or waiting ticket holds **zero** Krebs implementation slots; preserve its real
+question/dependency/failed-turn hold and immediately seek independent work. After
+**every** hold, the owning PM inspects its declared scope and accepted Todo queue,
+then accepts **and triages** the next authorized, independent Backlog items in
+priority order. Record exact authority, testable acceptance criteria, dependency
+and file-collision checks, launch cut (when declared), and restrictions for each;
+never label a vague request triaged just to fill a slot. Leave already-triaged
+Todo in place: Krebs alone starts at most the scope WIP cap and owns
+`agent:working`. Neither an occupied scope nor unanswered owner questions on
+other tickets are reasons to stop accepting eligible independent work. If no
+Backlog item qualifies, state the exact reason per excluded candidate, not
+"waiting" or "nothing to do". Human holds, live workers, opt-outs and reserved
+product decisions still outrank replenishment. The interval pass supports
+bounded intake+triage; the PM never sends a dispatch itself.
+
+## Owning-PM reconciliation
+
+When installed, Candybar alone wakes the externally pinned PM reconciliation job. Its
+`pm-reconcile.py --monitor` reports stable owned intake and hold facts; `--brief` gives
+only bounded candidates and a plan shape. The PM decides with explicit authority,
+restriction and original-hold evidence, then applies a six-write-cap plan. The
+applier takes the exact launcher owner on `runtime/wip-driver.lock`, refreshes the
+lease, verifies fresh registry routing and Krebs/Candystore liveness, re-reads each
+ticket, and records receipts. It never dispatches or touches `agent:working` or
+`lifecycle:human` (even to comment). Krebs alone takes accepted Todo work.
+
+`reconcile.enabled: false` or `explicit_opt_out: true` is a binding opt-out.
+Unavailable board, registry, scope, liveness or authority means no writes. On a
+shared board, unlabeled intake requires separate ownership routing: a fallback is
+not approval. No age or untagged agent comment clears a hold. `agent:failed`
+requires a diagnosed turn and a named recovery. PMs never treat this pass as
+permission for product publication, spending, legal action or credential changes.
+See `docs/pm-reconciliation.md` for the install and rollback protocol.
+
 ## Launch mode
 
 Launch mode is repo data, not a different role: it is on only while the repo's

@@ -50,7 +50,9 @@ import { formatCommentResult, postComment, verifyComments } from "./workforce/co
 import { formatPlaneCommentResult, verifyPlaneComments } from "./workforce/plane";
 import { runEmployeeCommand } from "./workforce/launcher";
 import { disableLaunch, enableLaunch, formatLaunchPlan, formatLaunchStatus, launchStatus } from "./workforce/launch";
+import { installReconcile, reconcileAuthority, reconcileCoverage, reconcileTicketAuthority } from "./workforce/reconcile";
 import { homedir } from "node:os";
+import { spawnSync } from "node:child_process";
 import YAML from "yaml";
 import { join } from "node:path";
 
@@ -186,6 +188,40 @@ async function launchResult(action: () => unknown, format: (value: any) => strin
     await exitAfterFlush(1);
   }
 }
+
+program.command("reconcile")
+  .description("Inspect owning-PM reconciliation and preview or explicitly install one inert pass")
+  .command("status")
+  .argument("[repo]", "Owning repository (default cwd)")
+  .option("--json", "Machine-readable coverage")
+  .action((repo: string | undefined, opts) => launchResult(() => reconcileCoverage(repo), JSON.stringify, Boolean(opts.json)));
+
+program.commands.find((c) => c.name() === "reconcile")!
+  .command("authority")
+  .argument("[repo]", "Owning repository (default cwd)")
+  .option("--json", "Machine-readable authority for the interval driver")
+  .action((repo: string | undefined, opts) => launchResult(() => reconcileAuthority(repo), JSON.stringify, Boolean(opts.json)));
+
+program.commands.find((c) => c.name() === "reconcile")!
+  .command("install")
+  .argument("[repo]", "One owning repository (default cwd)")
+  .option("--apply", "Install inert wrappers, paused external job and disabled manifest; never register or resume Candybar")
+  .option("--json", "Machine-readable installation plan")
+  .action((repo: string | undefined, opts) => launchResult(() => installReconcile(repo, Boolean(opts.apply)), JSON.stringify, Boolean(opts.json)));
+
+program.commands.find((c) => c.name() === "reconcile")!
+  .command("ticket-authority")
+  .argument("<ref>", "Ticket reference")
+  .argument("[repo]", "Owning repository (default cwd)")
+  .option("--json", "Machine-readable exact-label owner verdict")
+  .action((ref: string, repo: string | undefined, opts) => launchResult(() => {
+    if (!/^[A-Z][A-Z0-9]*-[1-9][0-9]*$/u.test(ref)) return { ok: false, reason: "invalid ref" };
+    const px = spawnSync("px", ["task", "get", ref, "--json"], { cwd: repo ?? process.cwd(), encoding: "utf8", timeout: 30_000 });
+    if (px.status !== 0) return { ok: false, reason: "ticket unavailable" };
+    const t = JSON.parse(px.stdout)?.ticket;
+    if (t?.ref !== ref || !Array.isArray(t.label_names)) return { ok: false, reason: "ticket labels unavailable" };
+    return reconcileTicketAuthority(repo, t.label_names);
+  }, JSON.stringify, Boolean(opts.json)));
 
 launchCommand.command("status")
   .argument("[repo]", "Repository (default: cwd)")
