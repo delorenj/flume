@@ -47,11 +47,13 @@ step 1 "Cloudflare email routing: ${EMAIL} -> ${FORWARD_TO}"
 CF_SCOPED="$(op read 'op://DeLoSecrets/Cloudflare-EmailRouting/token' 2>/dev/null || true)"
 CF_GLOBAL="$(op read 'op://DeLoSecrets/Cloudflare/globalAPIToken' 2>/dev/null || true)"
 CF_EMAIL="${CLOUDFLARE_ACCOUNT_EMAIL:-jaradd@gmail.com}"
+# Credential headers reach curl on stdin (-H @-), never argv, so they stay out of the process list.
+# Request bodies therefore go in as -d arguments, not stdin.
 cf_curl() {
   if [[ "${CF_MODE}" == "global" ]]; then
-    curl -sS -H "X-Auth-Key: ${CF_GLOBAL}" -H "X-Auth-Email: ${CF_EMAIL}" "$@"
+    printf 'X-Auth-Key: %s\nX-Auth-Email: %s\n' "$CF_GLOBAL" "$CF_EMAIL" | curl -sS -H @- "$@"
   else
-    curl -sS -H "Authorization: Bearer ${CF_SCOPED}" "$@"
+    printf 'Authorization: Bearer %s\n' "$CF_SCOPED" | curl -sS -H @- "$@"
   fi
 }
 cf_list() { cf_curl "${CF_API}/zones/${CF_ZONE}/email/routing/rules?per_page=200"; }
@@ -129,7 +131,7 @@ fi
 
 # ── 4. workspace membership ─────────────────────────────────────────────────────
 step 4 "add ${EMAIL} to workspace '${WORKSPACE}'"
-IS_MEMBER="$(curl -sS -H "X-API-Key: ${PLANE_KEY}" \
+IS_MEMBER="$(printf 'X-API-Key: %s\n' "$PLANE_KEY" | curl -sS -H @- \
   "${PLANE_BASE}/api/v1/workspaces/${WORKSPACE}/members/" \
   | python3 -c "
 import sys,json
@@ -147,8 +149,9 @@ else
   # rejected with {"email":["This field is required."]} and a 200-shaped body, so an
   # unchecked POST reports success and invites nobody. Verify the response.
   if (( DRY )); then log "DRY-RUN: would invite ${EMAIL}"; else
-    INV="$(curl -sS -X POST "${PLANE_BASE}/api/v1/workspaces/${WORKSPACE}/invitations/" \
-      -H "X-API-Key: ${PLANE_KEY}" -H 'Content-Type: application/json' \
+    INV="$(printf 'X-API-Key: %s\n' "$PLANE_KEY" \
+      | curl -sS -X POST "${PLANE_BASE}/api/v1/workspaces/${WORKSPACE}/invitations/" \
+      -H @- -H 'Content-Type: application/json' \
       -d "{\"email\":\"${EMAIL}\",\"role\":15}")"
     if echo "$INV" | grep -q '"id"'; then
       log "invitation created"
