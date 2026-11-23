@@ -1,7 +1,7 @@
 // Isolated built-CLI installer prototype checks; not live installation acceptance.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import YAML from "yaml";
@@ -28,7 +28,11 @@ const registry = join(fleet, "agents-registry.yaml");
 const updateRegistry = () => writeFileSync(registry, YAML.stringify({ agents }));
 updateRegistry();
 // Deliberately inherit no provider credentials or production profile selectors.
-const env = { PATH: process.env.PATH, HOME: base, TMPDIR: base, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry,
+const bin = join(base, "bin");
+mkdirSync(bin);
+writeFileSync(join(bin, "px"), "#!/usr/bin/env python3\nimport json,sys\nassert sys.argv[1:3] == ['task','get']\nprint(json.dumps({'ticket':{'ref':sys.argv[3],'label_names':['repo:demo']}}))\n");
+chmodSync(join(bin, "px"), 0o755);
+const env = { PATH: `${bin}:${process.env.PATH}`, HOME: base, TMPDIR: base, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry,
   FLUME_HERMES_PYTHON: join(ROOT, "tests/helpers/fake-hermes-python.py") };
 const cli = (args) => {
   const r = spawnSync("node", [CLI, "reconcile", ...args, "--json"], { env, cwd: repo, encoding: "utf8", timeout: 60000 });
@@ -43,6 +47,10 @@ try {
     assert.equal(c.data.board, "33GOD");
     assert.deepEqual(c.data.scopes.map((s) => s.label).sort(), ["(unlabeled)", "repo:demo"]);
     assert.deepEqual(cli(["authority", repo]).data.scopes, ["repo:demo"]);
+    const exact = cli(["ticket-authority", "33GOD-1", repo]);
+    assert.equal(exact.status, 0, JSON.stringify(exact));
+    assert.equal(exact.data.ok, true);
+    assert.equal(exact.data.scope, "repo:demo");
   });
   check("shared-board unlabeled intake is visible but not authorized", () => {
     assert.equal(cli(["authority", repo]).data.scopes.includes("(unlabeled)"), false);
@@ -97,6 +105,7 @@ try {
       assert.equal(coverage.enabled, false, JSON.stringify(form));
       assert.ok(coverage.scopes.every((s) => !s.eligible));
       assert.equal(cli(["authority", repo]).data.ok, false);
+      assert.equal(cli(["ticket-authority", "33GOD-1", repo]).data.ok, false);
       assert.equal(cli(["install", repo, "--apply"]).status, 1);
     }
     assert.equal(readFileSync(join(profile, "cron/jobs.json"), "utf8"), jobBefore);

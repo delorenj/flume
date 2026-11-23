@@ -215,7 +215,7 @@ program.commands.find((c) => c.name() === "reconcile")!
   .argument("[repo]", "Owning repository (default cwd)")
   .option("--json", "Machine-readable exact-label owner verdict")
   .action((ref: string, repo: string | undefined, opts) => launchResult(() => {
-    if (!/^[A-Z][A-Z0-9]*-[1-9][0-9]*$/u.test(ref)) return { ok: false, reason: "invalid ref" };
+    if (!/^[A-Z0-9]+-[1-9][0-9]*$/u.test(ref)) return { ok: false, reason: "invalid ref" };
     const px = spawnSync("px", ["task", "get", ref, "--json"], { cwd: repo ?? process.cwd(), encoding: "utf8", timeout: 30_000 });
     if (px.status !== 0) return { ok: false, reason: "ticket unavailable" };
     const t = JSON.parse(px.stdout)?.ticket;
