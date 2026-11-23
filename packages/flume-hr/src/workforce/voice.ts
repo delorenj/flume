@@ -85,9 +85,25 @@ function voxBase(generated: Record<string, any>, base: Record<string, any>): str
   return String(url).replace(/\/+$/u, "");
 }
 
+let voxKey: string | null | undefined;
+/** Voxxy's key: $VOX_API_KEY, else the op:// ref in $VOX_API_KEY_REF (read once). The voxxy CLI's convention. */
+export function voxAuthHeaders(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  if (voxKey === undefined || env !== process.env) {
+    let key: string | null = env.VOX_API_KEY?.trim() || null;
+    const ref = env.VOX_API_KEY_REF?.trim();
+    if (!key && ref) {
+      const read = spawnSync("op", ["read", "--no-newline", ref], { encoding: "utf8", timeout: 20_000 });
+      key = read.status === 0 ? read.stdout.trim() || null : null;
+    }
+    if (env !== process.env) return key ? { Authorization: `Bearer ${key}`, "X-API-Key": key } : {};
+    voxKey = key;
+  }
+  return voxKey ? { Authorization: `Bearer ${voxKey}`, "X-API-Key": voxKey } : {};
+}
+
 async function voxVoiceExists(baseUrl: string, voice: string): Promise<{ exists: boolean | null; detail: string }> {
   try {
-    const response = await fetch(`${baseUrl}/voices/${encodeURIComponent(voice)}`, { signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(`${baseUrl}/voices/${encodeURIComponent(voice)}`, { headers: voxAuthHeaders(), signal: AbortSignal.timeout(10_000) });
     if (response.status === 404) return { exists: false, detail: `Vox has no voice "${voice}" (${baseUrl}/voices)` };
     if (!response.ok) return { exists: null, detail: `Vox answered HTTP ${response.status} for voice "${voice}"` };
     return { exists: true, detail: `Vox voice "${voice}" exists` };
