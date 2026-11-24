@@ -202,6 +202,10 @@ const HERMETIC_ENV = {
   // No per-host overlay: a developer's own ~/.config/flume/host-overlay.yaml must not change a suite's outcome.
   // tests/host-overlay-regressions.mjs sets its own overlay for the processes it spawns.
   FLUME_HOST_OVERLAY: "none",
+  // No live scheduler: `flume offboard` archives every Candybar that runs a profile, so a suite must never reach the
+  // host's Candybar API or binary. A suite that tests schedules runs its own fixture server and sets both.
+  FLUME_CANDYBAR_API_URL: "http://127.0.0.1:9",
+  FLUME_CANDYBAR_BIN: "false",
 };
 
 const results = [];

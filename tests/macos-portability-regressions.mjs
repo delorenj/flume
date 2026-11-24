@@ -300,11 +300,13 @@ try {
     const fleet = join(work, "offboard-fleet");
     mkdirSync(join(fleet, "profiles", "mac-repo-pm"), { recursive: true });
     writeFileSync(join(fleet, "agents-registry.yaml"), YAML.stringify({ schema_version: 1, agents: { "mac-repo-pm": { profile_name: "mac-repo-pm" } } }));
-    const env = { HOME: join(work, "offboard-home"), HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: "", HERMES_FLEET_REGISTRY_FILE: "" };
+    // Candybar is unreachable on purpose: a test never reads the live scheduler.
+    const env = { HOME: join(work, "offboard-home"), HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: "", HERMES_FLEET_REGISTRY_FILE: "", FLUME_CANDYBAR_API_URL: "http://127.0.0.1:9" };
     const mac = JSON.parse(run(["offboard", "mac-repo-pm", "--json"], work, { ...env, FLUME_HOST_PLATFORM: "darwin" }).stdout);
     assert.equal(mac.ok, true, JSON.stringify(mac));
     assert.equal(mac.registryPath, join(fleet, "agents-registry.yaml"));
-    assert.ok(mac.leftBehind.some((item) => item.startsWith(`desk ${join(fleet, "profiles", "mac-repo-pm")}`)), JSON.stringify(mac.leftBehind));
+    // offboard is the whole exit now (2026-11-24): the desk is archived, not left behind.
+    assert.ok(mac.steps.some((s) => s.step === "desk" && s.action === "would" && s.detail.includes(join(fleet, "profiles", "mac-repo-pm"))), JSON.stringify(mac.steps));
     assert.ok(mac.leftBehind.some((item) => /not observable on a launchd host.*ai\.hermes\.gateway/u.test(item)), JSON.stringify(mac.leftBehind));
     const linux = JSON.parse(run(["offboard", "mac-repo-pm", "--json"], work, env).stdout);
     assert.equal(linux.leftBehind.some((item) => /launchd/u.test(item)), false);

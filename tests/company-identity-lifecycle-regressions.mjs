@@ -100,7 +100,7 @@ async function world(label, o = {}) {
   };
   gw.save();
   const env = {
-    ...process.env, HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry, HERMES_FLEET_REGISTRY_FILE: registry, HERMES_TEMPLATE_CONFIG: join(dir, "no-config"), HERMES_FLEET_ENV: join(dir, "no-env"),
+    ...process.env, FLUME_CANDYBAR_API_URL: "http://127.0.0.1:9", FLUME_CANDYBAR_BIN: "false", HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry, HERMES_FLEET_REGISTRY_FILE: registry, HERMES_TEMPLATE_CONFIG: join(dir, "no-config"), HERMES_FLEET_ENV: join(dir, "no-env"),
     XDG_STATE_HOME: join(home, ".local/state"), PYTHONDONTWRITEBYTECODE: "1", PATH: `${bin}:${process.env.PATH}`,
     FLUME_IDENTITY_STATE: idState, FLUME_ACCESS_STATE: accessState, FLUME_PROVISION_CONFIG: o.noConfig ? join(dir, "absent.yaml") : configPath,
     FLUME_CLOUDFLARE_API_BASE: cf.url, FLUME_GITHUB_API_BASE: gh.url, FLUME_GITHUB_TIMEOUT_MS: "3000", FLUME_PX_BIN: join(bin, "px"), FLUME_PX_TIMEOUT_MS: "5000",
@@ -623,7 +623,7 @@ try {
     const tomb = stateOf(w).tombstones[w.ada.subject];
     assert.equal(tomb.handle, "ada"); assert.equal(tomb.email, "ada@agents.delo.sh");
     assert.deepEqual(tomb.bindings.map((b) => b.provider).sort(), ["cloudflare_access", "github", "plane"]);
-    w.json(await w.runAsync(["offboard", "ada-pm", "--apply", "--json"]));
+    w.json(await w.runAsync(["offboard", "ada-pm", "--keep-role-dir", "--apply", "--json"]));
     assert.equal(YAML.parse(readFileSync(w.registry, "utf8")).agents["ada-pm"], undefined, "offboard did not remove the row");
     // enroll another post under the retired handle
     const eve = w.post("eve-pm", "eve");
@@ -725,7 +725,7 @@ try {
     w.json(await w.runAsync(["identity", "rotate", "ada-pm", "github", "--credential-ref", REF.adaGithub2, "--apply", "--json"]));
     const adaText = readFileSync(w.adaRole, "utf8");
     const moved = w.post("ada-pm2", "ada", adaText.slice(adaText.indexOf("company_identity:")));
-    w.json(await w.runAsync(["offboard", "ada-pm", "--apply", "--json"]));
+    w.json(await w.runAsync(["offboard", "ada-pm", "--keep-role-dir", "--apply", "--json"]));
     assert.equal(w.block(moved).subject, w.ada.subject);
     // a plane comment receipt for ada, written by the real verifier
     const COMMENT = "b405f5b4-3525-4980-b9b2-4ad40b145d73";
@@ -970,7 +970,7 @@ try {
     const retry = w.json(await w.runAsync(["identity", "retire", "ada-pm", "--apply", "--json"]));
     assert.equal(stepOf(retry, "tombstone").outcome, "already-done");
     assert.equal(stateOf(w).tombstones[w.ada.subject].operation_id, tomb.operation_id);
-    w.json(await w.runAsync(["offboard", "ada-pm", "--apply", "--json"]));
+    w.json(await w.runAsync(["offboard", "ada-pm", "--keep-role-dir", "--apply", "--json"]));
     w.post("eve-pm", "eve");
     const reuse = w.json(await w.runAsync(["identity", "enroll", "eve-pm", "--handle", "ada", "--apply", "--json"]), 1);
     blockedWith(reuse, "handle-tombstoned");
