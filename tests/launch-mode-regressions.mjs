@@ -265,7 +265,7 @@ await check("audit: live is a first-class mode; an enabled pass fails and names 
   assert.equal(json(["launch", "status", repo]).doc.declaration.mode, "live");
 });
 
-await check("audit: a live em or launch-director row is a finding; a retired row is not", () => {
+await check("audit: an em or launch-director row is a finding until it is offboarded, retired or not", () => {
   writeRegistry({
     "demo-pm": row("demo-pm", "em"),
     "demo-launch-director": row("demo-launch-director", "paired-launch-director"),
@@ -274,9 +274,11 @@ await check("audit: a live em or launch-director row is a finding; a retired row
   const r = json(["audit", repo, "--rules", "hermes.launch-mode"]);
   const details = r.doc.rules[0].details.join("\n");
   assert.equal(r.doc.rules[0].status, "fail");
-  assert.match(details, /demo-pm: role em is retired; convert it to pm \(docs\/launch-mode\.md "em to pm conversion"\)/);
-  assert.match(details, /demo-launch-director: role paired-launch-director is retired.*flume retire demo-launch-director --apply/);
-  assert.doesNotMatch(details, /demo-old-ld/, "a retired row (bloodbank off) is never a finding");
+  assert.match(details, /demo-pm: role em is retired; convert it to pm \(docs\/launch-mode\.md "em to pm conversion"\), or run: flume offboard demo-pm --apply/);
+  assert.match(details, /demo-launch-director: role paired-launch-director is retired; .*flume offboard demo-launch-director --apply/);
+  // 2026-11-24: retired (bloodbank off) launch directors sat in the org chart, the status line and Telegram for six
+  // days because a retired row was never a finding. Out of service is not out of the org chart.
+  assert.match(details, /demo-old-ld: role launch-director is retired and the employee is out of service, but still in the org chart.*flume offboard demo-old-ld --apply/);
   assert.equal(r.doc.rules[0].fixable, false);
   const fix = json(["remediate", "hermes.launch-mode", repo]);
   assert.match(JSON.stringify(fix.doc), /blocked/);

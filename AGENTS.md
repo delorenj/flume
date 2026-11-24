@@ -34,7 +34,7 @@ with complexity, and it is the pillar every name in this repo is held to.
 ```
 flume hire <title>            # bring on a new employee for this repo
 flume onboard                 # run the onboarding checklist (idempotent)
-flume offboard <employee>     # retire an employee
+flume offboard <employee> [--reason ".."] [--keep-role-dir] [--restart] [--apply]   # the whole exit, one command: out of service, identity retired (all adapters), its candybars archived, desk unserved live + archived to profiles-retired/, role dir removed from its repo (path-scoped commit, pushed), row archived to agents-retired/ and removed from the registry. Gone from roster, status line and Telegram; reports what only a person can do (@BotFather /deletebot). Preview unless --apply
 flume retire <employee> [--reason ".."] [--apply]  # out of service, record kept: bloodbank off, plane board claim removed, live channels parked; reports who gets each ticket afterwards. Never hand-edit a status to "retire" a PM: a still-claiming row keeps winning the shared board
 
 flume identity enroll <employee>           # company subject + <handle>@agents.delo.sh (preview unless --apply)
@@ -56,6 +56,7 @@ flume identity recall <employee> [--narrow]  # write bank + declared banks most-
 
 flume access serve                         # employee access facade: Cloudflare Access assertion + launcher-signed run; fixture grants, and a real single-repository GitHub App token for service github
 flume access run <employee> -- <cmd>       # trusted launcher for any plain command: only that employee's access in its env
+flume access as <employee> -- <cmd>        # attribution only: PLANE_API_KEY = the employee's own adopted Plane key ref, so px writes from a job, worker pane or script acting for it show the employee, not the operator; `project-pm` = the PM whose project_path holds --cwd
 flume access request --service s --resource r --permission p   # plain client; identity comes from the launcher, never a flag
 flume access request --service github --resource owner/repo --permission issues:write --exec -- <cmd>   # the GitHub token reaches only <cmd>'s env (GH_TOKEN/GITHUB_TOKEN), never output
 flume access github-inspect (--employee e | --app-id id --key-ref op://...)   # read-only: the App and its installations (app-JWT GETs only)

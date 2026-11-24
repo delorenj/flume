@@ -1,7 +1,7 @@
 ---
 name: agent-fleet-operations
 description: |
-  Operate and maintain the Hermes workforce with `flume`: hire/onboard an employee into a repo, the org chart in `~/.hermes/agents-registry.yaml`, the handbook (`contracts/handbook.yaml`), real named profiles with generated base-plus-delta config, ignored local runtime, the single host gateway (`hermes-gateway.service` serves every profile and the Bloodbank lane; an employee owns no unit, and a leftover per-agent `hermes-<agent>-gateway.service` is drift to retire), compliance audits and remediations, credential migration, transactional config recovery, and TTS defaults. Use for `flume hire|onboard|roster|org|record|review|audit|remediate|handbook|launch`, PM launch mode (`.launch.yaml`, the launch pass, retiring launch directors, em-to-pm conversion), `~/.hermes/*`, `hermes-agent-template`, PM deployment verification, generated profiles, gateway state, MCP drift, template propagation, or voice changes. Do NOT use for project bootstrap/identity requests (→ 33god-projects), Plane ticket operations (→ project-lifecycle), Bloodbank event schemas (→ bloodbank-integration), or generic config fan-out (→ agent-config-fanout).
+  Operate and maintain the Hermes workforce with `flume`: hire/onboard an employee into a repo, the org chart in `~/.hermes/agents-registry.yaml`, the handbook (`contracts/handbook.yaml`), real named profiles with generated base-plus-delta config, ignored local runtime, the single host gateway (`hermes-gateway.service` serves every profile and the Bloodbank lane; an employee owns no unit, and a leftover per-agent `hermes-<agent>-gateway.service` is drift to retire), compliance audits and remediations, credential migration, transactional config recovery, and TTS defaults. Use for `flume hire|onboard|offboard|roster|org|record|review|audit|remediate|handbook|launch`, PM launch mode (`.launch.yaml`, the launch pass, offboarding launch directors, em-to-pm conversion), `~/.hermes/*`, `hermes-agent-template`, PM deployment verification, generated profiles, gateway state, MCP drift, template propagation, or voice changes. Do NOT use for project bootstrap/identity requests (→ 33god-projects), Plane ticket operations (→ project-lifecycle), Bloodbank event schemas (→ bloodbank-integration), or generic config fan-out (→ agent-config-fanout).
 ---
 
 # Hermes Workforce Operations
@@ -47,6 +47,7 @@ flume remediate <finding> [repo]   correct one finding
 flume channel list [--employee e]  every employee x platform: status, delta enabled, ref names, live gateway state, active Telegram bot count
 flume channel offline <employee> [--platform p] [--reason ".."] [--apply]   park a channel on purpose (preview unless --apply)
 flume channel online <employee> [--platform p] [--credential-ref op://..] [--apply]   bring it back / rotate to a new bot (getMe-verified)
+flume offboard <employee> [--reason ".."] [--keep-role-dir] [--apply]   the whole exit: retire + identity retired + its candybars archived + desk unserved and archived + role dir removed (pushed) + row archived and removed; gone from roster, status line and Telegram
 flume retire <employee> [--reason ".."] [--apply]   take an employee out of service, keep the row: bloodbank.enabled false AND the plane board claim removed (disabling bloodbank alone still wins the board and drops the ticket), live channels parked via channel offline; prints who gets each ticket per board; the gateway restart stays yours
 flume launch status [repo] [--json]   launch mode on a repo: declaration, pm desk, Hermes job, Candybar state, last run
 flume launch enable [repo] [--dry-run] [--schedule "<cron>"]   wire the launch pass (see "Launch mode"); idempotent
@@ -328,9 +329,9 @@ the first fire with `candybar history <repo>-pm-launch-pass` and the second
 requires the enabled Candybar `<repo>-pm-launch-pass`, an external Hermes job on
 the repo's pm desk and, in a pjangler project, crank on (`flume launch enable`
 runs `pj crank enable` for you); `mode: live`, `mode: steady` or no file requires no enabled launch pass; any
-non-retired registry row whose role is `launch-director`, `paired-launch-director`
-or `em` is a finding that names `flume retire` (directors) or the em-to-pm
-conversion below.
+registry row whose role is `launch-director`, `paired-launch-director` or `em`,
+retired or not, is a finding that names `flume offboard <id> --apply` (or the
+em-to-pm conversion below for a live `em`): out of service is not out of the org chart.
 
 **Retired titles.** `launch-director`, `paired-launch-director` and `em` are
 retired role titles: `flume hire|onboard <title>` refuses with a pointer here (a
@@ -339,15 +340,19 @@ desk's SOUL is never overwritten). The plain `director` title is not retired as 
 role, but the TOLT portfolio desk `tolt-director` is; other repos' directors
 (delonet-director, context-director, ...) are untouched.
 
-**Retire a director desk.** `flume retire <agent> --reason "launch directors retired:
-PM launch mode" --apply` (keeps the row, removes the board claim, parks channels),
-pause its Candybar jobs (`candybar pause <name>`; once the repo no longer defines
-the manifest, `candybar register --prune` archives it), and let the gateway restart
-ride on the one batched `hermes-gateway-restart`. Never delete the desk, its
-hindsight bank or its Telegram vault item. Retired 2026-11-18: `tolt-launch-director`,
-`tolt-director`, `gruvato-launch-director`, `green-in-between-launch-director`
-(jobs `tolt-launch-director-pass`, `tolt-director-pass`, `gruvato-launch-director-pass`,
-`green-in-between-launch-groom`, `green-in-between-launch-weekly`).
+**Offboard a director desk.** `flume offboard <agent> --reason "launch directors
+retired: PM launch mode"` (preview), then the same with `--apply`. One command is the
+whole exit: out of service (`flume retire` under the hood), identity retired with
+every adapter revoked (tombstone kept), every Candybar that runs the profile
+archived, the desk unserved live through the gateway control socket and moved to
+`~/.hermes/profiles-retired/`, the role dir removed from its repo (path-scoped
+commit, pushed; archived copy in `~/.hermes/agents-retired/`), the row archived and
+removed from the registry. No gateway restart. It reports what only a person can do
+(`@BotFather /deletebot` for a bot no other row uses); Hindsight bank and native
+Plane user are kept as history. `flume retire` alone keeps the row: the employee
+stays in the roster, status line and Telegram. Offboarded 2026-11-24 (retired
+2026-11-18): `tolt-launch-director`, `tolt-director`, `gruvato-launch-director`,
+`green-in-between-launch-director`.
 
 **Convert an EM desk to a PM** (`tolt-pm`, `gruvato-pm`; the EM pass
 `tolt-em-pass`/`gruvato-em-pass` is replaced by the launch pass). Full recipe:
@@ -452,7 +457,7 @@ monitor hash matches and the agent never starts. Recipe and measurements:
   | `hermes.delta-list-override` | host | no delta replaces a fleet-base list |
   | `hermes.profile-wiring` | host | each role launcher (`agents/hermes/<title>/hermes`) sets `HERMES_HOME` to the named desk; no dead `HERMES_OAUTH_FILE`. The rule also reads a per-agent unit's `Environment=HERMES_HOME=` when a leftover file exists; that unit is drift whatever its env says. The one host unit runs with `HERMES_HOME=~/.hermes`, which is correct |
   | `hermes.registry-parity` | host | registry ↔ `role.yaml` ↔ `.project.json` agree; `bloodbank` block present; no legacy `consumer_unit`/`checkpoint_timer`/`gateway_unit` under `systemd` |
-  | `hermes.launch-mode` | project | `.launch.yaml` `mode: launch` => enabled Candybar `<repo>-pm-launch-pass` plus an external-pinned Hermes job on the repo's pm desk; `live`/`steady`/absent => no enabled launch pass; a non-retired registry row with role `launch-director`, `paired-launch-director` or `em` is a finding (names `flume retire` or the em-to-pm conversion). See "Launch mode" |
+  | `hermes.launch-mode` | project | `.launch.yaml` `mode: launch` => enabled Candybar `<repo>-pm-launch-pass` plus an external-pinned Hermes job on the repo's pm desk; `live`/`steady`/absent => no enabled launch pass; any registry row with role `launch-director`, `paired-launch-director` or `em`, retired or not, is a finding (names `flume offboard <id> --apply` or the em-to-pm conversion). See "Launch mode" |
   | `hermes.retired-routing` | host | no row with a `retired` channel still has a `plane` board claim or enabled bloodbank, and no Plane board has two `plane.scope_default: true` rows. Not auto-fixable; each finding names `flume retire <id> --apply` |
 
   `hermes.fleet-config` is deliberately **not** auto-fixable: those are fleet-wide

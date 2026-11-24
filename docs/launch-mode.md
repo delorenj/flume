@@ -57,9 +57,10 @@ launcher) is unchanged and is the default when the first word is not `status|ena
   `policy.enabled`). An unreadable Candybar or `pj` is a `warn` (unverified), not a pass.
 - `mode: live`, `mode: steady` or no `.launch.yaml` fails if the `<repo>-pm-launch-pass` Candybar is enabled
   (`flume launch disable`).
-- Any non-retired registry row (`bloodbank.enabled` not false) for the repo with role
-  `launch-director`, `paired-launch-director` or `em` fails, naming `flume retire <id> --apply` for a
-  director or the em-to-pm conversion for an `em`.
+- Any registry row for the repo with role `launch-director`, `paired-launch-director` or `em` fails,
+  retired or not, naming `flume offboard <id> --apply`, or the em-to-pm conversion for a live `em`. A
+  retired row is out of service but still in the org chart (status line, Telegram, roster), so it stays a
+  finding until it is offboarded.
 - Skips a repo with no declaration, no desk and no `.candybars/`.
 - `flume remediate hermes.launch-mode [repo]` is fixable only when the sole problems are pass
   mismatches: it runs `enable` or `disable`. Retired roles and a missing driver are blocked with the
@@ -72,19 +73,27 @@ The composer refuses to render those roles too (`RetiredRoleError`), so a deploy
 overwritten with the notice; `hermes.pm-scaffold` reports such a desk as preserved. The role files stay
 as notices (`roles/README.md`, "Retired roles").
 
-## Retiring a director desk
+## Offboarding a director desk
 
-For each of `tolt-launch-director`, `tolt-director`, `gruvato-launch-director`,
-`green-in-between-launch-director` (never other directors):
+`flume offboard <id>` (preview), then `flume offboard <id> --apply`. One command does the whole exit:
 
-1. `flume retire <id>` (preview), then `flume retire <id> --apply`: bloodbank off, board claim removed,
-   channels parked, row kept. Nothing is deleted: desks, Telegram vault items and Hindsight banks stay.
-2. Pause the director's Candybar jobs (`candybar pause <name>`; `tolt-launch-director-pass`,
-   `tolt-director-pass`, `gruvato-launch-director-pass`, `green-in-between-launch-groom`,
-   `green-in-between-launch-weekly`) and set their manifests `enabled = false`; their Hermes jobs stay
-   pinned external. `hermes.retired-routing` and `hermes.launch-mode` then pass for the row.
-3. Move any receipts, gate docs and policy the director kept into the PM's contract
-   (`.launch.yaml` `contract:`); the PM reads them directly.
+1. **Out of service** (`flume retire` under the hood): bloodbank off, Plane board claim removed, channels parked.
+2. **Identity**: if enrolled, retired with every adapter revoked (mailbox allowlist and routing rule, its own
+   gateway token); the lifecycle tombstone outlives the row. A shared consumer is never revoked.
+3. **Schedules**: every Candybar whose runner runs the profile is archived.
+4. **Desk**: unserved live through the gateway control socket (other profiles untouched), then moved to
+   `~/.hermes/profiles-retired/<profile>-<stamp>`. No gateway restart.
+5. **Role dir**: `agents/hermes/<role>/` in the repo is copied to `~/.hermes/agents-retired/` and removed
+   with a path-scoped commit that is pushed (`--keep-role-dir` skips this).
+6. **Record**: the row is archived to `~/.hermes/agents-retired/<id>-<stamp>.yaml`, then removed from the
+   registry. It no longer appears in `flume roster`, the status line or Telegram.
+
+The report lists what it cannot do: a Telegram bot only its owner can delete (`@BotFather /deletebot`),
+the Hindsight bank and native Plane user (kept for history). Any failed step stops before the row is
+removed, so a re-run picks up where it stopped.
+
+All four retired directors (`tolt-launch-director`, `tolt-director`, `gruvato-launch-director`,
+`green-in-between-launch-director`) were offboarded on 2026-11-24.
 
 ## em to pm conversion
 

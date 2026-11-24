@@ -83,8 +83,8 @@ notice for a body. Three titles are retired (2026-11-18), replaced by launch mod
   (`ValidateHermesOptions`, via `retiredRole()` in `workforce/role.ts`).
 - `composeSoul()` throws `RetiredRoleError` for it, so a deployed desk's SOUL is never overwritten
   with the notice. `flume remediate hermes.pm-scaffold` reports such a desk as preserved and moves on.
-- `hermes.launch-mode` names every non-retired registry row still carrying one of the three roles:
-  retire a director with `flume retire <id> --apply`, convert an `em` desk to `pm`
+- `hermes.launch-mode` names every registry row still carrying one of the three roles, retired or not:
+  offboard it with `flume offboard <id> --apply`, or convert an `em` desk to `pm`
   (`docs/launch-mode.md`, "em to pm conversion"). Retiring a role is a one-line `retired:` block in its
   file; nothing else lists retired roles.
 

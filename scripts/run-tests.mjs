@@ -109,6 +109,7 @@ const SUITES = [
   "tests/plane-enrollment-regressions.mjs",
   "tests/identity-voice-regressions.mjs",
   "tests/retire-regressions.mjs",
+  "tests/offboard-regressions.mjs",
   "tests/macos-portability-regressions.mjs",
   "tests/host-overlay-regressions.mjs",
 ];

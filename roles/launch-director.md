@@ -15,5 +15,5 @@ committed `.launch.yaml` declares the launch, `flume launch enable <repo>` wires
 launch pass, and the PM holds the cut line, records review verdicts, keeps gate receipts
 current, applies the copy gate and records go. `flume hire launch-director` and `flume onboard launch-director`
 refuse this title, and the composer refuses to render it, so a desk is never overwritten with
-this notice. A desk already deployed with this role keeps its SOUL until it is retired (`flume retire <id> --apply`).
+this notice. A desk already deployed with this role keeps its SOUL until it is offboarded (`flume offboard <id> --apply`).
 Why the file stays: history, and a deployed desk must still be recognisable by its role.

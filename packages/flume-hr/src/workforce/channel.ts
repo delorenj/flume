@@ -276,6 +276,22 @@ export async function cycleProfileViaSocket(profile: string): Promise<{ ok: bool
   return { ok: true, detail: `cycled profile ${profile} through the gateway control socket (other profiles untouched)${up.result?.pending ? "; the gateway reported the start as still pending" : ""}` };
 }
 
+/**
+ * unserve ONE profile through the gateway control socket and leave it unserved: every adapter it runs (Telegram, Slack,
+ * the Bloodbank lane) stops now, other profiles are untouched, and no restart is needed. `flume offboard` uses it before
+ * moving the desk away, so the running gateway never writes into (and re-creates) a desk that is being archived.
+ * "not served" counts as done. Never unserves the profile this process runs inside (see callerRunsProfile).
+ */
+export async function unserveProfileViaSocket(profile: string): Promise<{ ok: boolean; self?: true; absent?: true; detail: string }> {
+  if (callerRunsProfile(profile)) return { ok: false, self: true, detail: `not unserved: this command runs inside ${profile}'s own turn; run it from outside the profile` };
+  const socket = join(fleetHome(), "gateway.sock");
+  if (!existsSync(socket)) return { ok: false, absent: true, detail: "no gateway control socket (is the gateway running?)" };
+  const down = await controlRequest(socket, "unserve-profile", { name: profile }, 15_000);
+  if (down.ok) return { ok: true, detail: `unserved profile ${profile} through the gateway control socket (other profiles untouched)` };
+  if (/not served/u.test(down.error ?? "")) return { ok: true, detail: `profile ${profile} was not served` };
+  return { ok: false, detail: `unserve-profile: ${down.error}` };
+}
+
 async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offline" | "online", options: ChannelOptions): Promise<GatewayPickup> {
   const gateway = readGateway();
   const key = `${employee.profile}:${platform}`;

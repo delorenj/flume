@@ -265,12 +265,15 @@ async function runHire(title: string, options: Record<string, unknown>): Promise
 program
   .command("offboard")
   .argument("<employee>", "Employee id, e.g. 33god-pm")
-  .description("Remove an employee's record from the org chart")
+  .description("An employee leaves: out of service, identity retired, schedules archived, profile unserved, desk archived, role directory removed from its repo, record archived and the row removed (dry run unless --apply)")
+  .option("--reason <text>", "Why; recorded on parked channels, the role-dir commit and the record archive")
+  .option("--keep-role-dir", "Leave <repo>/agents/hermes/<role> in its repository")
+  .option("--restart", "Finish with one hermes-gateway-restart (not needed when the profile could be unserved)")
   .option("--apply", "Write the change (default is a dry run)")
   .option("--json", "Output machine-parseable JSON")
   .action(async (employee: string, options) => {
     guardBrokenPipe();
-    const result = offboardEmployee(employee, { apply: Boolean(options.apply) });
+    const result = await offboardEmployee(employee, { apply: Boolean(options.apply), reason: options.reason, keepRoleDir: Boolean(options.keepRoleDir), restart: Boolean(options.restart) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
   });

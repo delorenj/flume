@@ -99,7 +99,7 @@ export interface Desk {
   profile: string;
   roleDir: string;
   displayName: string;
-  /** A retired row (`flume retire`): bloodbank off. Never a launch desk, never a finding. */
+  /** A retired row (`flume retire`): bloodbank off. Never a launch desk; a finding only while its title is a retired launch role (it still sits in the org chart until `flume offboard`). */
   retired: boolean;
   row: Row;
 }
@@ -416,9 +416,12 @@ export function launchProblems(input: {
   const { declaration, candybar } = input;
   for (const desk of input.deskExtras) {
     fixable = false;
-    problems.push(desk.role === "em"
-      ? `${desk.id}: role em is retired; convert it to pm (docs/launch-mode.md "em to pm conversion")`
-      : `${desk.id}: role ${desk.role} is retired; launch mode on the PM replaced it; run: flume retire ${desk.id} --apply`);
+    // A row with a retired title is a finding until it leaves the org chart. `flume retire` (record kept) used to clear
+    // it, which is how three launch directors stayed in the registry, the status line and Telegram for six days after
+    // launch mode replaced them (2026-11-18 to 2026-11-24). `flume offboard` is the whole exit.
+    problems.push(desk.role === "em" && !desk.retired
+      ? `${desk.id}: role em is retired; convert it to pm (docs/launch-mode.md "em to pm conversion"), or run: flume offboard ${desk.id} --apply`
+      : `${desk.id}: role ${desk.role} is retired${desk.retired ? " and the employee is out of service, but still in the org chart" : ""}; launch mode on the PM replaced it; run: flume offboard ${desk.id} --apply`);
   }
   if (declaration.mode === "invalid" && declaration.error) { fixable = false; problems.push(declaration.error); }
   const enabled = candybar.state === "enabled";
@@ -457,7 +460,7 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
   const jobs = desk ? launchJobsOf(desk.profile, env) : [];
   const wrappers = names ? { monitor: wrapperOk(names.monitorPath, "monitor", names), brief: wrapperOk(names.briefPath, "brief", names) } : { monitor: false, brief: false };
   const manifest = names ? readManifest(names.manifestPath) : { exists: false };
-  const extras = desksOfRepo(repoRoot, env).filter((d) => !d.retired && (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
+  const extras = desksOfRepo(repoRoot, env).filter((d) => (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
   const driver = names ? existsSync(names.driverPath) : false;
   const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
   const { problems } = launchProblems({ declaration, desk: found, deskExtras: extras, driver, wrappers, jobs, manifestExists: manifest.exists, candybar, crank, ...(names ? { names } : {}) });
@@ -704,7 +707,7 @@ function readLaunchMode(repoRoot: string, homeDir: string): LaunchModeReading {
   const candybar: CandybarState = declaration.mode === "launch" || hasCandybars ? candybarState(repoRoot, candybarName) : { observable: true, state: "unregistered" };
   const jobs = found.desk ? launchJobsOf(found.desk.profile, env) : [];
   const wrappers = names ? { monitor: wrapperOk(names.monitorPath, "monitor", names), brief: wrapperOk(names.briefPath, "brief", names) } : { monitor: false, brief: false };
-  const extras = desks.filter((d) => !d.retired && (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
+  const extras = desks.filter((d) => (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
   const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
   const { problems: all, fixable } = launchProblems({
     declaration, desk: found, deskExtras: extras, driver: names ? existsSync(names.driverPath) : false, wrappers, jobs,
@@ -733,7 +736,7 @@ export const launchModeCheck: RecipeOwnedCheck = {
     const reading = readLaunchMode(ctx.repoRoot, ctx.homeDir);
     if (reading.skip || reading.problems.length === 0) return { ...base, status: "noop", summary: "launch mode already consistent", details: [] };
     if (!reading.fixable) {
-      return { ...base, status: "blocked", summary: "Retired roles and a missing driver are per-employee decisions: retire the row (flume retire <id> --apply), convert em to pm (docs/launch-mode.md), or refresh the desk scripts", details: reading.problems };
+      return { ...base, status: "blocked", summary: "Retired roles and a missing driver are per-employee decisions: offboard the employee (flume offboard <id> --apply), convert em to pm (docs/launch-mode.md), or refresh the desk scripts", details: reading.problems };
     }
     const env: LaunchEnv = { home: ctx.homeDir };
     const plan = declaration.mode === "launch" ? enableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun }) : disableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun });

@@ -492,8 +492,8 @@ FLUME-39 provisions on hire through `gateway-tokens.py`. Every gateway row and r
 `evidence_status`. A missing path, empty directory or blank document is `unverified`; a nonempty regular owner document
 links the evidence (`present`), but does not prove a live gateway request. A generated desk config is never usage evidence.
 
-**Tombstones.** Retire records the subject, handle, email and binding keys in the lifecycle state. `flume offboard` removes only the
-registry row, but enroll, bind, status, suspend, restore and rotate consult the tombstone: `handle-tombstoned`, `subject-tombstoned`,
+**Tombstones.** Retire records the subject, handle, email and binding keys in the lifecycle state. `flume offboard` retires the identity
+first (all adapters) when it is still active, then removes the registry row; the tombstone outlives the row, so enroll, bind, status, suspend, restore and rotate consult the tombstone: `handle-tombstoned`, `subject-tombstoned`,
 `binding-tombstoned` and `retired-terminal`. A tombstone matches a definition by its subject OR its handle, so a retired
 `role.yaml` reverted to `active` (a `git checkout`) and a fresh subject hand-written around a retired handle are both still retired.
 The facade (`/v1/access/requests` and `/v1/mail/authorize`) and the launcher (`flume launch`, `flume access run`) refuse them
