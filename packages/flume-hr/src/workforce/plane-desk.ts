@@ -17,8 +17,10 @@
 // Suspended and retired employees are never projected (and reported). An employee with no adopted binding keeps the
 // shared key: "shared-key: not yet enrolled" is a fact, not a failure. Nothing here reads or prints a secret value: only
 // `op://` reference text.
-import { existsSync, lstatSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, join, sep } from "node:path";
+import YAML from "yaml";
+import { resolveAgentRegistryPath } from "../kernel/fleet-paths";
 import { deskProfileOf, identityCensus, resolveEmployee, type IdentityCensus, type IdentityDefinition } from "./company";
 import { appendPlaneReceipt, planeAdoptionVerified, planeBindingOf } from "./plane";
 import { readRef, type RefRead } from "./gateway-desk";
@@ -274,4 +276,24 @@ export function employeePlaneKeyRef(employee: string): string {
     throw new Error(`${employee} has no usable Plane identity of its own (${row.standing}): ${row.detail}`);
   }
   return row.want;
+}
+
+/**
+ * The PM that owns the project a directory belongs to: the registry row whose `project_path` is the deepest one that
+ * contains `dir` (role `pm`). A worker pane, loop or script running inside a repo acts for that repo's PM.
+ */
+export function projectOwnerOf(dir: string, registryPath = resolveAgentRegistryPath()): string {
+  const target = realpathSync(dir);
+  const doc = YAML.parse(readFileSync(registryPath, "utf8")) ?? {};
+  const rows: Record<string, any> = doc.agents ?? doc;
+  let best: { id: string; depth: number } | null = null;
+  for (const [id, row] of Object.entries(rows)) {
+    if (!row || typeof row !== "object" || row.role !== "pm" || typeof row.project_path !== "string") continue;
+    let root: string;
+    try { root = realpathSync(row.project_path); } catch { continue; }
+    if (target !== root && !target.startsWith(root + sep)) continue;
+    if (!best || root.length > best.depth) best = { id, depth: root.length };
+  }
+  if (!best) throw new Error(`No PM owns ${target} (no registry row with role pm and a project_path containing it)`);
+  return best.id;
 }

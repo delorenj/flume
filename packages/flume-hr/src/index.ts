@@ -639,13 +639,14 @@ accessCmd
 
 accessCmd
   .command("as")
-  .argument("<employee>", "Enrolled employee (registry id, desk name or person)")
+  .argument("<employee>", "Enrolled employee (registry id, desk name or person), or `project-pm`: the PM whose project_path contains --cwd")
   .argument("<command...>", "Command to run, after --")
   .option("--cwd <directory>", "Working directory (default: caller's current directory)")
   .description("Run a command whose Plane writes (px) are attributed to <employee>: PLANE_API_KEY = its own adopted key reference; nothing else changes. For jobs, workers and scripts acting for an employee outside its desk")
   .action(async (employee: string, command: string[], options) => {
     try {
-      const { employeePlaneKeyRef } = await import("./workforce/plane-desk");
+      const { employeePlaneKeyRef, projectOwnerOf } = await import("./workforce/plane-desk");
+      if (employee === "project-pm") employee = projectOwnerOf(options.cwd ?? process.cwd());
       const ref = employeePlaneKeyRef(employee);
       const { spawn } = await import("node:child_process");
       const { resolve } = await import("node:path");
