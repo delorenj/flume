@@ -256,3 +256,22 @@ export const PLANE_CREDENTIAL_CHECK: RecipeCheck = { id: PLANE_CREDENTIAL_RULE, 
 
 /** For a caller that wants to know whether a desk exists without opening one. */
 export const deskExists = (profile: string): boolean => existsSync(deskDirOf(profile)) && realDir(deskDirOf(profile));
+
+/** Standings whose `want` is the employee's own adopted, Pilot-verified key. */
+const OWN_KEY_STANDINGS: ReadonlySet<PlaneDeskStanding> = new Set(["own-key", "projectable", "no-desk", "blocked"]);
+
+/**
+ * The employee's own adopted Plane key reference, for a writer that acts for it OUTSIDE its desk: a Candybar job, a
+ * worker pane a PM dispatched, a fan-out script, a service. The desk carries this reference already (projection above);
+ * everything else that files on the employee's board fell back to Pilot's shared default and showed the operator as
+ * author (2026-11-17..24: 459 of 586 new tickets). Same proof as the projection: active, bound, adopted, verified.
+ * Returns the `op://` reference only; Pilot resolves it at the point of use.
+ */
+export function employeePlaneKeyRef(employee: string): string {
+  const census = identityCensus();
+  const row = planeDeskRow(census, resolveEmployee(census, employee));
+  if (row.status !== "active" || !row.want || !OWN_KEY_STANDINGS.has(row.standing)) {
+    throw new Error(`${employee} has no usable Plane identity of its own (${row.standing}): ${row.detail}`);
+  }
+  return row.want;
+}

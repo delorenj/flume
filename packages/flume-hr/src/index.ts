@@ -638,6 +638,27 @@ accessCmd
   });
 
 accessCmd
+  .command("as")
+  .argument("<employee>", "Enrolled employee (registry id, desk name or person)")
+  .argument("<command...>", "Command to run, after --")
+  .option("--cwd <directory>", "Working directory (default: caller's current directory)")
+  .description("Run a command whose Plane writes (px) are attributed to <employee>: PLANE_API_KEY = its own adopted key reference; nothing else changes. For jobs, workers and scripts acting for an employee outside its desk")
+  .action(async (employee: string, command: string[], options) => {
+    try {
+      const { employeePlaneKeyRef } = await import("./workforce/plane-desk");
+      const ref = employeePlaneKeyRef(employee);
+      const { spawn } = await import("node:child_process");
+      const { resolve } = await import("node:path");
+      process.exitCode = await new Promise<number>((done, fail) => {
+        const child = spawn(command[0]!, command.slice(1), { cwd: resolve(options.cwd ?? process.cwd()), stdio: "inherit",
+          env: { ...process.env, PLANE_API_KEY: ref, FLUME_PLANE_AS: employee } });
+        child.once("error", error => fail(new Error(`Cannot run ${command[0]}: ${error.message}`)));
+        child.once("close", (code, signal) => done(code ?? (signal ? 1 : 0)));
+      });
+    } catch (error) { console.error((error as Error).message); process.exitCode = 1; }
+  });
+
+accessCmd
   .command("request")
   .argument("[command...]", "With --exec: the consumer to run, after --")
   .description("Request access as the launched employee; identity comes from the launcher's environment, never a flag")
