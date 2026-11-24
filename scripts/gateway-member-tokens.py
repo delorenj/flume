@@ -270,10 +270,19 @@ def main():
     try:
         renderer = load_module("flume_member_renderer", RENDERER)
         def mint(consumer, group, gateway_bin):
-            command = ["python3", str(gateway_bin), "mint", consumer, "--preset", "owner-no-anthropic",
-                       "--group", group, "--days", "-1"]
-            response = subprocess.run(command, capture_output=True, text=True, timeout=args.deadline,
-                                      env={**os.environ, "OP_CACHE": "off"})
+            env = {**os.environ, "OP_CACHE": "off"}
+            def call(*verb):
+                return subprocess.run(["python3", str(gateway_bin), *verb, consumer, "--preset", "owner-no-anthropic",
+                                       "--group", group, *([] if verb[0] == "scope" else ["--days", "-1"])],
+                                      capture_output=True, text=True, timeout=args.deadline, env=env)
+            response = call("mint")
+            if response.returncode:
+                # The preset's route set moves under live tokens (27 -> 33 routes by 2026-11-24), and mint
+                # refuses a token whose scope no longer equals it. `scope` re-scopes that one tracked token in
+                # place (same key, same expiry; fail-closed on expired, disabled, untracked or foreign-group),
+                # so the employee keeps its key. Anything else still fails the mint below.
+                if call("scope").returncode == 0:
+                    response = call("mint")
             return response.returncode, response.stdout
         for profile in dict.fromkeys(args.members.split(",")):
             results.append(provision(profile, renderer, mint, apply=args.apply, render=args.render,

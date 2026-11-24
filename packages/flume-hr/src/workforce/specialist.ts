@@ -105,7 +105,10 @@ function projection(p: Prepared, check: boolean) {
     env: { ...process.env, HERMES_FLEET_HOME: p.hermesRoot, PYTHONDONTWRITEBYTECODE: "1" },
   });
   if (run.error || run.status !== 0) throw new Error(run.error?.message || run.stderr.trim() || "Specialist profile projection failed");
-  return JSON.parse(run.stdout) as { changed: string[]; write_bank: string; recall_banks: string[] };
+  // replaced_drift: base-owned leaves a moved fleet base or a Hermes migration left in config.yaml; onboard
+  // re-renders them and keeps the replaced bytes at `backup` (null in --check).
+  return JSON.parse(run.stdout) as { changed: string[]; write_bank: string; recall_banks: string[];
+    replaced_drift?: { paths: string[]; backup: string | null } };
 }
 function row(p: Prepared) {
   return { employment: EMPLOYMENT, definition_path: join(p.desk, "agent.yaml"), desk_path: p.desk,
@@ -277,7 +280,10 @@ export async function auditSpecialist(employee: string) {
   const marker = ownership(p, false);
   if (marker.status !== "complete") throw new Error("Incomplete specialist publication: desk marker is pending");
   const config = projection(p, true);
-  const problems = [...config.changed.map(file => `Profile projection differs: ${file}`), ...await auditRoleSelection(employee, p.profile, p.definition.skills, p.selection)];
+  const drift = config.replaced_drift?.paths ?? [];
+  const problems = [...config.changed.map(file => file === "config.yaml" && drift.length
+    ? `Profile projection differs: config.yaml (base-owned drift from a moved fleet base or a Hermes migration: ${drift.slice(0, 6).join(", ")}${drift.length > 6 ? ` +${drift.length - 6} more` : ""}; onboard re-renders it and keeps a backup)`
+    : `Profile projection differs: ${file}`), ...await auditRoleSelection(employee, p.profile, p.definition.skills, p.selection)];
   if (p.definition.department || p.definition.reports_to || p.definition.title) {
     try { problems.push(...placementDrift(employee, p.definition, p.placement)); }
     catch (error) { problems.push(`Placement unreadable: ${(error as Error).message}`); }
@@ -342,7 +348,9 @@ export async function launchSpecialist(employee: string, args: string[], cwd = p
     // the projection. Converge through the same onboarding refresh an operator would run; it still
     // refuses handwritten changes and foreign skills, so only benign drift heals here.
     try {
-      await hireSpecialist(join(environment().home, ".agents/workforce", employee, "agent.yaml"), true, { expectedEmployee: employee });
+      const refreshed: any = await hireSpecialist(join(environment().home, ".agents/workforce", employee, "agent.yaml"), true, { expectedEmployee: employee });
+      const replaced = refreshed?.projection?.replaced_drift;
+      if (replaced?.paths?.length) process.stderr.write(`flume: ${employee}: re-rendered ${replaced.paths.length} base-owned config.yaml value(s) a Hermes migration or moved fleet base left behind (${replaced.paths.slice(0, 4).join(", ")}${replaced.paths.length > 4 ? ", ..." : ""}); previous bytes: ${replaced.backup}\n`);
     } catch (error) {
       throw new Error(`Specialist launch refused: ${audited.problems.join("; ")}; onboarding refresh failed: ${(error as Error).message}`);
     }
