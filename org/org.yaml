@@ -41,7 +41,13 @@ ceo:
 personas:
   peggy-olson:
     title: "Director of Marketing — 33GOD"
-    expertise: [ platform-positioning, product-marketing, editorial-direction, launch-narratives ]
+    expertise:
+      [
+        platform-positioning,
+        product-marketing,
+        editorial-direction,
+        launch-narratives
+      ]
   gruvato-pm:
     title: "Project Manager — Gruvato (launch mode)"
     expertise: [ orchestration, delivery, launch-mode, cut-line, mobile-deploy-hub ]
@@ -138,9 +144,11 @@ personas:
   milkshake-pm:
     title: "Client Billing Lead"
     expertise: [ cost-calculation, invoicing, client-accounts ]
-
   bluey:
     title: Roblox 3D Avatar Artist & Technical Creator
+  steve-jobs:
+    title: "Director of Product Monetization & Creative Product Engineering"
+    expertise: [ monetization-register, product-strategy, pricing-hypotheses, demand-validation, creative-product-concepts ]
 
 # Departments, in display order. manager + members are agent_ids. A manager is
 # rendered first inside its department; members follow in the order listed.
@@ -239,6 +247,7 @@ departments:
       - pile-of-dumb-things-pm # tower-of-lost-things, a toddler game
       - idealscenario-pm # story discovery for TruthOrDarePics.com
       - bluey
+      - steve-jobs
 
   - id: people
     name: "People & HR"
