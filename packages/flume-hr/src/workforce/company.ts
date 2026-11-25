@@ -21,7 +21,7 @@ import YAML from "yaml";
 import { resolveFlumeRoot } from "../kernel/paths";
 import { copierFleetPaths } from "../hire/PreserveRegistryComments";
 import { renderDeskContract } from "./desk";
-import { appendLifecycleLedger, readTombstones, tombstoneFor, type Tombstone } from "./lifecycle-state";
+import { appendLifecycleLedger, readLifecycleState, readTombstones, tombstoneFor, type Tombstone } from "./lifecycle-state";
 import { githubBindingOf, githubBindingProblems, githubCredentialRefProblem, githubEvidence, resolveGithubBotActor } from "./github";
 import { readRoleIdentity } from "./identity";
 import { accessIssuanceReservation } from "./access-issuance";
@@ -378,7 +378,20 @@ export async function enrollEmployee(employee: string, options: IdentityOptions 
 }
 
 /** Record local employment status. Never touches a provider. */
-export async function setEmployeeStatus(employee: string, status: string, options: IdentityOptions & { lifecycle?: true } = {}) {
+/**
+ * The one exception to "retired is terminal": `flume rehire` lifts a tombstone (moved whole into the lifecycle state's
+ * `unretired` history under operation `unretire`) and then, and only then, may move the definition from retired to
+ * suspended. The operation id must name the newest lift recorded for this very subject, and no tombstone may remain for it.
+ */
+function unretireAuthorized(block: CompanyIdentity, operationId: string | undefined, status: string): boolean {
+  if (!operationId || status !== "suspended" || block.status !== "retired") return false;
+  const state = readLifecycleState();
+  if (state.tombstones[block.subject]) return false;
+  const last = (state.unretired?.[block.subject] ?? []).at(-1);
+  return Boolean(last && last.operation_id === operationId && last.tombstone.subject === block.subject && last.tombstone.handle === block.handle);
+}
+
+export async function setEmployeeStatus(employee: string, status: string, options: IdentityOptions & { lifecycle?: true; unretire?: string } = {}) {
   const run = async () => {
     const census = identityCensus();
     const target = resolveEmployee(census, employee);
@@ -388,7 +401,7 @@ export async function setEmployeeStatus(employee: string, status: string, option
     else if (target.problem) blockers.push({ code: "invalid-definition", detail: target.problem, path: target.path });
     else if (stat(target.path)?.isSymbolicLink()) blockers.push({ code: "invalid-definition", detail: `refusing symlinked definition ${target.path}`, path: target.path });
     else if (!target.block) blockers.push({ code: "not-enrolled", detail: `${employee} has no company identity; enroll first` });
-    else if (target.block.status === "retired" && status !== "retired") blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
+    else if (target.block.status === "retired" && status !== "retired" && !unretireAuthorized(target.block, options.unretire, status)) blockers.push({ code: "retired-terminal", detail: "a retired identity is a tombstone and never returns to service" });
     if (status === "retired" && !options.lifecycle) blockers.push({ code: "retirement-requires-lifecycle", detail: `use flume identity retire ${employee} [--apply] to preserve the permanent identity tombstone and report residual provider access` });
     if (target.block && target.block.status !== "retired" && status !== "retired") {
       // The registry row may be gone and the block hand-edited back to active (or hand-written around a retired handle): the tombstone still answers.

@@ -496,6 +496,13 @@ links the evidence (`present`), but does not prove a live gateway request. A gen
 first (all adapters) when it is still active, then removes the registry row; the tombstone outlives the row, so enroll, bind, status, suspend, restore and rotate consult the tombstone: `handle-tombstoned`, `subject-tombstoned`,
 `binding-tombstoned` and `retired-terminal`. A tombstone matches a definition by its subject OR its handle, so a retired
 `role.yaml` reverted to `active` (a `git checkout`) and a fresh subject hand-written around a retired handle are both still retired.
+
+The one way back is `flume rehire`, and only for a tombstone THIS offboard made: the archive must name the retire operation
+(`identity_operation_id`, or for older archives the offboard's own time window) and the ledger must hold that `retire` line.
+The tombstone is then moved, whole, into `unretired[<subject>]` (a history entry with the archive path, proof and operation id), a
+`lifecycle.unretire` pair of ledger lines is appended, and `setEmployeeStatus` accepts retired -> suspended for exactly that
+operation id; `flume identity restore` then reopens the mailbox and writes `active` last. A tombstone `flume identity retire` made
+on its own, or one the archive cannot place inside its run, is never lifted; `status`, `suspend` and `restore` stay `retired-terminal`.
 The facade (`/v1/access/requests` and `/v1/mail/authorize`) and the launcher (`flume launch`, `flume access run`) refuse them
 `employee-retired`; tombstones that cannot be read fail CLOSED (facade 503 `lifecycle-state-unavailable`, launch refused). Only a
 state file that does not EXIST reads as "no tombstones": one behind a directory that cannot be searched, or that cannot be read

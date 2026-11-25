@@ -26,6 +26,23 @@ export interface ContinuityBaseline {
   bindings: Record<string, { principal: string; instance?: string; native_actor_id?: string; credential_ref?: string }>;
   definition: string; posts: string[];
 }
+/**
+ * A tombstone lifted by `flume rehire`: never deleted, moved here whole with who lifted it, when, and the offboard archive
+ * that proved the retirement was that offboard's own. Append-only per subject.
+ */
+export interface UnretireRecord {
+  tombstone: Tombstone;
+  unretired_at: string;
+  operation_id: string;
+  /** The `agents-retired/<id>-<stamp>.yaml` offboard archive that proved the tombstone. */
+  archive: string;
+  /** How the archive proved it: the recorded retire operation id, or the offboard's time window. */
+  proof: "operation-id" | "offboard-window";
+  reason: string;
+  /** The status the definition was moved to; `flume identity restore` takes it the rest of the way. */
+  to: "suspended";
+}
+
 export interface LifecycleState {
   version: 1;
   /** subject -> step key -> record. */
@@ -34,9 +51,11 @@ export interface LifecycleState {
   captures: Record<string, Record<string, unknown>>;
   tombstones: Record<string, Tombstone>;
   continuity: Record<string, ContinuityBaseline>;
+  /** subject -> every tombstone `flume rehire` lifted, oldest first. Absent in state written before 2026-11-24. */
+  unretired: Record<string, UnretireRecord[]>;
 }
 
-export const emptyLifecycleState = (): LifecycleState => ({ version: 1, steps: {}, captures: {}, tombstones: {}, continuity: {} });
+export const emptyLifecycleState = (): LifecycleState => ({ version: 1, steps: {}, captures: {}, tombstones: {}, continuity: {}, unretired: {} });
 
 export const lifecycleStatePath = (env: NodeJS.ProcessEnv = process.env): string => join(identityStateDir(env), LIFECYCLE_STATE_FILE);
 export const lifecycleLedgerPath = (env: NodeJS.ProcessEnv = process.env): string => join(identityStateDir(env), LIFECYCLE_LEDGER_FILE);

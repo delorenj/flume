@@ -357,8 +357,34 @@ export const mailAdapter: LifecycleAdapter = {
     const address = ctx.block.email.toLowerCase();
     const key = `mail:allowlist-delete:${address}`;
     const captured = ctx.captures.mail_allowlist as { key?: string; record?: unknown } | undefined;
-    if (!ctx.steps[key] && !captured) return [];
-    return [{
+    const steps: PlannedStep[] = [];
+    // Only a retire disables the routing rule, and a retired subject reaches restore only through `flume rehire`'s recorded
+    // un-retire (tombstone lifted, status suspended). Re-enable the employee's own rule, never a foreign one.
+    const routingKey = `mail:routing-disable:${address}`;
+    if (ctx.steps[routingKey]?.status === "done") {
+      steps.push({
+        key: `mail:routing-enable:${address}`, adapter: "mail", action: "routing-enable", resource: ctx.block.email, reverses: routingKey,
+        description: `re-enable the employee's own literal routing rule for ${ctx.block.email}, verify by GET`,
+        async run(context) {
+          const cf = await cloudflareOf(context);
+          if (!cf.ok) return { result: "unresolved", provider_code: cf.code, detail: cf.detail };
+          const rules = await listRules(cf);
+          if (!rules.ok) return { result: "unresolved", provider_code: rules.code, detail: "could not list routing rules completely" };
+          const rule = literalRule(rules.items, context.block.email, cf.config.mailbox.worker);
+          if (!rule) return { result: "converged", detail: `no routing rule exists for ${context.block.email}; flume identity provision ${context.employee} --apply creates one` };
+          if (!pointsAtWorker(rule, cf.config.mailbox.worker)) return { result: "converged", detail: "the address has a rule that does not point at the mailbox worker; it is foreign and was left untouched" };
+          if (rule.enabled !== false) return { result: "converged", detail: `rule ${rule.id} is already enabled` };
+          const path = `/zones/${cf.config.cloudflare.zone_id}/email/routing/rules/${rule.id}`;
+          const put = await cfRequest(cf.token, "PUT", path, { name: rule.name, enabled: true, matchers: rule.matchers, actions: rule.actions });
+          if (!cfOk(put)) return { result: "unresolved", provider_code: codeOf(put), detail: `routing rule ${rule.id} could not be re-enabled` };
+          const read = await cfRequest(cf.token, "GET", path);
+          if (!cfOk(read) || read.body?.result?.enabled !== true) return { result: "unresolved", provider_code: cfOk(read) ? "enable-not-effective" : codeOf(read), detail: `routing rule ${rule.id} was not read back as enabled` };
+          return { result: "done", detail: `routing rule ${rule.id} re-enabled (GET enabled:true)` };
+        },
+      });
+    }
+    if (!ctx.steps[key] && !captured) return steps;
+    return [...steps, {
       key: `mail:allowlist-restore:${address}`, adapter: "mail", action: "allowlist-restore", resource: allowlistKey(ctx.block), reverses: key, releases: ["mail_allowlist"],
       description: `re-PUT the captured KV record for ${allowlistKey(ctx.block)}, verify by GET`,
       async run(context) {

@@ -25,15 +25,16 @@
 // State is `<identityStateDir()>/lifecycle-state.json` (0600 in a 0700 directory) held under its own lock for the whole of an
 // apply. The registry lock is never taken here: `setEmployeeStatus` takes it itself and flock is not re-entrant.
 import { randomUUID } from "node:crypto";
-import { lstatSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
+import YAML from "yaml";
 import { identityCensus, resolveEmployee, setEmployeeStatus, type IdentityBlocker, type IdentityCensus, type IdentityDefinition } from "./company";
 import {
   ADAPTER_ORDER, DEFAULT_ADAPTERS, REVOCABLE, gatewayLink,
   type AdapterName, type CredentialRow, type EmploymentStatus, type LifecycleAdapter, type LifecycleContext, type PlannedStep, type StepOutcome,
 } from "./lifecycle-adapters";
 import {
-  appendLifecycleLedger, lifecycleLedgerPath, lifecycleStatePath, readLifecycleState, tombstoneFor, withLifecycleLock, writeLifecycleState,
-  type ContinuityBaseline, type LifecycleState, type StepRecord, type Tombstone,
+  appendLifecycleLedger, lifecycleLedgerPath, lifecycleStatePath, readLifecycleLedger, readLifecycleState, tombstoneFor, withLifecycleLock, writeLifecycleState,
+  type ContinuityBaseline, type LifecycleState, type StepRecord, type Tombstone, type UnretireRecord,
 } from "./lifecycle-state";
 import { readPlaneReceipts } from "./plane";
 import type { CompanyIdentity } from "./types";
@@ -341,6 +342,132 @@ async function suspendOrRetire(command: "suspend" | "retire", employee: string, 
 
 export const suspendEmployee = (employee: string, options: LifecycleOptions = {}) => suspendOrRetire("suspend", employee, options);
 export const retireEmployee = (employee: string, options: LifecycleOptions = {}) => suspendOrRetire("retire", employee, options);
+
+// ---------------------------------------------------------------------------
+// un-retire (flume rehire only)
+// ---------------------------------------------------------------------------
+//
+// Retired is terminal, with exactly one recorded exception: an employee `flume offboard` retired by accident. The proof is
+// the offboard's own archive (`agents-retired/<id>-<stamp>.yaml`): it names the subject and handle, its identity step says
+// THIS offboard retired the identity (`done`), and the tombstone is that retirement's -- by the retire operation id the
+// archive recorded, or (archives written before it was recorded) by the tombstone falling inside the offboard's own run,
+// from the stamp it took when it started to the `offboarded_at` it wrote when it finished. The ledger must carry that
+// retire operation for this employee. A tombstone made by `flume identity retire` alone, or another subject's tombstone on
+// the same handle, is never lifted.
+//
+// Lifting MOVES the tombstone whole into `unretired[subject]` (who, when, which archive, which proof) and appends ledger
+// lines; it is never deleted. The definition then goes retired -> suspended, the one transition `setEmployeeStatus` allows
+// only for the operation that just lifted this subject's tombstone. From suspended, the ordinary `restoreEmployee` reopens
+// what retire closed and can be reopened (the allowlist record it captured, the routing rule it disabled), writes active
+// LAST, and lists what cannot be (a deleted Access token, a revoked gateway token) in `not_reversed`.
+
+export interface UnretireOptions { apply?: boolean; archive: string; reason?: string; env?: NodeJS.ProcessEnv }
+
+interface OffboardArchive { employee?: string; offboarded_at?: string; identity_operation_id?: string; steps?: Array<{ step?: string; action?: string }>; record?: { company_identity?: { subject?: string; handle?: string } } }
+
+/** `<id>-YYYYMMDDTHHMMSSZ.yaml` -> the instant the offboard started (its stamp), or null. */
+function archiveStartedAt(path: string): Date | null {
+  const m = /-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.yaml$/u.exec(path);
+  return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`) : null;
+}
+
+/** Did the offboard that wrote `archive` create `tombstone`? Pure apart from reading the ledger. */
+export function offboardTombstoneProof(employee: string, archivePath: string, archive: OffboardArchive, tombstone: Tombstone, env: NodeJS.ProcessEnv = process.env): { ok: true; proof: "operation-id" | "offboard-window" } | { ok: false; detail: string } {
+  const identity = archive.record?.company_identity;
+  if (archive.employee !== employee) return { ok: false, detail: `${archivePath} is ${archive.employee ?? "nobody"}'s offboard, not ${employee}'s` };
+  if (identity?.subject !== tombstone.subject || identity?.handle !== tombstone.handle) return { ok: false, detail: `${archivePath} names subject ${identity?.subject ?? "none"} / handle ${identity?.handle ?? "none"}, not the tombstone's ${tombstone.subject} / ${tombstone.handle}` };
+  if (!(archive.steps ?? []).some(step => step.step === "identity" && step.action === "done")) return { ok: false, detail: `${archivePath} does not show that offboard retiring the identity (its identity step is not "done"): the tombstone predates it and is not this offboard's to lift` };
+  let proof: "operation-id" | "offboard-window";
+  if (archive.identity_operation_id) {
+    if (archive.identity_operation_id !== tombstone.operation_id) return { ok: false, detail: `the tombstone was made by operation ${tombstone.operation_id}, the offboard recorded ${archive.identity_operation_id}` };
+    proof = "operation-id";
+  } else {
+    const started = archiveStartedAt(archivePath), finished = archive.offboarded_at ? new Date(archive.offboarded_at) : null, retired = new Date(tombstone.retired_at);
+    if (!started || !finished || Number.isNaN(finished.getTime()) || Number.isNaN(retired.getTime())) return { ok: false, detail: `${archivePath} has no readable stamp or offboarded_at to place the tombstone in` };
+    if (retired < started || retired > finished) return { ok: false, detail: `the tombstone (retired ${tombstone.retired_at}) falls outside that offboard's run (${started.toISOString()} .. ${finished.toISOString()})` };
+    proof = "offboard-window";
+  }
+  const ledger = readLifecycleLedger(env);
+  if (!ledger.some(line => line.operation_id === tombstone.operation_id && line.command === "retire" && line.employee === employee)) return { ok: false, detail: `the lifecycle ledger has no retire operation ${tombstone.operation_id} for ${employee}` };
+  return { ok: true, proof };
+}
+
+export async function unretireEmployee(employee: string, options: UnretireOptions) {
+  const env = options.env ?? process.env;
+  const apply = Boolean(options.apply);
+  const reason = options.reason?.trim() || "rehired: the offboard is undone";
+  const base = { command: "unretire" as const, employee, apply, archive: options.archive, to: "suspended" as const };
+  let archive: OffboardArchive;
+  try {
+    const parsed = YAML.parse(readFileSync(options.archive, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not a mapping");
+    archive = parsed as OffboardArchive;
+  } catch (error) {
+    return { ok: false, changed: false, ...base, blockers: [{ code: "invalid-request", detail: `offboard archive ${options.archive} cannot be read: ${firstLine(error)}` }] as IdentityBlocker[], steps: [] as StepReport[], writes: [] as string[] };
+  }
+
+  const assess = (state: LifecycleState) => {
+    const prepared = prepare(employee);
+    const blockers = [...prepared.blockers];
+    const block = prepared.block;
+    let lift: { tombstone: Tombstone; proof: "operation-id" | "offboard-window" } | undefined;
+    let resume: string | undefined;
+    if (block) {
+      const own = state.tombstones[block.subject];
+      const other = Object.values(state.tombstones).find(t => t.subject !== block.subject && t.handle === block.handle);
+      if (other) blockers.push({ code: "handle-tombstoned", detail: `handle "${block.handle}" also belongs to retired subject ${other.subject}; that tombstone is not this offboard's to lift` });
+      if (own) {
+        const proven = offboardTombstoneProof(employee, options.archive, archive, own, env);
+        if (proven.ok) lift = { tombstone: own, proof: proven.proof };
+        else blockers.push({ code: "unretire-unproven", detail: proven.detail });
+      } else if (block.status === "retired") {
+        // A lift whose status write did not land: finish it with the same operation.
+        const last = (state.unretired?.[block.subject] ?? []).at(-1);
+        if (last && last.archive === options.archive) resume = last.operation_id;
+        else blockers.push({ code: "retired-terminal", detail: `${employee} is retired with no tombstone to lift and no recorded un-retire from ${options.archive}` });
+      }
+    }
+    return { prepared, blockers, block, lift, resume };
+  };
+
+  const first = assess(readLifecycleState(env));
+  const already = first.block && !first.lift && !first.resume && first.block.status !== "retired";
+  if (first.blockers.length || !first.block) return { ok: false, changed: false, ...base, definition: first.prepared.target.path, blockers: first.blockers, steps: [] as StepReport[], writes: [] as string[] };
+  if (already) return { ok: true, changed: false, ...base, definition: first.prepared.target.path, from: first.block.status, blockers: [] as IdentityBlocker[], steps: [{ key: "unretire", adapter: "local", action: "unretire", resource: first.block.subject, outcome: "converged", detail: `not retired (${first.block.status}); nothing to lift` }] as StepReport[], writes: [] as string[] };
+  if (!apply) {
+    const steps: StepReport[] = [];
+    if (first.lift) steps.push({ key: "tombstone-lift", adapter: "local", action: "unretire", resource: first.block.subject, outcome: "planned", detail: `move the tombstone (retired ${first.lift.tombstone.retired_at}, operation ${first.lift.tombstone.operation_id}) into the unretired history; proof: ${first.lift.proof}` });
+    steps.push({ ...localStep(employee, "suspended"), detail: "retired -> suspended; flume identity restore takes it to active" });
+    return { ok: true, changed: false, ...base, definition: first.prepared.target.path, from: first.block.status, blockers: [] as IdentityBlocker[], steps, writes: [] as string[], note: "Preview only: nothing was written. Pass --apply." };
+  }
+
+  return withLifecycleLock(async () => {
+    const state = readLifecycleState(env);
+    const now = assess(state);
+    if (now.blockers.length || !now.block) return { ok: false, changed: false, ...base, definition: now.prepared.target.path, blockers: now.blockers, steps: [] as StepReport[], writes: [] as string[] };
+    const block = now.block;
+    const operationId = now.resume ?? randomUUID();
+    const writes = new Set<string>();
+    const ledger = (line: Record<string, unknown>) => { writes.add(appendLifecycleLedger({ operation_id: operationId, command: "unretire", employee, handle: block.handle, subject: block.subject, ...line }, env)); };
+    const steps: StepReport[] = [];
+    if (now.lift) {
+      const record: UnretireRecord = { tombstone: now.lift.tombstone, unretired_at: new Date().toISOString(), operation_id: operationId, archive: options.archive, proof: now.lift.proof, reason, to: "suspended" };
+      state.unretired = state.unretired ?? {};
+      (state.unretired[block.subject] ??= []).push(record);
+      delete state.tombstones[block.subject];
+      writes.add(writeLifecycleState(state, env));
+      ledger({ event: "lifecycle.unretire", phase: "tombstone-lifted", tombstone_operation_id: now.lift.tombstone.operation_id, archive: options.archive, proof: now.lift.proof, reason });
+      steps.push({ key: "tombstone-lift", adapter: "local", action: "unretire", resource: block.subject, outcome: "done", operation_id: operationId, detail: `tombstone of ${now.lift.tombstone.retired_at} moved to the unretired history (proof: ${now.lift.proof})` });
+    }
+    // Status last: until it lands the definition still says retired, and the facade and launcher deny by status.
+    const status = await setEmployeeStatus(employee, "suspended", { apply: true, lifecycle: true, unretire: operationId });
+    const local: StepReport = { ...localStep(employee, "suspended"), outcome: status.ok ? (status.changed ? "done" : "converged") : "unresolved", operation_id: operationId, ...(status.ok ? { detail: `${block.status} -> suspended` } : { provider_code: status.blockers[0]?.code ?? "status-refused", detail: status.blockers[0]?.detail }) };
+    steps.push(local);
+    for (const path of status.writes ?? []) writes.add(path);
+    ledger({ event: "lifecycle.unretire", phase: "finished", ok: status.ok, step: local.key, outcome: local.outcome });
+    return { ok: status.ok, changed: true, ...base, operation_id: operationId, definition: now.prepared.target.path, from: block.status, blockers: status.ok ? [] as IdentityBlocker[] : status.blockers, steps, writes: [...writes], note: status.ok ? `Un-retired to suspended. Next: flume identity restore ${employee} --apply` : "The tombstone is lifted but the status write failed; the definition still says retired (denied). Re-run to finish." };
+  }, env);
+}
 
 // ---------------------------------------------------------------------------
 // restore

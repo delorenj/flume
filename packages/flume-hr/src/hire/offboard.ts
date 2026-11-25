@@ -27,6 +27,9 @@
  * What it cannot do is reported, never faked: a Telegram bot can only be deleted by its owner in @BotFather (there is no
  * Bot API call for that), and the employee's Hindsight bank and native Plane user are kept as history. Re-running is
  * safe: each step converges (an already-retired service, an already-retired identity, an archived candybar).
+ *
+ * Every archive it writes is what `flume rehire` (hire/rehire.ts) reads to undo the exit: the record, the desk, the role
+ * directory copy, the retire operation id whose tombstone it made, and the schedules it archived.
  */
 
 import { spawnSync } from "node:child_process";
@@ -78,6 +81,8 @@ export interface OffboardResult {
   service?: RetireResult;
   /** The identity lifecycle's own result, verbatim, when the employee was enrolled. */
   identity?: Record<string, unknown>;
+  /** The Candybars this run archived, with whether each was scheduling before: `flume rehire` puts exactly these back. */
+  archivedSchedules?: Array<{ id: string; name: string; enabled: boolean }>;
 }
 
 export interface OffboardOptions {
@@ -157,8 +162,17 @@ async function schedulesOf(profile: string): Promise<{ runs: ScheduledRun[]; err
 // The role directory: a path-scoped removal commit in its own repository
 // ---------------------------------------------------------------------------------------------
 
-function git(cwd: string, args: string[], timeout = 60_000) {
+export function git(cwd: string, args: string[], timeout = 60_000) {
   return spawnSync("git", args, { cwd, encoding: "utf8", timeout, shell: false, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+}
+
+/** Push the commit just made: once, then once more after a rebase onto the upstream. `command` is the manual finish when it could not. */
+export function pushRepository(repo: string): { note: string; command?: string } {
+  if (git(repo, ["rev-parse", "--abbrev-ref", "@{u}"]).status !== 0) return { note: "no upstream to push to", command: `git -C ${JSON.stringify(repo)} push -u origin HEAD` };
+  let pushed = git(repo, ["push", "-q"], 120_000);
+  if (pushed.status !== 0 && git(repo, ["pull", "-q", "--rebase", "--autostash"], 120_000).status === 0) pushed = git(repo, ["push", "-q"], 120_000);
+  if (pushed.status !== 0) return { note: `push failed: ${pushed.stderr.trim().split("\n")[0]}`, command: `git -C ${JSON.stringify(repo)} pull --rebase --autostash && git -C ${JSON.stringify(repo)} push` };
+  return { note: "pushed" };
 }
 
 /**
@@ -191,17 +205,9 @@ function retireRoleDir(roleDir: string, employeeId: string, reason: string, arch
     if (committed.status !== 0) return { step: "role-dir", action: "failed", detail: `git commit in ${repo}: ${(committed.stderr || committed.stdout).trim()} (archived to ${archive})` };
     const sha = git(repo, ["rev-parse", "--short", "HEAD"]).stdout.trim();
     commitNote = `commit ${sha}`;
-    if (git(repo, ["rev-parse", "--abbrev-ref", "@{u}"]).status !== 0) {
-      pushStep = { step: "role-dir", action: "next-action", detail: "", command: `git -C ${JSON.stringify(repo)} push -u origin HEAD` };
-      commitNote += ", no upstream to push to";
-    } else {
-      let pushed = git(repo, ["push", "-q"], 120_000);
-      if (pushed.status !== 0 && git(repo, ["pull", "-q", "--rebase", "--autostash"], 120_000).status === 0) pushed = git(repo, ["push", "-q"], 120_000);
-      if (pushed.status !== 0) {
-        pushStep = { step: "role-dir", action: "next-action", detail: "", command: `git -C ${JSON.stringify(repo)} pull --rebase --autostash && git -C ${JSON.stringify(repo)} push` };
-        commitNote += `, push failed: ${pushed.stderr.trim().split("\n")[0]}`;
-      } else commitNote += ", pushed";
-    }
+    const pushed = pushRepository(repo);
+    commitNote += `, ${pushed.note}`;
+    if (pushed.command) pushStep = { step: "role-dir", action: "next-action", detail: "", command: pushed.command };
   }
   // What git does not track (ignored runtime/, caches) is in the archive; clear it so the directory is gone.
   try { rmSync(roleDir, { recursive: true, force: true }); } catch (error) {
@@ -255,6 +261,7 @@ async function vacateDesk({ profile, desk, deskArchive, fleetHome, apply, restar
         result.errors.push(`schedules: candybar ${run.name} still scheduled`);
       } else {
         step({ step: "schedules", action: "done", detail: `archived candybar ${run.name} (${run.why})` });
+        (result.archivedSchedules ??= []).push({ id: run.id, name: run.name, enabled: run.enabled });
       }
     }
   }
@@ -430,6 +437,10 @@ export async function offboardEmployee(employeeId: string, options: OffboardOpti
       const archived = {
         employee: employeeId, offboarded_at: (options.now ?? new Date()).toISOString(), reason,
         desk_archive: result.deskArchive, removed_plane: service.removedPlane,
+        // What `flume rehire` needs to undo this exit exactly: the retire operation whose tombstone this run made, and the
+        // schedules it archived (with whether each was scheduling).
+        ...(typeof result.identity?.operation_id === "string" ? { identity_operation_id: result.identity.operation_id } : {}),
+        ...(result.archivedSchedules?.length ? { archived_schedules: result.archivedSchedules } : {}),
         steps: result.steps.map(({ step: name, action, detail }) => ({ step: name, action, detail })),
         record: snapshot,
       };

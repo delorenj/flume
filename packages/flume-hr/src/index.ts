@@ -26,6 +26,7 @@ import { formatAuditReport, formatMigrationReport, scopeEmployee, SCAFFOLD_SCRIP
 import { REGISTER_PROJECTS_ENV } from "./parity/reconcile";
 import { SOUL_TONES, type HermesAgentContext } from "./hire/types";
 import { offboardEmployee, formatOffboardResult } from "./hire/offboard";
+import { rehireEmployee, formatRehireResult } from "./hire/rehire";
 import { retireFromService, formatRetireResult } from "./hire/retire";
 import { hostPlatform, isLaunchdHost } from "./kernel/host-platform";
 import { EnsureTemplateConfig, renderHostConfig } from "./hire/EnsureTemplateConfig";
@@ -275,6 +276,22 @@ program
     guardBrokenPipe();
     const result = await offboardEmployee(employee, { apply: Boolean(options.apply), reason: options.reason, keepRoleDir: Boolean(options.keepRoleDir), restart: Boolean(options.restart) });
     await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatOffboardResult(result)}\n`);
+    await exitAfterFlush(result.ok ? 0 : 1);
+  });
+
+program
+  .command("rehire")
+  .argument("<employee>", "Employee id of an offboarded employee, e.g. tolt-director")
+  .description("Undo a flume offboard from its archives: role dir, desk and the exact archived row back; an identity this offboard retired is un-retired (tombstone moved to a recorded history, never deleted) and restored; its revoked gateway key minted again; the role dir committed (path-scoped) and pushed; the candybars it archived unarchived; the profile served. Reports what it would take to put it back in service (dry run unless --apply)")
+  .option("--archive <path>", "The offboard archive to read (default: the newest ~/.hermes/agents-retired/<employee>-<stamp>.yaml)")
+  .option("--reason <text>", "Why; recorded in the role-dir commit, the lifecycle ledger and the rehire receipt")
+  .option("--no-serve", "Leave the profile unserved (the gateway picks the desk up at its next restart)")
+  .option("--apply", "Write the change (default is a dry run)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string, options) => {
+    guardBrokenPipe();
+    const result = await rehireEmployee(employee, { apply: Boolean(options.apply), archive: options.archive, reason: options.reason, serve: options.serve !== false });
+    await writeStdout(options.json ? `${JSON.stringify(result, null, 2)}\n` : `${formatRehireResult(result)}\n`);
     await exitAfterFlush(result.ok ? 0 : 1);
   });
 

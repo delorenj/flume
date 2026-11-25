@@ -93,7 +93,10 @@ the Hindsight bank and native Plane user (kept for history). Any failed step sto
 removed, so a re-run picks up where it stopped.
 
 All four retired directors (`tolt-launch-director`, `tolt-director`, `gruvato-launch-director`,
-`green-in-between-launch-director`) were offboarded on 2026-11-24.
+`green-in-between-launch-director`) were offboarded on 2026-11-24. `tolt-director` is the exception that
+came back the same day: it is the TOLT portfolio director (plain `director` title, `board_scope: advisory`),
+not a launch-mode role, so it was never covered by the retirement. `flume rehire tolt-director --apply`
+undid its offboard from the archives (see "Undo an offboard" in the agent-fleet-operations skill).
 
 ## em to pm conversion
 

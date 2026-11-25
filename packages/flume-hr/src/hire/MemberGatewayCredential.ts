@@ -15,7 +15,8 @@ export interface MemberCredentialOutcome {
 
 /** The Python helper owns the canonical profile lock; never hand-edit a delta here. */
 export function provisionMemberCredential(profile: string, options: { home?: string; apply?: boolean; group?: string } = {}): MemberCredentialOutcome {
-  const helper = join(resolveFlumeRoot(), "scripts/gateway-member-tokens.py");
+  // FLUME_GATEWAY_MEMBER_TOKENS: a test seam (a fixture helper speaking the same --json contract), never set on a host.
+  const helper = process.env.FLUME_GATEWAY_MEMBER_TOKENS?.trim() || join(resolveFlumeRoot(), "scripts/gateway-member-tokens.py");
   const run = spawnSync("python3", [helper, "--members", profile, "--json", "--render",
     ...(options.apply === false ? [] : ["--apply"]), ...(options.group ? ["--group", options.group] : [])], {
     encoding: "utf8", timeout: 200_000, maxBuffer: 256 * 1024,

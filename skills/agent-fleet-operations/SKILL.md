@@ -48,6 +48,7 @@ flume channel list [--employee e]  every employee x platform: status, delta enab
 flume channel offline <employee> [--platform p] [--reason ".."] [--apply]   park a channel on purpose (preview unless --apply)
 flume channel online <employee> [--platform p] [--credential-ref op://..] [--apply]   bring it back / rotate to a new bot (getMe-verified)
 flume offboard <employee> [--reason ".."] [--keep-role-dir] [--apply]   the whole exit: retire + identity retired + its candybars archived + desk unserved and archived + role dir removed (pushed) + row archived and removed; gone from roster, status line and Telegram
+flume rehire <employee> [--reason ".."] [--apply]   undo an offboard from its archives: row, desk, role dir (pushed), candybars, member key back; an identity that offboard retired is un-retired (recorded), not one retired earlier
 flume retire <employee> [--reason ".."] [--apply]   take an employee out of service, keep the row: bloodbank.enabled false AND the plane board claim removed (disabling bloodbank alone still wins the board and drops the ticket), live channels parked via channel offline; prints who gets each ticket per board; the gateway restart stays yours
 flume launch status [repo] [--json]   launch mode on a repo: declaration, pm desk, Hermes job, Candybar state, last run
 flume launch enable [repo] [--dry-run] [--schedule "<cron>"]   wire the launch pass (see "Launch mode"); idempotent
@@ -337,7 +338,8 @@ em-to-pm conversion below for a live `em`): out of service is not out of the org
 retired role titles: `flume hire|onboard <title>` refuses with a pointer here (a
 `retired:` block in the role file; the composer refuses to render it too, so a deployed
 desk's SOUL is never overwritten). The plain `director` title is not retired as a
-role, but the TOLT portfolio desk `tolt-director` is; other repos' directors
+role, and neither is the TOLT portfolio desk `tolt-director` (offboarded with the
+launch directors, rehired 2026-11-24); other repos' directors
 (delonet-director, context-director, ...) are untouched.
 
 **Offboard a director desk.** `flume offboard <agent> --reason "launch directors
@@ -351,8 +353,24 @@ removed from the registry. No gateway restart. It reports what only a person can
 (`@BotFather /deletebot` for a bot no other row uses); Hindsight bank and native
 Plane user are kept as history. `flume retire` alone keeps the row: the employee
 stays in the roster, status line and Telegram. Offboarded 2026-11-24 (retired
-2026-11-18): `tolt-launch-director`, `tolt-director`, `gruvato-launch-director`,
-`green-in-between-launch-director`.
+2026-11-18): `tolt-launch-director`, `gruvato-launch-director`,
+`green-in-between-launch-director` (and `tolt-director`, rehired the same day).
+
+**Undo an offboard.** `flume rehire <agent> [--reason ".."] [--archive <path>] [--no-serve] [--apply]`
+(preview unless `--apply`) reads the newest `~/.hermes/agents-retired/<id>-<stamp>.yaml` and
+reverses what it can: the exact row back in the registry (comment-preserving; refused if the id
+exists), the desk moved back from `profiles-retired/`, the role dir restored from its archive and
+committed path-scoped and pushed, the candybars that offboard archived unarchived (and resumed if
+they were scheduling), the FLUME-39 member key minted again, and the profile served through the
+gateway control socket (no restart). The identity is un-retired only when the archive proves
+THIS offboard retired it (the retire operation id, or the offboard's time window plus the ledger):
+the tombstone moves into a recorded `unretired` history (never deleted), status goes
+retired -> suspended -> active through `flume identity restore`, and the ledger gets
+`lifecycle.unretire` lines. An identity retired before the offboard stays retired. Not reversible,
+and listed: a deleted Access service token (`flume identity provision` issues a new one), a
+Telegram bot (create it in @BotFather, then `flume channel online <agent> --platform telegram
+--credential-ref op://DeLoSecrets/<item-uuid>/credential --apply`), and a candybar archived
+before the offboard.
 
 **Convert an EM desk to a PM** (`tolt-pm`, `gruvato-pm`; the EM pass
 `tolt-em-pass`/`gruvato-em-pass` is replaced by the launch pass). Full recipe:

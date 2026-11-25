@@ -292,6 +292,19 @@ export async function unserveProfileViaSocket(profile: string): Promise<{ ok: bo
   return { ok: false, detail: `unserve-profile: ${down.error}` };
 }
 
+/**
+ * serve ONE profile through the gateway control socket: the running gateway starts it from the desk on disk, other profiles
+ * untouched, no restart. `flume rehire` uses it once the desk is back in profiles/. "already served" counts as done.
+ */
+export async function serveProfileViaSocket(profile: string): Promise<{ ok: boolean; absent?: true; detail: string }> {
+  const socket = join(fleetHome(), "gateway.sock");
+  if (!existsSync(socket)) return { ok: false, absent: true, detail: "no gateway control socket (is the gateway running?)" };
+  const up = await controlRequest(socket, "serve-profile", { name: profile }, 20_000);
+  if (up.ok) return { ok: true, detail: `served profile ${profile} through the gateway control socket (other profiles untouched)${up.result?.pending ? "; the gateway reported the start as still pending" : ""}` };
+  if (/already served/u.test(up.error ?? "")) return { ok: true, detail: `profile ${profile} was already served` };
+  return { ok: false, detail: `serve-profile: ${up.error}` };
+}
+
 async function pickUp(employee: Employee, platform: ChannelPlatform, want: "offline" | "online", options: ChannelOptions): Promise<GatewayPickup> {
   const gateway = readGateway();
   const key = `${employee.profile}:${platform}`;
