@@ -379,6 +379,8 @@ async function verifyBot(platform: ChannelPlatform, token: string): Promise<BotI
   if (platform === "telegram") {
     const base = (process.env.FLUME_TELEGRAM_API_BASE || "https://api.telegram.org").replace(/\/+$/u, "");
     const { status, body } = await platformCall(`${base}/bot${token}/getMe`, {}, token, "Telegram");
+    // 5xx and 429 are Telegram failing to answer (it 502s one bot while others work), not a verdict on the token.
+    if (status >= 500 || status === 429) throw new Error(`Telegram could not answer for this bot (HTTP ${status}); try again later; nothing was changed`);
     if (status === 401 || status === 404 || body.ok === false) {
       throw new Rejected(`Telegram rejected the token (HTTP ${status}${typeof body.description === "string" ? `: ${body.description}` : ""}); the bot is revoked, deleted, or the reference is wrong`);
     }
@@ -389,6 +391,7 @@ async function verifyBot(platform: ChannelPlatform, token: string): Promise<BotI
   }
   const base = (process.env.FLUME_SLACK_API_BASE || "https://slack.com/api").replace(/\/+$/u, "");
   const { status, body } = await platformCall(`${base}/auth.test`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }, token, "Slack");
+  if (status >= 500 || status === 429 || body.error === "ratelimited") throw new Error(`Slack could not answer (HTTP ${status}${typeof body.error === "string" ? `: ${body.error}` : ""}); try again later; nothing was changed`);
   if (body.ok !== true) throw new Rejected(`Slack rejected the token (HTTP ${status}${typeof body.error === "string" ? `: ${body.error}` : ""}); the bot is revoked, or the reference is wrong`);
   const fields = { team_id: String(body.team_id ?? ""), team_name: String(body.team ?? ""), bot_user_id: String(body.user_id ?? ""), bot_id: String(body.bot_id ?? ""), bot_username: String(body.user ?? "") };
   if (!fields.team_id || !fields.bot_user_id) throw new Error("Slack auth.test gave an unusable answer; nothing was changed");
@@ -669,6 +672,117 @@ export function channelList(employee?: string, options: { all?: boolean } = {}):
   const shown = options.all || employee ? rows : rows.filter((row) => !quiet(row));
   const active = Object.entries(gateway.platforms).filter(([key, value]) => key.endsWith(":telegram") && value?.state === "connected").length;
   return { ok: true, rows: shown, hidden_quiet: rows.length - shown.length, totals, active_telegram_bots: gateway.running ? active : 0, gateway_running: gateway.running, blockers: [] };
+}
+
+// ---------------------------------------------------------------------------------------------
+// verify: ask each platform whether every wired bot still exists, and park the ones it rejects
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The incident (2026-11-24): the operator deleted a batch of bots in BotFather. The gateway kept
+ * showing two of them `connected` (its state was older than the deletion) and one `fatal`, and the
+ * channel-coverage probe paged "19/20 ... slowburns-pm missing" every two hours. Finding which bots
+ * were gone took a hand-written script that resolved every token. This is that script, done once:
+ * every channel with a credential reference is resolved with `op` and checked with its platform
+ * (Telegram getMe, Slack auth.test). The token lives only inside verifyBot, exactly as for `online`.
+ *
+ * `--park-rejected` parks every channel the platform REJECTS (401/404, ok:false) through
+ * channelOffline, never reimplemented. A bot the platform could not be asked about (network, 5xx,
+ * op failure) is never parked: that is not evidence the bot is gone.
+ */
+export type VerifyVerdict = "ok" | "rejected" | "unreachable" | "unresolved";
+
+export interface ChannelVerifyRow {
+  employee: string;
+  platform: ChannelPlatform;
+  standing: ChannelRow["standing"];
+  verdict: VerifyVerdict;
+  bot_username: string | null;
+  detail: string;
+  park?: { action: "parked" | "would-park" | "failed"; detail: string };
+}
+
+export interface ChannelVerifyResult {
+  ok: boolean;
+  apply: boolean;
+  park_rejected: boolean;
+  rows: ChannelVerifyRow[];
+  totals: Record<VerifyVerdict, number>;
+  /** Live (not already parked) channels whose bot the platform rejected and that are still not parked. */
+  rejected_live: string[];
+  blockers: ChannelBlocker[];
+  warnings: string[];
+}
+
+export async function channelVerify(employee?: string, options: ChannelOptions & { parkRejected?: boolean } = {}): Promise<ChannelVerifyResult> {
+  const wanted = options.platform ? parsePlatform(options.platform) : null;
+  const listed = channelList(employee, { all: true }).rows;
+  const agents = registryAgents();
+  const day = (options.now ?? new Date().toISOString()).slice(0, 10);
+  const rows: ChannelVerifyRow[] = [];
+  const blockers: ChannelBlocker[] = [];
+  for (const row of listed) {
+    if (wanted && row.platform !== wanted) continue;
+    const spec = CHANNEL_PLATFORMS[row.platform];
+    if (!row.refs.includes(spec.credentialEnv)) continue;
+    const agent = agents[row.employee];
+    const profile = String(agent?.profile_name || row.employee);
+    const ref = deltaRefs(readYaml(join(fleetHome(), "profiles", profile, "config.delta.yaml")) ?? {})[spec.credentialEnv];
+    const out: ChannelVerifyRow = { employee: row.employee, platform: row.platform, standing: row.standing, verdict: "ok", bot_username: null, detail: "" };
+    rows.push(out);
+    if (!ref) { out.verdict = "unresolved"; out.detail = `no ${spec.credentialEnv} reference`; continue; }
+    let token: string;
+    try { token = await readSecret(ref); } catch (error) { out.verdict = "unresolved"; out.detail = (error as Error).message; continue; }
+    try {
+      const identity = await verifyBot(row.platform, token);
+      out.bot_username = identity.fields.bot_username || null;
+      out.detail = "the platform knows this bot";
+    } catch (error) {
+      out.verdict = error instanceof Rejected ? "rejected" : "unreachable";
+      out.detail = (error as Error).message;
+    } finally {
+      token = "";
+    }
+    if (out.verdict !== "rejected" || row.standing === "offline" || !options.parkRejected) continue;
+    const name = row.platform === "telegram" ? "Telegram" : "Slack";
+    const reason = (options.reason ?? "").trim() || `${name} rejected the token on ${day} (bot deleted or revoked); found by flume channel verify`;
+    try {
+      const parked = await channelOffline(row.employee, { platform: row.platform, reason, apply: options.apply, noReload: options.noReload, confirmMs: options.confirmMs, now: options.now });
+      if (!parked.ok) {
+        out.park = { action: "failed", detail: parked.blockers.map((b) => `${b.code}: ${b.detail}`).join("; ") };
+        blockers.push({ code: "park-failed", detail: `${row.employee} ${row.platform}: ${out.park.detail}` });
+      } else {
+        out.park = { action: options.apply ? "parked" : "would-park", detail: options.apply ? (parked.gateway ? `gateway ${parked.gateway.action}: ${parked.gateway.detail}` : "parked") : "preview; pass --apply" };
+      }
+    } catch (error) {
+      out.park = { action: "failed", detail: (error as Error).message };
+      blockers.push({ code: "park-failed", detail: `${row.employee} ${row.platform}: ${(error as Error).message}` });
+    }
+  }
+  const totals: Record<VerifyVerdict, number> = { ok: 0, rejected: 0, unreachable: 0, unresolved: 0 };
+  for (const row of rows) totals[row.verdict] += 1;
+  const rejectedLive = rows.filter((row) => row.verdict === "rejected" && row.standing !== "offline" && row.park?.action !== "parked")
+    .map((row) => `${row.employee}:${row.platform}`);
+  const warnings: string[] = [];
+  if (rejectedLive.length && !options.parkRejected) warnings.push(`${rejectedLive.length} live channel(s) have a bot the platform rejects; park them all with: flume channel verify --park-rejected --apply`);
+  if (rows.some((row) => row.park?.action === "parked") && options.noReload) warnings.push("parked with --no-reload: the running gateway still has the old adapters; cycle the profiles or run one hermes-gateway-restart");
+  return { ok: blockers.length === 0, apply: Boolean(options.apply), park_rejected: Boolean(options.parkRejected), rows, totals, rejected_live: rejectedLive, blockers, warnings };
+}
+
+export function formatChannelVerify(result: ChannelVerifyResult): string {
+  const lines: string[] = [];
+  const width = Math.max(8, ...result.rows.map((row) => row.employee.length));
+  lines.push(`${"employee".padEnd(width)}  platform  standing  verdict      bot`);
+  for (const row of result.rows) {
+    lines.push(`${row.employee.padEnd(width)}  ${row.platform.padEnd(8)}  ${row.standing.padEnd(8)}  ${row.verdict.padEnd(11)}  ${row.bot_username ? `@${row.bot_username}` : "-"}`);
+    if (row.verdict !== "ok") lines.push(`${" ".repeat(width + 2)}${row.detail}`);
+    if (row.park) lines.push(`${" ".repeat(width + 2)}${row.park.action}: ${row.park.detail}`);
+  }
+  lines.push("");
+  lines.push(Object.entries(result.totals).map(([key, value]) => `${value} ${key}`).join(", ") + ".");
+  for (const blocker of result.blockers) lines.push(`✗ ${blocker.code}: ${blocker.detail}`);
+  for (const warning of result.warnings) lines.push(`! ${warning}`);
+  return `${lines.join("\n")}\n`;
 }
 
 // ---------------------------------------------------------------------------------------------

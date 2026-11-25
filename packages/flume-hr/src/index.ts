@@ -43,7 +43,7 @@ import { PROVISION_GROUPS, provisionEmployee, type ProvisionGroup } from "./work
 import { identityReadiness } from "./workforce/readiness";
 import { employeeManifest, formatManifestMarkdown, formatManifestResult, projectManifest } from "./workforce/manifest";
 import { effectiveRecall, readRecency, touchProject } from "./workforce/recency";
-import { channelList, channelOffline, channelOnline, formatChannelList, formatChannelResult } from "./workforce/channel";
+import { channelList, channelOffline, channelOnline, channelVerify, formatChannelList, formatChannelResult, formatChannelVerify } from "./workforce/channel";
 import { accessConfigPath, execWithGithubToken, githubInspect, loadAccessConfig, printableResult, requestAccess, requestMail, startAccessServer } from "./workforce/access";
 import { githubApiBase, githubEvidence } from "./workforce/github";
 import { formatCommentResult, postComment, verifyComments } from "./workforce/comment";
@@ -852,7 +852,7 @@ async function channelResult<T extends { ok: boolean }>(action: () => Promise<T>
   catch (error) { result = { ok: false, blockers: [{ code: "channel-failed", detail: (error as Error).message }] } as unknown as T; }
   const failed = result as unknown as { blockers?: Array<{ code: string; detail: string }> };
   await writeStdout(json ? `${JSON.stringify(result, null, 2)}\n`
-    : (result as { employee?: string }).employee || !failed.blockers?.length ? format(result)
+    : (result as { employee?: string }).employee || Array.isArray((result as { rows?: unknown }).rows) || !failed.blockers?.length ? format(result)
       : `${failed.blockers.map((blocker) => `✗ ${blocker.code}: ${blocker.detail}`).join("\n")}\n`);
   await exitAfterFlush(result.ok ? 0 : 1);
 }
@@ -892,6 +892,20 @@ channelCmd
   .option("--json", "Output machine-parseable JSON")
   .action(async (options) => {
     await channelResult(async () => channelList(options.employee, { all: Boolean(options.all) }), options.json, formatChannelList);
+  });
+
+channelCmd
+  .command("verify")
+  .argument("[employee]", "Only this employee (registry id or profile name); default every employee")
+  .description("Ask each platform whether every wired bot still exists (Telegram getMe, Slack auth.test; tokens resolved with op, never shown). With --park-rejected, park every live channel whose bot is rejected (deleted in BotFather, revoked). Preview unless --apply")
+  .option("--platform <platform>", "telegram or slack (default both)")
+  .option("--park-rejected", "Park (flume channel offline) every live channel the platform rejects; an unreachable platform is never a reason to park")
+  .option("--reason <text>", "offline_reason for the channels it parks (default: '<Platform> rejected the token on <date> ...')")
+  .option("--apply", "Write the parks (default is a preview)")
+  .option("--no-reload", "Do not touch the running gateway; the change is written but not picked up")
+  .option("--json", "Output machine-parseable JSON")
+  .action(async (employee: string | undefined, options) => {
+    await channelResult(() => channelVerify(employee, { platform: options.platform, parkRejected: Boolean(options.parkRejected), reason: options.reason, apply: Boolean(options.apply), noReload: options.reload === false }), options.json, formatChannelVerify);
   });
 
 // ============================================================================

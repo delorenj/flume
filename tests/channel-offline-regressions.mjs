@@ -48,6 +48,7 @@ const TOKEN = {
   rotated: "333:AAplanted-rotated-token-value-3",
   dup: "222:AAplanted-bob-again-token-value-5",
   revoked: "999:AAplanted-revoked-token-value-9",
+  flaky: "555:AAplanted-flaky-token-value-5",
   slack: "xoxb-planted-slack-bot-token-value",
   appslack: "xapp-planted-slack-app-token-value",
 };
@@ -65,6 +66,8 @@ const REF = {
   rotated: `op://DeLoSecrets/${item("cyrotated")}/credential`,
   dup: `op://DeLoSecrets/${item("dupbot")}/credential`,
   revoked: `op://DeLoSecrets/${item("revokedbot")}/credential`,
+  flaky: `op://DeLoSecrets/${item("flakybot")}/credential`,
+  missing: `op://DeLoSecrets/${item("missingbot")}/credential`,
   slack: `op://DeLoSecrets/${item("adaslack")}/bot`,
   appslack: `op://DeLoSecrets/${item("adaslack")}/app`,
 };
@@ -72,6 +75,7 @@ const OPMAP = join(work, "op-map.json");
 writeFileSync(OPMAP, JSON.stringify({
   [REF.ada]: TOKEN.ada, [REF.bob]: TOKEN.bob, [REF.cy]: TOKEN.cy, [REF.rotated]: TOKEN.rotated,
   [REF.dup]: TOKEN.dup, [REF.revoked]: TOKEN.revoked, [REF.slack]: TOKEN.slack, [REF.appslack]: TOKEN.appslack,
+  [REF.flaky]: TOKEN.flaky,
 }));
 
 // ---- the fake `op` and `systemctl` ------------------------------------------------------------
@@ -104,6 +108,8 @@ const http = createHttp((request, response) => {
   const match = /^\/bot([^/]+)\/getMe$/u.exec(request.url);
   response.setHeader("content-type", "application/json");
   if (match) {
+    // Telegram itself failing for one bot (502 Bad Gateway, measured 2026-11-19/20): not a rejection.
+    if (decodeURIComponent(match[1]) === TOKEN.flaky) { response.statusCode = 502; response.end(JSON.stringify({ ok: false, error_code: 502, description: "Bad Gateway" })); return; }
     const bot = BOT[decodeURIComponent(match[1])];
     if (!bot) { response.statusCode = 401; response.end(JSON.stringify({ ok: false, error_code: 401, description: "Unauthorized" })); return; }
     response.end(JSON.stringify({ ok: true, result: { id: bot.id, is_bot: true, username: bot.username } }));
@@ -613,6 +619,71 @@ await check("a write that fails part way puts every file back byte for byte", as
   assert.equal(run.status, 1, JSON.stringify(run.body));
   assert.equal(run.body.blockers[0].code, "internal");
   assert.equal(tell(), before, "the delta and the generated config written before the failure were restored");
+});
+
+// ---- verify: which wired bots does the platform still know? (2026-11-24: a batch deleted in BotFather) ----
+function hire(id, ref) {
+  const reg = registry();
+  reg.agents[id] = { repo: id.replace(/-pm$/u, ""), role: "pm", type: "hermes", display_name: `${id} display`, profile_name: id, project_path: `/tmp/none/${id}`, telegram: { bot_username: `${id.replace(/-pm$/u, "")}_bot` } };
+  writeFileSync(REG, YAML.stringify(reg), { mode: 0o600 });
+  const dir = join(FLEET, "profiles", id);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.delta.yaml"), YAML.stringify({ secrets: { onepassword: { enabled: true, env: { TELEGRAM_BOT_TOKEN: ref } } } }), { mode: 0o600 });
+  writeFileSync(join(dir, "config.yaml"), "# GENERATED FILE\n", { mode: 0o600 });
+}
+
+await check("verify asks the platform about every wired bot, names the rejected ones, and writes nothing", async () => {
+  hire("dee-pm", REF.revoked);   // deleted in BotFather; the gateway still says connected (older state)
+  hire("eve-pm", REF.missing);   // op cannot resolve it
+  hire("fay-pm", REF.flaky);     // Telegram answers 502 for this one bot
+  const state = readState();
+  state.platforms["dee-pm:telegram"] = entry("connected");
+  writeState(state);
+  const before = tell();
+  const { body, status } = await json(["channel", "verify"]);
+  assert.equal(status, 0, JSON.stringify(body));
+  const row = (id, platform = "telegram") => body.rows.find((r) => r.employee === id && r.platform === platform);
+  assert.equal(row("ada-pm").verdict, "ok");
+  assert.equal(row("ada-pm").bot_username, "ada_pm_bot");
+  assert.equal(row("ada-pm", "slack").verdict, "ok");
+  assert.equal(row("cy-pm").bot_username, "cy_rotated_bot");
+  assert.equal(row("dee-pm").verdict, "rejected");
+  assert.match(row("dee-pm").detail, /rejected the token/u);
+  assert.equal(row("eve-pm").verdict, "unresolved");
+  assert.equal(row("fay-pm").verdict, "unreachable", "a 502 is Telegram's problem, not proof the bot is gone");
+  assert.deepEqual(body.rejected_live, ["dee-pm:telegram"]);
+  assert.ok(body.warnings.some((w) => w.includes("flume channel verify --park-rejected --apply")));
+  assert.equal(body.rows.some((r) => r.park), false, "without --park-rejected nothing is parked");
+  assert.equal(tell(), before);
+  const text = (await flume(["channel", "verify"])).stdout;
+  assert.match(text, /dee-pm\s+telegram\s+\S+\s+rejected/u);
+  assert.match(text, /@ada_pm_bot/u);
+});
+
+await check("verify --park-rejected previews, then parks ONLY the rejected live bots through channel offline", async () => {
+  const before = tell();
+  const preview = await json(["channel", "verify", "--park-rejected"]);
+  assert.equal(preview.status, 0);
+  assert.equal(preview.body.rows.find((r) => r.employee === "dee-pm").park.action, "would-park");
+  assert.equal(tell(), before, "a preview writes nothing");
+  verbs.length = 0;
+  const { body, status } = await json(["channel", "verify", "--park-rejected", "--apply", "--no-reload"]);
+  assert.equal(status, 0, JSON.stringify(body));
+  const parked = body.rows.filter((r) => r.park).map((r) => `${r.employee}:${r.platform}:${r.park.action}`);
+  assert.deepEqual(parked, ["dee-pm:telegram:parked"], "unresolved and unreachable bots are never parked");
+  const dee = registry().agents["dee-pm"].telegram;
+  assert.equal(dee.provisioning_status, "offline");
+  assert.match(dee.offline_reason, /^Telegram rejected the token on \d{4}-\d\d-\d\d \(bot deleted or revoked\)/u);
+  assert.equal(delta("dee-pm").platforms.telegram.enabled, false);
+  assert.equal(delta("dee-pm").secrets.onepassword.env.TELEGRAM_BOT_TOKEN, REF.revoked, "the reference is kept");
+  for (const id of ["eve-pm", "fay-pm", "ada-pm", "bob-pm", "cy-pm"]) assert.notEqual(registry().agents[id].telegram.provisioning_status, "offline", id);
+  assert.deepEqual(verbs, [], "--no-reload leaves the gateway alone");
+  assert.deepEqual(body.rejected_live, []);
+  assert.ok(body.warnings.some((w) => /hermes-gateway-restart/u.test(w)));
+  const again = await json(["channel", "verify", "dee-pm", "--park-rejected", "--apply", "--no-reload"]);
+  assert.equal(again.body.rows[0].standing, "offline");
+  assert.equal(again.body.rows[0].verdict, "rejected");
+  assert.equal(again.body.rows[0].park, undefined, "an already parked bot is not parked again");
 });
 
 await check("no planted credential reached any output, the registry, a delta or a generated config", async () => {
