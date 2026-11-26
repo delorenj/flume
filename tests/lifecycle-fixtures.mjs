@@ -9,7 +9,7 @@
 // Nothing here inherits a real HOME, `op` session or binary.
 import { createServer } from "node:http";
 import { generateKeyPairSync } from "node:crypto";
-import { lstatSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { decodeJwt, importSPKI, jwtVerify } from "jose";
 
@@ -296,4 +296,22 @@ if (verb === "revoke") {
 }
 fail("unsupported verb");
 `, { mode: 0o755 });
+}
+
+/**
+ * A hire mints and reads back the employee's own gateway key (FLUME-39, ed465c9: scripts/gateway-member-tokens.py).
+ * This installs a fixture gateway-tokens CLI plus an `op` that serves only the member-token item, into <dir>/member-bin, and
+ * returns the env that points a suite at them. A suite that hires must spread this into its env (and keep its own `op`, if it
+ * needs one, ahead of this on PATH); without it the hire reaches for the live gateway and the live vault.
+ */
+export function installMemberGateway(dir, basePath = process.env.PATH) {
+  const bin = join(dir, "member-bin");
+  mkdirSync(bin, { recursive: true });
+  writeFakeMemberGateway(join(bin, "gateway-tokens.py"));
+  writeFileSync(join(bin, "op"), `#!/usr/bin/env node
+const a = process.argv.slice(2);
+if (a[0] !== "read" || !a[1].startsWith("op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-")) process.exit(2);
+process.stdout.write("fixture-member-value-long-enough-for-readback");
+`, { mode: 0o755 });
+  return { PATH: `${bin}:${basePath}`, FLUME_GATEWAY_TOKENS_BIN: join(bin, "gateway-tokens.py") };
 }

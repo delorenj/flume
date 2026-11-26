@@ -316,7 +316,9 @@ setBindings(roles.dan, { cloudflare_access: cfBinding("dan"), github: ghBinding(
 setBindings(roles.fay, { cloudflare_access: cfBinding("fay"), github: ghBinding("fay") }); // bound, never adopted
 setBindings(roles.gus, { cloudflare_access: cfBinding("gus") }); // no github binding
 setBindings(roles.hal, { cloudflare_access: cfBinding("hal"), github: { principal: "1999", instance: "2999", credential_ref: refFor("hal"), attribution_mode: "native" } });
-json(run(["identity", "status", "hal-pm", "retired", "--apply", "--json"]));
+// `identity status ... retired` is refused since FLUME-53 (retirement goes through `identity retire`, which also touches live
+// providers). This suite only needs a retired record to prove adopt-actor refuses it, so write the status directly.
+{ const doc = YAML.parseDocument(readFileSync(roles.hal, "utf8")); doc.setIn(["company_identity", "status"], "retired"); writeFileSync(roles.hal, String(doc)); }
 
 const gh_ = (name) => ({ subject: subject[name], service: "github", resource: "o/sandbox", permissions: ["issues:write", "issues:read", "pull_requests:write", "pull_requests:read"], max_lifetime_seconds: 3600 });
 writeFileSync(configPath, YAML.stringify({

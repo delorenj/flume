@@ -207,6 +207,10 @@ const HERMETIC_ENV = {
   // host's Candybar API or binary. A suite that tests schedules runs its own fixture server and sets both.
   FLUME_CANDYBAR_API_URL: "http://127.0.0.1:9",
   FLUME_CANDYBAR_BIN: "false",
+  // No live gateway: a hire mints and reads back the employee's own gateway key through scripts/gateway-member-tokens.py, which
+  // otherwise falls back to the host's real gateway-tokens.py. A suite that hires points this at its own fixture CLI (with a
+  // fixture `op`); one that forgets fails closed with `gateway-mint-or-confirm-failed` instead of minting a real token.
+  FLUME_GATEWAY_TOKENS_BIN: join(root, "scripts", "no-such-gateway-tokens.py"),
 };
 
 const results = [];

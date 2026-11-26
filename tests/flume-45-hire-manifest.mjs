@@ -20,7 +20,7 @@ const copierLookup=spawnSync('which',['copier'],{encoding:'utf8'});
 assert.equal(copierLookup.status,0,'real Copier is required for the public hire regression');
 const copier=realpathSync(copierLookup.stdout.trim());
 const executable=(path,code)=>writeFileSync(path,`#!${process.execPath}\n${code}\n`,{mode:0o755});
-const blocked=['curl','wget','op','systemctl','gh','pj','mise','bloodbank','nats','ssh'];
+const blocked=['curl','wget','systemctl','gh','pj','mise','bloodbank','nats','ssh'];
 let passed=0;
 const pass=label=>{passed++;console.log(`PASS ${label}`);};
 
@@ -46,6 +46,8 @@ async function fixture(label,shape,extra={}) {
     providers:{automaticai:{api:'https://api.automaticai.io/v1',key_env:'AUTOMATICAI_GATEWAY_KEY',models,extra_body:{reasoning_effort:'high'}}},
     delegation:{provider:'automaticai',model:'automaticai/personal/kimi-2.8'},auxiliary:{free_only:true,discovery:false},moa:{presets:{default:{enabled:false}}},
     memory:{provider:'hindsight'},hooks:Object.fromEntries(['on_session_start','on_session_end','pre_tool_call','post_tool_call'].map(e=>[e,[{command:`${join(home,'.agents/hooks/bb-hook')} --cli hermes --native ${e}`}]])),skills:{external_dirs:[join(home,'.agents/skills')]},platform_toolsets:{bloodbank:['delegation','terminal','file','skills','web']},
+    // Each employee's own Plane key must reach its terminal (FLUME-93; hermes.fleet-config rule).
+    terminal:{env_passthrough:['PLANE_API_KEY']},
     timeouts:{tools:{concurrent_batch:1800,sequential_call:1800}},
     secrets:{onepassword:{enabled:true,env:{AUTOMATICAI_GATEWAY_KEY:'op://fixture/gateway/credential'}}},
   }));
@@ -60,6 +62,10 @@ async function fixture(label,shape,extra={}) {
   executable(join(bin,'hermes'),`import {mkdirSync,writeFileSync} from 'node:fs';import {join} from 'node:path';const a=process.argv.slice(2);if(a[0]!=='profile'||a[1]!=='create'||!['demo-pm','demo-dev'].includes(a[2])||a[3]!=='--no-alias'||a[4]!=='--no-skills')process.exit(93);const p=join(process.env.HOME,'.hermes/profiles',a[2]);mkdirSync(p,{recursive:true});writeFileSync(join(p,'config.yaml'),'{}\\n');writeFileSync(join(p,'.env'),'');`);
   executable(join(bin,'flume'),`await import(${JSON.stringify(cli)});`);
   for(const name of blocked) executable(join(bin,name),`import {appendFileSync} from 'node:fs';appendFileSync(${JSON.stringify(blockedLog)},${JSON.stringify(name)}+'\\n');process.exit(97);`);
+  // `op` is blocked except for the one read a hire now makes: the employee's own gateway key read-back (FLUME-39, ed465c9).
+  // The gateway CLI is a fixture, so the hire never mints against the live gateway. Any other `op` call is still a violation.
+  executable(join(bin,'op'),`import {appendFileSync} from 'node:fs';const a=process.argv.slice(2);if(a[0]==='read'&&/^op:\\/\\/DeLoSecrets\\/yeurk5dpqkaarspvsn3cjtmkki\\/hermes-demo-(pm|dev)$/.test(a[1])){process.stdout.write('fixture-member-value-long-enough-for-readback');process.exit(0);}appendFileSync(${JSON.stringify(blockedLog)},'op\\n');process.exit(97);`);
+  writeFileSync(join(bin,'gateway-tokens.py'),'#!/usr/bin/env python3\nimport sys\nassert sys.argv[1]=="mint" and sys.argv[3:6]==["--preset","owner-no-anthropic","--group"]\nprint(f"{sys.argv[2]}: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/{sys.argv[2]}")\n',{mode:0o755});
   executable(join(bin,'copier'),`import {spawnSync} from 'node:child_process';const r=spawnSync(${JSON.stringify(copier)},process.argv.slice(2),{stdio:'inherit',env:process.env});process.exit(r.status??1);`);
   symlinkSync('/usr/bin/python3',join(bin,'python3'));
   const env={HOME:home,PATH:`${bin}:/usr/bin:/bin`,TMPDIR:dir,LANG:'C.UTF-8',NO_COLOR:'1',COLUMNS:'100',
@@ -67,7 +73,7 @@ async function fixture(label,shape,extra={}) {
     HERMES_FLEET_HOME:hermes,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,HERMES_ORG_PATH:join(hermes,'org.yaml'),FLUME_ROLES_ROOT:roles,
     HERMES_TEMPLATE_CONFIG:config,HERMES_FLEET_ENV:join(hermes,'fleet.env'),HERMES_BIN:join(bin,'hermes'),HERMES_AGENT_REPO:runtime,
     FLUME_BIN:join(bin,'flume'),PJANGLER_BIN:join(bin,'unavailable-pj'),SKILLEX_BIN:join(bin,'skillex'),PJ_SKILLS_REGISTRY_ROOT:catalog,
-    PROFILE_RENDERER:join(template,'scripts/hermes-profile-config.py'),FLUME_GATEWAY_CATALOG:join(dir,'routes.json'),FLUME_HOST_OVERLAY:'none',
+    PROFILE_RENDERER:join(template,'scripts/hermes-profile-config.py'),FLUME_GATEWAY_CATALOG:join(dir,'routes.json'),FLUME_HOST_OVERLAY:'none',FLUME_GATEWAY_TOKENS_BIN:join(bin,'gateway-tokens.py'),
     PJANGLER_HERMES_TEMPLATE:template,GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_SYSTEM:'/dev/null',GIT_CEILING_DIRECTORIES:work,
     GIT_ALLOW_PROTOCOL:'file',PYTHONDONTWRITEBYTECODE:'1',PLANE_API_KEY:'',TRELLO_KEY:'',TRELLO_TOKEN:'',
   };

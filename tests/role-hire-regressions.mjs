@@ -69,6 +69,8 @@ async function fixture(label,skills) {
     delegation:{provider:'automaticai',model},auxiliary:{free_only:true,discovery:false},moa:{presets:{default:{enabled:false}}},
     memory:{provider:'hindsight'},hooks:Object.fromEntries(['on_session_start','on_session_end','pre_tool_call','post_tool_call'].map(e=>[e,[{command:`${join(home,'.agents/hooks/bb-hook')} --cli hermes --native ${e}`}]])),
     skills:{external_dirs:[join(home,'.agents/skills')]},platform_toolsets:{bloodbank:['delegation','terminal','file','skills','web']},
+    // Each employee's own Plane key must reach its terminal (FLUME-93; hermes.fleet-config rule).
+    terminal:{env_passthrough:['PLANE_API_KEY']},
     timeouts:{tools:{concurrent_batch:1800,sequential_call:1800}},
     // A deliberately unusable reference: neither the test nor any child resolves it.
     secrets:{onepassword:{enabled:true,env:{AUTOMATICAI_GATEWAY_KEY:'op://fixture/gateway/credential'}}},

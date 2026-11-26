@@ -33,7 +33,7 @@ async function fixture(label){
   const options={registryRoot:catalog,home,stateHome:join(home,'.local/state')};
   assert.ok((await createSet('first',options)).ok);assert.ok((await addSetSkills('first',['alpha'],options)).ok);
   assert.ok((await createSet('global',options)).ok);assert.ok((await addSetSkills('global',['global'],options)).ok);
-  writeFileSync(join(home,'.agents/skills.json'),JSON.stringify({sets:['global']}));
+  writeFileSync(join(home,'.agents/skills.json'),JSON.stringify({set:'global'}));
   writeFileSync(join(fleet,'config.yaml'),YAML.stringify({model:{provider:'automaticai',default:'automaticai/personal/sol'},skills:{external_dirs:['/foreign']},memory:{provider:'hindsight'},operator:{base:'preserve'}}));
   const registry=join(fleet,'agents-registry.yaml');
   writeFileSync(registry,'# org comment\nschema_version: 1\nagents: {}\n');
@@ -42,9 +42,14 @@ async function fixture(label){
     charter:{purpose:'Coordinate the portfolio.',tone:'Clear, practical and accountable.',directives:['Keep conventions','Escalate scope changes to Jarad']},
     skills:{set:'first'},memory:{write_bank:'agent-bennett',recall_banks:['james-brennan']}};
   writeFileSync(definition,YAML.stringify(contract));
+  // Hire mints and reads back the employee's own gateway key (FLUME-39, ed465c9). Fixture CLI + fixture `op`, so a suite never reaches the live gateway or vault.
+  const bin=join(dir,'bin');mkdirSync(bin,{recursive:true});
+  writeFileSync(join(bin,'gateway-tokens.py'),'#!/usr/bin/env python3\nimport sys\nassert sys.argv[1]=="mint" and sys.argv[3:6]==["--preset","owner-no-anthropic","--group"]\nname=sys.argv[2]\nprint(f"{name}: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/{name}")\n',{mode:0o755});
+  writeFileSync(join(bin,'op'),'#!/usr/bin/env node\nconst a=process.argv.slice(2);if(a[0]!=="read"||!a[1].startsWith("op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-"))process.exit(2);process.stdout.write("fixture-member-value-long-enough-for-readback");\n',{mode:0o755});
   const env={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,
     HERMES_TEMPLATE_CONFIG:join(dir,'no-config'),HERMES_FLEET_ENV:join(dir,'no-env'),PJ_SKILLS_REGISTRY_ROOT:catalog,
-    XDG_STATE_HOME:join(home,'.local/state'),PYTHONDONTWRITEBYTECODE:'1',TMPDIR:work};
+    XDG_STATE_HOME:join(home,'.local/state'),PYTHONDONTWRITEBYTECODE:'1',TMPDIR:work,
+    PATH:`${bin}:${process.env.PATH}`,FLUME_GATEWAY_TOKENS_BIN:join(bin,'gateway-tokens.py')};
   const run=(args,extra={},cwd=join(dir,'unrelated'))=>spawnSync(process.execPath,[cli,...args],{env:{...env,...extra},cwd,encoding:'utf8',timeout:60000});
   const json=r=>{assert.equal(r.status,0,r.stdout+r.stderr);return JSON.parse(r.stdout);};
   json(run(['hire','--definition',definition,'--json']));

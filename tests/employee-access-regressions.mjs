@@ -131,13 +131,17 @@ writeFileSync(join(dir, "op.json"), JSON.stringify({
   "op://DeLoSecrets/ada-access/credential": SECRET.ada,
   "op://DeLoSecrets/bob-access/credential": SECRET.bob,
   "op://DeLoSecrets/cy-access/credential": SECRET.cy,
+  // The member gateway key `flume hire` mints and reads back (scripts/gateway-member-tokens.py, FLUME-39 ed465c9).
+  "op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/hermes-ada": GATEWAY,
 }));
+// A fixture gateway-tokens CLI: hire must never mint against the live gateway.
+writeFileSync(join(bin, "gateway-tokens.py"), '#!/usr/bin/env python3\nimport sys\nassert sys.argv[1] == "mint" and sys.argv[3:6] == ["--preset", "owner-no-anthropic", "--group"]\nname = sys.argv[2]\nprint(f"{name}: existing token; op://DeLoSecrets/yeurk5dpqkaarspvsn3cjtmkki/{name}")\n', { mode: 0o755 });
 const baseEnv = {
   ...process.env, HOME: home, HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: registry, HERMES_FLEET_REGISTRY_FILE: registry,
   HERMES_TEMPLATE_CONFIG: join(dir, "no-config"), HERMES_FLEET_ENV: join(dir, "no-env"), HERMES_FLEET_BIN: join(bin, "hermes"),
   XDG_STATE_HOME: join(home, ".local/state"), PJ_SKILLS_REGISTRY_ROOT: catalog, PYTHONDONTWRITEBYTECODE: "1",
   PATH: `${bin}:${process.env.PATH}`, FLUME_ACCESS_CONFIG: configPath, FLUME_ACCESS_STATE: state,
-  OP_SERVICE_ACCOUNT_TOKEN: VAULT, OP_FIXTURE: join(dir, "op.json"), FIXTURE_CLI: cli, LAUNCH_RECEIPT: join(dir, "launch.json"),
+  OP_SERVICE_ACCOUNT_TOKEN: VAULT, OP_FIXTURE: join(dir, "op.json"), FLUME_GATEWAY_TOKENS_BIN: join(bin, "gateway-tokens.py"), FIXTURE_CLI: cli, LAUNCH_RECEIPT: join(dir, "launch.json"),
   // Another employee's bootstrap secrets in the parent: they must never reach a child.
   ...OPERATOR_ENV, ...HARMLESS_ENV,
   CF_ACCESS_CLIENT_ID: CLIENT.bob, CF_ACCESS_CLIENT_SECRET: SECRET.bob, FLUME_RUN_ASSERTION: "foreign-run-assertion", FLUME_ACCESS_URL: "http://127.0.0.1:9/foreign", OPENAI_API_KEY: "foreign-inference-key", AUTOMATICAI_GATEWAY_KEY: "foreign-gateway-key",
@@ -499,7 +503,9 @@ try {
     setBinding(cyRole, { cloudflare_access: { principal: CLIENT.cy, instance: "https://other.cloudflareaccess.com", credential_ref: "op://DeLoSecrets/cy-access/credential" } });
     assert.match(run(["access", "run", "cy-pm", "--", process.execPath, join(dir, "dump.cjs"), probe]).stderr, /issuer does not match/u);
     // Hermes: a retired employee cannot launch.
-    json(run(["identity", "status", "bob-pm", "retired", "--apply", "--json"]));
+    // `identity status ... retired` is refused since FLUME-53 (retirement goes through `identity retire`, which also
+    // revokes live providers). This suite only needs the launcher to see a retired record, so write the status directly.
+    { const doc = YAML.parseDocument(readFileSync(bobRole, "utf8")); doc.setIn(["company_identity", "status"], "retired"); writeFileSync(bobRole, String(doc)); }
     refused(await direct({ clientId: CLIENT.bob }, body(), bobRun), 403, "employee-retired");
     assert.match(run(["access", "run", "bob-pm", "--", process.execPath, join(dir, "dump.cjs"), probe]).stderr, /retired/u);
     assert.equal(existsSync(probe), false);

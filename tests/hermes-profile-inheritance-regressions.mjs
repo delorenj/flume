@@ -654,7 +654,8 @@ const withoutKey = (obj, key) => Object.fromEntries(Object.entries(obj).filter((
 {
   const f = auditRule(repo, makeFleet({}), "hermes.gateway-routing");
   assert.equal(f.status, "pass", `a fully routed base must pass:\n${f.text}`);
-  assert.match(f.summary, /Main, auxiliary, delegated, fallback and MoA inference route through the gateway/);
+  // ed465c9 (FLUME-39) rewrote the summary to report member-token coverage; a clean audit is `status: pass` plus 0 routing issues.
+  assert.match(f.summary, /Main, auxiliary, delegated, fallback and MoA inference gateway audit: .* 0 routing issue\(s\)$/);
   assert.equal(f.title, "All agent inference routes through the AutomaticAI gateway");
 }
 {

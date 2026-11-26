@@ -9,6 +9,7 @@ import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import YAML from 'yaml';
 import {build} from 'esbuild';
+import {installMemberGateway} from './lifecycle-fixtures.mjs';
 import {addSetSkills,createPack,createSet,addPackSkills} from '@delorenj/skillex';
 
 const root=process.cwd();
@@ -44,7 +45,7 @@ async function fleet(label,{externalDirs=true}={}) {
   writeFileSync(registry,'agents:\n  boss: {role: director, department: engineering}\n  unrelated: {role: reporter, department: editorial}\n');
   writeFileSync(org,'# precious top comment\ncompany: {name: Fixture}\ndepartments:\n  - id: engineering # department comment\n    manager: boss\n    members: []\n  - id: editorial\n    members: [unrelated]\n');
   const stateHome=join(home,'.local','state');
-  const env={...process.env,HOME:home,XDG_STATE_HOME:stateHome,HERMES_FLEET_HOME:hermes,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,PJ_SKILLS_REGISTRY_ROOT:skillex,FLUME_GATEWAY_CATALOG:join(dir,'routes.json')};
+  const env={...process.env,HOME:home,XDG_STATE_HOME:stateHome,HERMES_FLEET_HOME:hermes,HERMES_AGENTS_REGISTRY:registry,HERMES_ORG_PATH:org,PJ_SKILLS_REGISTRY_ROOT:skillex,FLUME_GATEWAY_CATALOG:join(dir,'routes.json'),...installMemberGateway(dir)};
   const options=desk=>({home,fleetRoot:hermes,registryPath:registry,orgPath:org,skillexRoot:skillex,deskPath:desk,stateHome,renderer});
   const deskOf=profile=>join(hermes,'profiles',profile);
   const skillexCmd=(...args)=>{

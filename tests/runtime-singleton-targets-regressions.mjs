@@ -73,6 +73,7 @@ function fixture({ roleSoul = "I am demo-pm.\n", runtimeSoul = "seeded soul\n", 
   writeFileSync(join(profile, "config.delta.yaml"), "{}\n");
   writeFileSync(join(profile, "hindsight", "config.json"), JSON.stringify({ bank_id: "agent-demo-pm" }));
   writeFileSync(join(profile, ".skillex-only"), "Skillex owns this PM skill projection.\n");
+  writeFileSync(join(profile, ".no-bundled-skills"), "Strict Skillex profile: no bundled skills.\n");
 
   // The fresh runtime.
   mkdirSync(join(runtime, "memories"), { recursive: true });

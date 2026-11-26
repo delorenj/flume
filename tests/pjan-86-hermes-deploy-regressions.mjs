@@ -20,6 +20,7 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
+import { installMemberGateway } from "./lifecycle-fixtures.mjs";
 import { delimiter, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -821,9 +822,8 @@ exit 1
   writeFileSync(join(parityRole, "role.yaml"), `repo: parity-repo\nrole: pm\nagent_id: parity-repo-pm\ndeployment:\n  systemd: required\nservice_state:\n  gateway: deferred\n  heartbeat: active\n`);
   const parityGateway = "hermes-parity-repo-pm-gateway.service";
   const parityHeartbeat = "hermes-parity-repo-pm-heartbeat.timer";
-  for (const unit of [parityGateway]) {
-    writeFileSync(join(systemdDir, unit), "[Unit]\nDescription=fixture\n");
-  }
+  // One host gateway serves every profile (6d7ee53, handbook 1.8.0): a deferred role needs no unit at all, and a per-agent
+  // gateway unit is a retired conflict. So the healthy deferred fixture has NO per-agent unit file.
   writeFileSync(join(parityState, `${parityHeartbeat}.enabled`), "");
   writeFileSync(join(parityState, `${parityHeartbeat}.active`), "");
   for (const probe of ["is-enabled", "is-active"]) {
@@ -840,6 +840,12 @@ exit 1
   });
   const deferredFinding = JSON.parse(deferredAudit.stdout).rules.find((rule) => rule.id === "systemd.sentinel");
   assert.equal(deferredFinding.status, "pass", JSON.stringify(deferredFinding));
+  // A leftover per-agent gateway unit is retired and conflicts with the host gateway: present, then still active.
+  writeFileSync(join(systemdDir, parityGateway), "[Unit]\nDescription=fixture\n");
+  const presentAudit = run(["audit", parityRepo, "--json"], parityRepo, { ...commandEnv, HOME: parityHome, PJAN86_SYSTEMD_STATE: parityState });
+  const presentFinding = JSON.parse(presentAudit.stdout).rules.find((rule) => rule.id === "systemd.sentinel");
+  assert.equal(presentFinding.status, "fail");
+  assert.match(presentFinding.details.join("\n"), /hermes-parity-repo-pm-gateway\.service is retired but still present: it conflicts with hermes-gateway\.service/);
   const unsafeAudit = run(["audit", parityRepo, "--json"], parityRepo, {
     ...commandEnv,
     HOME: parityHome,
@@ -848,7 +854,7 @@ exit 1
   });
   const unsafeFinding = JSON.parse(unsafeAudit.stdout).rules.find((rule) => rule.id === "systemd.sentinel");
   assert.equal(unsafeFinding.status, "fail");
-  assert.match(unsafeFinding.details.join("\n"), /deferred and should be disabled\+inactive/);
+  assert.match(unsafeFinding.details.join("\n"), /hermes-parity-repo-pm-gateway\.service is retired but still active/);
 
   // Gateway reconciliation leaves deferred and historical heartbeat metadata
   // unchanged, and the immediate post-audit passes.
@@ -890,6 +896,9 @@ exit 1
 
   // Installed gateway -> active becomes durable only after enabled and active
   // postconditions. Preserve the comment and retired heartbeat metadata.
+  // The one host gateway serves the role: flume only OBSERVES it and never starts it (6d7ee53), so the fixture's
+  // host unit is already enabled+active when the manifest is promoted from installed to active.
+  for (const leaf of ["enabled", "active"]) writeFileSync(join(migrateState, `hermes-gateway.service.${leaf}`), "");
   writeFileSync(migrateRolePath, migrateRoleSource.replace("gateway: deferred", "gateway: installed"));
   const activated = run(["migrate", "systemd.sentinel", migrateRepo, "--json"], migrateRepo, {
     ...commandEnv, HOME: migrateHome, PJAN86_SYSTEMD_STATE: migrateState,
@@ -899,8 +908,8 @@ exit 1
   assert.equal(activatedResult.status, "applied");
   assert.ok(activatedResult.changedFiles.includes(migrateRolePath));
   assert.equal(readFileSync(migrateRolePath, "utf8"), migrateRoleSource.replace("gateway: deferred", "gateway: active"));
-  assert.ok(existsSync(join(migrateState, "hermes-migrate-repo-pm-gateway.service.enabled")));
-  assert.ok(existsSync(join(migrateState, "hermes-migrate-repo-pm-gateway.service.active")));
+  assert.equal(existsSync(join(migrateState, "hermes-migrate-repo-pm-gateway.service.enabled")), false, "no per-agent gateway unit is ever enabled");
+  assert.ok(existsSync(join(migrateState, "hermes-gateway.service.enabled")) && existsSync(join(migrateState, "hermes-gateway.service.active")), "the host gateway is left as it was");
   assert.equal(existsSync(join(migrateState, "hermes-migrate-repo-pm-heartbeat.timer.enabled")), false);
   const activatedAudit = run(["audit", migrateRepo, "--json"], migrateRepo, {
     ...commandEnv, HOME: migrateHome, PJAN86_SYSTEMD_STATE: migrateState,
@@ -952,7 +961,7 @@ exit 1
     for (const path of [profile, join(profile, "skills"), join(profile, "hindsight"), join(catalog, "all-skills"), join(declarations, "roles"), state, unitDir, join(repo, ".agents")]) mkdirSync(path, { recursive: true });
     writeFileSync(join(declarations, "roles", "dev.md"), "---\nrole: dev\n---\nDevelopment contributor.\n");
     writeFileSync(join(repo, ".project.json"), JSON.stringify({ project_name: "verified-repo", repo_path: repo, ticket_provider: { type: "plane", state: "linked" }, agents: {} }));
-    writeFileSync(join(repo, ".agents", "skills.json"), JSON.stringify({ sets: [], inherit_global: false }));
+    writeFileSync(join(repo, ".agents", "skills.json"), JSON.stringify({ inherit_global: false }));
     const model = "automaticai/personal/kimi-2.8";
     const base = {
       model: { provider: "automaticai", default: model },
@@ -971,6 +980,8 @@ exit 1
       hooks: Object.fromEntries(["on_session_start", "on_session_end", "pre_tool_call", "post_tool_call"].map((event) => [event, [{ command: `${join(home, ".agents", "hooks", "bb-hook")} --cli hermes --native ${event}` }]])),
       platform_toolsets: { bloodbank: ["delegation", "terminal", "file", "skills"] },
       timeouts: { tools: { concurrent_batch: 1800, sequential_call: 1800 } },
+      // Each employee's own Plane key must reach its terminal (FLUME-93; hermes.fleet-config rule).
+      terminal: { env_passthrough: ["PLANE_API_KEY"] },
       wake_word: { enabled: true, start_new_session: false },
     };
     writeFileSync(join(fleet, "config.yaml"), YAML.stringify(base));
@@ -979,7 +990,9 @@ exit 1
     writeFileSync(join(profile, "config.delta.yaml"), "{}\n");
     writeFileSync(join(profile, "hindsight", "config.json"), JSON.stringify({ bank_id: `agent-${agent}` }));
     writeFileSync(join(fleet, "agents-registry.yaml"), "schema_version: 1\nagents: {}\n");
-    const gateway = `hermes-${agent}-gateway.service`;
+    // One host gateway serves every profile (6d7ee53): the fixture's user manager has the host unit enabled+active and
+    // NO per-agent unit (that would be a retired conflict the postcondition audit rightly fails).
+    const gateway = "hermes-gateway.service";
     writeFileSync(join(unitDir, gateway), `[Service]\nEnvironment=HERMES_HOME=${profile}\n`);
     for (const leaf of ["enabled", "active"]) writeFileSync(join(state, `${gateway}.${leaf}`), "");
     const env = {
@@ -988,6 +1001,8 @@ exit 1
       HERMES_FLEET_HOME: fleet, HERMES_AGENTS_REGISTRY: join(fleet, "agents-registry.yaml"), HERMES_FLEET_REGISTRY_FILE: join(fleet, "agents-registry.yaml"),
       HERMES_FLEET_ENV: join(fleet, "fleet.env"), PJAN86_SYSTEMD_STATE: state,
       PJ_SKILLS_REGISTRY_ROOT: catalog, FLUME_ROLES_ROOT: declarations, PJANGLER_BIN: join(temp, "unavailable-pj"),
+      // A hire mints and reads back the employee's own gateway key (FLUME-39, ed465c9): fixture CLI + fixture `op`.
+      ...installMemberGateway(join(temp, "verified-gw"), commandEnv.PATH),
     };
     const skills = await syncProfile(agent, { project: repo, home, hermesRoot: fleet, registryRoot: catalog, env });
     assert.ok(skills.ok, JSON.stringify(skills.findings));

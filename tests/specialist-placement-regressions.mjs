@@ -4,6 +4,7 @@ import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import YAML from 'yaml';
 import {createSet,addSetSkills} from '@delorenj/skillex';
+import {installMemberGateway} from './lifecycle-fixtures.mjs';
 const root=resolve(import.meta.dirname,'..'), cli=join(root,'packages/flume-hr/dist/index.js');
 const scratch=mkdtempSync(join(process.env.TMPDIR || join(process.env.HOME,'.hermes/cache/scratch'),'flume32-placement-'));
 try {
@@ -18,7 +19,7 @@ try {
   writeFileSync(org,'# org comment\nceo:\n  id: ceo\npersonas:\n  specialist:\n    expertise: [ops] # keep\ndepartments:\n  - id: ops\n    manager: manager\n    members: [other] # keep members\n  - id: bare\n    manager: null\n    members: []\n');
   const definition=join(scratch,'agent.yaml');
   const contract={schema_version:1,id:'specialist',display_name:'Specialist',role:'infra',charter:{purpose:'Fixture'},skills:{set:'first'},memory:{write_bank:'agent-specialist'}};
-  const env={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,HERMES_ORG_PATH:org,HERMES_TEMPLATE_CONFIG:join(scratch,'none'),HERMES_FLEET_ENV:join(scratch,'none'),PJ_SKILLS_REGISTRY_ROOT:catalog,XDG_STATE_HOME:join(home,'.local/state'),PYTHONDONTWRITEBYTECODE:'1'};
+  const env={...process.env,HOME:home,HERMES_FLEET_HOME:fleet,HERMES_AGENTS_REGISTRY:registry,HERMES_FLEET_REGISTRY_FILE:registry,HERMES_ORG_PATH:org,HERMES_TEMPLATE_CONFIG:join(scratch,'none'),HERMES_FLEET_ENV:join(scratch,'none'),PJ_SKILLS_REGISTRY_ROOT:catalog,XDG_STATE_HOME:join(home,'.local/state'),PYTHONDONTWRITEBYTECODE:'1',...installMemberGateway(scratch)};
   const run=(...args)=>spawnSync(process.execPath,[cli,...args.slice(0,args[0]==='org'?2:1),'--json',...args.slice(args[0]==='org'?2:1)],{env,encoding:'utf8',timeout:40000});
   const success=(...args)=>{const result=run(...args);assert.equal(result.status,0,result.stdout+result.stderr);return JSON.parse(result.stdout)};
   const rejected=(...args)=>{const result=run(...args);assert.notEqual(result.status,0,result.stdout+result.stderr);return result.stdout+result.stderr};
