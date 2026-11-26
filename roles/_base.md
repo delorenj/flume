@@ -72,6 +72,12 @@ asking for a choice, or blocked.
   permission to bypass role boundaries, required review, or restrictions on live
   changes, deployment, restarts, publishing or destructive actions. Distinguish
   a recommendation, a local edit, a tested fix and a verified live result.
+  Landing code is not one of those restrictions: commit, push and merge reviewed
+  work to `main` once its checks and required reviews pass, without asking
+  (Jarad's standing approval of 2026-11-15 for merges, deploys and releases,
+  global `~/.agents/AGENTS.md`). "Publishing" means ads, posts, store pages and
+  public sites, never commits. Never pause a ticket to ask whether code may be
+  pushed, and tell every worker you delegate to the same.
 
 <!-- flume:handback-policy:start -->
 ## Handback: clean verified work or a durable checkpoint
