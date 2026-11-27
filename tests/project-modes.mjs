@@ -33,6 +33,7 @@ const profile = join(fleet, "profiles", "demo-pm");
 const roleDir = join(repo, "agents", "hermes", "pm");
 for (const dir of [home, fleet, profile, join(roleDir, ".scripts"), join(repo, ".candybars")]) mkdirSync(dir, { recursive: true });
 writeFileSync(join(roleDir, ".scripts", "launch-pass.py"), "#!/usr/bin/env python3\n");
+writeFileSync(join(roleDir, ".scripts", "polish-pass.prompt.md"), "# polish pass\n");
 mkdirSync(join(repo, ".git"));
 
 writeFileSync(join(fleet, "agents-registry.yaml"), YAML.stringify({
@@ -234,6 +235,16 @@ await check("flume mode status|enable|disable drive the same machinery; enable s
   assert.equal(refused.status, 1);
   assert.match(refused.doc.error, /must say `mode: launch` or `mode: polish` \(it is develop\)/);
   assert.match(flume(["mode", "status", repo]).out, /\(mode: develop\)/, "the text status names the mode");
+});
+
+await check("polish enable refuses a desk scaffolded before polish mode (its driver would read polish as develop)", () => {
+  declarePolish();
+  const prompt = join(roleDir, ".scripts", "polish-pass.prompt.md");
+  rmSync(prompt);
+  const refused = json(["mode", "enable", repo, "--dry-run"]);
+  assert.equal(refused.status, 1);
+  assert.match(refused.doc.error, /predates polish mode .*flume remediate hermes\.pm-scaffold .* --scripts-only/);
+  writeFileSync(prompt, "# polish pass\n");
 });
 
 rmSync(work, { recursive: true, force: true });

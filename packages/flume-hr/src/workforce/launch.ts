@@ -658,6 +658,10 @@ export function enableLaunch(repoArg: string | undefined, options: LaunchOptions
   const desk = found.desk;
   const names = launchNames(repoRoot, desk, options);
   if (!existsSync(names.driverPath)) return bad(`${names.driverPath} is missing; the desk predates the launch driver. Run: flume remediate hermes.pm-scaffold ${repoRoot} --scripts-only`);
+  // A desk scaffolded before polish mode reads `mode: polish` as develop and stays quiet forever: refuse instead.
+  if (mode === "polish" && !existsSync(join(desk.roleDir, ".scripts", "polish-pass.prompt.md"))) {
+    return bad(`${desk.roleDir}/.scripts predates polish mode (no polish-pass.prompt.md), so its driver would read polish as develop. Run: flume remediate hermes.pm-scaffold ${repoRoot} --scripts-only, commit the refreshed .scripts/, then enable again`);
+  }
   if (!existsSync(join(envPaths(options).fleetHome, "profiles", desk.profile))) return bad(`Hermes profile ${desk.profile} does not exist under ${envPaths(options).fleetHome}/profiles`);
 
   const actions: LaunchAction[] = [];
