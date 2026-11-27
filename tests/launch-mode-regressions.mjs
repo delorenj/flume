@@ -64,13 +64,13 @@ const manifestPath = join(repo, ".candybars", "demo-pm-launch-pass.candybar.toml
 const monitor = join(profile, "scripts", "launch-monitor.sh");
 const brief = join(profile, "scripts", "launch-brief.sh");
 
-await check("enable refuses a repo that has not declared launch mode, and writes nothing", () => {
+await check("enable refuses a repo that has not declared an active mode, and writes nothing", () => {
   const r = json(["launch", "enable", repo]);
   assert.equal(r.status, 1);
-  assert.match(r.doc.error, /\.launch\.yaml must say `mode: launch` \(it is absent\)/);
+  assert.match(r.doc.error, /\.launch\.yaml must say `mode: launch` or `mode: polish` \(it is absent\)/);
   assert.equal(existsSync(manifestPath), false);
   declare("steady");
-  assert.match(json(["launch", "enable", repo]).doc.error, /it is steady/);
+  assert.match(json(["launch", "enable", repo]).doc.error, /it is develop/, "the legacy steady alias reads as develop");
   declare("live");
   assert.match(json(["launch", "enable", repo]).doc.error, /it is live/, "a live app has no finish line to launch");
 });
@@ -237,18 +237,18 @@ await check("disable pauses the Candybar and keeps the manifest and the Hermes j
   assert.equal(json(["launch", "disable", repo]).doc.changes, 0);
 });
 
-await check("audit: steady with an enabled pass fails and names flume launch disable; steady and paused passes", () => {
+await check("audit: develop (via the legacy steady alias) with an enabled pass fails and names flume launch disable", () => {
   declare("steady");
   const cb = cbState(); cb["demo-pm-launch-pass"].enabled = true; writeFileSync(state, JSON.stringify(cb));
   const bad = json(["audit", repo, "--rules", "hermes.launch-mode"]);
   assert.equal(bad.doc.rules[0].status, "fail");
-  assert.match(bad.doc.rules[0].details.join("\n"), /enabled but \.launch\.yaml is steady.*flume launch disable/);
+  assert.match(bad.doc.rules[0].details.join("\n"), /enabled but \.launch\.yaml is develop.*flume launch disable/);
   const fix = json(["remediate", "hermes.launch-mode", repo]);
   assert.equal(fix.status, 0, fix.out);
   assert.equal(cbState()["demo-pm-launch-pass"].enabled, false);
   assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass");
   rmSync(join(repo, ".launch.yaml"));
-  assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass", "absent declaration is steady");
+  assert.equal(json(["audit", repo, "--rules", "hermes.launch-mode"]).doc.rules[0].status, "pass", "absent declaration reads as develop");
 });
 
 await check("audit: live is a first-class mode; an enabled pass fails and names flume launch disable", () => {

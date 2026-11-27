@@ -1,9 +1,13 @@
 /**
- * Launch mode, wired: `flume launch status|enable|disable` and the `hermes.launch-mode` audit rule.
+ * Project modes, wired: `flume launch status|enable|disable` (and the mode-first spelling
+ * `flume mode ...`) plus the `hermes.launch-mode` audit rule.
  *
- * Launch mode is repo DATA: a PM drives a launch while the repo's committed `.launch.yaml` says
- * `mode: launch` (roles/pm.md "## Launch mode"). This module is the machinery around it, so no repo
- * is wired by hand again (earshot was, the first time):
+ * A repo's PM mode is repo DATA: the owner declares it in the repo's committed `.launch.yaml`
+ * (`mode:` key) and agents never edit that file. `develop` is the default (no file, `mode:
+ * develop`, or the legacy alias `mode: steady`) and runs no pass; `launch` races a finish line;
+ * `polish` is around-the-clock exploratory QA; `live` is a lifecycle stage (in production) and
+ * runs no pass. Launch and polish share every piece of machinery below -- same driver, wrappers,
+ * Hermes job and Candybar entry; only the cadence, the job budget and the pass contract differ:
  *
  *   declaration   <repo>/.launch.yaml                       owner-edited, read here, never written
  *   driver        <desk>/.scripts/launch-pass.py            shipped by the hermes-agent template
@@ -15,9 +19,9 @@
  *
  * Candybar is the only clock: the job is pinned `external`, and nothing here schedules anything.
  * `enable` is idempotent and adopts what already exists (zero changes on a wired repo); `disable`
- * only pauses the Candybar job (manifest and Hermes job stay, so going live or steady is reversible).
+ * only pauses the Candybar job (manifest and Hermes job stay, so leaving a mode is reversible).
  * Writes only the wrappers, the Hermes job and the manifest, and asks pj to turn crank on (pj writes
- * `.project.json`); it commits nothing. `disable` leaves crank alone: crank also serves steady repos.
+ * `.project.json`); it commits nothing. `disable` leaves crank alone: crank also serves develop repos.
  */
 
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -38,7 +42,13 @@ export const DEFAULT_TIMEZONE = "America/New_York";
 export const JOB_PROMPT = "Follow the pass contract in the brief above.";
 const LEAN_TOOLSETS = ["terminal", "file", "no_mcp"];
 const MAX_ITERATIONS = 10;
+const POLISH_MAX_ITERATIONS = 30;
 const REASONING_EFFORT = "medium";
+/** Polish cadence when the declaration names none (launch defaults to hourly, per repo). */
+export const POLISH_DEFAULT_SCHEDULE = "*/15 * * * *";
+/** Krebs WIP slots ("lanes") while polishing; develop and launch default to 2. */
+export const POLISH_DEFAULT_WIP = 4;
+const SCHEDULE = /^(\S+\s+){4}\S+$/u;
 
 type Row = Record<string, unknown>;
 const mapping = (value: unknown): Row | undefined =>
@@ -57,18 +67,69 @@ function envPaths(env: LaunchEnv = {}) {
 // Declaration
 // ---------------------------------------------------------------------------------------------
 
+export type LaunchMode = "develop" | "launch" | "polish" | "live" | "absent" | "invalid";
+/** The modes a pass runs for. develop (the default) and live run none. */
+export type ActiveMode = "launch" | "polish";
+export const isActiveMode = (mode: LaunchMode): mode is ActiveMode => mode === "launch" || mode === "polish";
+
+/** The optional `polish:` block of the declaration. Every field is a hint with a default, never a limit. */
+export interface PolishDeclaration {
+  /** Krebs WIP slots ("lanes") while polishing; default POLISH_DEFAULT_WIP (develop/launch default is 2). */
+  wip?: number;
+  /** Candybar schedule of the pass; default POLISH_DEFAULT_SCHEDULE. */
+  cadence?: string;
+  /** Todo is topped up to this many polish tickets each pass; default 2 x wip. */
+  todoDepth?: number;
+  /** Repo commands a QA cycle may run (exploratory harness, e2e, screenshots). */
+  qa?: string[];
+  /** Hint areas, never a limit: anything, however small, is ticketable. */
+  focus?: string[];
+}
+
 export interface LaunchDeclaration {
   path: string;
   exists: boolean;
   /**
-   * The lifecycle is launch (racing to a finish line) -> live (in production: people can buy it and use it);
-   * `steady` is for projects that are neither. Only `launch` runs a launch pass; `live` and `steady` run none.
-   * `absent` = no file (steady); `invalid` = unreadable or an unknown mode (treated as steady, reported).
+   * The lifecycle is develop (the default: building, no pass) -> launch (racing to a finish line)
+   * -> live (in production: people can buy it and use it); `polish` is around-the-clock exploratory
+   * QA. `steady` is a LEGACY ALIAS that reads as `develop`. Only `launch` and `polish` run a pass.
+   * `absent` = no file (develop); `invalid` = unreadable or an unknown mode (treated as develop, reported).
    */
-  mode: "launch" | "live" | "steady" | "absent" | "invalid";
+  mode: LaunchMode;
   epic?: string;
   declared?: string;
+  polish?: PolishDeclaration;
   error?: string;
+}
+
+/** The optional `polish:` block; a string return is the reason the declaration is invalid. */
+function readPolishBlock(raw: unknown): PolishDeclaration | string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const block = mapping(raw);
+  if (!block) return `${LAUNCH_DECLARATION} polish must be a mapping (got ${JSON.stringify(raw)})`;
+  const out: PolishDeclaration = {};
+  const positiveInt = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1;
+  if (block.wip !== undefined) {
+    if (!positiveInt(block.wip)) return `${LAUNCH_DECLARATION} polish.wip must be a positive integer (got ${JSON.stringify(block.wip)})`;
+    out.wip = block.wip;
+  }
+  if (block.cadence !== undefined) {
+    if (typeof block.cadence !== "string" || !SCHEDULE.test(block.cadence.trim())) return `${LAUNCH_DECLARATION} polish.cadence must be a 5-field cron expression (got ${JSON.stringify(block.cadence)})`;
+    out.cadence = block.cadence.trim();
+  }
+  if (block.todo_depth !== undefined) {
+    if (!positiveInt(block.todo_depth)) return `${LAUNCH_DECLARATION} polish.todo_depth must be a positive integer (got ${JSON.stringify(block.todo_depth)})`;
+    out.todoDepth = block.todo_depth;
+  }
+  if (block.qa !== undefined) {
+    if (!Array.isArray(block.qa) || block.qa.some((c) => typeof c !== "string" || !c.trim())) return `${LAUNCH_DECLARATION} polish.qa must be a list of command strings`;
+    out.qa = (block.qa as string[]).map((c) => c.trim());
+  }
+  if (block.focus !== undefined) {
+    if (!Array.isArray(block.focus) || block.focus.some((c) => typeof c !== "string" || !c.trim())) return `${LAUNCH_DECLARATION} polish.focus must be a list of words`;
+    out.focus = (block.focus as string[]).map((c) => c.trim().toLowerCase());
+  }
+  return out;
 }
 
 export function readLaunchDeclaration(repoRoot: string): LaunchDeclaration {
@@ -76,12 +137,22 @@ export function readLaunchDeclaration(repoRoot: string): LaunchDeclaration {
   if (!existsSync(path)) return { path, exists: false, mode: "absent" };
   try {
     const doc = mapping(YAML.parse(readFileSync(path, "utf8")));
-    const mode = doc?.mode;
+    // Every reader normalises: lowercase; `steady` is a legacy alias that reads as develop.
+    const raw = typeof doc?.mode === "string" ? doc.mode.trim().toLowerCase() : doc?.mode;
+    const mode = raw === "steady" ? "develop" : raw;
     const out: LaunchDeclaration = { path, exists: true, mode: "invalid" };
     if (typeof doc?.epic === "string") out.epic = doc.epic;
     if (doc?.declared !== undefined) out.declared = String(doc.declared);
-    if (mode === "launch" || mode === "live" || mode === "steady") out.mode = mode;
-    else out.error = `${LAUNCH_DECLARATION} mode must be "launch", "live" or "steady" (got ${JSON.stringify(mode ?? null)})`;
+    if (mode !== "develop" && mode !== "launch" && mode !== "polish" && mode !== "live") {
+      out.error = `${LAUNCH_DECLARATION} mode must be "develop", "launch", "polish" or "live" ("steady" is a legacy alias for develop; got ${JSON.stringify(doc?.mode ?? null)})`;
+      return out;
+    }
+    out.mode = mode;
+    if (mode === "polish") {
+      const polish = readPolishBlock(doc?.polish);
+      if (typeof polish === "string") { out.mode = "invalid"; out.error = polish; return out; }
+      if (polish) out.polish = polish;
+    }
     return out;
   } catch (error) {
     return { path, exists: true, mode: "invalid", error: `${LAUNCH_DECLARATION} unreadable: ${(error as Error).message}` };
@@ -206,21 +277,34 @@ export function defaultSchedule(repo: string): string {
   return `${5 + (sum % 50)} 8-22 * * *`;
 }
 
-function manifestText(names: LaunchNames, schedule: string, timezone: string, profile: string, jobId: string): string {
-  const [minute] = schedule.split(/\s+/u);
-  return `# ${names.label} launch pass (${profile}), hourly at :${String(minute).padStart(2, "0")}, 08:00-22:00 ET by default.
+/** The pass cadence a mode gets when nothing more specific is declared: polish every 15 minutes, launch hourly at a per-repo minute. */
+export function modeDefaultSchedule(mode: ActiveMode, repo: string): string {
+  return mode === "polish" ? POLISH_DEFAULT_SCHEDULE : defaultSchedule(repo);
+}
+
+/** The Hermes job's display name per mode (the launch name is unchanged since the first wiring). */
+export function modeJobName(mode: ActiveMode, label: string): string {
+  return mode === "polish" ? `${label} polish pass (every 15m)` : `${label} launch pass (hourly)`;
+}
+
+function manifestText(names: LaunchNames, schedule: string, timezone: string, profile: string, jobId: string, mode: ActiveMode): string {
+  const maxIterations = mode === "polish" ? POLISH_MAX_ITERATIONS : MAX_ITERATIONS;
+  const cadence = mode === "polish"
+    ? (schedule === POLISH_DEFAULT_SCHEDULE ? "every 15 minutes by default" : `on "${schedule}"`)
+    : `hourly at :${String(schedule.split(/\s+/u)[0]).padStart(2, "0")}, 08:00-22:00 ET by default`;
+  return `# ${names.label} ${mode} pass (${profile}), ${cadence}.
 #
-# Launch mode is repo data: this pass does work only while .launch.yaml says \`mode: launch\`.
-# In steady mode the monitor prints exactly \`launch-mode: steady\`, so every fire costs 0 tokens.
+# ${mode === "polish" ? "Polish" : "Launch"} mode is repo data: this pass does work only while .launch.yaml says \`mode: ${mode}\`.
+# In develop mode the monitor prints exactly \`launch-mode: develop\`, so every fire costs 0 tokens.
 #
 # interval-driver pattern (~/.agents/skills/interval-driver):
 #   monitor  agents/hermes/pm/.scripts/launch-pass.py --monitor  (unchanged = the agent never starts)
 #   brief    agents/hermes/pm/.scripts/launch-pass.py --brief    (pass contract + declaration + snapshot + plan shape)
 #   apply    agents/hermes/pm/.scripts/launch-pass.py --apply    (board-driver lease, capped writes, receipt, roadmap)
-#   lean     toolsets terminal,file,no_mcp; no skills; max_iterations ${MAX_ITERATIONS}; ${REASONING_EFFORT} effort; no continuity
+#   lean     toolsets terminal,file,no_mcp; no skills; max_iterations ${maxIterations}; ${REASONING_EFFORT} effort; no continuity
 # Wrappers: ~/.hermes/profiles/${profile}/scripts/launch-{monitor,brief}.sh (real files; exec the repo).
 # Hermes job ${jobId} is pinned scheduler=external: Candybar is its only clock.
-# Wired by \`flume launch enable\`; \`flume launch disable\` pauses it when the repo goes steady.
+# Wired by \`flume launch enable\`; \`flume launch disable\` pauses it when the repo leaves ${mode} mode.
 [candybar]
 name = "${names.candybar}"
 schedule = "${schedule}"
@@ -236,16 +320,17 @@ timeout_s = 1500
 `;
 }
 
-interface ManifestFacts { schedule?: string; timezone?: string; profile?: string; jobId?: string; name?: string }
+interface ManifestFacts { schedule?: string; timezone?: string; profile?: string; jobId?: string; name?: string; header?: string }
 
 function readManifest(path: string): { exists: boolean; facts?: ManifestFacts; error?: string } {
   if (!existsSync(path)) return { exists: false };
   try {
-    const doc = mapping(parseToml(readFileSync(path, "utf8")));
+    const text = readFileSync(path, "utf8");
+    const doc = mapping(parseToml(text));
     const c = mapping(doc?.candybar), r = mapping(c?.runner);
     return { exists: true, facts: {
       name: c?.name as string | undefined, schedule: c?.schedule as string | undefined, timezone: c?.timezone as string | undefined,
-      profile: r?.profile as string | undefined, jobId: r?.job_id as string | undefined,
+      profile: r?.profile as string | undefined, jobId: r?.job_id as string | undefined, header: text.split("\n", 1)[0] ?? "",
     } };
   } catch (error) { return { exists: true, error: (error as Error).message }; }
 }
@@ -274,13 +359,14 @@ const sameSet = (a: unknown, b: string[]): boolean =>
   Array.isArray(a) && a.length === b.length && [...a].map(String).sort().join("\0") === [...b].sort().join("\0");
 
 /** Updates that bring an existing launch job to the lean, externally scheduled shape. Empty = already there. */
-export function jobUpdates(job: Job, wanted: { schedule?: string; timezone: string }): Record<string, unknown> {
+export function jobUpdates(job: Job, wanted: { schedule?: string; timezone: string; maxIterations?: number }): Record<string, unknown> {
   const updates: Record<string, unknown> = {};
+  const maxIterations = wanted.maxIterations ?? MAX_ITERATIONS;
   if (job.scheduler !== "external") updates.scheduler = "external";
   if (!sameSet(job.enabled_toolsets, LEAN_TOOLSETS)) updates.enabled_toolsets = LEAN_TOOLSETS;
   const skills = job.skills;
   if ((Array.isArray(skills) && skills.length > 0) || (job.skill ?? null) !== null) { updates.skills = []; updates.skill = null; }
-  if (mapping(job.economics)?.max_iterations !== MAX_ITERATIONS) updates.economics = { ...(mapping(job.economics) ?? {}), max_iterations: MAX_ITERATIONS };
+  if (mapping(job.economics)?.max_iterations !== maxIterations) updates.economics = { ...(mapping(job.economics) ?? {}), max_iterations: maxIterations };
   if (job.reasoning_effort !== REASONING_EFFORT) updates.reasoning_effort = REASONING_EFFORT;
   if (job.timezone !== wanted.timezone) updates.timezone = wanted.timezone;
   if (wanted.schedule !== undefined && mapping(job.schedule)?.expr !== wanted.schedule) updates.schedule = wanted.schedule;
@@ -391,10 +477,33 @@ export function crankState(repoRoot: string): CrankState {
 // status
 // ---------------------------------------------------------------------------------------------
 
+/** The polish metrics ledger the pass driver keeps at <role dir>/runtime/polish-metrics.json. */
+export interface PolishMetrics { cycles: number; proposed: number; implemented: number; updatedAt: string | null }
+
+/**
+ * Read the polish metrics ledger. proposed = improvements proposed, implemented = proposed refs now
+ * in the completed state group, cycles = total QA cycles. A missing or broken file is "no metrics",
+ * never an error: the status line and this reader only display it.
+ */
+export function readPolishMetrics(roleDir: string): PolishMetrics | null {
+  try {
+    const doc = mapping(JSON.parse(readFileSync(join(roleDir, "runtime", "polish-metrics.json"), "utf8")));
+    if (!doc) return null;
+    return {
+      cycles: typeof doc.cycles === "number" && Number.isFinite(doc.cycles) ? doc.cycles : 0,
+      proposed: Array.isArray(doc.proposed) ? doc.proposed.length : 0,
+      implemented: Array.isArray(doc.implemented) ? doc.implemented.length : 0,
+      updatedAt: typeof doc.updated_at === "string" ? doc.updated_at : null,
+    };
+  } catch { return null; }
+}
+
 export interface LaunchStatus {
   ok: boolean;
   repo: string;
-  declaration: { path: string; mode: LaunchDeclaration["mode"]; epic: string | null; declared: string | null; error: string | null };
+  /** Mirror of declaration.mode, top-level so a status line can read one key. */
+  mode: LaunchMode;
+  declaration: { path: string; mode: LaunchDeclaration["mode"]; epic: string | null; declared: string | null; polish: PolishDeclaration | null; error: string | null };
   desk: { id: string; role: string; profile: string; roleDir: string } | null;
   driver: boolean;
   wrappers: { monitor: boolean; brief: boolean };
@@ -402,6 +511,8 @@ export interface LaunchStatus {
   manifest: { path: string; exists: boolean; inSync: boolean };
   candybar: CandybarState & { lastRun: { when?: string; result?: string } | null };
   crank: CrankState;
+  /** Non-null only in polish mode; metrics null until the first cycle writes the ledger. */
+  polish: { metrics: PolishMetrics | null } | null;
   retiredDesks: string[];
   problems: string[];
 }
@@ -425,8 +536,9 @@ export function launchProblems(input: {
   }
   if (declaration.mode === "invalid" && declaration.error) { fixable = false; problems.push(declaration.error); }
   const enabled = candybar.state === "enabled";
-  if (declaration.mode === "launch") {
-    if (!input.desk.desk) { fixable = false; problems.push(`mode: launch but ${input.desk.error}`); }
+  if (isActiveMode(declaration.mode)) {
+    const mode = declaration.mode;
+    if (!input.desk.desk) { fixable = false; problems.push(`mode: ${mode} but ${input.desk.error}`); }
     else {
       if (!input.driver) { fixable = false; problems.push(`${input.desk.desk.id}: .scripts/launch-pass.py missing; run: flume remediate hermes.pm-scaffold --scripts-only`); }
       if (!input.wrappers.monitor || !input.wrappers.brief) problems.push(`${input.desk.desk.id}: launch wrapper scripts missing or not real executables; run: flume launch enable`);
@@ -435,16 +547,19 @@ export function launchProblems(input: {
       else if (external.length === 0) problems.push(`${input.desk.desk.id}: Hermes launch job is not an enabled scheduler=external job; run: flume launch enable`);
       if (!input.manifestExists) problems.push("Candybar manifest missing; run: flume launch enable");
       if (!candybar.observable) problems.push(`Candybar not observable (${candybar.error ?? "unknown"}); launch pass state unverified`);
-      else if (!enabled) problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is ${candybar.state}, mode is launch; run: flume launch enable`);
+      else if (!enabled) problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is ${candybar.state}, mode is ${mode}; run: flume launch enable`);
     }
-    // A launch keeps momentum in the interactive sessions too: crank on is part of launch mode.
+    // An active mode keeps momentum in the interactive sessions too: crank on is part of launch and polish.
     const crank = input.crank;
     if (crank?.applicable) {
       if (!crank.observable) problems.push(`Crank not observable (${crank.error ?? "unknown"}); crank policy unverified`);
-      else if (crank.enabled === false) problems.push(`crank is off (${crank.source ?? "default"}), mode is launch; run: flume launch enable`);
+      else if (crank.enabled === false) problems.push(`crank is off (${crank.source ?? "default"}), mode is ${mode}; run: flume launch enable`);
     }
   } else if (enabled) {
-    problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is enabled but ${LAUNCH_DECLARATION} is ${declaration.mode === "absent" ? "absent" : declaration.mode} (${declaration.mode === "live" ? "live: in production, no finish line" : "steady"}); run: flume launch disable`);
+    const why = declaration.mode === "live" ? "live: in production, no finish line"
+      : declaration.mode === "absent" ? "absent, so develop: the default mode, no pass"
+      : "develop: the default mode, no pass";
+    problems.push(`Candybar ${input.names?.candybar ?? "<repo>-pm-launch-pass"} is enabled but ${LAUNCH_DECLARATION} is ${declaration.mode} (${why}); run: flume launch disable`);
   }
   return { problems, fixable };
 }
@@ -462,7 +577,7 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
   const manifest = names ? readManifest(names.manifestPath) : { exists: false };
   const extras = desksOfRepo(repoRoot, env).filter((d) => (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
   const driver = names ? existsSync(names.driverPath) : false;
-  const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
+  const crank: CrankState = isActiveMode(declaration.mode) ? crankState(repoRoot) : { applicable: false, observable: true };
   const { problems } = launchProblems({ declaration, desk: found, deskExtras: extras, driver, wrappers, jobs, manifestExists: manifest.exists, candybar, crank, ...(names ? { names } : {}) });
   const job = jobs[0];
   const jobFacts = job ? {
@@ -473,13 +588,14 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
   const inSync = Boolean(manifest.facts && job && manifest.facts.jobId === job.id && manifest.facts.profile === desk?.profile
     && manifest.facts.schedule === jobFacts?.schedule && manifest.facts.name === names?.candybar);
   return {
-    ok: problems.length === 0, repo: repoRoot,
-    declaration: { path: declaration.path, mode: declaration.mode, epic: declaration.epic ?? null, declared: declaration.declared ?? null, error: declaration.error ?? null },
+    ok: problems.length === 0, repo: repoRoot, mode: declaration.mode,
+    declaration: { path: declaration.path, mode: declaration.mode, epic: declaration.epic ?? null, declared: declaration.declared ?? null, polish: declaration.polish ?? null, error: declaration.error ?? null },
     desk: desk ? { id: desk.id, role: desk.role, profile: desk.profile, roleDir: desk.roleDir } : null,
     driver, wrappers, job: jobFacts,
     manifest: { path: names?.manifestPath ?? "", exists: manifest.exists, inSync },
     candybar: { ...candybar, lastRun: candybar.state === "unregistered" || !candybar.observable ? null : lastCandybarRun(repoRoot, candybarName) },
     crank,
+    polish: declaration.mode === "polish" ? { metrics: desk ? readPolishMetrics(desk.roleDir) : null } : null,
     retiredDesks: extras.map((d) => `${d.id} (${d.role})`),
     problems,
   };
@@ -487,7 +603,7 @@ export function launchStatus(repoArg: string | undefined, env: LaunchEnv = {}): 
 
 export function formatLaunchStatus(s: LaunchStatus): string {
   const lines = [
-    `launch status: ${s.repo}`,
+    `launch status: ${s.repo} (mode: ${s.mode})`,
     `  declaration  ${s.declaration.mode}${s.declaration.epic ? `  epic ${s.declaration.epic}` : ""}${s.declaration.declared ? `  declared ${s.declaration.declared}` : ""}`,
     `  pm desk      ${s.desk ? `${s.desk.id} (profile ${s.desk.profile})` : "none"}${s.desk && !s.driver ? "  [driver .scripts/launch-pass.py missing]" : ""}`,
     `  wrappers     monitor ${s.wrappers.monitor ? "ok" : "missing"}, brief ${s.wrappers.brief ? "ok" : "missing"}`,
@@ -496,6 +612,10 @@ export function formatLaunchStatus(s: LaunchStatus): string {
     `  candybar     ${s.candybar.state}${s.candybar.sync ? ` (sync ${s.candybar.sync})` : ""}${s.candybar.lastRun?.when ? `  last run ${s.candybar.lastRun.when} ${s.candybar.lastRun.result ?? ""}` : ""}`,
     `  crank        ${!s.crank.applicable ? "n/a (no .project.json)" : !s.crank.observable ? `unknown (${s.crank.error ?? "unreadable"})` : `${s.crank.enabled ? "on" : "off"}${s.crank.interval ? ` every ${s.crank.interval}` : ""}${s.crank.source ? ` (${s.crank.source})` : ""}`}`,
   ];
+  if (s.polish) {
+    const m = s.polish.metrics;
+    lines.push(`  polish       ${m ? `${m.cycles} cycle(s), ${m.proposed} proposed, ${m.implemented} implemented${m.updatedAt ? ` (updated ${m.updatedAt})` : ""}` : "no cycles yet"}`);
+  }
   if (s.retiredDesks.length) lines.push(`  retired roles still live: ${s.retiredDesks.join(", ")}`);
   lines.push(s.problems.length ? `problems:\n${s.problems.map((p) => `  - ${p}`).join("\n")}` : "ok");
   return lines.join("\n");
@@ -522,16 +642,16 @@ function fail(repo: string, operation: LaunchPlan["operation"], dryRun: boolean,
   return { ok: false, repo, operation, dryRun, actions: [], changes: 0, error };
 }
 
-const SCHEDULE = /^(\S+\s+){4}\S+$/u;
-
 export function enableLaunch(repoArg: string | undefined, options: LaunchOptions = {}): LaunchPlan {
   const repoRoot = realOrResolved(repoArg ?? process.cwd());
   const dryRun = Boolean(options.dryRun);
   const bad = (error: string) => fail(repoRoot, "enable", dryRun, error);
   const declaration = readLaunchDeclaration(repoRoot);
-  if (declaration.mode !== "launch") {
-    return bad(`${LAUNCH_DECLARATION} must say \`mode: launch\` (it is ${declaration.mode}${declaration.error ? `: ${declaration.error}` : ""}); the owner declares launch mode, flume never writes that file`);
+  if (!isActiveMode(declaration.mode)) {
+    return bad(`${LAUNCH_DECLARATION} must say \`mode: launch\` or \`mode: polish\` (it is ${declaration.mode}${declaration.error ? `: ${declaration.error}` : ""}); the owner declares the mode, flume never writes that file`);
   }
+  const mode = declaration.mode;
+  const otherMode: ActiveMode = mode === "polish" ? "launch" : "polish";
   if (options.schedule !== undefined && !SCHEDULE.test(options.schedule.trim())) return bad(`--schedule must be a 5-field cron expression, got "${options.schedule}"`);
   const found = pmDeskOf(repoRoot, options);
   if (!found.desk) return bad(found.error ?? "no pm desk");
@@ -555,41 +675,49 @@ export function enableLaunch(repoArg: string | undefined, options: LaunchOptions
     });
   }
 
-  // 2. The Hermes job: adopt an existing launch job, else create one
+  // 2. The Hermes job: adopt an existing launch/polish job, else create one
   const existing = launchJobsOf(desk.profile, options);
   if (existing.length > 1) return bad(`profile ${desk.profile} has ${existing.length} launch jobs (${existing.map((j) => j.id).join(", ")}); keep one`);
   const job = existing[0];
   const explicitSchedule = options.schedule?.trim();
   const jobSchedule = job ? String(mapping(job.schedule)?.expr ?? "") : "";
-  const schedule = explicitSchedule ?? (jobSchedule || defaultSchedule(names.repo));
+  // Schedule precedence: --schedule > the declaration's polish.cadence > an adopted job's own
+  // schedule > the mode default. A job still on the OTHER mode's factory default was never
+  // hand-tuned: switching modes retunes it to this mode's default.
+  const modeDefault = modeDefaultSchedule(mode, names.repo);
+  const handTuned = jobSchedule && jobSchedule !== modeDefaultSchedule(otherMode, names.repo) ? jobSchedule : "";
+  const schedule = explicitSchedule ?? (mode === "polish" ? declaration.polish?.cadence : undefined) ?? (handTuned || modeDefault);
+  const maxIterations = mode === "polish" ? POLISH_MAX_ITERATIONS : MAX_ITERATIONS;
   let jobId = job ? String(job.id) : "";
   const jobTimezone = typeof job?.timezone === "string" && job.timezone ? job.timezone : "";
   const effectiveTz = options.timezone ?? (jobTimezone || DEFAULT_TIMEZONE);
   let jobPlan: { create?: Record<string, unknown>; updates: Record<string, unknown> };
   if (job) {
-    const updates = jobUpdates(job, { ...(explicitSchedule ? { schedule: explicitSchedule } : {}), timezone: effectiveTz });
+    const updates = jobUpdates(job, { schedule, timezone: effectiveTz, maxIterations });
+    if (job.name === modeJobName(otherMode, names.label)) updates.name = modeJobName(mode, names.label);
     jobPlan = { updates };
     const keys = Object.keys(updates);
     actions.push({ target: `hermes job ${jobId} (${desk.profile})`, action: keys.length ? "update" : "adopt", detail: keys.length ? `set ${keys.join(", ")}` : "already lean and scheduler=external" });
   } else {
     jobPlan = {
-      create: { prompt: JOB_PROMPT, schedule, name: `${names.label} launch pass (hourly)`, script: LAUNCH_BRIEF, monitor_script: LAUNCH_MONITOR, timezone: effectiveTz, reasoning_effort: REASONING_EFFORT },
-      updates: { enabled_toolsets: LEAN_TOOLSETS, skills: [], skill: null, economics: { max_iterations: MAX_ITERATIONS } },
+      create: { prompt: JOB_PROMPT, schedule, name: modeJobName(mode, names.label), script: LAUNCH_BRIEF, monitor_script: LAUNCH_MONITOR, timezone: effectiveTz, reasoning_effort: REASONING_EFFORT },
+      updates: { enabled_toolsets: LEAN_TOOLSETS, skills: [], skill: null, economics: { max_iterations: maxIterations } },
     };
-    actions.push({ target: `hermes job (${desk.profile})`, action: "create", detail: `scheduler=external, schedule "${schedule}" ${effectiveTz}, lean (terminal,file,no_mcp; max_iterations ${MAX_ITERATIONS})` });
+    actions.push({ target: `hermes job (${desk.profile})`, action: "create", detail: `scheduler=external, schedule "${schedule}" ${effectiveTz}, lean (terminal,file,no_mcp; max_iterations ${maxIterations})` });
   }
 
   // 3. The Candybar manifest
   const manifest = readManifest(names.manifestPath);
   const manifestMatches = (id: string) => Boolean(manifest.facts && manifest.facts.name === names.candybar && manifest.facts.schedule === schedule
-    && manifest.facts.timezone === effectiveTz && manifest.facts.profile === desk.profile && manifest.facts.jobId === id);
+    && manifest.facts.timezone === effectiveTz && manifest.facts.profile === desk.profile && manifest.facts.jobId === id
+    && (manifest.facts.header ?? "").startsWith(`# ${names.label} ${mode} pass`));
   let manifestWrite: ((id: string) => void) | undefined;
   if (job && manifestMatches(jobId)) actions.push({ target: names.manifestPath, action: "unchanged", detail: `${names.candybar} "${schedule}" ${effectiveTz}` });
   else {
     actions.push({ target: names.manifestPath, action: manifest.exists ? "update" : "create", detail: `${names.candybar} "${schedule}" ${effectiveTz} -> job ${jobId || "<new>"}` });
     manifestWrite = (id) => {
       mkdirSync(join(repoRoot, ".candybars"), { recursive: true });
-      writeFileSync(names.manifestPath, manifestText(names, schedule, effectiveTz, desk.profile, id));
+      writeFileSync(names.manifestPath, manifestText(names, schedule, effectiveTz, desk.profile, id, mode));
     };
   }
 
@@ -606,7 +734,7 @@ export function enableLaunch(repoArg: string | undefined, options: LaunchOptions
     if (manifestWrite || !cb || cb.state !== "enabled") actions.push({ target: `candybar ${names.candybar}`, action: "update", detail: "candybar resume (enabled)" });
   }
 
-  // 5. Crank: a launching pjangler project cranks its interactive sessions (pj owns the write)
+  // 5. Crank: an active mode (launch or polish) cranks the pjangler project's interactive sessions (pj owns the write)
   const crank = crankState(repoRoot);
   let crankInterval: string | undefined;
   if (!crank.applicable) { /* no .project.json: not a pjangler project, crank does not apply */ }
@@ -704,11 +832,11 @@ function readLaunchMode(repoRoot: string, homeDir: string): LaunchModeReading {
   const found = pmDeskOf(repoRoot, env);
   const names = found.desk ? launchNames(repoRoot, found.desk, env) : undefined;
   const candybarName = names?.candybar ?? `${basename(repoRoot)}-pm-launch-pass`;
-  const candybar: CandybarState = declaration.mode === "launch" || hasCandybars ? candybarState(repoRoot, candybarName) : { observable: true, state: "unregistered" };
+  const candybar: CandybarState = isActiveMode(declaration.mode) || hasCandybars ? candybarState(repoRoot, candybarName) : { observable: true, state: "unregistered" };
   const jobs = found.desk ? launchJobsOf(found.desk.profile, env) : [];
   const wrappers = names ? { monitor: wrapperOk(names.monitorPath, "monitor", names), brief: wrapperOk(names.briefPath, "brief", names) } : { monitor: false, brief: false };
   const extras = desks.filter((d) => (RETIRED_LAUNCH_ROLES as readonly string[]).includes(d.role));
-  const crank: CrankState = declaration.mode === "launch" ? crankState(repoRoot) : { applicable: false, observable: true };
+  const crank: CrankState = isActiveMode(declaration.mode) ? crankState(repoRoot) : { applicable: false, observable: true };
   const { problems: all, fixable } = launchProblems({
     declaration, desk: found, deskExtras: extras, driver: names ? existsSync(names.driverPath) : false, wrappers, jobs,
     manifestExists: names ? existsSync(names.manifestPath) : false, candybar, crank, ...(names ? { names } : {}),
@@ -739,7 +867,7 @@ export const launchModeCheck: RecipeOwnedCheck = {
       return { ...base, status: "blocked", summary: "Retired roles and a missing driver are per-employee decisions: offboard the employee (flume offboard <id> --apply), convert em to pm (docs/launch-mode.md), or refresh the desk scripts", details: reading.problems };
     }
     const env: LaunchEnv = { home: ctx.homeDir };
-    const plan = declaration.mode === "launch" ? enableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun }) : disableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun });
+    const plan = isActiveMode(declaration.mode) ? enableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun }) : disableLaunch(ctx.repoRoot, { ...env, dryRun: ctx.dryRun });
     const details = plan.actions.filter((a) => a.action !== "unchanged" && a.action !== "adopt").map((a) => `${a.action} ${a.target}: ${a.detail}`);
     if (!plan.ok) return { ...base, status: "blocked", summary: plan.error ?? `flume launch ${plan.operation} failed`, details };
     return { ...base, status: plan.changes ? "applied" : "noop", summary: `flume launch ${plan.operation}${ctx.dryRun ? " (dry run)" : ""}: ${plan.changes} change(s)`, details };

@@ -170,11 +170,12 @@ async function specialistResult(action: () => Promise<unknown>, json: boolean): 
   }
 }
 
-// `flume launch` has two faces. `flume launch status|enable|disable [repo]` wires a repo's PM launch
-// pass (launch mode, `.launch.yaml`); `flume launch <employee> [-- hermes args]` is the older
-// portable-specialist launcher and stays the default subcommand, so every existing invocation works.
+// `flume launch` has two faces. `flume launch status|enable|disable [repo]` wires a repo's PM mode
+// pass (develop | launch | polish, declared in `.launch.yaml`); `flume launch <employee> [-- hermes
+// args]` is the older portable-specialist launcher and stays the default subcommand, so every
+// existing invocation works. `flume mode ...` below is the mode-first spelling of the same machinery.
 const launchCommand = program.command("launch")
-  .description("Launch mode for a repo's PM (status | enable | disable), or launch a portable employee");
+  .description("Project mode for a repo's PM (status | enable | disable), or launch a portable employee");
 
 async function launchResult(action: () => unknown, format: (value: any) => string, json: boolean): Promise<void> {
   guardBrokenPipe();
@@ -188,29 +189,36 @@ async function launchResult(action: () => unknown, format: (value: any) => strin
   }
 }
 
+const modeStatusAction = (repo: string | undefined, options: { json?: boolean }): Promise<void> =>
+  launchResult(() => launchStatus(repo), formatLaunchStatus, Boolean(options.json));
+const modeEnableAction = (repo: string | undefined, options: { dryRun?: boolean; schedule?: string; timezone?: string; json?: boolean }): Promise<void> =>
+  launchResult(
+    () => enableLaunch(repo, { dryRun: Boolean(options.dryRun), ...(options.schedule ? { schedule: options.schedule } : {}), ...(options.timezone ? { timezone: options.timezone } : {}) }),
+    formatLaunchPlan, Boolean(options.json));
+const modeDisableAction = (repo: string | undefined, options: { dryRun?: boolean; json?: boolean }): Promise<void> =>
+  launchResult(() => disableLaunch(repo, { dryRun: Boolean(options.dryRun) }), formatLaunchPlan, Boolean(options.json));
+
 launchCommand.command("status")
   .argument("[repo]", "Repository (default: cwd)")
-  .description("Declaration, PM desk, wrappers, Hermes job, Candybar state and last run for a repo's launch pass")
+  .description("The declared mode, PM desk, wrappers, Hermes job, Candybar state and (in polish mode) the polish metrics for a repo's pass")
   .option("--json", "Output machine-parseable JSON")
-  .action((repo: string | undefined, options) => launchResult(() => launchStatus(repo), formatLaunchStatus, Boolean(options.json)));
+  .action(modeStatusAction);
 
 launchCommand.command("enable")
   .argument("[repo]", "Repository (default: cwd)")
-  .description("Wire the launch pass: wrappers, external Hermes job, Candybar manifest, registered and enabled. Needs .launch.yaml `mode: launch` and a pm desk. Idempotent; adopts what exists")
+  .description("Wire the active mode's pass: wrappers, external Hermes job, Candybar manifest, registered and enabled. Needs .launch.yaml `mode: launch` or `mode: polish` and a pm desk. Idempotent; adopts what exists")
   .option("--dry-run", "Print the plan and change nothing")
-  .option("--schedule <cron>", "5-field cron for a new or re-scheduled pass (default: hourly 08-22 at a per-repo minute; an adopted job keeps its own)")
+  .option("--schedule <cron>", "5-field cron for a new or re-scheduled pass (default: the declaration's polish.cadence, else the mode default \u2014 hourly 08-22 at a per-repo minute for launch, every 15m for polish; an adopted job keeps a hand-tuned schedule)")
   .option("--timezone <iana>", "IANA timezone for the schedule (default: the job's, else America/New_York)")
   .option("--json", "Output machine-parseable JSON")
-  .action((repo: string | undefined, options) => launchResult(
-    () => enableLaunch(repo, { dryRun: Boolean(options.dryRun), ...(options.schedule ? { schedule: options.schedule } : {}), ...(options.timezone ? { timezone: options.timezone } : {}) }),
-    formatLaunchPlan, Boolean(options.json)));
+  .action(modeEnableAction);
 
 launchCommand.command("disable")
   .argument("[repo]", "Repository (default: cwd)")
-  .description("Pause the repo's Candybar launch pass (manifest and Hermes job stay). Use when .launch.yaml goes steady")
+  .description("Pause the repo's Candybar pass (manifest and Hermes job stay). Use when .launch.yaml goes develop or live")
   .option("--dry-run", "Print the plan and change nothing")
   .option("--json", "Output machine-parseable JSON")
-  .action((repo: string | undefined, options) => launchResult(() => disableLaunch(repo, { dryRun: Boolean(options.dryRun) }), formatLaunchPlan, Boolean(options.json)));
+  .action(modeDisableAction);
 
 launchCommand.command("employee", { isDefault: true, hidden: true })
   .argument("<employee>", "Portable specialist identity")
@@ -221,6 +229,33 @@ launchCommand.command("employee", { isDefault: true, hidden: true })
     try { process.exitCode = await launchSpecialist(employee, args, options.cwd); }
     catch (error) { console.error((error as Error).message); process.exitCode = 1; }
   });
+
+// `flume mode` \u2014 the mode-first spelling of the same status|enable|disable machinery (a group of
+// its own so `flume launch <employee>`, the specialist launcher, keeps the bare `launch` name).
+const modeCommand = program.command("mode")
+  .description("Project mode for a repo's PM (develop | launch | polish; docs/project-modes.md): status | enable | disable");
+
+modeCommand.command("status")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("The declared mode, PM desk, pass wiring, Candybar state and (in polish mode) the polish metrics")
+  .option("--json", "Output machine-parseable JSON")
+  .action(modeStatusAction);
+
+modeCommand.command("enable")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("Wire the active mode's pass: wrappers, external Hermes job, Candybar manifest, registered and enabled. Needs .launch.yaml `mode: launch` or `mode: polish` and a pm desk. Idempotent; adopts what exists")
+  .option("--dry-run", "Print the plan and change nothing")
+  .option("--schedule <cron>", "5-field cron for a new or re-scheduled pass (default: the declaration's polish.cadence, else the mode default \u2014 hourly 08-22 at a per-repo minute for launch, every 15m for polish; an adopted job keeps a hand-tuned schedule)")
+  .option("--timezone <iana>", "IANA timezone for the schedule (default: the job's, else America/New_York)")
+  .option("--json", "Output machine-parseable JSON")
+  .action(modeEnableAction);
+
+modeCommand.command("disable")
+  .argument("[repo]", "Repository (default: cwd)")
+  .description("Pause the repo's Candybar pass (manifest and Hermes job stay). Use when .launch.yaml goes develop or live")
+  .option("--dry-run", "Print the plan and change nothing")
+  .option("--json", "Output machine-parseable JSON")
+  .action(modeDisableAction);
 
 async function runHire(title: string, options: Record<string, unknown>): Promise<void> {
   const platform = hostPlatform();

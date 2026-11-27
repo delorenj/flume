@@ -60,18 +60,19 @@ point. An undeclared placeholder is a hard error, never a half-rendered SOUL.
 
 ## A mode read from repo data is not a role branch
 
-A second role file is for a different charter. A PM in launch mode is the same
+A second role file is for a different charter. A PM in launch or polish mode is the same
 PM reading different data, so it is a section, not a file: `pm.md` puts one
-`## Launch mode` section in every PM soul, and the repo's committed
-`.launch.yaml` decides whether it applies (`mode: launch | live | steady`, declared
+`## Launch mode` and one `## Polish mode` section in every PM soul, and the repo's committed
+`.launch.yaml` decides which applies (`mode: develop | launch | polish | live` — `steady` is a
+legacy alias that reads as develop — declared
 date, source, finish line, target date, contract paths, epic, optional cut-line
-hint; never status). No file, `steady` or `live` leaves the section inert. Turning
-launch on or off is a commit to that repo, never a new role, a re-hire or a
+hint, optional `polish:` block; never status). No file, `develop` or `live` leaves both sections inert. Turning
+a mode on or off is a commit to that repo, never a new role, a re-hire or a
 re-compose. The template ships `.scripts/launch-pass.py` to every PM desk, and
-Candybar fires it (`<repo>-pm-launch-pass`) only for a repo that launches.
+Candybar fires it (`<repo>-pm-launch-pass`) only for a repo in launch or polish mode.
 
-Launch mode is wired by `flume launch status|enable|disable [repo]` and audited by
-`flume audit --rules hermes.launch-mode` (full procedure: `docs/launch-mode.md`).
+The modes are wired by `flume launch status|enable|disable [repo]` (also `flume mode ...`) and audited by
+`flume audit --rules hermes.launch-mode` (the modes: `docs/project-modes.md`; the wiring: `docs/launch-mode.md`).
 
 ## Retired roles
 

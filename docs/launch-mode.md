@@ -5,13 +5,18 @@ launch directors (`launch-director`, `paired-launch-director`), the paired engin
 and the portfolio director desk that ran a launch (2026-11-18). The `director` **role** stays for
 repos that use it.
 
+> The declaration's `mode:` key now spans the whole project lifecycle — `develop` (the default;
+> `steady` is a legacy alias), `launch`, `polish` and `live`. Polish reuses every piece of machinery
+> on this page (same driver, wrappers, job, Candybar entry, audit rule) at a faster cadence. See
+> [project-modes.md](project-modes.md) for the modes themselves; this page stays the wiring reference.
+
 | piece | where | owner |
 | --- | --- | --- |
-| charter | `roles/pm.md`, `## Launch mode` (inert without the declaration) | flume |
-| declaration | `<repo>/.launch.yaml` (`mode: launch \| live \| steady`, `finish_line`, `contract`, `epic`, optional `cut_line`, optional `scopes: [child dirs]` for a monorepo parent) | **Jarad only**; the PM proposes `mode: live` (in production, people can buy it and are using it) or `mode: steady` (not) in a ticket |
+| charter | `roles/pm.md`, `## Launch mode` and `## Polish mode` (inert without the declaration) | flume |
+| declaration | `<repo>/.launch.yaml` (`mode: develop \| launch \| polish \| live` — `steady` reads as develop — plus `finish_line`, `contract`, `epic`, optional `cut_line`, optional `scopes: [child dirs]` for a monorepo parent, optional `polish:` block) | **Jarad only**; the PM proposes `mode: live` (in production, people can buy it and are using it) or `mode: develop` (not) in a ticket |
 | driver | `<desk>/.scripts/launch-pass.py` (`--monitor`, `--brief`, `--apply plan.json`) | hermes-agent template |
 | wrappers | `~/.hermes/profiles/<profile>/scripts/launch-{monitor,brief}.sh` (real files exec'ing the driver) | `flume launch enable` |
-| Hermes job | profile cron job, `scheduler: external`, lean (terminal,file,no_mcp; no skills; 10 iterations) | `flume launch enable` |
+| Hermes job | profile cron job, `scheduler: external`, lean (terminal,file,no_mcp; no skills; 10 iterations, 30 in polish) | `flume launch enable` |
 | clock | `<repo>/.candybars/<repo>-pm-launch-pass.candybar.toml`, registered and enabled | `flume launch enable` |
 
 Candybar is the only clock. The job never schedules itself; `hermes cron run` is the only trigger.
@@ -22,40 +27,46 @@ Candybar is the only clock. The job never schedules itself; `hermes cron run` is
 flume launch status  [repo] [--json]
 flume launch enable  [repo] [--dry-run] [--schedule "<cron>"] [--timezone <iana>] [--json]
 flume launch disable [repo] [--dry-run] [--json]
+flume mode status|enable|disable [repo]   # the same machinery, mode-first name
 ```
 
 `[repo]` defaults to the current directory. `flume launch <employee>` (the older portable-specialist
 launcher) is unchanged and is the default when the first word is not `status|enable|disable`.
 
-- **status** reads, never writes: declaration, the repo's PM desk, driver and wrapper presence, the
-  Hermes launch job, the Candybar manifest and its registration state, last Candybar run, and any
-  retired-role desk still live. Exit 1 when it lists problems.
-- **enable** requires `.launch.yaml` `mode: launch`, exactly one live `pm` desk in the registry for
+- **status** reads, never writes: declaration (and mode), the repo's PM desk, driver and wrapper
+  presence, the Hermes launch job, the Candybar manifest and its registration state, last Candybar
+  run, the polish metrics ledger in polish mode, and any retired-role desk still live. Exit 1 when
+  it lists problems.
+- **enable** requires `.launch.yaml` `mode: launch` or `mode: polish`, exactly one live `pm` desk in
+  the registry for
   the repo (an unconverted `em` desk is named, see below) and `.scripts/launch-pass.py` on that desk
   (else: `flume remediate hermes.pm-scaffold <repo> --scripts-only`). It then makes true, in order:
   the two wrappers; one Hermes launch job (adopts the profile's job whose script is
   `launch-brief.sh` and monitor is `launch-monitor.sh`, else creates one at `--schedule`, default
-  hourly 08-22 at a per-repo minute, America/New_York) pinned `scheduler: external` and lean; the
+  the declaration's `polish.cadence` in polish, else hourly 08-22 at a per-repo minute for launch /
+  every 15 minutes for polish, America/New_York) pinned `scheduler: external` and lean; the
   Candybar manifest; `candybar register --name <repo>-pm-launch-pass`; `candybar resume`; and, for a
   pjangler project (a `.project.json`), crank on via `pj crank enable --interval <resolved interval>`
   so the repo's interactive agent sessions keep moving too (pj writes `.project.json`; commit it).
   An unreadable `pj` skips crank with a note rather than failing the enable. Idempotent:
-  a wired repo reports `nothing to change`. An adopted job keeps its own schedule unless `--schedule`
-  is given. It writes the wrappers, the job and the manifest, and commits nothing: commit the
-  manifest to the repo.
-- **disable** pauses the Candybar job and keeps the manifest and the Hermes job, so going steady is
-  reversible. Use it when `.launch.yaml` goes `live` or `steady`. It leaves crank alone: crank also serves
-  steady repos (`pj crank disable` turns it off).
+  a wired repo reports `nothing to change`. An adopted job keeps a hand-tuned schedule; one still on
+  the other mode's factory default is retuned to this mode's default (and renamed). It writes the
+  wrappers, the job and the manifest, and commits nothing: commit the manifest to the repo.
+- **disable** pauses the Candybar job and keeps the manifest and the Hermes job, so leaving a mode is
+  reversible. Use it when `.launch.yaml` goes `develop` or `live`. It leaves crank alone: crank also
+  serves develop repos (`pj crank disable` turns it off).
 
 ## Audit rule `hermes.launch-mode` (project scope)
 
 `flume audit [repo] --rules hermes.launch-mode`
 
-- `mode: launch` fails unless there is a live `pm` desk, the driver, both wrappers, a Hermes launch
+- `mode: launch` or `mode: polish` fails unless there is a live `pm` desk, the driver, both
+  wrappers, a Hermes launch
   job that is enabled and `scheduler: external`, the manifest, and an **enabled** Candybar
   `<repo>-pm-launch-pass`, and, in a pjangler project, crank on (`pj crank status --json`
   `policy.enabled`). An unreadable Candybar or `pj` is a `warn` (unverified), not a pass.
-- `mode: live`, `mode: steady` or no `.launch.yaml` fails if the `<repo>-pm-launch-pass` Candybar is enabled
+- `mode: develop` (or the legacy `steady`), `mode: live` or no `.launch.yaml` fails if the
+  `<repo>-pm-launch-pass` Candybar is enabled
   (`flume launch disable`).
 - Any registry row for the repo with role `launch-director`, `paired-launch-director` or `em` fails,
   retired or not, naming `flume offboard <id> --apply`, or the em-to-pm conversion for a live `em`. A

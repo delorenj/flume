@@ -1,7 +1,7 @@
 // Launch mode is a capability of every PM, switched per repo by a committed
 // `.launch.yaml`; it is not a role branch. The composed PM soul carries one
-// `## Launch mode` section (inert without the declaration), and no other role
-// gains it.
+// `## Launch mode` section (inert without the declaration) and one `## Polish
+// mode` section, and no other role gains either.
 import assert from "node:assert/strict";
 import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -26,11 +26,13 @@ try {
     profileName: `${repo}-${role}`, purpose: "", botHandle: "", soulTone: "direct", projectBank: repo,
   });
 
-  /** The `## Launch mode` section of a composed soul, up to the next `## ` heading. */
-  const section = (text) => {
-    const match = /^## Launch mode\n([\s\S]*?)(?=^## )/mu.exec(text);
+  /** A `## <name>` section of a composed soul, up to the next `## ` heading. */
+  const named = (name) => (text) => {
+    const match = new RegExp(`^## ${name}\\n([\\s\\S]*?)(?=^## )`, "mu").exec(text);
     return match ? match[1] : null;
   };
+  const section = named("Launch mode");
+  const polishSection = named("Polish mode");
 
   const assertLaunchMode = (text, repo) => {
     assert.match(text, /\*\*Launch mode is declared, never guessed\*\*/, "prime directive rendered");
@@ -38,9 +40,9 @@ try {
     assert.ok(body, "pm soul has a ## Launch mode section");
     // Wrapping is not content: every phrase below is matched against the whitespace-collapsed section.
     const flat = body.replace(/\s+/gu, " ");
-    // Inert by default: the declaration file switches it, and absence means steady.
+    // Inert by default: the declaration file switches it, and absence means develop.
     assert.match(flat, /committed `\.launch\.yaml` says `mode: launch`/);
-    assert.match(flat, /With no file, `mode: steady` \(not public\) or `mode: live` \(in production:\s+people can buy it and use it\) this section is inert/);
+    assert.match(flat, /With no file, `mode: develop` \(the\s+default; the legacy alias `mode: steady` reads as develop\) or `mode: live` \(in production:\s+people can buy it and use it\) this section is inert/);
     // The rules absorbed from the retired Launch Director charters: the PM is the whole launch desk.
     assert.match(flat, /\*\*One finish line:\*\* the declaration's `finish_line`, `contract` and `epic`/);
     assert.match(flat, /Hold the cut line:\*\* rank open work launch-critical, after-launch or cut/);
@@ -64,7 +66,7 @@ try {
     assert.match(flat, /\*\*Dashboard:\*\* keep Jarad's launch dashboard current[\s\S]*never verify-the-build[\s\S]*every gap is work/);
     assert.match(flat, /money, legal, passkey,\s+product decisions\), each with a recommendation and a default/);
     assert.match(flat, /at most one short comment a day on the epic, only on change/);
-    assert.match(flat, /file one ticket proposing `mode: live` when the\s+product is in production and sellable, or `mode: steady` when it is not\. Never edit the declaration yourself/);
+    assert.match(flat, /file one ticket proposing `mode: live` when the\s+product is in production and sellable, or `mode: develop` when it is not\. Never edit the declaration yourself/);
     // One clock (Candybar) and one board writer (the driver's --apply).
     assert.ok(flat.includes(`Candybar fires the launch pass (\`${repo}-pm-launch-pass\`)`), "candybar manifest named per repo");
     assert.match(flat, /`\.scripts\/launch-pass\.py --brief`/);
@@ -75,17 +77,51 @@ try {
     assert.ok(lines <= 44, `launch mode section stays short (${lines} lines)`);
   };
 
+  const assertPolishMode = (text, repo) => {
+    const body = polishSection(text);
+    assert.ok(body, "pm soul has a ## Polish mode section");
+    const flat = body.replace(/\s+/gu, " ");
+    // On only while the declaration says polish; anything, however small, is ticketable.
+    assert.match(flat, /on only\s+while the repo's committed `\.launch\.yaml` says `mode: polish`/);
+    assert.match(flat, /around-the-clock exploratory QA/);
+    assert.match(flat, /no rules about what is\s+ticketable/);
+    // One pass is one QA cycle; the declaration's qa commands run first.
+    assert.match(flat, /\*\*One pass is one QA cycle\.\*\* Run the declaration's `polish\.qa` commands when\s+present/);
+    // The title convention, with the spec's own examples; never colon labels.
+    assert.match(flat, /\[area:kind\] <what>/);
+    assert.match(flat, /\[ux:improvement\] The location of the X element sometimes blocks Y/);
+    assert.match(flat, /\[physics:tweak\] It is possible to apply an unrealistically high force to the\s+cue ball sending the balls at much too high a speed/);
+    assert.match(flat, /Never colon labels; the\s+driver adds the bare `polish` label to every create/);
+    // Board shape: Backlog by default, Todo topped up, more Krebs lanes.
+    assert.match(flat, /\*\*Backlog by default\.\*\* Each pass tops Todo up to `todo_depth` \(default 2 ×\s+wip\)/);
+    assert.match(flat, /`polish\.wip`, default 4/);
+    assert.match(flat, /\*\*Review verdicts are yours\*\*, exactly as in launch mode/);
+    // The metrics ledger and the no-owner-chores rule.
+    assert.match(flat, /`runtime\/polish-metrics\.json` \(cycles,\s+improvements proposed, improvements implemented\)/);
+    assert.match(flat, /\*\*No owner chores:\*\* an improvement is a ticket/);
+    assert.match(flat, /propose `mode: develop` with one ticket\. Never edit the declaration yourself/);
+    assert.ok(flat.includes(`\`${repo}-pm-launch-pass\`, every 15 minutes by default`), "same candybar pass, polish cadence");
+    assert.match(flat, /`--apply <plan\.json>` is still the only board writer/);
+    assert.doesNotMatch(body, /\{\{|\}\}/, "no unrendered placeholder");
+    const lines = body.trim().split("\n").length;
+    assert.ok(lines <= 34, `polish mode section stays short (${lines} lines)`);
+  };
+
   const pm = composeSoul(root, identity("earshot", "pm")).text;
   assertLaunchMode(pm, "earshot");
+  assertPolishMode(pm, "earshot");
   // It lands inside the role body, before the shared conventions section.
-  assert.ok(pm.indexOf("## Launch mode") < pm.indexOf("## DeloNet conventions you respect"));
+  assert.ok(pm.indexOf("## Launch mode") < pm.indexOf("## Polish mode"));
+  assert.ok(pm.indexOf("## Polish mode") < pm.indexOf("## DeloNet conventions you respect"));
   // Repo-agnostic: another repo's PM gets the same section with its own manifest name.
   assertLaunchMode(composeSoul(root, identity("another-product", "pm")).text, "another-product");
+  assertPolishMode(composeSoul(root, identity("another-product", "pm")).text, "another-product");
 
   // Only the PM charter carries it; a mode is not smeared across every role.
   for (const role of ["dev", "review", "reporter", "director"]) {
     const text = composeSoul(root, identity("earshot", role)).text;
     assert.equal(section(text), null, `${role} soul has no Launch mode section`);
+    assert.equal(polishSection(text), null, `${role} soul has no Polish mode section`);
     assert.doesNotMatch(text, /\.launch\.yaml|launch-pass\.py|Launch mode is declared/, `${role} soul does not mention launch mode`);
   }
 
@@ -105,13 +141,13 @@ try {
   for (const name of ["_base.md", "_tones.yaml", "pm.md"]) copyFileSync(join(root, "roles", name), join(fixtureRoles, name));
   const fixtureRole = join(fixtureRoles, "pm.md");
   const original = readFileSync(fixtureRole, "utf8");
-  const unsafe = original.replace(/file one ticket proposing `mode: live` when the\n  product is in production and sellable, or `mode: steady` when it is not\. Never edit the declaration yourself\./u,
-    "set `mode: steady` in `.launch.yaml` yourself.");
+  const unsafe = original.replace(/file one ticket proposing `mode: live` when the\n  product is in production and sellable, or `mode: develop` when it is not\. Never edit the declaration yourself\./u,
+    "set `mode: develop` in `.launch.yaml` yourself.");
   assert.notEqual(unsafe, original, "negative fixture must alter the role source");
   writeFileSync(fixtureRole, unsafe);
-  assert.throws(() => assertLaunchMode(composeSoul(scratch, identity("earshot", "pm")).text, "earshot"), /mode: steady` in `\.launch\.yaml` yourself|mode: live/);
+  assert.throws(() => assertLaunchMode(composeSoul(scratch, identity("earshot", "pm")).text, "earshot"), /mode: develop` in `\.launch\.yaml` yourself|mode: live/);
 
-  console.log("pm-launch-mode: pm section, prime directive, behavior key, per-repo manifest, non-pm exclusion and negative mutation passed");
+  console.log("pm-launch-mode: pm sections (launch + polish), prime directive, behavior key, per-repo manifest, non-pm exclusion and negative mutation passed");
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

@@ -67,6 +67,7 @@ const SUITES = [
   "tests/pm-launch-copy-gate.mjs",
   "tests/pm-launch-mode.mjs",
   "tests/launch-mode-regressions.mjs",
+  "tests/project-modes.mjs",
   "tests/scheduling-policy-regressions.mjs",
   "tests/handback-policy-regressions.mjs",
   "tests/scheduling-policy-audit-regressions.mjs",

@@ -68,6 +68,9 @@ flume comment verify <owner/repo> --comment <employee>:<issue|review>:<id> ...  
 flume comment verify-plane <REF> --comment <employee>:<comment-id> ... [--apply]   # reads the ticket via `px show`; native-distinct-verified only for distinct adopted Plane users, by actor_id alone (docs/employee-access.md)
 flume launch <employee> -- <args>          # the Hermes launcher uses the same contract (see docs/employee-access.md)
 
+flume launch status|enable|disable [repo] [--dry-run] [--schedule <cron>]   # the repo's project mode (develop default; launch hourly; polish every 15m), declared by the owner in .launch.yaml — never edit that file. enable wires the active mode's pass (launch|polish), disable pauses it when the mode goes develop or live (docs/project-modes.md)
+flume mode status|enable|disable [repo]    # the same machinery under a mode-first name; polish metrics (cycles, proposed, implemented) show in status
+
 flume channel list [--employee e] [--all]   # every employee x platform: registry status, delta enabled, reference names present, live gateway state, and how many Telegram bots are active
 flume channel offline <employee> [--platform telegram|slack] [--reason "..."] [--apply] [--no-reload]   # PARK a channel on purpose (token rotated out, Telegram's active-bot cap, revoked): reference kept, delta pinned enabled: false, registry says offline + offline_since/offline_reason; one profile is cycled through the gateway control socket (preview unless --apply)
 flume channel online <employee> [--platform telegram|slack] [--credential-ref op://<vault>/<item-uuid>/<field>] [--app-token-ref op://...] [--apply] [--no-reload]   # bring it back; with a NEW ref this is the rotation path: op-resolved at apply time only, verified with the platform (Telegram getMe / Slack auth.test), refused on rejection or a bot another profile already owns, identity recorded (preview unless --apply)
